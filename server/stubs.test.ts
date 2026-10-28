@@ -20,11 +20,8 @@ const modules: Array<[string, string]> = [
   ['./http/handlers/review', 'S5b'],
   ['./http/handlers/local', 'S9'],
 ];
-// ./tools/authoring is filled in by S3a and no longer a stub
-const toolFiles: Array<[string, string]> = [
-  ['./tools/review', 'S5b'],
-  ['./tools/generate', 'S7b'],
-];
+// ./tools/authoring (S3a), ./tools/review (S5b) and ./tools/art, ./tools/edit are filled in and no longer stubs
+const toolFiles: Array<[string, string]> = [['./tools/generate', 'S7b']];
 
 describe('step modules expose their owner', () => {
   it.each(modules)('%s is owned by %s', async (path, owner) => {
@@ -42,7 +39,6 @@ describe('remaining handler stubs answer 501 with their owner', async () => {
   (await import('./http/handlers/review')).registerReviewRoutes(app, deps);
   (await import('./http/handlers/local')).registerLocalRoutes(app, deps);
   const rows: Array<[string, string, string]> = [
-    ['POST', '/api/films/film_3fa9c2d41b7e/frames', 'S5b'],
     ['GET', '/api/local-mode', 'S9'],
     ['PUT', '/api/local-mode', 'S9'],
   ];

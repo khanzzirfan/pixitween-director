@@ -12,6 +12,12 @@ export interface AssetRef {
   height?: number;
   role?: 'product-photo' | 'plate' | 'still' | 'cutout' | 'mask' | 'clip' | 'frame' | 'audio';
   sceneId?: string;
+  /** Review frames only: the film they were captured for, the time they show and whether they are before or after a fix. */
+  filmId?: FilmId;
+  atSec?: number;
+  phase?: 'before' | 'after';
+  /** Review frames only: one capture request; the newest batch per scene is the one reviewed. */
+  batch?: string;
 }
 
 export interface FilmVersion {

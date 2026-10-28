@@ -22,6 +22,8 @@ export interface ChatRequest {
   tool_choice?: 'auto' | 'none' | 'required';
   response_format?: { type: 'json_object' } | { type: 'json_schema'; json_schema: { name: string; strict?: boolean; schema: object } };
   temperature?: number;
+  /** Output cap. Reasoning models spend most of it thinking, so leave it generous. */
+  max_tokens?: number;
 }
 export interface ToolCall {
   id: string;
@@ -51,11 +53,18 @@ export interface TranscribeResult {
 
 // ---- Stores ----
 export interface FilmStore {
-  create(init: Omit<FilmState, 'id' | 'version' | 'costUsd' | 'clippyCredits' | 'status' | 'createdAt'> & { createdAt?: string }): Promise<FilmState>;
+  create(
+    init: Omit<FilmState, 'id' | 'version' | 'costUsd' | 'clippyCredits' | 'status' | 'createdAt'> & { createdAt?: string },
+  ): Promise<FilmState>;
   get(id: FilmId): Promise<FilmState>;
   // Validates with the active composition validator; on failure returns the issues and stores nothing.
   // `FilmState.version` is the current pointer; a commit after an undo DISCARDS the redo tail; versions() lists every stored version.
-  commit(id: FilmId, next: AepCompositionJson, source: FilmVersion['source'], note?: string): Promise<{ ok: true; version: number } | { ok: false; issues: unknown }>;
+  commit(
+    id: FilmId,
+    next: AepCompositionJson,
+    source: FilmVersion['source'],
+    note?: string,
+  ): Promise<{ ok: true; version: number } | { ok: false; issues: unknown }>;
   // Read, apply, validate and commit as ONE step inside the per-film lock (D-15).
   // `fn` is pure and SYNCHRONOUS. If it throws, nothing is stored, the lock is released and the error is rethrown.
   mutate<T>(
@@ -75,6 +84,7 @@ export interface FilmStore {
 export interface AssetStore {
   put(bytes: Buffer, mime: string, meta?: Partial<AssetRef>): Promise<AssetRef>;
   read(id: string): Promise<Buffer>;
+  list(): Promise<AssetRef[]>;
   url(id: string): string;
 }
 
@@ -122,5 +132,13 @@ export interface FilmAdmission {
     run: () => Promise<void>,
   ): { state: 'running' } | { state: 'queued'; position: number; etaSec: number } | { state: 'rejected'; retryAfterSec: number };
   position(filmId: FilmId): { state: 'running' } | { state: 'queued'; position: number; etaSec: number } | { state: 'unknown' };
-  stats(): { inFlight: number; queued: number; maxInFlight: number; maxQueued: number; startsInWindow: number; startsPerWindow: number; windowSec: number };
+  stats(): {
+    inFlight: number;
+    queued: number;
+    maxInFlight: number;
+    maxQueued: number;
+    startsInWindow: number;
+    startsPerWindow: number;
+    windowSec: number;
+  };
 }

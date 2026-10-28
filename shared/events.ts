@@ -13,6 +13,10 @@ const assetRefSchema = z.object({
   height: z.number().optional(),
   role: z.enum(['product-photo', 'plate', 'still', 'cutout', 'mask', 'clip', 'frame', 'audio']).optional(),
   sceneId: z.string().optional(),
+  filmId: z.string().optional(),
+  atSec: z.number().optional(),
+  phase: z.enum(['before', 'after']).optional(),
+  batch: z.string().optional(),
 });
 
 export const filmEventSchema = z.discriminatedUnion('type', [
@@ -50,6 +54,7 @@ export const filmEventSchema = z.discriminatedUnion('type', [
     ...base,
     type: t('review.fix'),
     sceneId: z.string(),
+    atSec: z.number().optional(),
     beforeFrame: z.string().optional(),
     afterFrame: z.string().optional(),
     note: z.string(),

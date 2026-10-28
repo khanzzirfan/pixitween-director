@@ -1,6 +1,21 @@
-import type { ApproveRequest, ChatRequest, ChatResponse, CreateFilmResponse, ListFilmsResponse, UndoRedoResponse, VersionsResponse } from '@shared/api';
+import type {
+  ApproveRequest,
+  ChatRequest,
+  ChatResponse,
+  CreateFilmResponse,
+  ListFilmsResponse,
+  UndoRedoResponse,
+  VersionsResponse,
+} from '@shared/api';
 import { PASSCODE_HEADER } from '@shared/api';
 import type { FilmState } from '@shared/composition';
+
+export interface FramesResponse {
+  review?: 'started';
+  frames?: number;
+  stored?: number;
+  geometry: { maxRelError: number; layers: number } | null;
+}
 
 export class ApiRequestError extends Error {
   readonly status: number;
@@ -45,6 +60,8 @@ export const api = {
   createFilm: (form: FormData) => request<CreateFilmResponse>('POST', '/api/films', form),
   undo: (id: string) => request<UndoRedoResponse>('POST', `/api/films/${id}/undo`),
   redo: (id: string) => request<UndoRedoResponse>('POST', `/api/films/${id}/redo`),
+  /** Review frames: a 'before' batch starts a review; a form with phase 'after' records the after pictures. */
+  postFrames: (id: string, form: FormData) => request<FramesResponse>('POST', `/api/films/${id}/frames`, form),
   chat: (id: string, body: ChatRequest) => request<ChatResponse>('POST', `/api/films/${id}/chat`, JSON.stringify(body), true),
   approve: (id: string, sceneId: string, token: string) =>
     request<unknown>('POST', `/api/films/${id}/scenes/${sceneId}/approve`, JSON.stringify({ token } satisfies ApproveRequest), true),

@@ -26,17 +26,35 @@ function Director({ filmId }: { filmId: string | null }) {
     <>
       <header className="app-header">
         <h1>PixiTween Director</h1>
+        <span className="header-caption">Creative studio</span>
+        <div className="header-spacer" />
         {film && <span data-testid="film-status">{film.status}</span>}
       </header>
       <main className="grid">
-        <Slot name="new-film"><NewFilm {...panelProps} /></Slot>
-        <Slot name="storyboard"><Storyboard {...panelProps} /></Slot>
-        <Slot name="player"><Player ref={playerRef} composition={film?.composition ?? null} /></Slot>
-        <Slot name="review"><Review {...panelProps} /></Slot>
-        <Slot name="chat"><Chat {...panelProps} player={playerRef.current} comp={film?.composition} /></Slot>
-        <Slot name="generate"><GenerateApproval {...panelProps} /></Slot>
-        <Slot name="export"><ExportPanel {...panelProps} getPlayer={() => playerRef.current} /></Slot>
-        <Slot name="gallery"><Gallery {...panelProps} /></Slot>
+        <Slot name="new-film">
+          <NewFilm {...panelProps} />
+        </Slot>
+        <Slot name="storyboard">
+          <Storyboard {...panelProps} />
+        </Slot>
+        <Slot name="player">
+          <Player ref={playerRef} composition={film?.composition ?? null} />
+        </Slot>
+        <Slot name="review">
+          <Review {...panelProps} getPlayer={() => playerRef.current} />
+        </Slot>
+        <Slot name="chat">
+          <Chat {...panelProps} player={playerRef.current} comp={film?.composition} />
+        </Slot>
+        <Slot name="generate">
+          <GenerateApproval {...panelProps} />
+        </Slot>
+        <Slot name="export">
+          <ExportPanel {...panelProps} getPlayer={() => playerRef.current} />
+        </Slot>
+        <Slot name="gallery">
+          <Gallery {...panelProps} />
+        </Slot>
       </main>
     </>
   );
