@@ -43,7 +43,8 @@ export async function runLive(argv: string[], o: { dir?: string; log?: (l: strin
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  if (existsSync('.env')) process.loadEnvFile('.env');
+  // loadEnvFile never overrides a variable that is already set, so .env.dev wins over .env
+  for (const file of ['.env.dev', '.env']) if (existsSync(file)) process.loadEnvFile(file);
   runLive(process.argv.slice(2)).then(
     (code) => void (process.exitCode = code),
     (e: unknown) => {

@@ -26,6 +26,8 @@ export class MetaConfigError extends Error {
 export interface MetaHttpOptions {
   baseUrl: string;
   apiKey?: () => string | undefined;
+  /** Env var named in the error when the key is missing. Default: META_API_KEY. */
+  keyName?: string;
   retryDelayMs?: number;
   maxInflight?: number;
   sleep?: (ms: number) => Promise<void>;
@@ -123,7 +125,7 @@ export function createMetaHttp(opts: MetaHttpOptions): MetaHttp {
     }
 
     const apiKey = opts.apiKey?.();
-    if (!apiKey) throw new MetaConfigError();
+    if (!apiKey) throw new MetaConfigError(opts.keyName ? `${opts.keyName} is not set` : undefined);
 
     let retried402 = false;
     let retries429 = 0;

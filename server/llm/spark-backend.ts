@@ -17,14 +17,18 @@ function withHint(messages: ChatMessage[]): ChatMessage[] {
   return messages.map((m, j) => (j === i ? { ...m, content } : m));
 }
 
-export function createSparkBackend(spark: MetaClients['spark']): LlmBackend {
+export function createSparkBackend(
+  spark: MetaClients['spark'],
+  o: { id?: LlmBackend['id']; maxTokens?: number } = {},
+): LlmBackend {
   return {
-    id: 'spark',
+    id: o.id ?? 'spark',
     async chatWithTools(messages, tools, opts) {
       const r = await spark.chat({
         messages: opts?.parallelHint ? withHint(messages) : [...messages],
         tools: tools.map(toolSpec),
         tool_choice: 'auto',
+        ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
       });
       return { toolCalls: r.toolCalls, ...(r.content !== undefined ? { content: r.content } : {}), ms: r.ms, ...(r.usage ? { usage: r.usage } : {}) };
     },
