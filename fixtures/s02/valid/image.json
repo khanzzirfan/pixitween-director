@@ -1,0 +1,42 @@
+{
+  "version": "1.8.0",
+  "id": "image",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "durationInFrames": 90,
+  "bgColor": "#101226",
+  "layers": [
+    {
+      "kind": "image",
+      "id": "product",
+      "inPoint": 0,
+      "outPoint": 90,
+      "transform": {
+        "position": [
+          960,
+          540
+        ],
+        "anchor": [
+          192,
+          192
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      },
+      "assetId": "photo"
+    }
+  ],
+  "assets": {
+    "photo": {
+      "type": "image",
+      "src": "/api/assets/ast_00000000000000000000000000000000",
+      "width": 384,
+      "height": 384
+    }
+  }
+}

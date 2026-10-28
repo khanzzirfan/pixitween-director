@@ -1,0 +1,35 @@
+{
+  "version": "1.8.0",
+  "id": "missing-asset",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "durationInFrames": 90,
+  "bgColor": "#101226",
+  "layers": [
+    {
+      "kind": "image",
+      "id": "p",
+      "inPoint": 0,
+      "outPoint": 90,
+      "transform": {
+        "position": [
+          960,
+          540
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      },
+      "assetId": "nope"
+    }
+  ],
+  "assets": {}
+}

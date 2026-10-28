@@ -1,0 +1,81 @@
+{
+  "version": "1.8.0",
+  "id": "scene-precomp",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "durationInFrames": 90,
+  "bgColor": "#101226",
+  "layers": [
+    {
+      "kind": "precomp",
+      "id": "scene1",
+      "inPoint": 0,
+      "outPoint": 90,
+      "transform": {
+        "position": [
+          960,
+          540
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      },
+      "compId": "scene1",
+      "width": 1920,
+      "height": 1080
+    }
+  ],
+  "assets": {},
+  "precomps": {
+    "scene1": {
+      "version": "1.8.0",
+      "id": "scene1",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 90,
+      "bgColor": "#101226",
+      "layers": [
+        {
+          "kind": "image",
+          "id": "scene1:product",
+          "inPoint": 0,
+          "outPoint": 90,
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              0,
+              0
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "assetId": "photo"
+        }
+      ],
+      "assets": {
+        "photo": {
+          "type": "image",
+          "src": "/api/assets/ast_00000000000000000000000000000000",
+          "width": 384,
+          "height": 384
+        }
+      }
+    }
+  }
+}

@@ -99,3 +99,47 @@ director needs from it is listed in [`ENGINE-NEEDS.md`](ENGINE-NEEDS.md).
 ---
 
 <sub>🏆 Meta Global AI Developer Hackathon 2026 · Track: Startups · Theme: Build for Your World</sub>
+
+---
+
+## 🧰 Development
+
+**Prerequisites:** Node 22. `ffmpeg` is optional (the tests that need it skip without it).
+
+**Setup**
+
+```bash
+npm ci
+cp .env.example .env   # then fill in META_API_KEY (the app and tests run without it)
+```
+
+**Scripts**
+
+| Script | What it does |
+|--------|--------------|
+| `npm run dev` | Runs the server (`tsx watch`, port 8787) and the web app (Vite, port 5173) together |
+| `npm run dev:server` | Server only |
+| `npm run dev:web` | Web app only; open `http://localhost:5173/?fixture=1` to play the fixture compositions |
+| `npm run build` | Builds the web app into `web/dist` (the server serves it) |
+| `npm run check:bundle` | Scans `web/dist` for API key names, values and `Bearer`/`sk-` strings; run it after `npm run build` |
+| `npm run typecheck` | `tsc` over `server/` and `web/` |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest, offline (no network) |
+| `npm run live -- <name> [--yes]` | Live or paid checks. A dry run by default: it prints the estimate and stops unless you pass `--yes` |
+
+**Layout**
+
+| Folder | Holds |
+|--------|-------|
+| `shared/` | Contracts used by server and web: film state, storyboard, events, tool and port interfaces |
+| `server/` | Hono API, stores, Meta clients, tool registry, test doubles |
+| `web/` | Vite + React app and the Player |
+| `scripts/` | The live-check dispatcher and the bundle key scanner |
+| `fixtures/` | Recorded real-shape responses (`seed/`) and hand-made compositions (`s02/`) |
+| `docs/`, `ralph/` | Specs and the build plan |
+
+**Live checks:** `npm run live -- s02-smoke` prints what it would call and what it would cost. Only `--yes` spends.
+
+**Licences:** this repo is Apache-2.0. The engine `reacthub-pixitweenjs` is Apache-2.0. `@meta-sam/parser` is under the SAM License, not Apache. The Meta models are used through the Meta Model API under its terms.
+
+<!-- S10 completes: Built during the hackathon / Pre-existing dependencies -->
