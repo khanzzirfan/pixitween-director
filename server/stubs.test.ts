@@ -7,8 +7,8 @@ const FILM = 'film_3fa9c2d41b7e';
 const modules: Array<[string, string]> = [
   ['./authoring/api', 'S3a'], ['./agent/director', 'S3b'], ['./agent/prompts/director', 'S3b'], ['./listener', 'S3b'],
   ['./art/cutout', 'S4'], ['./art/stills', 'S4'], ['./review/geometry', 'S5a'], ['./review/rules', 'S5a'], ['./review/visual', 'S5b'],
-  ['./agent/edit-loop', 'S6'], ['./clippy/mcp', 'S7a'], ['./generate/approval', 'S7a'], ['./generate/request', 'S7a'], ['./generate/clip-check', 'S7b'],
-  ['./http/handlers/films', 'S3b'], ['./http/handlers/chat', 'S6'], ['./http/handlers/review', 'S5b'], ['./http/handlers/generate', 'S7a'], ['./http/handlers/local', 'S9'],
+  ['./agent/edit-loop', 'S6'], ['./generate/clip-check', 'S7b'],
+  ['./http/handlers/films', 'S3b'], ['./http/handlers/chat', 'S6'], ['./http/handlers/review', 'S5b'], ['./http/handlers/local', 'S9'],
 ];
 const toolFiles: Array<[string, string]> = [['./tools/authoring', 'S3a'], ['./tools/art', 'S4'], ['./tools/review', 'S5b'], ['./tools/edit', 'S6'], ['./tools/generate', 'S7b']];
 
@@ -38,7 +38,6 @@ describe('handler stubs answer 501 with their owner', async () => {
   (await import('./http/handlers/films')).registerFilmsRoutes(app, deps);
   (await import('./http/handlers/chat')).registerChatRoutes(app, deps);
   (await import('./http/handlers/review')).registerReviewRoutes(app, deps);
-  (await import('./http/handlers/generate')).registerGenerateRoutes(app, deps);
   (await import('./http/handlers/local')).registerLocalRoutes(app, deps);
   const rows: Array<[string, string, string]> = [
     ['POST', '/api/films', 'S3b'],
@@ -46,8 +45,6 @@ describe('handler stubs answer 501 with their owner', async () => {
     ['POST', `/api/films/${FILM}/undo`, 'S6'],
     ['POST', `/api/films/${FILM}/redo`, 'S6'],
     ['POST', `/api/films/${FILM}/frames`, 'S5b'],
-    ['POST', `/api/films/${FILM}/scenes/s1/mode`, 'S7a'],
-    ['POST', `/api/films/${FILM}/scenes/s1/approve`, 'S7a'],
     ['GET', '/api/local-mode', 'S9'],
     ['PUT', '/api/local-mode', 'S9'],
   ];
