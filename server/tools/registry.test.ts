@@ -73,4 +73,7 @@ it('duplicate names make all() throw', () => {
   expect(() => createRegistry([[adder as ToolDef], [adder as ToolDef]]).all()).toThrow(/add/);
 });
 
-it('the default registry is empty in S2', () => expect(allTools()).toEqual([]));
+it('the default registry has no duplicate names', () => {
+  const names = allTools().map((t) => t.name);
+  expect(new Set(names).size).toBe(names.length);
+});

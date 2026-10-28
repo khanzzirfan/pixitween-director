@@ -10,7 +10,8 @@ const modules: Array<[string, string]> = [
   ['./agent/edit-loop', 'S6'], ['./clippy/mcp', 'S7a'], ['./generate/approval', 'S7a'], ['./generate/request', 'S7a'], ['./generate/clip-check', 'S7b'],
   ['./http/handlers/films', 'S3b'], ['./http/handlers/chat', 'S6'], ['./http/handlers/review', 'S5b'], ['./http/handlers/generate', 'S7a'], ['./http/handlers/local', 'S9'],
 ];
-const toolFiles: Array<[string, string]> = [['./tools/authoring', 'S3a'], ['./tools/art', 'S4'], ['./tools/review', 'S5b'], ['./tools/edit', 'S6'], ['./tools/generate', 'S7b']];
+// ./tools/authoring is filled in by S3a and no longer a stub
+const toolFiles: Array<[string, string]> = [['./tools/art', 'S4'], ['./tools/review', 'S5b'], ['./tools/edit', 'S6'], ['./tools/generate', 'S7b']];
 
 describe('stub modules', () => {
   it.each(modules)('%s is owned by %s', async (path, owner) => {
