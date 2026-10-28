@@ -11,6 +11,8 @@ debug/
 .ralph-tui/progress.md
 .DS_Store
 *.log
+playwright-report/
+test-results/
 
 ## ralphtui
 .ralph-tui/

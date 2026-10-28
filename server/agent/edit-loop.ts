@@ -8,6 +8,8 @@ import { allTools, runTool } from '../tools/registry';
 import { assistantMessageFrom, toolResultMessage } from '../llm/messages';
 import { buildEditMessages } from './edit-prompt';
 import { editCostUsd, type TokenUsage } from './edit-cost';
+import { createFakeEditBackend, isFakeDirector } from './fake-director';
+import { SPARK_OPEN_MODEL } from '../llm/spark-open-backend';
 
 export const STUB_OWNER = 'S6' as const;
 export const MAX_TURNS = 4,
@@ -90,6 +92,7 @@ export async function runEditWithCtx(
     const messages = buildEditMessages({ comp, selection: input.selection, message: input.message });
     const backend =
       deps.backend ??
+      (isFakeDirector() ? createFakeEditBackend(comp) : undefined) ??
       pickBackend('edit', {
         local: input.local,
         onFallback: (i) => ctx.emit({ type: 'error', where: 'llm.fallback', message: `${i.from} -> ${i.to}: ${i.reason}` }),
@@ -111,7 +114,7 @@ export async function runEditWithCtx(
       const reply = r.content?.trim();
       if (reply) outcome.reply = reply;
       ctx.emit({ type: 'agent.turn', backend: backend.id, ms: r.ms, calls: r.toolCalls.length, ...(reply ? { reply } : {}) });
-      const model = backend.id === 'glimmer' ? 'muse-glimmer' : loadEnv().META_SPARK_MODEL;
+      const model = backend.id === 'glimmer' ? 'muse-glimmer' : backend.id === 'spark-open' ? SPARK_OPEN_MODEL : loadEnv().META_SPARK_MODEL;
       if (r.usage) {
         const u = r.usage as TokenUsage;
         const usd = editCostUsd(model, u);

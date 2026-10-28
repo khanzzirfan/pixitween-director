@@ -69,9 +69,16 @@ export default function NewFilm(_props: PanelProps) {
   }
   return (
     <form onSubmit={submit}>
-      <h2>New film</h2>
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">START WITH AN IDEA</span>
+          <h2>Make a new film</h2>
+        </div>
+        <span className="step-pill">01 / 03</span>
+      </div>
+      <p className="panel-intro">Add your product and a few words. Your director will turn the brief into a storyboard.</p>
       <label>
-        Product photo{' '}
+        Product photo
         <input
           aria-label="Product photo"
           type="file"
@@ -79,7 +86,7 @@ export default function NewFilm(_props: PanelProps) {
           onChange={(e) => setProduct(e.target.files?.[0] ?? null)}
         />
       </label>
-      {preview && <img alt="Product preview" src={preview} style={{ maxWidth: 180, maxHeight: 180, objectFit: 'contain' }} />}
+      {preview && <img className="product-preview" alt="Product preview" src={preview} />}
       <label>
         Product name <input aria-label="Product name" maxLength={80} value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
@@ -89,7 +96,7 @@ export default function NewFilm(_props: PanelProps) {
       </label>
       <p>{brief.length} / 2000</p>
       <fieldset>
-        <legend>Aspect</legend>
+        <legend>Video format</legend>
         {(['16:9', '9:16', '1:1'] as const).map((item) => (
           <label key={item}>
             <input type="radio" name="aspect" value={item} checked={aspect === item} onChange={() => setAspect(item)} />
@@ -105,8 +112,8 @@ export default function NewFilm(_props: PanelProps) {
           </button>
         </>
       ) : (
-        <button type="button" aria-label="Record a voice brief" onClick={() => void recorder.start()}>
-          Record voice brief
+        <button type="button" className="subtle-button" aria-label="Record a voice brief" onClick={() => void recorder.start()}>
+          Record a voice brief
         </button>
       )}
       {recorder.blob && (
@@ -125,7 +132,7 @@ export default function NewFilm(_props: PanelProps) {
       )}
       {error && <p role="alert">{error}</p>}
       <button type="submit" disabled={!enabled}>
-        {busy ? 'Starting…' : 'Start'}
+        {busy ? 'Starting your film…' : 'Create my storyboard →'}
       </button>
     </form>
   );

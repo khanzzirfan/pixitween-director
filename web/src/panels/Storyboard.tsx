@@ -22,18 +22,26 @@ export default function Storyboard({ film, events }: PanelProps) {
   const credits = costs.reduce((sum, event) => (event.type === 'cost' ? sum + (event.credits ?? 0) : sum), 0);
   return (
     <section>
-      <h2>Storyboard</h2>
-      <p role="status">{labels[status]}</p>
-      {transcript?.type === 'listener.transcript' && <p>We heard: “{transcript.text}”</p>}
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">YOUR CREATIVE PLAN</span>
+          <h2>Storyboard</h2>
+        </div>
+        <span className={`status-pill status-${status}`}>{labels[status]}</span>
+      </div>
+      {transcript?.type === 'listener.transcript' && <p className="transcript-note">We heard: “{transcript.text}”</p>}
       {storyboard ? (
         <div>
           {storyboard.scenes.map((scene) => (
-            <article data-testid="scene-card" key={scene.id}>
-              <h3>
-                {scene.id} · {scene.durationSec}s
-              </h3>
-              <span data-testid="mode-badge">{scene.mode.toUpperCase()}</span>
-              <p>{scene.intent}</p>
+            <article className="story-scene" data-testid="scene-card" key={scene.id}>
+              <div className="story-scene-top">
+                <span className="scene-number">{scene.id}</span>
+                <span className="scene-duration">{scene.durationSec}s</span>
+              </div>
+              <h3>{scene.intent}</h3>
+              <span className={`mode-pill mode-${scene.mode}`} data-testid="mode-badge">
+                {scene.mode.toUpperCase()}
+              </span>
               <p>{scene.camera}</p>
               {scene.text && <p>{scene.text}</p>}
               <p>{scene.modeReason}</p>

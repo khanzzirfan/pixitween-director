@@ -14,7 +14,13 @@ export const STUB_OWNER = 'S8a' as const;
 export interface ExportPanelProps extends PanelProps {
   /** Returns the Player handle at click time (always fresh, unlike a ref value read during render). */
   getPlayer?: () => ExportPlayerHandle | null;
-  deps?: { recordCanvas?: typeof recordCanvas; mixAudio?: typeof mixAudio; now?: () => Date; mp4Supported?: typeof mp4Supported; exportMp4?: typeof exportMp4 };
+  deps?: {
+    recordCanvas?: typeof recordCanvas;
+    mixAudio?: typeof mixAudio;
+    now?: () => Date;
+    mp4Supported?: typeof mp4Supported;
+    exportMp4?: typeof exportMp4;
+  };
 }
 
 type State =
@@ -23,7 +29,8 @@ type State =
   | { kind: 'done'; url: string; name: string }
   | { kind: 'error'; message: string };
 
-const canRecord = () => typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement !== 'undefined' && 'captureStream' in HTMLCanvasElement.prototype;
+const canRecord = () =>
+  typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement !== 'undefined' && 'captureStream' in HTMLCanvasElement.prototype;
 
 export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelProps) {
   const record = deps.recordCanvas ?? recordCanvas;
@@ -79,7 +86,11 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
       setNotes(messages);
       setState({ kind: 'done', url: URL.createObjectURL(blob), name: exportFileName(film?.title ?? 'film', ext, now()) });
     } catch (e) {
-      setState(e instanceof ExportError && e.code === 'aborted' ? { kind: 'idle' } : { kind: 'error', message: e instanceof Error ? e.message : String(e) });
+      setState(
+        e instanceof ExportError && e.code === 'aborted'
+          ? { kind: 'idle' }
+          : { kind: 'error', message: e instanceof Error ? e.message : String(e) },
+      );
     }
   }
 
@@ -91,7 +102,13 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
 
   return (
     <div>
-      <h2>Export</h2>
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">READY FOR THE WORLD</span>
+          <h2>Export your film</h2>
+        </div>
+        <span className="step-pill">FINAL STEP</span>
+      </div>
       {state.kind === 'idle' && (
         <>
           {mp4 && (
@@ -103,30 +120,52 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
               </select>
             </label>
           )}
-          <button type="button" onClick={() => void start()} disabled={!supported || !hasContent}>Export video</button>
+          <button
+            className="primary"
+            type="button"
+            aria-label="Export video"
+            onClick={() => void start()}
+            disabled={!supported || !hasContent}
+          >
+            Export video →
+          </button>
           {!supported && <p>Your browser can&apos;t record video. Try Chrome.</p>}
           {supported && !hasContent && <p>Nothing to export</p>}
         </>
       )}
       {state.kind === 'running' && (
         <div>
-          <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={state.progress}>{state.progress}%</div>
-          <button type="button" onClick={() => abort.current?.abort()}>Cancel</button>
+          <p>Preparing your video…</p>
+          <div className="export-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={state.progress}>
+            <span style={{ width: `${state.progress}%` }} />
+          </div>
+          <p>{state.progress}% complete</p>
+          <button type="button" onClick={() => abort.current?.abort()}>
+            Cancel
+          </button>
         </div>
       )}
       {state.kind === 'done' && (
         <div>
-          <a href={state.url} download={state.name}>Download {state.name}</a>{' '}
-          <button type="button" onClick={dismiss}>Dismiss</button>
+          <a href={state.url} download={state.name}>
+            Download {state.name}
+          </a>{' '}
+          <button type="button" onClick={dismiss}>
+            Dismiss
+          </button>
         </div>
       )}
       {state.kind === 'error' && (
         <div role="alert">
           <p>{state.message}</p>
-          <button type="button" onClick={() => setState({ kind: 'idle' })}>Try again</button>
+          <button type="button" onClick={() => setState({ kind: 'idle' })}>
+            Try again
+          </button>
         </div>
       )}
-      {notes.map((n) => <p key={n}>{n}</p>)}
+      {notes.map((n) => (
+        <p key={n}>{n}</p>
+      ))}
     </div>
   );
 }

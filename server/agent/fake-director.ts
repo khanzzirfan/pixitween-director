@@ -1,3 +1,4 @@
+import type { AepCompositionJson } from 'reacthub-pixitweenjs';
 import type { MetaClients, LlmBackend } from '@shared/ports';
 import type { Storyboard } from '@shared/storyboard';
 import { makeFakeMeta } from '../meta/fakes';
@@ -90,6 +91,21 @@ export function createFakeParts(o: { delayMs?: number } = {}): {
           return { toolCalls: calls.map((call, i) => ({ ...call, id: `${scene.id}_${i}` })), content: '', ms: 1 };
         },
       };
+    },
+  };
+}
+
+// Edit backend for the fake director: one scaleLayer call on the first headline (else the first text layer), then an honest reply.
+export function createFakeEditBackend(comp?: AepCompositionJson): LlmBackend {
+  const layers = Object.values(comp?.precomps ?? {}).flatMap((p) => (p as { layers?: Array<{ id: string; kind: string }> }).layers ?? []);
+  const target = (layers.find((l) => l.id.endsWith(':headline')) ?? layers.find((l) => l.kind === 'text'))?.id;
+  let turns = 0;
+  return {
+    id: 'spark',
+    async chatWithTools() {
+      if (!target) return { toolCalls: [], content: 'There is no text layer to change.', ms: 1 };
+      if (turns++ > 0) return { toolCalls: [], content: `Made ${target} bigger.`, ms: 1 };
+      return { toolCalls: [{ id: 'fake_edit_0', name: 'scaleLayer', args: { layerId: target, factor: 1.25 } }], content: '', ms: 1 };
     },
   };
 }
