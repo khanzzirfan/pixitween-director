@@ -1,0 +1,34 @@
+{
+  "film": {
+    "title": "Morning Ritual - White Ceramic Mug",
+    "aspect": "16:9",
+    "status": "ready",
+    "brief": { "text": "A slow morning with a white ceramic mug.", "productAssetId": "{{asset:mug-product}}" },
+    "storyboard": {
+      "title": "Morning Ritual - White Ceramic Mug",
+      "aspect": "16:9",
+      "durationSec": 12,
+      "palette": ["#2b1d14"],
+      "scenes": [
+        { "id": "scene-1-hero-reveal", "durationSec": 4, "intent": "Slow push-in to reveal a white ceramic mug on a sunlit wooden table", "shotType": "hero", "camera": "dolly-in", "layersWanted": ["bg", "product"], "mode": "motion", "modeReason": "A static tabletop scene can be faked with layered stills and a slow camera push-in." },
+        { "id": "scene-2-pour", "durationSec": 4, "intent": "Fresh coffee pours into the mug with rising steam", "shotType": "reveal", "camera": "static", "layersWanted": ["bg", "product"], "mode": "generate", "modeReason": "Pouring coffee and rising steam need real fluid motion." },
+        { "id": "scene-3-detail", "durationSec": 4, "intent": "Close-up detail of the mug texture and handle with soft studio light", "shotType": "detail", "camera": "pan", "layersWanted": ["bg", "product"], "mode": "motion", "modeReason": "A held close-up needs only a slow camera move." }
+      ]
+    },
+    "composition": {
+      "version": "1.0.0",
+      "id": "demo-mug",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 360,
+      "bgColor": "#2b1d14",
+      "assets": { "mug": { "type": "image", "src": "{{asset:mug-product}}", "width": 384, "height": 672 } },
+      "layers": [
+        { "kind": "shape", "id": "bg", "inPoint": 0, "outPoint": 360, "transform": { "position": [960, 540], "anchor": [960, 540], "scale": [1, 1], "rotation": 0, "opacity": 1 }, "path": { "kind": "rect", "size": [1920, 1080] }, "fill": "#2b1d14" },
+        { "kind": "image", "id": "mug", "assetId": "mug", "inPoint": 0, "outPoint": 360, "transform": { "position": [960, 540], "anchor": [192, 336], "scale": [1.2, 1.2], "rotation": 0, "opacity": 1 } }
+      ]
+    }
+  },
+  "assets": [{ "key": "mug-product", "file": "../../../seed/mug-product.png", "mime": "image/png", "role": "product-photo" }]
+}
