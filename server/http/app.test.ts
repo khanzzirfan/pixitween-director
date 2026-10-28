@@ -2,7 +2,6 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { createApp } from './app';
 import { makeTestDeps } from '../test-utils/deps';
 
-const FILM = 'film_3fa9c2d41b7e';
 const saved = { ...process.env };
 beforeEach(() => {
   delete process.env.DIRECTOR_PASSCODE;
@@ -27,25 +26,40 @@ it('serves health without a passcode', async () => {
 
 it('enforces the passcode on mutating routes only', async () => {
   process.env.DIRECTOR_PASSCODE = 'secret';
-  const app = await mk();
-  const path = `/api/films/${FILM}/chat`;
-  const none = await app.request(path, { method: 'POST' });
-  const wrong = await app.request(path, { method: 'POST', headers: { 'x-director-passcode': 'nope' } });
+  const deps = await makeTestDeps();
+  const app = createApp(deps);
+  const path = `/api/films/${deps.filmId}/chat`;
+  const none = await app.request(path, {
+    method: 'POST',
+    body: JSON.stringify({ message: 'hi' }),
+    headers: { 'content-type': 'application/json' },
+  });
+  const wrong = await app.request(path, {
+    method: 'POST',
+    body: JSON.stringify({ message: 'hi' }),
+    headers: { 'content-type': 'application/json', 'x-director-passcode': 'nope' },
+  });
   expect(none.status).toBe(401);
   expect(wrong.status).toBe(401);
   expect(await none.json()).toEqual({ error: 'passcode_required' });
   expect(await wrong.json()).toEqual({ error: 'passcode_required' });
   const goodHeaders: Record<string, string>[] = [{ 'x-director-passcode': 'secret' }, { authorization: 'Bearer secret' }];
   for (const headers of goodHeaders) {
-    const ok = await app.request(path, { method: 'POST', headers });
-    expect(ok.status).toBe(501);
-    expect((await ok.json()).owner).toBe('S6');
+    const ok = await app.request(path, {
+      method: 'POST',
+      body: JSON.stringify({ message: 'hi' }),
+      headers: { ...headers, 'content-type': 'application/json' },
+    });
+    expect(ok.status).toBe(409);
+    expect((await ok.json()).error).toBe('film_not_ready');
   }
   expect((await app.request('/api/local-mode')).status).toBe(501); // GET is never blocked
 });
 
 it('lets mutating routes through when no passcode is set', async () => {
-  expect((await (await mk()).request('/api/films', { method: 'POST' })).status).toBe(501);
+  const res = await (await mk()).request('/api/films', { method: 'POST' });
+  expect(res.status).toBe(400);
+  expect((await res.json()).error).toBe('product_required');
 });
 
 it('answers 404 JSON for unknown API paths', async () => {

@@ -32,7 +32,12 @@ it('serves a film and its versions', async () => {
 
 it('lists newest first and 404s unknown films', async () => {
   const { t, app } = await setup();
-  const newer = await t.films.create({ aspect: '1:1', brief: { text: 'n', productAssetId: 'x' }, assets: [], createdAt: new Date(Date.now() + 10_000).toISOString() });
+  const newer = await t.films.create({
+    aspect: '1:1',
+    brief: { text: 'n', productAssetId: 'x' },
+    assets: [],
+    createdAt: new Date(Date.now() + 10_000).toISOString(),
+  });
   const list = await (await app.request('/api/films')).json();
   expect(list.map((f: { id: string }) => f.id)).toEqual([newer.id, t.filmId]);
   const res = await app.request('/api/films/film_000000000000');

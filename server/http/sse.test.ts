@@ -3,16 +3,23 @@ import { createApp } from './app';
 import { HEARTBEAT_MS } from './sse';
 import { makeTestFilm } from '../test-utils/film';
 
-interface Frame { id?: string; event?: string; data?: string }
+interface Frame {
+  id?: string;
+  event?: string;
+  data?: string;
+}
 
 async function open(path: string, headers: Record<string, string> = {}) {
   const t = await makeTestFilm();
   let subscribers = 0;
-  const bus = { ...t.bus, subscribe: ((id: string, fn: never) => {
-    subscribers++;
-    const off = t.bus.subscribe(id, fn);
-    return () => (subscribers--, off());
-  }) as typeof t.bus.subscribe };
+  const bus = {
+    ...t.bus,
+    subscribe: ((id: string, fn: never) => {
+      subscribers++;
+      const off = t.bus.subscribe(id, fn);
+      return () => (subscribers--, off());
+    }) as typeof t.bus.subscribe,
+  };
   const app = createApp({ films: t.films, assets: t.assets, meta: t.meta, ledger: t.ledger, bus, makeToolCtx: () => t.ctx });
   return { t, app, subscribers: () => subscribers, path: path.replace('FILM', t.filmId), headers };
 }
@@ -44,7 +51,12 @@ function reader(res: Response) {
   };
 }
 
-const status = (filmId: string, n: number) => ({ filmId, at: new Date().toISOString(), type: 'listener.transcript' as const, text: `t${n}` });
+const status = (filmId: string, n: number) => ({
+  filmId,
+  at: new Date().toISOString(),
+  type: 'listener.transcript' as const,
+  text: `t${n}`,
+});
 
 beforeEach(() => void vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] }));
 afterEach(() => vi.useRealTimers());

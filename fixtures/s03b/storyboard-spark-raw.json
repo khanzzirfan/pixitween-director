@@ -1,0 +1,10 @@
+{
+  "title": "  Morning Ritual - Ceramic Mug  ",
+  "palette": ["red", "#F5E6D3"],
+  "scenes": [
+    { "id": "scene-1-hero-reveal", "durationSec": 4, "intent": "Reveal the mug in warm sunrise light", "shotType": "hero", "camera": "dolly-in", "layersWanted": ["product", "headline", "product"], "text": "Slow mornings", "mode": "motion", "modeReason": "A tabletop product can be shown with a still and a slow push-in." },
+    { "id": "scene-2-pour", "durationSec": 4, "intent": "Coffee pours into the mug", "shotType": "lifestyle", "camera": "static", "layersWanted": ["product", "bg"], "text": "", "mode": "generate", "modeReason": "Pouring coffee needs fluid motion." },
+    { "id": "scene-3-steam", "durationSec": 4, "intent": "Steam curls above the mug", "shotType": "detail", "camera": "pan", "layersWanted": ["bg", "product"], "text": "", "mode": "generate", "modeReason": "Steam needs natural movement." },
+    { "id": "scene-4-closer", "durationSec": 4, "intent": "Close on the mug", "shotType": "closer", "camera": "static", "layersWanted": ["headline"], "text": "", "mode": "generate", "modeReason": "A moving camera circles the mug." }
+  ]
+}

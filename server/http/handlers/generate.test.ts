@@ -29,17 +29,27 @@ async function setup(o: { balance?: number | 'none'; modes?: Array<'motion' | 'g
   let now = Date.parse('2026-11-02T01:00:00Z');
   const dir = mkdtempSync(join(tmpdir(), 'gen-'));
   const clippy = o.balance === 'none' ? undefined : makeFakeClippy({ balance: o.balance ?? 120 });
-  setGenerateServicesForTests({ approvals: createApprovalStore({ dir: (f) => join(dir, f), now: () => new Date(now) }), clippy, balance: createBalanceReader(clippy, { ttlMs: 0 }) });
+  setGenerateServicesForTests({
+    approvals: createApprovalStore({ dir: (f) => join(dir, f), now: () => new Date(now) }),
+    clippy,
+    balance: createBalanceReader(clippy, { ttlMs: 0 }),
+  });
   const deps = { films: t.films, assets: t.assets, meta: t.meta, ledger: t.ledger, bus: t.bus, makeToolCtx: () => t.ctx } as AppDeps;
   const app = new Hono();
   registerGenerateRoutes(app, deps);
-  const post = (path: string, body: unknown) => app.request(`/api/films/${t.filmId}/scenes/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const mode = async (sceneId: string, m: string) => (await post(`${sceneId}/mode`, { mode: m }));
+  const post = (path: string, body: unknown) =>
+    app.request(`/api/films/${t.filmId}/scenes/${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  const mode = async (sceneId: string, m: string) => await post(`${sceneId}/mode`, { mode: m });
   const modeOf = async (sceneId: string) => ((await t.films.get(t.filmId)).composition!.meta as any).director.scenes[sceneId].mode;
   const settle = () => new Promise((r) => setTimeout(r, 40));
   return { t, post, mode, modeOf, settle, advance: (min: number) => (now += min * 60_000) };
 }
-const runner = (over: Partial<GenerationRunner> = {}): GenerationRunner & { run: ReturnType<typeof vi.fn> } => ({ preflight: async () => ({ ok: true }), run: vi.fn(async () => undefined), ...over }) as never;
+const runner = (over: Partial<GenerationRunner> = {}): GenerationRunner & { run: ReturnType<typeof vi.fn> } =>
+  ({ preflight: async () => ({ ok: true }), run: vi.fn(async () => undefined), ...over }) as never;
 
 describe('mode route', () => {
   it('flips a scene to generate and returns a proposal once', async () => {
@@ -143,7 +153,13 @@ describe('approve route', () => {
   it('a rejecting runner keeps the 202 and emits one error event', async () => {
     const s = await setup();
     const token = await proposed(s);
-    setGenerationRunner(runner({ run: vi.fn(async () => { throw new Error('boom'); }) as never }));
+    setGenerationRunner(
+      runner({
+        run: vi.fn(async () => {
+          throw new Error('boom');
+        }) as never,
+      }),
+    );
     const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     expect((await s.post('s1/approve', { token })).status).toBe(202);
     await s.settle();

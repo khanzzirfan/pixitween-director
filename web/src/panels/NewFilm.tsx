@@ -1,13 +1,132 @@
-// Owned by S3b. S2 stub: replace the body, keep the export names.
+import { useEffect, useState, type FormEvent } from 'react';
+import { ApiRequestError, api } from '../api/client';
 import type { PanelProps } from './types';
+import { useRecorder } from './useRecorder';
 
 export const STUB_OWNER = 'S3b' as const;
+type Aspect = '16:9' | '9:16' | '1:1';
+const messageOf = (e: unknown) =>
+  e instanceof ApiRequestError && e.body && typeof e.body === 'object' && 'message' in e.body
+    ? String(e.body.message)
+    : e instanceof ApiRequestError && e.body && typeof e.body === 'object' && 'error' in e.body
+      ? String(e.body.error)
+      : e instanceof Error
+        ? e.message
+        : 'Unable to create film.';
 
 export default function NewFilm(_props: PanelProps) {
+  const [product, setProduct] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string>();
+  const [title, setTitle] = useState('');
+  const [brief, setBrief] = useState('');
+  const [aspect, setAspect] = useState<Aspect>('16:9');
+  const [passcode, setPasscode] = useState('');
+  const [needPasscode, setNeedPasscode] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const recorder = useRecorder();
+
+  useEffect(() => {
+    if (!product) {
+      setPreview(undefined);
+      return;
+    }
+    const url = URL.createObjectURL(product);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [product]);
+  const enabled = !!product && (!!recorder.blob || !!brief.trim()) && !busy;
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!enabled || !product) return;
+    setBusy(true);
+    setError('');
+    if (needPasscode) {
+      try {
+        localStorage.setItem('director.passcode', passcode);
+      } catch {
+        /* storage may be unavailable */
+      }
+    }
+    const form = new FormData();
+    form.set('product', product);
+    form.set('aspect', aspect);
+    if (title.trim()) form.set('title', title.trim());
+    if (recorder.blob) form.set('audio', new File([recorder.blob], 'brief.webm', { type: recorder.blob.type || 'audio/webm' }));
+    else form.set('brief', brief.trim());
+    try {
+      const result = await api.createFilm(form);
+      const url = new URL(window.location.href);
+      url.searchParams.set('film', result.filmId);
+      history.pushState({}, '', url);
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.status === 401) setNeedPasscode(true);
+      setError(messageOf(err));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <div>
+    <form onSubmit={submit}>
       <h2>New film</h2>
-      <p>Not built yet</p>
-    </div>
+      <label>
+        Product photo{' '}
+        <input
+          aria-label="Product photo"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={(e) => setProduct(e.target.files?.[0] ?? null)}
+        />
+      </label>
+      {preview && <img alt="Product preview" src={preview} style={{ maxWidth: 180, maxHeight: 180, objectFit: 'contain' }} />}
+      <label>
+        Product name <input aria-label="Product name" maxLength={80} value={title} onChange={(e) => setTitle(e.target.value)} />
+      </label>
+      <label>
+        Brief{' '}
+        <textarea aria-label="Brief" maxLength={2000} value={brief} disabled={!!recorder.blob} onChange={(e) => setBrief(e.target.value)} />
+      </label>
+      <p>{brief.length} / 2000</p>
+      <fieldset>
+        <legend>Aspect</legend>
+        {(['16:9', '9:16', '1:1'] as const).map((item) => (
+          <label key={item}>
+            <input type="radio" name="aspect" value={item} checked={aspect === item} onChange={() => setAspect(item)} />
+            {item}
+          </label>
+        ))}
+      </fieldset>
+      {recorder.state === 'recording' ? (
+        <>
+          <p>{recorder.seconds} s</p>
+          <button type="button" onClick={recorder.stop}>
+            Stop recording
+          </button>
+        </>
+      ) : (
+        <button type="button" aria-label="Record a voice brief" onClick={() => void recorder.start()}>
+          Record voice brief
+        </button>
+      )}
+      {recorder.blob && (
+        <>
+          <audio controls src={URL.createObjectURL(recorder.blob)} />
+          <button type="button" onClick={recorder.reset}>
+            Remove recording
+          </button>
+        </>
+      )}
+      {recorder.error && <p role="alert">{recorder.error}</p>}
+      {needPasscode && (
+        <label>
+          Passcode <input aria-label="Passcode" type="password" value={passcode} onChange={(e) => setPasscode(e.target.value)} />
+        </label>
+      )}
+      {error && <p role="alert">{error}</p>}
+      <button type="submit" disabled={!enabled}>
+        {busy ? 'Starting…' : 'Start'}
+      </button>
+    </form>
   );
 }
