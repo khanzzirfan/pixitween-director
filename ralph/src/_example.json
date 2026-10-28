@@ -1,0 +1,57 @@
+{
+  "name": "PixiTween Director S99: example (shape reference, not built)",
+  "branchName": "ralph/s99-example",
+  "description": "One or two sentences: what this PRD delivers and what it deliberately leaves out.",
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-99-example/requirements.md",
+      "docs/hackathon/steps/step-99-example/design.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (shared types, file ownership, repo rules)",
+      "docs/hackathon/steps/step-01-meta-api-probes/findings.md (verified Meta payloads)",
+      "docs/hackathon/steps/step-99-example/design.md"
+    ],
+    "requires": ["prd-s02-skeleton"],
+    "owns": ["server/example/*", "web/src/panels/Example.tsx"],
+    "extraGuardrails": ["Story-specific rule, if any."],
+    "manualGates": [
+      "MG-1: owner runs `npm run live -- example --yes` (prints the estimate first; about $0.05) and records the output in the PR."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Pure helper: seconds to frames",
+      "description": "As a tool author, I want a tested seconds-to-frames helper so that every tool converts time the same way.",
+      "steps": [
+        "Read docs/hackathon/06-contracts.md section 3a (time is in frames, fps = 30) and shared/composition.ts.",
+        "Create server/authoring/units.ts exporting secToFrames(sec: number, fps = 30): number (rounds to the nearest frame, throws RangeError if sec < 0) and framesToSec(frames, fps).",
+        "Create server/authoring/units.test.ts covering 0, 0.5, 2.0, a rounding case (0.016 s -> 0) and the negative-input error."
+      ],
+      "acceptance": [
+        "secToFrames(2, 30) returns 60 and secToFrames(0.5, 30) returns 15",
+        "secToFrames(-1) throws RangeError with a message that names the value",
+        "framesToSec(secToFrames(x)) is within one frame of x for 100 random inputs in [0, 30] s"
+      ],
+      "labels": ["backend", "tools"],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Example panel shows the status line",
+      "description": "As a viewer, I want to see the film status so that I know what the director is doing.",
+      "steps": [
+        "Read web/src/api/sse.ts (the useFilmEvents hook) and the FilmEvent union in shared/events.ts.",
+        "Create web/src/panels/Example.tsx rendering the latest film.status event as a labelled badge.",
+        "Add web/src/panels/Example.test.tsx using @testing-library/react with a fake event list."
+      ],
+      "acceptance": [
+        "With a 'building' status event the badge text is 'Building'",
+        "With no events the badge text is 'Waiting'"
+      ],
+      "labels": ["frontend", "ui"],
+      "dependsOn": ["US-001"]
+    }
+  ]
+}

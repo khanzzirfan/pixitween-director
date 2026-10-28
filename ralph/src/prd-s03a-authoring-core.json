@@ -1,0 +1,558 @@
+{
+  "name": "PixiTween Director S03a: authoring core (pure composition functions + tools)",
+  "branchName": "ralph/s03a-authoring-core",
+  "description": "Implements docs/hackathon/06-contracts.md section 4a EXACTLY as pure, immutable functions over an engine composition (scenes as precomps, layers, keyframes, a 2D parallax camera, summarise), plus the eleven zod-validated authoring tools and a fixture generator. Every later step edits films only through this API. Excludes the director agent (S3b), art (S4) and review (S5).",
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-03-brief-to-composition/requirements.md",
+      "docs/hackathon/steps/step-03-brief-to-composition/design.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md sections 3a and 4a (the API to implement) and 4b (test doubles)",
+      "docs/hackathon/steps/step-03-brief-to-composition/design.md (sections 4.1 example, 5.1-5.8 rules and numbers, 11 verified engine facts)",
+      "server/engine/light-validator.ts and fixtures/s02/valid/*.json (S2: how a valid composition looks)",
+      "shared/composition.ts (ASPECT_SIZES, FILM_FPS) and shared/tools.ts (ToolDef)"
+    ],
+    "requires": [
+      "prd-s02-skeleton"
+    ],
+    "owns": [
+      "server/authoring/*",
+      "server/tools/authoring.ts",
+      "scripts/gen-s03a-fixtures.ts",
+      "fixtures/s03a/*"
+    ],
+    "manualGates": [
+      "MG-1: owner opens http://localhost:5173/?fixture=1, picks the s03a/* fixtures and confirms scene 2 follows scene 1, the product is centred, the headline is centred and the dolly-in grows; the story US-022 records the observed text-anchor result.",
+      "MG-2: after the P0 engine publish, re-run `npm test` (the web agreement test compares the light validator with the engine schema)."
+    ],
+    "extraGuardrails": [
+      "Authoring functions are pure: they never mutate their input and never touch the filesystem, the network or Date.now(). Use structuredClone for the returned composition.",
+      "Do not import the engine at runtime in server/ (type-only imports are allowed); the engine is reached only in web/ tests.",
+      "Numbers in the design (default boxes, camera factors, z weights) are binding: tests assert them."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "units.ts, errors.ts, constants.ts: frames, AuthoringError, binding constants",
+      "description": "As an authoring-core author, I want one place for unit conversion, error codes and the design's constants so that every function uses the same numbers.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 5.1 (units, ids, errors), 5.2 (roles, z), 5.3 (default boxes) and 5.6 (camera factors).",
+        "Create server/authoring/units.ts: secToFrames(sec, fps = 30) = Math.round(sec * fps) (RangeError whose message contains the value when sec is negative or not finite) and framesToSec(frames, fps = 30).",
+        "Create server/authoring/errors.ts: type AuthoringCode = 'unknown_scene' | 'unknown_layer' | 'unknown_asset' | 'duplicate_scene' | 'time_out_of_range' | 'keys_too_close' | 'bad_value' | 'invalid_role_kind' | 'bad_duration' | 'film_too_long' | 'scene_limit'; class AuthoringError extends Error {code; hint?} with message `<code>: <text>` and helper hintList(ids: string[], max = 8) returning 'Valid ids: a, b, c' (or 'There are none yet').",
+        "Create server/authoring/constants.ts exporting: AEP_VERSION = '1.8.0'; MAX_SCENES = 12; MAX_FILM_SECONDS = 60; ROLE_KINDS (bg: shape|image, clip: video, subject: image, product: image, headline: text, caption: text); DEFAULT_Z (bg 10, clip 10, subject 3, product 1, headline 0, caption 0); EASE_HANDLES (easeIn [0.42,0,1,1], easeOut [0,0,0.58,1], easeInOut [0.42,0,0.58,1], linear undefined); DEFAULT_BOX_FRACTIONS per role (bg {0,0,1,1}, clip {0,0,1,1}, product {0.15,0.21,0.70,0.62}, subject {0.05,0.15,0.40,0.70}, headline {0.10,0.08,0.80,0.16}, caption {0.10,0.84,0.80,0.10}); TEXT_DEFAULTS {font 'Inter, system-ui, sans-serif', fill '#ffffff', weight 700, align 'center', headlineSizeFraction 0.07, captionSizeFraction 0.04}; CAMERA_FACTORS {dollyGrowth 0.15, panTravel 0.08, parallaxPan 0.04, parallaxGrowth 0.06, orbitPan 0.10, orbitRotationDeg 1.5}; HUD_ROLES ['headline','caption']; depthWeight(z) = 1 / (1 + 0.5 * Math.max(z, 0)).",
+        "Create server/authoring/units.test.ts and constants.test.ts: secToFrames(2) = 60, secToFrames(0.5) = 15, secToFrames(0.016) = 0, secToFrames(-1) throws RangeError containing '-1', framesToSec(45) = 1.5; depthWeight(1) is within 1e-9 of 0.6666666667, depthWeight(10) within 1e-9 of 0.1666666667, depthWeight(-3) = 1; hintList of 10 ids lists exactly 8; AuthoringError('unknown_layer', ...) has message starting 'unknown_layer:'."
+      ],
+      "acceptance": [
+        "secToFrames(2) returns 60 and secToFrames(-1) throws a RangeError whose message contains '-1'",
+        "depthWeight(1) is within 1e-9 of 2/3 and depthWeight(10) is within 1e-9 of 1/6",
+        "AuthoringError('unknown_layer', 'x') has message 'unknown_layer: x' and its code property is 'unknown_layer'"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "types.ts and meta.ts: composition aliases and typed meta.director access",
+      "description": "As an authoring-core author, I want typed access to meta.director so that no function touches loosely typed JSON.",
+      "steps": [
+        "Read docs/hackathon/06-contracts.md section 3a (meta.director shape) and docs/hackathon/steps/step-03-brief-to-composition/design.md section 4.1 (the additive fields: scenes[id].intent and camera, layers[id].z, base, placeholder).",
+        "Create server/authoring/types.ts: `import type { AepCompositionJson, AepLayer } from 'reacthub-pixitweenjs'`; export type Comp = AepCompositionJson, Aspect (from @shared/composition), LayerRole, Prop ('x'|'y'|'scale'|'rotation'|'opacity'), Ease, CameraMove ('static'|'dolly-in'|'pan'|'orbit'|'parallax'), StyleArg {font?, size?, color?, weight?, align?, boxWidth?}, SceneMeta {precompId, startFrame, durationFrames, mode, intent?, camera?: {move, strength}}, LayerMeta {sceneId, role, assetId?, maskAssetId?, z?, base?: {x, y, scale}, placeholder?}, DirectorMeta {productNoun?: string; scenes: Record<string, SceneMeta>; layers: Record<string, LayerMeta>} (productNoun is the short noun phrase for SAM, written by S4's placeProduct and read by S5a and S7b, contract section 3a).",
+        "Create server/authoring/meta.ts: readDirector(c): DirectorMeta (returns empty maps when absent, never undefined), writeDirector(c, meta): Comp (returns a clone of c whose meta.director is meta, preserving other meta keys), sceneMeta(c, id) and layerMeta(c, id) (throw AuthoringError unknown_scene / unknown_layer with a hint listing existing ids), sceneIds(c) in timeline order (the order of root precomp layers), setProductNoun(c, noun: string): Comp (trims; empty -> bad_value) and getProductNoun(c): string | undefined (both preserve the rest of meta.director).",
+        "Create server/authoring/meta.test.ts: readDirector on {} gives empty maps; writeDirector preserves an unrelated meta key 'x'; sceneMeta('nope') throws unknown_scene whose message lists the existing scene ids; sceneIds follows root layer order, not object key order; setProductNoun(c, ' mug ') stores 'mug', getProductNoun returns it, and writeDirector/readDirector keep productNoun intact."
+      ],
+      "acceptance": [
+        "readDirector of a composition without meta returns {scenes: {}, layers: {}}",
+        "writeDirector keeps unrelated keys of composition.meta and does not mutate its input",
+        "sceneMeta(c, 'nope') throws AuthoringError with code 'unknown_scene' and a message listing existing scene ids",
+        "setProductNoun(c, ' mug ') then getProductNoun(c) returns 'mug' and an empty noun throws bad_value"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "composition.ts: newFilmComposition, registerAsset, setAssetSrc",
+      "description": "As a director, I want to start an empty valid film and register assets so that scenes and layers can reference them.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 4.1 (root composition JSON), 5.5 (empty film has durationInFrames 1) and 11 (asset entry {type, src, width?, height?}; inner assets override the outer assetMap).",
+        "Create server/authoring/composition.ts: newFilmComposition({aspect, title?, palette?}): Comp = {version: AEP_VERSION, id: 'film', name: title, width/height from ASPECT_SIZES, fps 30, durationInFrames 1, bgColor palette[0] ?? '#000000', assets: {}, layers: [], precomps: {}, meta: {director: {scenes: {}, layers: {}}}}.",
+        "Add registerAsset(c, {id, kind: 'image'|'video'|'audio', src, width?, height?, duration?}): Comp writing root assets[id] = {type: kind, src, width?, height?, duration?} (duration is passed through in the engine's own unit, FRAMES; document that in a comment); a second registration of the same id with a different src replaces it. Add setAssetSrc(c, assetId, src): Comp that updates the entry in the root assets AND in every scene precomp whose own assets contain that id (inner entries override the outer assetMap in the engine); throws unknown_asset if the id is not registered at the root.",
+        "Create server/authoring/composition.test.ts using lightValidate from server/engine/light-validator.ts: newFilmComposition({aspect: '9:16'}) has width 1080, height 1920, fps 30, durationInFrames 1 and validates; registerAsset adds the entry with type 'image' and, given duration 150 for a video asset, writes duration 150 (absent otherwise); setAssetSrc changes the src in root and in a precomp that holds a copy (build that precomp literal by hand in the test) and throws unknown_asset for an unknown id; inputs are never mutated (deep-freeze the input with a helper and assert no throw)."
+      ],
+      "acceptance": [
+        "newFilmComposition({aspect: '9:16'}) has width 1080, height 1920, fps 30, version '1.8.0' and passes lightValidate",
+        "setAssetSrc updates the src in the root assets and in every scene precomp that contains the asset id",
+        "Passing a deep-frozen composition to registerAsset does not throw (the input is never mutated)"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "keyframes.ts: sampler, ease handles, keyframe builder",
+      "description": "As an authoring-core author, I want a tested keyframe builder and sampler that match the engine's interpolation so that merged axes keep the right values.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.4 and the engine files ~/Documents/code/trolio/reacthub-pixitweenjs/src/types/aep/transform.ts (keyframe shape) and src/hooks/aep/sampleAnimatable.ts (the sampler: only a.easeOut of the segment's first key is used). Do NOT copy the engine file; write your own implementation of the same behaviour.",
+        "Create server/authoring/keyframes.ts: type Kf<T> = {t: number; v: T; easeOut?: [number, number, number, number]}; cubicBezierEase(handles, x) (Newton iteration, 8 steps, x<=0 -> 0, x>=1 -> 1); sampleScalar(field, fallback, frame) and sampleVec2(field, fallback, frame) over a static value or a Kf array (before the first key -> first value, after the last -> last value, linear between keys, easeOut bezier of the segment's first key when present); isAnimated(field).",
+        "Add buildKeys(keys: Array<[sec, value]>, ease, fps, sceneFrames, o?: {min?, max?}): Kf<number>[]: converts seconds with secToFrames, throws time_out_of_range when any time is outside [0, sceneFrames/fps] (message states the scene length), keys_too_close when two keys land on the same frame, bad_value when a value is outside o.min/o.max or not finite; writes EASE_HANDLES[ease] as the easeOut handle on every key except the last (none for 'linear'); keys must be strictly ascending in seconds (else bad_value 'keys must be ascending').",
+        "Create server/authoring/keyframes.test.ts: sampleScalar of [{t:0,v:0},{t:60,v:1}] at frame 30 is 0.5, at 90 is 1, at -5 is 0; with easeOut [0,0,0.58,1] the value at frame 30 is greater than 0.5 and within [0.5, 0.9]; sampleVec2 interpolates both components; buildKeys([[0,0.9],[2,1]], 'easeOut', 30, 120) equals [{t:0,v:0.9,easeOut:[0,0,0.58,1]},{t:60,v:1}]; 'linear' writes no easeOut; times [0, 5] in a 4 s scene throw time_out_of_range mentioning 4; keys [[1,0],[1.01,1]] throw keys_too_close; opacity value 2 with {min:0,max:1} throws bad_value."
+      ],
+      "acceptance": [
+        "buildKeys([[0,0.9],[2,1]], 'easeOut', 30, 120) returns [{t:0, v:0.9, easeOut:[0,0,0.58,1]}, {t:60, v:1}]",
+        "sampleScalar over keys {t:0,v:0} and {t:60,v:1} returns 0.5 at frame 30, 1 at frame 90 and 0 at frame -5",
+        "A key time of 5 s in a 4 s scene throws AuthoringError time_out_of_range whose message contains '4'"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "axis.ts: keying x or y alone merges into the position vec2",
+      "description": "As a director, I want to animate only x or only y so that position keyframes keep the other axis' values.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.4 (x and y merge) and server/authoring/keyframes.ts.",
+        "Create server/authoring/axis.ts: mergePositionAxis(position: Static|Kf<[number,number]>[], axis: 'x'|'y', newKeys: Kf<number>[], fps): Kf<[number,number]>[]: take the union of the frames of newKeys and the existing position keys (none when static), and for each frame f (ascending) build v = [x, y] where the keyed axis is sampleScalar(newKeys, first value, f) and the other axis is sampleVec2(position, [0,0], f) component; copy easeOut from newKeys at a frame that is a key of newKeys else from the existing position key at that frame (else none).",
+        "Add replaceAxisWithStatic(position, axis, value): returns a position field with the axis fixed to value (static [x,y] when the field was static; Kf array with that axis constant otherwise).",
+        "Create server/authoring/axis.test.ts using these exact numbers: position static [960, 561.6]; mergePositionAxis(..., 'x', keys at frames 0 and 60 with values 900 and 1000, linear) gives [{t:0,v:[900,561.6]},{t:60,v:[1000,561.6]}]; then mergePositionAxis(result, 'y', keys at frames 30 and 90 with values 500 and 600, linear) gives exactly [{t:0,v:[900,500]},{t:30,v:[950,500]},{t:60,v:[1000,550]},{t:90,v:[1000,600]}]; replaceAxisWithStatic on a static position changes only the chosen component."
+      ],
+      "acceptance": [
+        "The two-step merge in step 4 produces exactly [{t:0,v:[900,500]},{t:30,v:[950,500]},{t:60,v:[1000,550]},{t:90,v:[1000,600]}]",
+        "Frames in the output are strictly ascending with no duplicates",
+        "replaceAxisWithStatic on static [960, 561.6] with axis 'y' and value 500 returns [960, 500]"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-004"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "scenes.ts: addScene and timeline sequencing",
+      "description": "As a director, I want scenes as precomps sequenced on the root timeline so that a film is a list of scenes.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 4.1 (precomp JSON), 5.5 (scenes) and 11 (precomp timing, validator rules 4 and 5).",
+        "Create server/authoring/scenes.ts: sequenceScenes(c): Comp recomputes, in the order of the root precomp layers, each scene's startFrame (cumulative), the precomp comp's durationInFrames, the root layer's inPoint and outPoint, meta.director.scenes[id].startFrame/durationFrames, and the root durationInFrames (sum, minimum 1).",
+        "Add addScene(c, {id, durationSec, mode, intent?}): validates the id (^[a-z0-9][a-z0-9_-]{0,39}$ else bad_value), duplicate_scene, scene_limit (> MAX_SCENES), bad_duration (durationSec < 1 or > 30), film_too_long (total > MAX_FILM_SECONDS); creates precomps[id] = {version, id, name: id, width, height, fps, durationInFrames: secToFrames(d), assets: {}, layers: []} and a root layer {kind: 'precomp', id, name: id, inPoint: 0, outPoint: 0, compId: id, width, height, transform: {position: [0,0], anchor: [0,0], scale: [1,1], rotation: 0, opacity: 1}}; sets meta.director.scenes[id]; then sequenceScenes.",
+        "Create server/authoring/scenes.test.ts using lightValidate: after addScene s1 (4 s) and s2 (3 s) on a 16:9 film, root durationInFrames is 210, root layer s1 has inPoint 0 / outPoint 120 and s2 has 120 / 210, meta scenes[s2].startFrame is 120, the precomp 's1' has durationInFrames 120, and the composition validates; addScene('s1') again throws duplicate_scene; id 'a:b' throws bad_value; durationSec 0.5 throws bad_duration; a 13th scene throws scene_limit; adding scenes totalling 61 s throws film_too_long."
+      ],
+      "acceptance": [
+        "Two scenes of 4 s and 3 s give root durationInFrames 210 and root layer windows 0-120 and 120-210",
+        "addScene with id 'a:b' throws bad_value and with a duplicate id throws duplicate_scene",
+        "The composition after two addScene calls passes lightValidate"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "scenes.ts: setSceneDuration, swapScenes, removeScene",
+      "description": "As an editor, I want to retime, reorder and delete scenes so that a film can be restructured without rebuilding it.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.5 and server/authoring/scenes.ts.",
+        "Add to server/authoring/scenes.ts: setSceneDuration(c, sceneId, sec) (bad_duration outside 1..30): sets the precomp durationInFrames; sets every inner layer whose outPoint equals the old frame count to the new count; clamps inner keyframes with t greater than the new frame count to the new count (dedupe by frame keeping the last); then sequenceScenes. It does not re-apply the camera here (a later story wires that).",
+        "Add swapScenes(c, a, b) (swap the positions of the two root precomp layers in the layers array, then sequenceScenes; unknown ids throw unknown_scene with a hint) and removeScene(c, sceneId) (delete precomps[id], the root layer and the meta.director entries of the scene and of its layers; then sequenceScenes).",
+        "Create server/authoring/scenes-edit.test.ts with a hand-built three-scene film (s1 4 s, s2 3 s, s3 2 s; each inner layer outPoint equal to its scene frames, one inner opacity keyframe at t = 90 in s1): setSceneDuration(s1, 2) gives s1 durationInFrames 60 and later scenes start at 60 and 150, inner outPoint 60 and the keyframe clamped to t = 60; swapScenes(s1, s3) makes root order s3, s2, s1 with starts 0, 60, 150; removeScene(s2) leaves two scenes starting at 0 and 120, no precomps.s2 and no meta entries for s2; each result passes lightValidate; the input composition is unchanged."
+      ],
+      "acceptance": [
+        "setSceneDuration(s1, 2) on the three-scene film makes s2 start at frame 60 and clamps an inner keyframe at t = 90 down to t = 60",
+        "swapScenes(s1, s3) yields root layer order s3, s2, s1 with start frames 0, 60 and 150",
+        "removeScene(s2) removes precomps.s2 and every meta.director entry whose sceneId is s2"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-006",
+        "US-004"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "placement.ts: default boxes, fitting, and the box-to-transform formula",
+      "description": "As an authoring-core author, I want one placement function so that every layer kind is positioned by the same rules.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.3 (boxes, fit, anchors; all anchors are centres) and docs/hackathon/06-contracts.md section 4a (addLayer box: x,y are the TOP-LEFT of the displayed rectangle; position = (x+w/2, y+h/2), anchor = (assetW/2, assetH/2), scale = (w/assetW, h/assetH)).",
+        "Create server/authoring/placement.ts: type Rect = {x, y, w, h}; defaultBox(role, W, H): Rect from DEFAULT_BOX_FRACTIONS; fitRect(asset {width, height}, box: Rect, mode: 'contain'|'cover'): Rect (the displayed rectangle: uniform scale s = min or max of box.w/aw and box.h/ah, size (aw*s, ah*s), centred inside the box so for cover it overflows the box equally on both sides); boxToImageTransform(asset, rect): {position: [x + w/2, y + h/2], anchor: [aw/2, ah/2], scale: [w/aw, h/ah]} (NON-uniform when the rect has another aspect); boxToShape(rect): {position: [x + w/2, y + h/2], anchor: [w/2, h/2], size: [w, h]}; boxToText(rect, W, H): {position: [x + w/2, y + h/2], anchor: [W/2, H/2], boxWidth: w}; textSize(role, H) = Math.round(fraction * H) for headline (0.07) and caption (0.04).",
+        "Round position and scale values to 4 decimals.",
+        "Create server/authoring/placement.test.ts using 1920x1080 and the 384x672 mug: defaultBox('product') is {x: 288, y: 226.8, w: 1344, h: 669.6}; defaultBox('headline') is {x: 192, y: 86.4, w: 1536, h: 172.8}; fitRect(mug, productBox, 'contain') has h 669.6 and w within 0.01 of 382.6 and is centred (x within 0.01 of 768.7); boxToImageTransform of that rect gives position [960, 561.6], anchor [192, 336], scale within 1e-4 of [0.9964, 0.9964]; an explicit rect {x: 100, y: 100, w: 384, h: 336} gives position [292, 268], anchor [192, 336] and scale [1, 0.5]; fitRect(mug, bgBox, 'cover') has scale factor 5 (w 1920, h 3360) and its centre equals the box centre; boxToShape of the full-frame bg box gives position [960, 540], anchor [960, 540], size [1920, 1080]; boxToText(headlineBox, 1920, 1080) gives position [960, 172.8] and anchor [960, 540]; textSize('headline', 1080) is 76 and textSize('caption', 1080) is 43; a 9:16 case (1080x1920) for the product box has centre [540, 998.4]."
+      ],
+      "acceptance": [
+        "An explicit rect {x: 100, y: 100, w: 384, h: 336} for the 384x672 mug yields position [292, 268], anchor [192, 336] and scale [1, 0.5] (x,y are the top-left, scale is non-uniform)",
+        "fitRect(mug, productBox, 'contain') then boxToImageTransform yields position [960, 561.6], anchor [192, 336] and scale within 1e-4 of 0.9964",
+        "textSize('headline', 1080) returns 76 and textSize('caption', 1080) returns 43"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "layers.ts: addLayer for image, video and shape layers",
+      "description": "As a director, I want to add background shapes, product images and clips to a scene so that scenes get their visible content.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 5.2 (roles, z, array order), 5.3 and 11 (inner assets must live in the scene precomp's own assets), and server/authoring/placement.ts.",
+        "Create server/authoring/layers.ts with addLayer(c, o) for kind 'image' | 'video' | 'shape' (text comes in the next story): validate the scene (unknown_scene + hint) and ROLE_KINDS (invalid_role_kind, message lists the allowed kinds for the role); allocate the id `<sceneId>:<role>` (then -2, -3); for image/video require o.assetId registered at the root (unknown_asset) and copy that asset entry into precomps[sceneId].assets; build the engine layer: common fields {id, name: role, inPoint: 0, outPoint: sceneFrames, transform: {position, anchor, scale: [s,s], rotation: 0, opacity: 1}}; image {kind:'image', assetId}; video {kind:'video', assetId, muted: false}; shape {kind:'shape', path: {kind:'rect', size: [w,h]}, fill: o.fill ?? '#000000'}; if o.box is given use EXACTLY that rectangle (x,y = top-left; images get scale (w/aw, h/ah) via boxToImageTransform, which may be non-uniform); otherwise fit the role's default box with fitRect (mode 'cover' for roles bg and clip, 'contain' otherwise) and place that rectangle; shapes use boxToShape.",
+        "Insert the layer and record meta.director.layers[id] = {sceneId, role, assetId?, z: o.z ?? DEFAULT_Z[role]}; keep the scene's layers array sorted by z descending with ties in insertion order (stable; a new layer goes after existing layers of equal z).",
+        "Create server/authoring/layers-media.test.ts: with the 384x672 mug registered, addLayer product gives id 's1:product', position [960, 561.6], scale within 1e-4 of 0.9964, the asset copied into precomps.s1.assets, meta z 1; addLayer bg shape fill '#111827' gives position [960,540], path size [1920,1080] and sits BEFORE the product in precomps.s1.layers (z 10 vs 1); an explicit box {x: 100, y: 100, w: 384, h: 336} gives position [292, 268] and scale [1, 0.5]; a second product gives id 's1:product-2'; role 'headline' with kind 'image' throws invalid_role_kind; an unregistered assetId throws unknown_asset; a clip with a video asset yields kind 'video' and cover scale; the result passes lightValidate (inner assets satisfy the per-comp asset rule)."
+      ],
+      "acceptance": [
+        "addLayer product for the 384x672 mug in scene s1 returns id 's1:product' with position [960, 561.6] and copies the asset into precomps.s1.assets; an explicit box {x: 100, y: 100, w: 384, h: 336} gives position [292, 268] and scale [1, 0.5]",
+        "A bg shape (z 10) is placed before the product (z 1) in the scene's layers array; a second product gets id 's1:product-2'",
+        "addLayer role 'headline' with kind 'image' throws invalid_role_kind and an unregistered assetId throws unknown_asset"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-006",
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "addLayer for text layers and setText",
+      "description": "As a director, I want headline and caption text layers and the ability to change their words and style.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 5.3 (text defaults, centre anchor) and 11 (text layer schema: source and style with font, size, fill, weight, align, boxWidth).",
+        "In server/authoring/layers.ts extend addLayer for kind 'text' (roles headline and caption): require o.text (bad_value if empty or longer than 120 characters); style = TEXT_DEFAULTS merged with o.style where size defaults to textSize(role, H) and `color` is an alias for `fill`; build {kind:'text', source: text, style: {font, size, fill, weight, align, boxWidth}, transform from boxToText(o.box ?? defaultBox(role))}.",
+        "Add setText(c, layerId, text, style?): updates source and merges style (same alias rules and length checks; error unknown_layer with a hint when the id is missing; invalid_role_kind when the layer is not text).",
+        "Create server/authoring/layers-text.test.ts for 1920x1080: addLayer headline 'Slow mornings' gives id 's1:headline', style.size 76, fill '#ffffff', weight 700, align 'center', boxWidth 1536, position [960, 172.8], anchor [960, 540]; caption gives size 43 and position [960, 961.2]; style {color: '#ff0000', size: 90} yields fill '#ff0000' and size 90; text of 121 characters throws bad_value; setText changes source and keeps other style keys; setText on 's1:bg' throws invalid_role_kind; results pass lightValidate."
+      ],
+      "acceptance": [
+        "A headline layer in a 1920x1080 film has style.size 76, boxWidth 1536 and position [960, 172.8]; a caption has size 43 and position [960, 961.2]",
+        "style {color: '#ff0000'} is written as fill '#ff0000' (no `color` key in the output style)",
+        "setText on a shape layer throws invalid_role_kind and text of 121 characters throws bad_value"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-009"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "removeLayer, reorderLayer and setLayerHidden",
+      "description": "As an editor, I want to delete, hide and reorder layers so that scenes can be rearranged and a generated clip can replace stills without deleting them.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.2 (reorder rules: front = min z - 1, back = max z + 1, above = z(id) - 0.01, below = z(id) + 0.01, then stable re-sort) and server/authoring/layers.ts.",
+        "Add removeLayer(c, layerId) to server/authoring/layers.ts: removes the layer from its scene precomp, removes its meta entry, and drops the scene precomp's copy of the asset when no remaining layer in that scene uses it; unknown_layer with a hint (ids of that scene when the prefix before ':' is a scene) otherwise.",
+        "Add reorderLayer(c, layerId, to: 'front'|'back'|{above: string}|{below: string}) applying the z rules (round z to 2 decimals), validating that the reference layer is in the same scene (bad_value otherwise), updating meta.director.layers[id].z and re-sorting the scene's layers (z descending, ties keep their current relative order).",
+        "Add setLayerHidden(c, layerId, hidden: boolean) writing the engine's `hidden: true` layer field (layers.ts:189 in the engine; delete the key when hidden is false); unknown_layer with a hint otherwise.",
+        "Create server/authoring/layers-order.test.ts with a scene holding bg (z 10), product (z 1) and headline (z 0): reorderLayer(headline, {below: 's1:product'}) sets z 1.01 and the array order becomes bg, headline, product; reorderLayer(bg, 'front') sets z -1 and moves it last; reorderLayer(product, 'back') sets z 11 and moves it first; removeLayer(product) removes the layer, its meta entry and the unused asset copy but keeps an asset still used by another layer; unknown layer throws unknown_layer listing the scene's ids; setLayerHidden(product, true) sets hidden true, setLayerHidden(product, false) removes the key, and both results pass lightValidate."
+      ],
+      "acceptance": [
+        "reorderLayer(headline, {below: 's1:product'}) sets z to 1.01 and the scene order becomes bg, headline, product",
+        "removeLayer drops the scene's copy of an asset only when no other layer in the scene still uses it",
+        "reorderLayer with a reference layer from another scene throws bad_value",
+        "setLayerHidden(c, 's1:product', true) writes hidden: true on the layer and setLayerHidden(..., false) deletes the key"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-010"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "setTransform: static values per property",
+      "description": "As an editor, I want to set a layer's position, scale, rotation and opacity so that I can move and resize things.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 5.4 (property mapping, setTransform clears keyframes and updates base) and 4.1 (base in meta).",
+        "Create server/authoring/transform.ts: setTransform(c, layerId, p: Partial<Record<Prop, number>>): validates values (opacity within 0..1, scale >= 0, all finite; else bad_value), at least one property (bad_value 'nothing to set'); x and/or y replace the matching component of position with replaceAxisWithStatic (position becomes static [x, y]); scale writes [v, v]; rotation and opacity write numbers; clears keyframes of every property it sets; for layers in a scene whose meta.director.scenes[id].camera is set and whose role is not HUD, also updates meta.director.layers[id].base = {x, y, scale} from the new static values (the camera is re-applied by a later story).",
+        "Create server/authoring/transform.test.ts: setTransform(product, {x: 800}) on position [960, 561.6] gives [800, 561.6]; {scale: 1.2} gives [1.2, 1.2]; {opacity: 0.5, rotation: 10}; opacity 2 throws bad_value; {} throws bad_value; a layer with scale keyframes loses them when scale is set; meta base is updated for a camera-affected layer (camera set by hand in the fixture meta) and left alone for the headline; result passes lightValidate."
+      ],
+      "acceptance": [
+        "setTransform(product, {x: 800}) turns position [960, 561.6] into [800, 561.6] and leaves other properties untouched",
+        "setTransform with opacity 2 throws bad_value and with {} throws bad_value ('nothing to set')",
+        "Setting scale on a layer that had scale keyframes replaces them with the static value [v, v]"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-011",
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "setKeyframes: animate one property with eased keys",
+      "description": "As a director, I want to animate a layer's opacity, scale, rotation, x or y with simple second-based keys.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.4 and server/authoring/keyframes.ts and axis.ts.",
+        "Add setKeyframes(c, layerId, prop, keys: Array<[sec, value]>, ease = 'easeInOut') to server/authoring/transform.ts: the layer's scene duration bounds the times (use the scene's frame count); buildKeys with o {min: 0, max: 1} for opacity and {min: 0} for scale; one key writes a static value (same as setTransform for that property); opacity/rotation write Kf<number>[]; scale writes Kf<[v,v]>[]; x or y use mergePositionAxis; unknown layer throws unknown_layer with a hint.",
+        "Create server/authoring/set-keyframes.test.ts using a 4 s scene (120 frames) and the product layer at position [960, 561.6]: scale keys [[0,0.9],[2,1]] with 'easeOut' give transform.scale [{t:0,v:[0.9,0.9],easeOut:[0,0,0.58,1]},{t:60,v:[1,1]}]; opacity keys [[0,0],[0.6,1]] with 'linear' give t 0 and 18 and no easeOut; the two-step x then y example from the axis story, expressed in seconds and with ease 'linear' ([[0,900],[2,1000]] then [[1,500],[3,600]]), gives [{t:0,v:[900,500]},{t:30,v:[950,500]},{t:60,v:[1000,550]},{t:90,v:[1000,600]}]; a single key [[1, 0.5]] on opacity sets the static value 0.5; keys [[0,0],[5,1]] throw time_out_of_range; keys out of order throw bad_value; results pass lightValidate."
+      ],
+      "acceptance": [
+        "scale keys [[0,0.9],[2,1]] with ease 'easeOut' in a 4 s scene produce [{t:0, v:[0.9,0.9], easeOut:[0,0,0.58,1]}, {t:60, v:[1,1]}]",
+        "With ease 'linear', x keys [[0,900],[2,1000]] followed by y keys [[1,500],[3,600]] produce position keyframes at frames 0, 30, 60 and 90 with values [900,500], [950,500], [1000,550], [1000,600]",
+        "Keys [[0,0],[5,1]] in a 4 s scene throw time_out_of_range"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-012"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "camera.ts: setCamera (2D parallax: static, dolly-in, pan, parallax, orbit)",
+      "description": "As a director, I want camera moves that make layers move at different speeds so that stills read as depth.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.6 (decision: 2D parallax, the move table, base capture, worked example) and server/authoring/constants.ts (CAMERA_FACTORS, depthWeight, HUD_ROLES).",
+        "Create server/authoring/camera.ts: setCamera(c, sceneId, move, strength = 0.5): Comp. a = 2 * clamp(strength, 0, 1). For every layer of the scene whose role is bg, product, subject or clip: capture base = meta.director.layers[id].base ?? {x, y, scale} read from the layer's current static position/scale (first keyframe value if animated) and store it; w = depthWeight(z); D = scene frames; centre = (W/2, H/2); two keys at frames 0 and D with the easeInOut handle on the first.",
+        "Apply the table: static -> position [base.x, base.y], scale [base.scale, base.scale], rotation 0 (keyframes removed). dolly-in: g = 0.15*a*w; scale base.scale -> base.scale*(1+g); position p -> p + (p - centre)*g for x and y. pan: P = 0.08*W*a*w; x base.x + P/2 -> base.x - P/2. parallax: pan with P = 0.04*W*a*w plus dolly growth g = 0.06*a*w (scale only). orbit: x as pan with P = 0.10*W*a*w; y base.y - P/4 -> base.y + P/4; rotation -r -> +r with r = 1.5*a*w degrees. Write keyframes for a property only when its start and end values differ by more than 1e-6 (otherwise keep it static, so a centred bg gets no position keyframes). Headline/caption layers are never touched. Store meta.director.scenes[sceneId].camera = {move, strength}.",
+        "Create server/authoring/camera.test.ts on a 1920x1080 scene of 4 s with bg (z 10, centred shape), product (z 1, position [960, 561.6], scale 0.9964) and headline: pan at strength 0.5 moves the product x from 1011.2 to 908.8 (P = 102.4) and the bg x from 972.8 to 947.2 (P = 25.6); dolly-in product scale goes 0.9964 -> 1.09604 (growth 0.1) and its y from 561.6 to 563.76 at the end while bg x stays 960 and bg scale grows by 0.025; headline transform is unchanged; calling setCamera twice (pan then pan) equals calling it once (base reuse); setCamera(static) afterwards restores position [960, 561.6] and scale 0.9964 with no keyframes; strength 1 doubles the pan travel; unknown scene throws unknown_scene; results pass lightValidate. Use toBeCloseTo with 3 digits."
+      ],
+      "acceptance": [
+        "pan at the default strength moves the product's x from 1011.2 to 908.8 and the bg's x from 972.8 to 947.2 over the scene",
+        "dolly-in grows the product scale from 0.9964 to 1.09604 and leaves the headline layer's transform unchanged",
+        "Calling setCamera(pan) twice yields the same composition as calling it once, and setCamera(static) restores the base position and scale"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-013",
+        "US-006"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "Camera re-application when layers or scene length change",
+      "description": "As a director, I want the camera to follow later edits so that adding a layer or retiming a scene does not break the move.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.6 (last paragraph: addLayer applies the camera, setKeyframes overrides) and server/authoring/camera.ts, layers.ts, scenes.ts, transform.ts.",
+        "Add applyCameraIfSet(c, sceneId): Comp to server/authoring/camera.ts (re-runs setCamera with the stored move and strength when meta.director.scenes[sceneId].camera exists, otherwise returns c unchanged).",
+        "Call it at the end of addLayer (for roles bg, product, subject, clip), removeLayer, setSceneDuration and setTransform (after base is updated); keep functions free of circular imports by passing through a small server/authoring/hooks.ts that camera.ts registers into at module load (or import camera.ts lazily inside the functions).",
+        "Create server/authoring/camera-hooks.test.ts: after setCamera(pan) a newly added subject layer already has x keyframes; setSceneDuration(s1, 2) changes the last pan keyframe to t = 60; setTransform(product, {x: 800}) makes the pan run around 800 (first key 800 + P/2); a scene without a camera is not modified by these calls; results pass lightValidate."
+      ],
+      "acceptance": [
+        "A layer added to a scene that already has camera 'pan' receives x keyframes immediately",
+        "setSceneDuration(s1, 2) re-applies the camera so the last position keyframe has t = 60",
+        "In a scene without a camera none of the four mutating functions adds keyframes"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-014",
+        "US-011",
+        "US-007"
+      ]
+    },
+    {
+      "id": "US-016",
+      "title": "sceneInfo, layerInfo, layerIdsByRole, markPlaceholder",
+      "description": "As a reviewer or chat editor, I want read-only helpers so that I can inspect a film without parsing JSON.",
+      "steps": [
+        "Read docs/hackathon/06-contracts.md section 4a (read-only helper signatures) and docs/hackathon/steps/step-03-brief-to-composition/design.md section 4.1 (meta fields).",
+        "Create server/authoring/read.ts: sceneInfo(c): Array<{id, startSec, durationSec, mode, layerIds}> in timeline order (layerIds back-to-front); layerInfo(c, layerId): {id, sceneId, role, kind, assetId?, z?} (kind from the engine layer; unknown_layer with a hint otherwise); layerIdsByRole(c, role, sceneId?): string[].",
+        "Add markPlaceholder(c, layerId, flag: boolean): Comp setting or clearing meta.director.layers[id].placeholder (clearing deletes the key).",
+        "Create server/authoring/read.test.ts on a two-scene film built with the pure API: sceneInfo gives starts 0 and 4 and durations 4 and 4; layerIdsByRole(c, 'bg') returns both scenes' bg ids and with 's2' only s2's; layerInfo('s1:product') returns kind 'image' and z 1; markPlaceholder true then false removes the key."
+      ],
+      "acceptance": [
+        "sceneInfo on a two-scene film returns startSec 0 and 4 with the scenes' layer ids back-to-front",
+        "layerIdsByRole(c, 'bg', 's2') returns only the s2 background id",
+        "markPlaceholder(c, id, false) deletes the placeholder key from meta.director.layers[id]"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-011"
+      ]
+    },
+    {
+      "id": "US-017",
+      "title": "summariseComposition: compact text view for agent prompts",
+      "description": "As a chat or review agent, I want a compact text summary of the film so that prompts stay small.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.7 (format and rules) and server/authoring/read.ts.",
+        "Create server/authoring/summarise.ts: summariseComposition(c): string following the format in design 5.7: header `film \"<name>\" <aspect> <W>x<H> @30fps <seconds>s, <n> scenes` (aspect from W:H: 16:9, 9:16 or 1:1), one line per scene `scene <id> <start>-<end>s <mode> [camera=<move>] \"<intent<=60>\"`, then two-space-indented layer lines in array order: `<id> <kind> <detail> z<z> [at <x>,<y>] [scale <s>] [size <n>] [anim:<fields>] [[placeholder]]` where detail is the fill for shapes, the asset id for image/video, and the text in quotes for text (40 characters then an ellipsis); numbers: seconds 1 decimal, px integers, scale 2 decimals; anim lists position, scale, rotation, opacity when keyframed, and the first keyframe value is shown for animated fields.",
+        "An empty film prints `film \"<name>\" 16:9 1920x1080 @30fps 0.0s, no scenes yet`.",
+        "Create server/authoring/summarise.test.ts: build with the pure API the film newFilmComposition({aspect:'16:9', title:'Cold brew', palette:['#111827']}); registerAsset mug (id ast_0123456789abcdef0123456789abcdef, image, src '/api/assets/ast_0123456789abcdef0123456789abcdef', 384x672); addScene s1 4 s motion intent 'Slow push-in on the mug at sunrise'; addLayer s1 bg shape fill '#111827'; addLayer s1 product image (that asset); addLayer s1 headline text 'Slow mornings'; setKeyframes s1:headline opacity [[0,0],[0.6,1]] easeOut; setCamera s1 dolly-in; addScene s2 4 s generate intent 'Pour into the mug'; addLayer s2 bg shape fill '#111827'; addLayer s2 caption text 'Clip pending approval'; markPlaceholder s2:caption true. Assert the exact eight-line string given in the design example (lines: header with 8.0s and 2 scenes; scene s1 0.0-4.0s motion camera=dolly-in; s1:bg shape #111827 z10 anim:scale; s1:product image ast_0123456789abcdef0123456789abcdef z1 at 960,562 scale 1.00 anim:position,scale; s1:headline text \"Slow mornings\" z0 at 960,173 size 76 anim:opacity; scene s2 4.0-8.0s generate; s2:bg; s2:caption ... at 960,961 size 43 [placeholder]) and that a 40+ character text is truncated with an ellipsis and the empty-film line is exact. If a detail of the design example differs from what the rules produce, fix the DESIGN rules text in a comment in this test and keep the code deterministic; record the final string in `notes`."
+      ],
+      "acceptance": [
+        "The summary of the two-scene film has the header `film \"Cold brew\" 16:9 1920x1080 @30fps 8.0s, 2 scenes` and lists s1:headline as `s1:headline text \"Slow mornings\" z0 at 960,173 size 76 anim:opacity`",
+        "The empty-film line is exactly `film \"Cold brew\" 16:9 1920x1080 @30fps 0.0s, no scenes yet`",
+        "A 6-scene film with 6 layers per scene summarises to fewer than 2500 characters"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-016",
+        "US-014"
+      ]
+    },
+    {
+      "id": "US-018",
+      "title": "api.ts barrel and a type test against the contract",
+      "description": "As a step author, I want one import path for the authoring API so that S3b, S4, S5, S6 and S7 depend on a single module.",
+      "steps": [
+        "Read docs/hackathon/06-contracts.md section 4a (all signatures) and the stub server/authoring/api.ts created by S2.",
+        "Replace the body of server/authoring/api.ts with a barrel (keep the line `export const STUB_OWNER = 'S3a' as const;` so S2's server/stubs.test.ts row still passes) that re-exports every function and type of 06 section 4a: secToFrames, framesToSec, newFilmComposition, registerAsset, addScene, setSceneDuration, swapScenes, removeScene, addLayer, removeLayer, reorderLayer, setLayerHidden, setTransform, setKeyframes, setText, setCamera, sceneInfo, layerInfo, layerIdsByRole, summariseComposition; plus the additive extras setAssetSrc, markPlaceholder, applyCameraIfSet, setProductNoun, getProductNoun, AuthoringError, types Aspect, LayerRole, Prop, Ease, CameraMove, StyleArg, Comp.",
+        "Create server/authoring/api.test.ts using expectTypeOf: each exported function's parameter and return types match 06 section 4a (for example addScene returns Comp, setKeyframes' keys parameter is Array<[number, number]>, layerIdsByRole returns string[]); also a runtime check that Object.keys of the module include all 20 contract function names.",
+        "Do not edit server/stubs.test.ts (S2 owns it)."
+      ],
+      "acceptance": [
+        "The runtime check finds all 20 contract function names (including setLayerHidden) exported from server/authoring/api.ts",
+        "expectTypeOf assertions confirm addScene(c, {id, durationSec, mode}) returns Comp and layerIdsByRole returns string[]",
+        "`npm test` passes including S2's server/stubs.test.ts (api.ts still exports STUB_OWNER 'S3a')"
+      ],
+      "labels": [
+        "backend",
+        "tools",
+        "contracts"
+      ],
+      "dependsOn": [
+        "US-017",
+        "US-015"
+      ]
+    },
+    {
+      "id": "US-019",
+      "title": "tools/authoring.ts part 1: the wrapper and the scene tools",
+      "description": "As a director agent, I want scene tools that edit the stored film through validated commits so that a bad call never corrupts it.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.8 (wrapper, source, error mapping), shared/tools.ts, server/tools/registry.ts and server/test-utils/film.ts.",
+        "In server/tools/authoring.ts (currently `export const tools: ToolDef[] = []`) add runAuthoring(ctx, note, fn): does load, apply and commit as ONE call to ctx.films.mutate(ctx.filmId, cb, source, note) (never a separate get then commit: with two scene builders running at once the second commit would overwrite the first; contract D-15), where cb(film) computes composition = film.composition ?? newFilmComposition({aspect: film.aspect, title: film.storyboard?.title, palette: film.storyboard?.palette}) and returns fn(composition) in the {next, data} shape mutate expects, and source = (ctx as {source?: FilmVersion['source']}).source ?? 'director'; maps AuthoringError to {ok: false, error: err.message} and a failed commit to {ok: false, error: `invalid composition: ${first issue message}`, zodIssues: issues}; success returns {ok: true, version, data}.",
+        "Define tools addScene {id, durationSec 1..12, mode?: 'motion'|'generate' (default 'motion'), intent?: string max 300} (data {sceneId, startSec}), setSceneDuration {sceneId, durationSec}, removeScene {sceneId}, swapScenes {a, b}; descriptions at most 160 characters naming units; export them in the `tools` array (more are added in the next stories).",
+        "Create server/tools/authoring.test.ts with makeTestFilm: addScene s1 (4 s) returns ok true, version 1 and data {sceneId: 's1', startSec: 0}; a second addScene s2 returns startSec 4; duplicate id returns ok false with an error starting 'duplicate_scene'; a failing call leaves film.version unchanged; swapScenes and removeScene change the stored composition's scene order; setSceneDuration changes the root durationInFrames; each tool description is at most 160 characters.",
+        "Extend server/tools/authoring.test.ts with makeTestFilm: two addLayer calls for different scenes started at the same time with Promise.all (the second delayed by a fake timer) both end up in the stored composition, and film.version advances by exactly 2; this must fail if runAuthoring used get then commit."
+      ],
+      "acceptance": [
+        "addScene via the tool on an empty test film returns {ok: true, version: 1, data: {sceneId: 's1', startSec: 0}} and the stored film has one scene",
+        "A duplicate scene id returns ok false with an error starting 'duplicate_scene' and the film's version does not change",
+        "Every tool description in the array is at most 160 characters",
+        "Two concurrent authoring tool calls on one film both persist (no lost update) and add exactly two versions"
+      ],
+      "labels": [
+        "tools",
+        "backend"
+      ],
+      "dependsOn": [
+        "US-018",
+        "US-012"
+      ]
+    },
+    {
+      "id": "US-020",
+      "title": "tools/authoring.ts part 2: layer, text and transform tools",
+      "description": "As a director agent, I want layer tools with helpful errors so that I can repair a failed call in one turn.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.8 (tool table, hints, ignored unknown keys) and server/tools/authoring.ts.",
+        "Add tools: addLayer {sceneId, role, kind, assetId?, text?, style?, fill?, box?: {x,y,w,h}, z?} (data {layerId}; unknown keys such as layerId are ignored by zod), removeLayer {layerId}, reorderLayer {layerId, to: 'front'|'back'|{above}|{below}} (zod union), setText {layerId, text (1..120), style?}, setTransform {layerId, x?, y?, scale?, rotation?, opacity?} with a refine requiring at least one property. The `style` object accepts color, font, size, weight, align, boxWidth.",
+        "Make unknown_layer errors helpful: when the id has no colon, the error hint lists the layer ids of the film that end with ':' + id (for example 'headline' -> 'Did you mean s1:headline?') in addition to the id list.",
+        "Extend server/tools/authoring.test.ts: addLayer bg shape then product image (register an asset on the stored composition first through ctx.films.commit of registerAsset output) return data.layerId 's1:bg' and 's1:product'; passing layerId 'x' to addLayer is ignored and the result id is still 's1:bg-2' for a second bg; setTransform with {} is rejected by the tool's params (ok false, zodIssues non-empty); a call with layerId 'headline' returns an error containing 'Did you mean s1:headline?' when that layer exists; reorderLayer with {below: 's1:product'} works; setText updates the stored text."
+      ],
+      "acceptance": [
+        "addLayer ignores an extra `layerId` argument and returns the allocated id in data.layerId",
+        "A call with layerId 'headline' when 's1:headline' exists returns an error containing 'Did you mean s1:headline?'",
+        "setTransform with no properties is rejected with ok false and a non-empty zodIssues array"
+      ],
+      "labels": [
+        "tools",
+        "backend"
+      ],
+      "dependsOn": [
+        "US-019"
+      ]
+    },
+    {
+      "id": "US-021",
+      "title": "tools/authoring.ts part 3: setKeyframes and setCamera, registry and JSON-schema check",
+      "description": "As a director agent, I want animation and camera tools whose schemas convert cleanly for the model so that Spark can call them.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.8 and server/llm/spark-backend.ts (zodToJsonSchema usage) and server/tools/registry.ts.",
+        "Add tools setKeyframes {layerId, prop: 'x'|'y'|'scale'|'rotation'|'opacity' (the contract's `prop`, not the S1 probe's `property`), keys: array 1..12 of z.tuple([z.number(), z.number()]), ease?: 'linear'|'easeIn'|'easeOut'|'easeInOut'} and setCamera {sceneId, move, strength?: number 0..1}; both data {layerId} or {sceneId}.",
+        "Create server/tools/authoring-registry.test.ts: allTools() from server/tools/registry.ts contains exactly the eleven names addScene, setSceneDuration, removeScene, swapScenes, addLayer, removeLayer, reorderLayer, setTransform, setKeyframes, setText, setCamera (in any order) and no duplicates; every tool converts through zodToJsonSchema(def.params, {target: 'openApi3', $refStrategy: 'none'}) without throwing and the result has type 'object'; the setKeyframes schema's keys items are arrays of two numbers (minItems 2, maxItems 2).",
+        "Extend server/tools/authoring.test.ts with a full scripted scene through runTool on makeTestFilm: the six calls from fixtures/seed/spark-tool-loop-turns.json adapted to the real ids and to the contract's `prop` argument name (addScene s1 4 s; addLayer bg shape; addLayer product image; addLayer headline text 'Slow mornings'; setKeyframes s1:headline prop opacity keys [[1,0],[2,1]] easeOut; setKeyframes s1:product prop scale keys [[0,0.9],[4,1]] easeInOut) all return ok true, the film has 6 versions, and the stored composition passes lightValidate; setCamera dolly-in then adds position and scale keyframes to the product."
+      ],
+      "acceptance": [
+        "allTools() contains exactly the eleven authoring tool names with no duplicates",
+        "The six scripted calls return ok true and the film ends at version 6 with a composition that passes lightValidate",
+        "Every tool's params convert to a JSON schema of type 'object' and setKeyframes keys items are two-number arrays"
+      ],
+      "labels": [
+        "tools",
+        "backend"
+      ],
+      "dependsOn": [
+        "US-020"
+      ]
+    },
+    {
+      "id": "US-022",
+      "title": "Randomised test, engine agreement test, fixture generator and browser check",
+      "description": "As an owner, I want proof that everything the core builds is valid for the real engine and renders as designed so that later steps can trust it.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 9 (test plan) and 11 (Unverified items 1-3: text anchor, precomp origin, font), fixtures/s02/valid/*.json and web/src/engine-agreement.test.tsx (S2).",
+        "Create server/authoring/random.test.ts: a seeded PRNG (mulberry32 with seed 7) drives 200 random operations (mix of valid and invalid arguments) over the pure API starting from a 3-scene film; assert every returned composition passes lightValidate, every thrown error is an AuthoringError, and the input composition of each call is unchanged (deep equality with a pre-call clone).",
+        "Create web/src/authoring-agreement.test.tsx (jsdom project): build a three-scene film through server/authoring/api.ts (bg, product, headline, keyframes, camera in each scene) and assert parseAepCompositionSafe(film).success is true and lightValidate(film).ok is true; assert AEP_VERSION equals the engine's AEP_SCHEMA_VERSION export.",
+        "Create fixtures/s03a/mug-192.jpg once with a one-off tsx command that calls resizeFit(readSeedBuffer('mug-product.png'), 336, 'jpeg') from server/media/image.ts (result 192x336 pixels; commit the file).",
+        "Create scripts/gen-s03a-fixtures.ts (runs under tsx, no network, deterministic): reads fixtures/s03a/mug-192.jpg, builds three films with the pure API (two-scene-dolly 16:9, three-scene-pan 16:9, vertical-parallax 9:16; each with bg, product, headline, opacity keyframes and a camera) registering the product asset with width 192, height 336 and src set to the data URL of that jpeg, and writes fixtures/s03a/valid/{two-scene-dolly,three-scene-pan,vertical-parallax}.json (2-space indent, stable key order). Add scripts/gen-s03a-fixtures.test.ts asserting that regenerating in memory deep-equals the committed files.",
+        "Run `npx tsx scripts/gen-s03a-fixtures.ts`, then verify in the browser: `npm run dev:web`, open http://localhost:5173/?fixture=1, choose s03a/two-scene-dolly and press play. Check and record in `notes`: (a) scene 2 appears after scene 1 (time label around 4 s), (b) the product is horizontally centred, (c) the headline's visual centre is within 5% of the composition's horizontal centre (state what you observed: this settles the text-anchor question), (d) the dolly-in visibly grows the product, (e) which font family was rendered, (f) any console error."
+      ],
+      "acceptance": [
+        "random.test.ts performs 200 operations with seed 7 and every returned composition passes lightValidate",
+        "A three-scene film built through the API passes both the engine's parseAepCompositionSafe and lightValidate in web/src/authoring-agreement.test.tsx",
+        "Regenerating the fixtures in memory deep-equals the committed fixtures/s03a/valid/*.json, and in the browser s03a/two-scene-dolly shows scene 2 after scene 1 (recorded in notes)"
+      ],
+      "labels": [
+        "test",
+        "frontend",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-021"
+      ]
+    }
+  ]
+}

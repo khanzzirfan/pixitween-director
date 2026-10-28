@@ -1,0 +1,29 @@
+{
+  "id": "chatcmpl-01a17af1-d59f-7626-8a4e-239b873ac930",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "{\n  \"scenes\": [\n    {\n      \"durationSec\": 4,\n      \"id\": \"scene-1-hero-reveal\",\n      \"intent\": \"Slow push-in to reveal white ceramic mug on sunlit wooden table\",\n      \"mode\": \"motion\",\n      \"modeReason\": \"A static tabletop scene can be faked with layered stills and a slow camera push-in.\"\n    },\n    {\n      \"durationSec\": 4,\n      \"id\": \"scene-2-pour\",\n      \"intent\": \"Fresh coffee pours into mug with rising steam and liquid swirl\",\n      \"mode\": \"generate\",\n      \"modeReason\": \"Pouring coffee and rising steam require true fluid dynamics that stills cannot convincingly fake.\"\n    },\n    {\n      \"durationSec\": 4,\n      \"id\": \"scene-3-detail\",\n      \"intent\": \"Close-up detail of mug texture and handle with soft studio light\",\n      \"mode\": \"motion\",\n      \"modeReason\": \"A held product close-up needs only rotation and highlight shifts achievable with stills and camera motion.\"\n    }\n  ],\n  \"title\": \"Morning Ritual - White Ceramic Mug\"\n}",
+        "refusal": null,
+        "role": "assistant"
+      },
+      "logprobs": null
+    }
+  ],
+  "created": 1793064031,
+  "model": "muse-spark-1.3-contributor",
+  "object": "chat.completion",
+  "usage": {
+    "completion_tokens": 1809,
+    "prompt_tokens": 60,
+    "total_tokens": 1869,
+    "completion_tokens_details": {
+      "reasoning_tokens": 1558
+    },
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    }
+  }
+}

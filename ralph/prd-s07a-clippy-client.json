@@ -1,0 +1,619 @@
+{
+  "name": "PixiTween Director S07a: Clippy client, approval gate, request builder, mode and approve routes, panel",
+  "branchName": "ralph/s07a-clippy-client",
+  "description": "The first half of generate mode: a typed, tested Clippy MCP client; the single-use approval tokens and the guard that makes animate_image unreachable without one; the request builder (10 s rule, prompt limits, idempotency keys); the scene source still; the public-URL rule; the mode and approve routes with a runner registry (S7b plugs in the runner); and the approval panel. Offline only: no Clippy or Meta call in any story. Leaves out: polling, download, swap-in, clip check (S7b).",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Clippy MCP types: zod schemas and constants",
+      "description": "As a server developer, I want typed, validated shapes for the Clippy MCP tools so that bad requests are caught before any credit is reserved.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 4.1 (the verified animate_image contract, result shapes and server-side validation rules) and shared/tools.ts for the zod conventions.",
+        "Create server/clippy/types.ts exporting constants CLIPPY_ESTIMATED_CREDITS = 25, FAST_H3_MIN_SEC = 5.2, MAX_CLIP_SEC = 10, FAST_H3_PROMPT_MAX = 800, OMNI_PROMPT_MAX = 8000, OMNI_SECONDS = [5.875, 8, 10.125, 12.25, 14.375] as const.",
+        "In the same file export zod schemas and inferred types: animateImageArgsSchema (a discriminated union on `model`: 'fast-h3' requires an https sourceImageUrl, prompt <= 800, durationSec 5.2-14.375, aspect '16:9'|'9:16'|'1:1', no imageUrls with more than one entry; 'fast-h3-omni' requires imageUrls 1-9 https, prompt <= 8000, durationSec exactly one of OMNI_SECONDS (tolerance 1e-6), aspect '16:9'|'1:1'|'9:16'|'4:3'; both take an optional idempotencyKey matching /^[A-Za-z0-9._:-]{8,200}$/), submitResultSchema { jobId, status, estimatedCredits }, statusResultSchema { jobId, status: 'queued'|'planning'|'rendering'|'done'|'failed'|'cancelled', progress?, resultUrl: string | null, resultUrlExpiresAt?: string | null, error?: unknown, creditsCharged?: number } and balanceResultSchema { currentBalance: number } (the last two use .passthrough() so unknown fields survive).",
+        "Create hand-authored fixtures fixtures/s07a/submit-result.json, status-done.json, status-rendering.json and balance.json, each containing \"_handAuthored\": true, shaped as in the design section 4.1.",
+        "Create server/clippy/types.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "animateImageArgsSchema accepts { model: 'fast-h3', prompt: 'x', sourceImageUrl: 'https://a.example/i.jpg', durationSec: 5.2, aspect: '16:9' } and rejects the same with an http:// URL, with an 801-character prompt, with durationSec 5.1, and with imageUrls of two entries",
+        "The omni variant accepts durationSec 8 and 5.875 and rejects 10 and 9.99; it accepts 1 to 9 imageUrls and rejects 10",
+        "The four fixtures parse with their schemas (the _handAuthored key does not break parsing) and statusResultSchema rejects status 'unknown'",
+        "idempotencyKey 'film1:s2:1' parses; 'short' and 'has space in it' are rejected",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "meta-api"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Clippy MCP client over Streamable HTTP",
+      "description": "As a server developer, I want a typed client for Clippy's MCP server so that generate mode can read balances and submit jobs.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 4.1 and 11 (SDK facts), server/clippy/types.ts, and the installed SDK typings in node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.d.ts and streamableHttp.d.ts (confirm Client, StreamableHTTPClientTransport, requestInit, callTool, terminateSession) and its server side (server/mcp.js, server/streamableHttp.js) for the test server.",
+        "Create server/clippy/mcp.ts exporting interface ClippyClient { listLiveAnimateModels(): Promise<unknown>; getCreditBalance(): Promise<BalanceResult>; animateImage(args: AnimateImageArgs): Promise<SubmitResult>; getLiveAnimateStatus(jobId: string): Promise<StatusResult>; cancelLiveAnimate(jobId: string): Promise<unknown>; close(): Promise<void> }, class ClippyError extends Error { tool: string; isToolError: boolean; status?: number } and createClippyClient({ url, token, timeoutMs = 60000 }): ClippyClient.",
+        "Implementation: lazy connect on first use with `new Client({ name: 'pixitween-director', version: '1' })` and `new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers: { Authorization: `Bearer ${token}` } } })` (imports from '@modelcontextprotocol/sdk/client/index.js' and '@modelcontextprotocol/sdk/client/streamableHttp.js'); each method uses client.callTool({ name, arguments }); an MCP result with isError becomes ClippyError carrying the server's text; otherwise parse the first text content item as JSON and validate it with the matching zod schema (ClippyError('unexpected response') on failure). The token never appears in any error message (replace it with '[redacted]').",
+        "Create server/clippy/mcp.test.ts that starts a node:http server on port 0 hosting an SDK McpServer over StreamableHTTPServerTransport (stateless) with tools get_credit_balance, animate_image and get_live_animate_status returning JSON text content, and records the Authorization header it sees.",
+        "If the wildcard subpath import does not resolve under the repository's moduleResolution, fix the import path or tsconfig setting minimally and record what was needed in notes."
+      ],
+      "acceptanceCriteria": [
+        "getCreditBalance() against the test server returns an object with currentBalance equal to the number the test server returns, and the server saw the header 'Bearer test-token'",
+        "A tool result with isError true makes the client method reject with ClippyError whose message contains the tool name and the server text and does not contain 'test-token'",
+        "A tool result whose text is not valid JSON rejects with ClippyError 'unexpected response'",
+        "close() ends without error and `npm run typecheck` passes with the two SDK imports",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "meta-api"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Client timeouts and read-only retries",
+      "description": "As a server developer, I want reads to retry once and writes never to retry so that a flaky network cannot double-charge a clip.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 7 (errors table) and server/clippy/mcp.ts.",
+        "In server/clippy/mcp.ts add a per-call timeout (timeoutMs, default 60000; ClippyError('timeout') when exceeded) and `withReadRetry` used by listLiveAnimateModels, getCreditBalance and getLiveAnimateStatus: on a transport error (not a tool error) retry once after 2000 ms via an injectable `sleep`.",
+        "animateImage and cancelLiveAnimate are never retried automatically.",
+        "Extend server/clippy/mcp.test.ts: a test server that fails the first status request at the HTTP level and succeeds the second; a test server that never answers."
+      ],
+      "acceptanceCriteria": [
+        "A status read that fails once at transport level and then succeeds returns the result, the injected sleep was called once with 2000, and the server saw two requests",
+        "A transport failure on animateImage rejects after exactly one server request (no retry)",
+        "With timeoutMs 50 and a server that never answers, the call rejects with ClippyError message 'timeout' within 500 ms",
+        "A tool error (isError) on a read is not retried (one server request)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "backend",
+        "meta-api"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Fake Clippy client for tests",
+      "description": "As a test author, I want a scriptable fake of the Clippy client so that generate mode can be tested offline.",
+      "steps": [
+        "Read server/clippy/mcp.ts (the ClippyClient interface), fixtures/s07a/*.json and docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 9.",
+        "Create server/clippy/fake.ts exporting makeFakeClippy(opts?: { script?: StatusResult['status'][]; balance?: number; failSubmit?: ClippyError; resultUrl?: string }): ClippyClient & { calls: Array<{ tool: string; args: unknown }> }.",
+        "Behaviour: animateImage records the call, returns { jobId: 'job_<n>', status: 'rendering', estimatedCredits: 25 }, is idempotent (the same idempotencyKey with equal args returns the same jobId; with different args it throws ClippyError('idempotency_key_reused')), and throws opts.failSubmit when set. getLiveAnimateStatus walks the script (default ['queued', 'rendering', 'rendering', 'done']); the done step has resultUrl (default 'https://clip.example.test/out.mp4?sig=abc'). cancelLiveAnimate marks the job cancelled. getCreditBalance returns { currentBalance: opts.balance ?? 120 }.",
+        "Create server/clippy/fake.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "Submitting twice with the same key and args returns the same jobId and records two calls; the same key with a different prompt rejects with 'idempotency_key_reused'",
+        "Four status reads with the default script return queued, rendering, rendering, done, and only the last has a non-null resultUrl",
+        "After cancelLiveAnimate the next status is 'cancelled'; failSubmit makes animateImage reject with that error",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "test"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Credit balance reader",
+      "description": "As a UI developer, I want a safe balance reader so that the panel can show credits without ever failing the request.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 4.1 and 5.9 and server/clippy/mcp.ts.",
+        "Create server/clippy/balance.ts exporting createBalanceReader(client: ClippyClient | undefined, opts?: { ttlMs?: number; now?: () => number }): { read(): Promise<number | undefined> }. read() returns currentBalance when it is a finite number, otherwise undefined; it never throws (a client error or a missing client gives undefined) and caches a successful value for ttlMs (default 30000).",
+        "Create server/clippy/balance.test.ts using the fake client."
+      ],
+      "acceptanceCriteria": [
+        "With a fake balance of 120, read() returns 120 and a second read within 30 s does not call the client again (calls length 1); after advancing the injected clock by 31 s it calls again",
+        "A client whose getCreditBalance rejects, and an undefined client, both give undefined without throwing",
+        "A balance result with currentBalance 'abc' gives undefined",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "backend",
+        "meta-api"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Approval store: propose and consume tokens",
+      "description": "As an owner, I want single-use, expiring approval tokens so that nothing is generated without a click.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 5.4 and 4.3, server/store/film-store.ts and server/env.ts (DATA_DIR; the store reuses the same base: <DATA_DIR>/films/<filmId>).",
+        "Create server/generate/approval.ts exporting class ApprovalError extends Error { code: 'bad_token' | 'token_expired' | 'token_used' }, the branded type ConsumedApproval { filmId; sceneId; attempt; consumedAt } (only consume() can create one; use a unique-symbol brand) and createApprovalStore({ dir?: (filmId: string) => string (default: <env.DATA_DIR>/films/<filmId>), now?: () => Date, ttlMs?: number, random?: () => string }).",
+        "The store persists data to <dir(filmId)>/approvals.json (write a temp file then rename). Methods: propose(filmId, sceneId, estCredits): { token; attempt; expiresAt } (reuses an unexpired, unconsumed proposal for that scene; otherwise a new 32-hex-character token from crypto.randomBytes(16), expiry now + 30 minutes); consume(token, filmId, sceneId): ConsumedApproval (atomically sets consumedAt before returning; throws ApprovalError); attemptFor(filmId, sceneId): number (1 + the number of consumed approvals for the scene); hasProposal(filmId, sceneId): boolean.",
+        "Create server/generate/approval.test.ts with a temp directory and an injected clock."
+      ],
+      "acceptanceCriteria": [
+        "propose twice within 30 minutes returns the same token; after 31 minutes it returns a different token; tokens match /^[0-9a-f]{32}$/",
+        "consume succeeds once; a second consume throws code 'token_used'; a token for another scene or an unknown token throws 'bad_token'; an expired token throws 'token_expired'",
+        "attemptFor is 1 before any consume and 3 after two consumed approvals for the scene; a new store instance on the same directory sees the consumed state",
+        "The proposal reuse rule does not return a consumed token (a new propose after a consume returns a new token with attempt incremented)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "agent"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Guard: the only path to animateImage",
+      "description": "As an owner, I want a structural guarantee that nothing can be submitted without a consumed approval so that no credits are spent by accident.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 3 and 5.4, server/generate/approval.ts and server/clippy/mcp.ts.",
+        "Create server/generate/guard.ts exporting idempotencyKeyFor(filmId, sceneId, attempt): string (join with ':'; replace characters outside [A-Za-z0-9._:-] with '_'; if the result is shorter than 8 characters append ':s7'; always <= 200 characters) and submitApproved(client: ClippyClient, approval: ConsumedApproval, args: AnimateImageArgs): Promise<SubmitResult> which validates args with animateImageArgsSchema, requires args.idempotencyKey === idempotencyKeyFor(approval.filmId, approval.sceneId, approval.attempt) (otherwise throws an Error naming both keys) and then calls client.animateImage(args).",
+        "Create server/generate/guard.test.ts with: the behaviour tests; a type-level test using // @ts-expect-error showing that a plain object { filmId, sceneId, attempt, consumedAt } is not accepted as ConsumedApproval; and a source-scanning test that reads every server/**/*.ts file that is not a *.test.ts and not under server/clippy/ and not guard.ts and fails if any of them contains the pattern /\\.animateImage\\s*\\(/ ."
+      ],
+      "acceptanceCriteria": [
+        "submitApproved with a consumed approval and matching args reaches the fake client exactly once and returns its result; a mismatched idempotencyKey rejects before any client call",
+        "idempotencyKeyFor('film 1', 's/2', 1) returns 'film_1:s_2:1'; idempotencyKeyFor('f', 's', 1) returns 'f:s:1:s7' (8 characters)",
+        "The source-scanning test passes on the repository and fails when a temporary file under server/generate/ containing `client.animateImage(x)` is added during the test",
+        "The @ts-expect-error line is satisfied (typecheck passes), proving the brand blocks unapproved objects",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-004",
+        "US-006"
+      ],
+      "labels": [
+        "backend",
+        "agent",
+        "test"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Clip request builder",
+      "description": "As a server developer, I want a pure builder that turns a scene into valid animate_image arguments so that every request obeys the 10 s rule and the prompt limits.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 5.1 (rules, template and heuristics) and 4.1, server/clippy/types.ts, server/generate/guard.ts and shared/storyboard.ts (Scene.camera).",
+        "Create server/generate/request.ts exporting wantsSound(intent): boolean (true when the intent contains pour, splash, sizzle, crackle, fizz, steam, simmer or sound, case-insensitive, as whole words or word starts), snapOmniSeconds(sec): 5.875 | 8 (the smallest of [5.875, 8] that is >= sec, else 8), clipSecondsFor(model, sceneSec): number (fast-h3: round to 1 decimal then clamp to [5.2, 10]; omni: snapOmniSeconds), buildClipPrompt({ intent, camera, adjust?, omni? }): string and buildAnimateRequest({ filmId, aspect, scene: { id, durationSec, intent, camera }, stillUrl, productPhotoUrl?, attempt, adjust?, withSound? }): AnimateImageArgs.",
+        "buildClipPrompt follows the template in the design (intent, camera phrase, product-fidelity sentence, 'No text, no logos, no extra products.', optional retry sentence); for fast-h3 trim to 800 characters at a sentence boundary (never mid-word; the result ends with '.', '!' or '?'); omni adds 'Ambient sound only, no speech, no music.' and names <Picture 1> as the scene and <Picture 2> as the product, with a 1200 character cap.",
+        "buildAnimateRequest picks model omni when withSound (default wantsSound(intent)), uses idempotencyKeyFor, sets sourceImageUrl for fast-h3 or imageUrls [stillUrl, productPhotoUrl?] for omni, and validates the result with animateImageArgsSchema (a ZodError propagates).",
+        "Create server/generate/request.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "clipSecondsFor('fast-h3', 3) is 5.2, ('fast-h3', 12) is 10, ('fast-h3', 7.04) is 7; ('fast-h3-omni', 6) is 8, ('fast-h3-omni', 4) is 5.875, ('fast-h3-omni', 8) is 8",
+        "buildClipPrompt with a 2000-character intent returns at most 800 characters, ends with a sentence-ending character and is a prefix-cut at a sentence boundary (no partial word); with adjust true it contains 'Keep the product clearly visible in frame for the whole clip'",
+        "buildAnimateRequest for a 9:16 film with intent 'coffee pours into a cup' and stillUrl 'https://app.example.test/api/assets/a1' returns model 'fast-h3-omni', aspect '9:16', imageUrls starting with that URL, durationSec 8 for a 7 s scene, and idempotencyKey 'film1:s2:1' for attempt 1; the same scene with intent 'a slow reveal' returns model 'fast-h3' with sourceImageUrl set",
+        "An http:// stillUrl makes buildAnimateRequest throw a ZodError",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-007"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Scene source still: choose, crop, store",
+      "description": "As a server developer, I want the scene image Clippy will animate chosen from the best available asset and cropped to the film aspect so that clips match the film.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 5.2, server/media/image.ts (imageSize, resizeFit), shared/composition.ts (AssetRef roles) and server/test-utils/film.ts.",
+        "Create server/generate/source-still.ts exporting selectSource(film: FilmState, comp: Comp, sceneId: string): { kind: 'still' | 'flatten' | 'plate' | 'product-photo'; asset?: AssetRef } (order: an asset with role 'still' and that sceneId; else 'flatten' when the scene has bg or product layers with assetIds; else the bg plate asset; else the product photo from film.brief.productAssetId) and prepareSourceStill(ctx: ToolCtx, sceneId: string, aspect: '16:9' | '9:16' | '1:1', flatten?: (...args) => Promise<Buffer>): Promise<{ asset: AssetRef; kind: string }>.",
+        "prepareSourceStill reads the chosen bytes (for 'flatten' it uses the injected flatten function; the real one arrives in the next story), centre-crops with sharp resize({ width, height, fit: 'cover' }) to 1536x864 (16:9), 864x1536 (9:16) or 1280x1280 (1:1), encodes JPEG quality 85 and stores it through ctx.assets.put with role 'still' and sceneId; if such an asset of exactly that size already exists for the scene it is reused without writing.",
+        "Create server/generate/source-still.test.ts using fixtures/seed/cafe-with-mug.jpg and fixtures/seed/mug-product.png and compositions from the S3a functions."
+      ],
+      "acceptanceCriteria": [
+        "selectSource returns kind 'still' when a role 'still' asset exists for the scene, 'flatten' when only bg and product layers exist, 'plate' when only a bg layer exists, and 'product-photo' when the scene has no assets",
+        "prepareSourceStill on fixtures/seed/cafe-with-mug.jpg for 9:16 stores an image/jpeg asset whose imageSize is 864x1536 with role 'still' and the scene id; for 16:9 it is 1536x864",
+        "A second prepareSourceStill call for the same scene and aspect returns the same asset id and makes no new ctx.assets.put call",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "art"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Flatten fallback: compose a scene's layers into one image",
+      "description": "As a server developer, I want to flatten a scene's background and product layers when no ready-made still exists so that Clippy still gets a faithful picture.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 5.2 (item 2 and the engine geometry), the engine's mapping in ~/Documents/code/trolio/reacthub-pixitweenjs/src/components/AepComposition/useAepLayerTransform.ts lines 60-120, flatten in server/media/image.ts and server/generate/source-still.ts.",
+        "Create server/generate/flatten.ts exporting staticBox(layer, assetSize, compSize, frame = 0): { left; top; width; height } (left = x - anchorX * sx, top = y - anchorY * sy, width = W * sx, height = H * sy, where x,y,anchor,scale are the static value or, for keyframes, the value at `frame` by linear interpolation; rotation and parents are ignored and said so in a header comment) and flattenScene(ctx: ToolCtx, comp: Comp, sceneId: string, size: { width: number; height: number }): Promise<Buffer> drawing the scene's bg, subject and product image layers (those with assetIds, not hidden) in array order with the media flatten helper.",
+        "Wire it in: make prepareSourceStill's default flatten function call flattenScene.",
+        "Create server/generate/flatten.test.ts with synthetic solid-colour PNGs created through sharp in the test (a 1920x1080 red bg and a 400x400 blue product at position [960, 540], anchor [200, 200], scale [1, 1])."
+      ],
+      "acceptanceCriteria": [
+        "staticBox for that product returns left 760, top 340, width 400, height 400; with scale [0.5, 0.5] it returns left 860, top 440, width 200, height 200",
+        "flattenScene returns a PNG of 1920x1080 whose pixel at (960, 540) is blue within 8 per channel and whose pixel at (10, 10) is red within 8",
+        "A hidden product layer is not drawn (the centre pixel is red)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-009"
+      ],
+      "labels": [
+        "backend",
+        "art"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Public URL rule for assets Clippy must fetch",
+      "description": "As an owner, I want requests refused when the asset URL is not publicly reachable so that credits are never spent on a job that cannot fetch its image.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 5.3 and server/env.ts (PUBLIC_BASE_URL).",
+        "Create server/generate/public-url.ts exporting class PublicUrlError extends Error, assertPublicUrl(url: string): URL (must parse, be https:, and the host must not be localhost, *.localhost, *.local, 0.0.0.0, a loopback or link-local address, an IPv4 in 10.x, 127.x, 169.254.x, 172.16-31.x or 192.168.x, or an IPv6 loopback/unique-local) and publicAssetUrl(baseUrl: string | undefined, assetUrl: string): string (joins base and path without a double slash, then runs assertPublicUrl).",
+        "The error message follows the design: 'Clippy fetches the scene image itself, so PUBLIC_BASE_URL must be a public https URL (the deployed server, or a tunnel the owner approved). Got <host>.' and for a missing base 'PUBLIC_BASE_URL is not set.'.",
+        "Create server/generate/public-url.test.ts (table-driven)."
+      ],
+      "acceptanceCriteria": [
+        "Accepted: https://app.fly.dev, https://director.example.com:8443/x; rejected: http://app.fly.dev, https://localhost, https://127.0.0.1, https://10.0.0.5, https://172.16.0.1, https://172.31.255.1, https://192.168.1.2, https://169.254.1.1, https://[::1], https://foo.local, https://a.localhost",
+        "172.15.0.1 and 172.32.0.1 are accepted (outside the private /12)",
+        "publicAssetUrl('https://app.fly.dev/', '/api/assets/a1') returns 'https://app.fly.dev/api/assets/a1'; with an undefined base it throws PublicUrlError whose message contains 'PUBLIC_BASE_URL is not set'",
+        "The message for https://localhost contains 'Got localhost'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "tools"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Scene mode logic and generate cap",
+      "description": "As a server developer, I want pure helpers to flip a scene's mode and count generate scenes so that the two-scene cap is enforced everywhere.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 5.9 and 12, docs/hackathon/06-contracts.md section 3a (comp.meta.director.scenes) and server/authoring/api.ts (sceneInfo).",
+        "Create server/generate/mode.ts exporting MAX_GENERATE_SCENES = 2, countGenerateScenes(comp): number, setSceneMode(comp, sceneId, mode): Comp (works on a structuredClone; throws an Error with code 'unknown_scene' for a missing scene) and buildProposalInfo({ film, comp, sceneId, sourceKind, balance? }): { model; durationSec; withSound; reason; estCredits: 25 }.",
+        "The reason is the storyboard scene's modeReason when non-empty, otherwise 'You chose real video for this scene.'; when sourceKind is 'product-photo' append ' No scene image exists yet, so the product photo will be animated.'. model, durationSec and withSound come from wantsSound, clipSecondsFor and the scene intent in film.storyboard.",
+        "Create server/generate/mode.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "countGenerateScenes counts 2 for a film with two generate scenes; setSceneMode(comp, 's1', 'generate') returns a new composition whose meta.director.scenes.s1.mode is 'generate' while the input is unchanged",
+        "setSceneMode with an unknown scene throws an Error with code 'unknown_scene'",
+        "buildProposalInfo for a 3 s scene with intent 'coffee pours' returns model 'fast-h3-omni', durationSec 5.875, withSound true, estCredits 25; for intent 'a slow reveal' it returns 'fast-h3', 5.2, false",
+        "The reason uses modeReason 'Needs real liquid motion' when the storyboard has it and the default text otherwise",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-008"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Mode route: flip a scene and get a proposal",
+      "description": "As a web client developer, I want POST /scenes/:sceneId/mode so that the user can switch a scene to real video and see exactly what it would cost.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 3, 4.2 and 7, docs/hackathon/06-contracts.md section 5 (the /mode and /approve contract) and section 6 (D-1, D-2, D-4), server/http/handlers/generate.ts (the S2 stub `registerGenerateRoutes(app, deps)`; deps = { films, assets, meta, ledger, bus, makeToolCtx }), server/http/routes.ts (only to see how it is called; never edit it), server/clippy/balance.ts and shared/events.ts.",
+        "Create server/generate/types.ts with zod schemas and types for ModeRequest { mode }, Proposal, ModeResponse (the contract's `200 { mode, proposal? }`) and the GenerateErrorCode union from the design section 4.2; create server/generate/services.ts exporting getGenerateServices() (module-level singletons: the approval store, a Clippy client created lazily from env.CLIPPY_MCP_URL and env.CLIPPY_TOKEN or undefined when unset, a balance reader) and setGenerateServicesForTests(services).",
+        "Fill server/http/handlers/generate.ts (S2 created it as a 501 stub; S7a owns it): `registerGenerateRoutes(app, deps)` registers POST /api/films/:id/scenes/:sceneId/mode using deps.films and deps.makeToolCtx(filmId). The mode route: 404 for an unknown film or scene; mode 'generate': if the scene is not already generate and countGenerateScenes >= MAX_GENERATE_SCENES answer 409 { error: 'generate_cap' }; otherwise commit setSceneMode (source 'user', note 'scene <id> -> generate') when changed, prepare the source kind with selectSource, propose through the approval store, read the balance, emit generate.proposed { sceneId, reason, estCredits: 25, token } through the ToolCtx and answer 200 { mode: 'generate', proposal } (errors are { error: <code> }). Mode 'motion': commit the change, call the revert handler from the runner registry if one is registered (the registry is created in the next story; import it lazily and tolerate its absence), answer 200 { mode: 'motion' }.",
+        "Create server/http/handlers/generate.test.ts (mode cases): a Hono app, registerGenerateRoutes(app, deps) with deps assembled from makeTestFilm, app.request, and the fakes."
+      ],
+      "acceptanceCriteria": [
+        "POST mode 'generate' on a motion scene returns 200 with proposal { token (32 hex), estCredits 25, model, durationSec, balance 120 } and emits one generate.proposed event; a second identical request returns the same token",
+        "A third generate scene returns 409 { error: 'generate_cap' } and leaves the composition unchanged; an unknown scene returns 404",
+        "POST mode 'motion' on a generate scene returns 200 { mode: 'motion' } and meta.director.scenes[scene].mode becomes 'motion'",
+        "With no Clippy client configured the proposal is still returned with no balance field",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005",
+        "US-006",
+        "US-008",
+        "US-009",
+        "US-012"
+      ],
+      "labels": [
+        "backend",
+        "http"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Approve route and runner registry",
+      "description": "As a web client developer, I want POST /scenes/:sceneId/approve so that a click starts the clip exactly once.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 3, 5.3, 5.4 and 7, docs/hackathon/06-contracts.md section 5, server/http/handlers/generate.ts (registerGenerateRoutes from the previous story), server/generate/approval.ts, server/generate/public-url.ts and server/clippy/balance.ts.",
+        "Create server/generate/runner-registry.ts exporting type GenerationRunner = { preflight(ctx, sceneId): Promise<{ ok: true } | { ok: false; status: number; error: string; retryAfterSec?: number }>; run(ctx, input: { sceneId: string; approval: ConsumedApproval }): Promise<void> }, setGenerationRunner(r), getGenerationRunner(), setRevertHandler(fn) and getRevertHandler() (module-level; S7b registers them).",
+        "Extend registerGenerateRoutes in server/http/handlers/generate.ts with POST /api/films/:id/scenes/:sceneId/approve, answering in this order: 404 for an unknown film or scene; 409 { error: 'not_generate_scene' } when the scene is not generate; 501 { error: 'runner_unavailable' } when no runner is registered; 422 { error: 'public_url_invalid', message } when PUBLIC_BASE_URL fails assertPublicUrl; 402 { error: 'insufficient_credits' } when the balance is readable and below 25; the runner's preflight failure status and error (for example 429 rate_limited with retryAfterSec); ONLY THEN consume the token (404 bad_token, 410 token_expired, 409 token_used) and answer 202 { accepted: true } after starting runner.run in the background (never awaited; a rejection emits an error event { where: 'generate', message } and is logged). Errors are always { error: <code> }.",
+        "Extend server/http/handlers/generate.test.ts for every status code in that order."
+      ],
+      "acceptanceCriteria": [
+        "With a registered fake runner, a valid token returns 202 { accepted: true } and the runner's run is called once with the scene id and a ConsumedApproval; the same token again returns 409 token_used",
+        "Failures before the consume leave the token unconsumed: with no runner the response is 501 runner_unavailable, with PUBLIC_BASE_URL 'http://localhost:8787' it is 422 public_url_invalid, with a balance of 10 it is 402 insufficient_credits, with a preflight returning { ok: false, status: 429, error: 'rate_limited', retryAfterSec: 120 } it is 429 and the body has retryAfterSec 120; in each case a later valid request with the same token succeeds",
+        "An unknown token returns 404 bad_token and an expired token returns 410 token_expired (injected clock)",
+        "A runner whose run rejects does not change the 202 and produces one error event with where 'generate'; server/http/routes.ts is unchanged by this PRD (git diff shows no edit to it)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-007",
+        "US-011",
+        "US-013"
+      ],
+      "labels": [
+        "backend",
+        "http"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "useGenerate: state per scene from events",
+      "description": "As a UI developer, I want one reducer that turns server events into a per-scene state so that the panel only renders.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 3 (state diagram), 4.2 and 8, shared/events.ts, web/src/api/client.ts and web/src/api/sse.ts.",
+        "Create web/src/panels/generate-types.ts mirroring the server's Proposal, ModeResponse and GenerateErrorCode types (plain TypeScript interfaces) and fixtures/s07a/mode-response.json (hand-authored, _handAuthored true); add a test that the fixture parses with the server's ModeResponse zod schema and is assignable to the web ModeResponse type.",
+        "Create web/src/panels/useGenerate.ts exporting the pure reduceGenerate(state, event) and the hook useGenerate({ filmId, comp, events, api }): { scenes, review(sceneId), approve(sceneId), keepMotion(sceneId) } where api = { setMode(filmId, sceneId, mode), approve(filmId, sceneId, token) }. Per-scene phases: motion, idle (generate, no proposal), proposed, running, placing, checking, done, failed, needs_retry.",
+        "Event mapping: generate.proposed -> proposed (stores the token, reason, estimate); generate.progress statuses approved|submitted|queued|planning|rendering|downloading -> running, placing -> placing, checking -> checking, 'failed: <msg>' and 'timed_out' -> failed with the message, 'cancelled' -> motion; generate.done -> done with the asset and productVisibleFrac; review.finding with kind 'product-missing-in-clip' -> needs_retry until a new generate.proposed arrives. review(sceneId) calls api.setMode(..., 'generate') and stores the returned proposal; approve(sceneId) calls api.approve with the stored token; keepMotion calls api.setMode(..., 'motion').",
+        "Create web/src/panels/useGenerate.test.tsx."
+      ],
+      "acceptanceCriteria": [
+        "The event sequence proposed, progress rendering, progress downloading, progress placing, progress checking, done (productVisibleFrac 0.92) leaves the scene in phase done with visibleFrac 0.92 and passes through running, placing, checking in order",
+        "progress 'failed: pro_plan_required' gives phase failed with that message; progress 'timed_out' gives failed with 'timed out'; a review.finding product-missing-in-clip after done gives needs_retry, and a following generate.proposed gives proposed",
+        "approve('s2') calls api.approve once with the token from the stored proposal; with no proposal it does nothing; keepMotion calls api.setMode with 'motion'",
+        "The mode-response fixture is assignable to the web type and parses with the server schema",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-013"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ]
+    },
+    {
+      "id": "US-016",
+      "title": "ModeToggle component",
+      "description": "As a user, I want a small MOTION / GENERATE switch on a scene so that I can choose real video deliberately.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 1 and 3, web/src/panels/useGenerate.ts and web/src/App.tsx for styling tokens.",
+        "Create web/src/panels/ModeToggle.tsx: props { sceneId: string; mode: 'motion' | 'generate'; busy?: boolean; disabledReason?: string; onChange(mode): void }. Render a two-option segmented control (radio group with aria-label 'Scene mode'), the selected option has aria-checked='true'; when mode is motion show the note 'Real video costs about 25 credits and needs your approval.'; when disabledReason is set, GENERATE is disabled and the reason is shown.",
+        "Create web/src/panels/ModeToggle.test.tsx."
+      ],
+      "acceptanceCriteria": [
+        "Clicking GENERATE while mode is 'motion' calls onChange('generate') once; clicking the already selected option calls nothing",
+        "With disabledReason 'A film can have at most 2 generated scenes' GENERATE is disabled and the reason text is visible",
+        "With busy true both options are disabled; the selected option has aria-checked='true'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-015"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ]
+    },
+    {
+      "id": "US-017",
+      "title": "GenerateApproval panel",
+      "description": "As a user, I want to see every scene's mode, review the cost and approve or decline a clip so that I stay in control of spend.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 1, 3 and 10 (what leaves the machine), web/src/panels/useGenerate.ts, web/src/panels/ModeToggle.tsx, web/src/App.tsx (the GenerateApproval slot and its stub).",
+        "Replace the stub web/src/panels/GenerateApproval.tsx. Props { filmId?: string; comp?: AepCompositionJson; events: FilmEvent[]; api }. Render one card per scene with its ModeToggle. For a generate scene show by phase: idle 'Review and approve' button; proposed 'Generate this clip: about 25 credits, usually a few minutes. The scene image and prompt are sent to Clippy.' plus the reason, 'Balance: N credits' or 'Balance unavailable', and Approve and Keep as motion buttons; running 'Rendering...' with the latest status; placing and checking short labels; done 'Clip placed' and 'Product visible in N% of frames'; failed the message with Keep as motion and Try again; needs_retry the finding text with 'Retry (25 credits)'.",
+        "Map API error codes to messages: public_url_invalid shows the server message and disables Approve; insufficient_credits 'Not enough Clippy credits'; rate_limited 'Generation limit reached, try again in N minutes'; generate_cap 'A film can have at most 2 generated scenes'; token_expired 'The proposal expired, review again'. Approve is disabled once expiresAt has passed.",
+        "Create web/src/panels/GenerateApproval.test.tsx with @testing-library/react."
+      ],
+      "acceptanceCriteria": [
+        "For a proposed scene with balance 120 the panel shows the 25-credits sentence, 'Balance: 120 credits' and both buttons; clicking Approve calls approve once; clicking Keep as motion calls setMode with 'motion'",
+        "With no balance the text 'Balance unavailable' is shown; after the proposal's expiresAt the Approve button is disabled and 'The proposal expired, review again' is shown",
+        "A failed approve response with error 'public_url_invalid' shows its message and keeps Approve disabled; 'rate_limited' with retryAfterSec 120 shows 'try again in 2 minutes'",
+        "A done scene shows 'Clip placed' and 'Product visible in 92% of frames' for productVisibleFrac 0.92; with filmId undefined an empty state is shown",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-015",
+        "US-016"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ]
+    },
+    {
+      "id": "US-018",
+      "title": "Live script s07-connect (free connectivity check)",
+      "description": "As an owner, I want a free command that proves my Clippy token and URL work so that I find problems before spending credits.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 9 and 11, scripts/live/run.ts (the dispatcher and the exported shape { describe, estimateUsd, run }) and server/clippy/mcp.ts.",
+        "Create scripts/live/s07-connect.ts exporting describe() (what it does; it needs CLIPPY_MCP_URL and CLIPPY_TOKEN; it only reads: list models and credit balance, no job is created, no credit is spent), estimateUsd() returning 0 and run(): create the client, read the models and the balance, time each call, and print summariseConnect(results); throw a clear error naming the missing variable when either is unset.",
+        "Export summariseConnect({ models, balance, timings }): string (pure; shows model names, currentBalance and timings; never prints the token or the URL's query).",
+        "Create scripts/live/s07-connect.test.ts for the pure parts and the missing-variable error (never contacting a server)."
+      ],
+      "acceptanceCriteria": [
+        "estimateUsd() returns 0 and describe() contains 'no credit is spent'",
+        "summariseConnect for models ['fast-h3', 'fast-h3-omni'] and balance { currentBalance: 120 } timings 340 and 210 ms returns text containing 'fast-h3-omni', '120' and '340', and no 'Bearer' or 'token' substring",
+        "run() without CLIPPY_TOKEN rejects with a message containing 'CLIPPY_TOKEN' and opens no connection",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "scripts",
+        "test"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-07-generate-mode-mcp/design.md",
+      "docs/hackathon/steps/step-07-generate-mode-mcp/requirements.md",
+      "docs/hackathon/steps/step-07-generate-mode-mcp/contract-issues.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (types, interfaces, authoring core 4a, helpers and test doubles 4b, HTTP 5, decisions D-1..D-14 in section 6)",
+      "docs/hackathon/ralph/README.md (rules every story follows)",
+      "docs/hackathon/steps/step-07-generate-mode-mcp/design.md",
+      "docs/hackathon/steps/step-07-generate-mode-mcp/contract-issues.md",
+      "docs/hackathon/steps/step-01-meta-api-probes/findings.md",
+      "fixtures/seed/README.md"
+    ],
+    "requires": [
+      "prd-s02-skeleton"
+    ],
+    "owns": [
+      "server/clippy/*",
+      "server/generate/approval.ts",
+      "server/generate/guard.ts",
+      "server/generate/request.ts",
+      "server/generate/source-still.ts",
+      "server/generate/flatten.ts",
+      "server/generate/public-url.ts",
+      "server/generate/mode.ts",
+      "server/generate/types.ts",
+      "server/generate/services.ts",
+      "server/generate/runner-registry.ts",
+      "server/http/handlers/generate.ts",
+      "web/src/panels/GenerateApproval.tsx",
+      "web/src/panels/useGenerate.ts",
+      "web/src/panels/ModeToggle.tsx",
+      "web/src/panels/generate-types.ts",
+      "scripts/live/s07-connect.ts",
+      "fixtures/s07a/*"
+    ],
+    "sharedEdits": [],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "No story calls the Clippy MCP server, including in tests: tests use the in-process SDK test server or makeFakeClippy. `animateImage` may only be called from server/clippy/* and server/generate/guard.ts (a test enforces it).",
+      "Clippy fixtures are hand-authored and marked \"_handAuthored\": true; never present them as recorded responses.",
+      "S7a never edits server/http/routes.ts (D-1): it fills registerGenerateRoutes in server/http/handlers/generate.ts, which S2 creates as a stub and S7a owns. S7a has no other edit outside its own files.",
+      "Never log or return the CLIPPY_TOKEN, a signed resultUrl, or an URL query string."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner runs `npm run live -- s07-connect --yes` (free: lists models and the credit balance; no job, no credit) with CLIPPY_MCP_URL and CLIPPY_TOKEN set, and pastes the output (no token) in the PR. It confirms the SDK transport, the bearer header and the balance shape.",
+      "MG-2: owner confirms S4 stores the product-in-scene still with role 'still' and sceneId and writes meta.director.productNoun (D-11); S7a falls back to a flatten, the plate or the product photo if not.",
+      "MG-3: owner provides PUBLIC_BASE_URL (the S8b deployment or an approved tunnel); without it Approve answers 422 public_url_invalid and nothing is spent."
+    ]
+  }
+}

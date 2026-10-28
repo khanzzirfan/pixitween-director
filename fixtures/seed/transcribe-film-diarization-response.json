@@ -1,0 +1,14 @@
+{
+  "sessionId": "voyager/transcribe/36214C9AFBE44EFD9A55EB8E4F661036",
+  "transcript": "From first extraction extraction to first sip, watch calm become ritual. One careful pour turns into a finished guest's notice. And that first taste often brings a quiet smile.",
+  "audioDurationMs": 15120,
+  "turns": [
+    {
+      "turnId": 0,
+      "startMs": 1660,
+      "endMs": 14140,
+      "transcript": "From first extraction extraction to first sip, watch calm become ritual. One careful pour turns into a finished guest's notice. And that first taste often brings a quiet smile.",
+      "speaker": "A"
+    }
+  ]
+}

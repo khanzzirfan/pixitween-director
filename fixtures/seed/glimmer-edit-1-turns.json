@@ -1,0 +1,17 @@
+[
+  {
+    "ms": 33366,
+    "status": 200,
+    "calls": [
+      "setKeyframes({\"layerId\":\"mug\",\"property\":\"scale\",\"keys\":[[0,1],[6,1.25]],\"ease\":\"easeInOut\"})",
+      "setKeyframes({\"layerId\":\"headline\",\"property\":\"opacity\",\"keys\":[[1,0],[2,1],[5,1],[6,0]],\"ease\":\"easeOut\"})"
+    ],
+    "content": ""
+  },
+  {
+    "ms": 5463,
+    "status": 200,
+    "calls": [],
+    "content": "DONE"
+  }
+]

@@ -1,0 +1,486 @@
+{
+  "name": "PixiTween Director S11: the director as an MCP server (Option A)",
+  "branchName": "ralph/s11-mcp-server",
+  "description": "Offline PRD for the optional S11 stretch, Option A: expose the director over MCP (Streamable HTTP, stateless, passcode-protected) with five tools (create_film, get_film, edit_film, list_films, get_player_url), SSRF-safe product-image input and a film-service port that is fully testable with an in-memory MCP transport. Option B (Muse Wonder computer use) has no stories: it was researched and recorded as no-go in the design. Mounted through one appended boot hook in server/boot.ts (decision D-3). Start only if S0-S9 are green by Tue 3 Nov 12:00 ET.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "MCP SDK smoke test and dependency check",
+      "description": "As a developer, I want a test that proves the pinned MCP SDK and zod versions work together so that every later story builds on verified imports.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md section 11 (verified SDK facts and import paths) and docs/hackathon/06-contracts.md section 6 (D-9, the dependency pins), then package.json (the installed versions of `@modelcontextprotocol/sdk` and `zod`).",
+        "Do not install or upgrade anything: S2 pins `@modelcontextprotocol/sdk@1.32.2` and `zod@^3.25` (D-9). If either is missing or the installed zod is older than 3.25.0, write `blocked: S2 pin missing (<package>)` in `notes` and stop; never install `@modelcontextprotocol/server`, `@modelcontextprotocol/client` or `@modelcontextprotocol/node`.",
+        "Create server/mcp/sdk-smoke.test.ts. It imports `McpServer` from `@modelcontextprotocol/sdk/server/mcp.js`, `Client` from `@modelcontextprotocol/sdk/client/index.js`, `InMemoryTransport` from `@modelcontextprotocol/sdk/inMemory.js`, `WebStandardStreamableHTTPServerTransport` from `@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js` and `StreamableHTTPClientTransport` from `@modelcontextprotocol/sdk/client/streamableHttp.js`.",
+        "In that test assert each imported class is a function, read the installed zod version from `zod/package.json` (via `createRequire(import.meta.url)`) and assert it is at least 3.25.0, and read the installed SDK version and assert its major version is 1.",
+        "In that test register a tool `echo` with `server.registerTool('echo', { description: 'echo', inputSchema: { text: z.string() } }, async ({ text }) => ({ content: [{ type: 'text', text }] }))` using a zod 3 raw shape, connect a `Client` to the server over `InMemoryTransport.createLinkedPair()`, and call it."
+      ],
+      "acceptanceCriteria": [
+        "`client.callTool({ name: 'echo', arguments: { text: 'hi' } })` returns a result whose `content[0].text` is `hi`",
+        "The test asserts the installed zod version is >= 3.25.0 and the installed SDK major version is 1",
+        "package.json lists `@modelcontextprotocol/sdk` as a dependency and does not list any `@modelcontextprotocol/server` package",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Tool input and result schemas",
+      "description": "As a client developer, I want strict, documented tool inputs so that invalid requests are refused before any work starts.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md section 4 (the zod raw shapes and the result interfaces) and shared/storyboard.ts and shared/composition.ts for `FilmState` and the aspect values.",
+        "Create server/mcp/schemas.ts exporting the raw shapes `createFilmInput`, `getFilmInput`, `editFilmInput`, `listFilmsInput`, `getPlayerUrlInput` and the `filmId` schema exactly as in design section 4, plus `createFilmSchema = z.object(createFilmInput).refine(exactlyOne)` where `exactlyOne` requires exactly one of `productImageUrl` and `productImageBase64`.",
+        "Export the result types `CreateFilmResult`, `GetFilmResult`, `EditFilmResult`, `ListFilmsResult` and `GetPlayerUrlResult` as in design section 4, and a `MAX_SUMMARY_CHARS = 4000` constant.",
+        "Create server/mcp/schemas.test.ts with accept and reject tables."
+      ],
+      "acceptanceCriteria": [
+        "`createFilmSchema.parse({ brief: 'A calm film of a mug', productImageUrl: 'https://example.com/a.png' })` succeeds and its `aspect` is `16:9`",
+        "`createFilmSchema` rejects an input with both `productImageUrl` and `productImageBase64`, an input with neither, and a brief of 9 characters",
+        "The `filmId` schema rejects `../x`, an empty string and a 65-character string, and accepts `f_demo01`",
+        "`listFilmsInput.limit` rejects 0 and 51, accepts 50, and defaults to 20; `editFilmInput.message` rejects a 1-character string",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Public-address guard for image URLs",
+      "description": "As an owner, I want image URLs checked against private address ranges so that the server cannot be tricked into reading internal services.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md section 5.2 (the rule table and the blocked ranges) and section 10 (security).",
+        "Create server/mcp/ip-guard.ts exporting `class ImageUrlError extends Error { code: 'bad-url' | 'bad-scheme' | 'credentials-in-url' | 'private-address' | 'dns-failed' }`, `isPublicAddress(ip: string): boolean` and `assertPublicHttpsUrl(url: string, lookup: (host: string) => Promise<Array<{ address: string; family: number }>>): Promise<URL>`.",
+        "`isPublicAddress` uses `node:net` `isIP`; for IPv4 it rejects the ranges of the design table; for IPv6 it rejects `::`, `::1`, `fc00::/7`, `fe80::/10`, `ff00::/8`, and for IPv4-mapped addresses (`::ffff:a.b.c.d` and the hex form `::ffff:7f00:1`) it re-checks the embedded IPv4 address; an invalid string returns false.",
+        "`assertPublicHttpsUrl` rejects an unparseable URL (`bad-url`), any scheme other than `https:` (`bad-scheme`), a URL with a username or password (`credentials-in-url`), an IP-literal host that is not public without calling `lookup` (`private-address`), a host whose lookup throws or returns nothing (`dns-failed`), and a host whose lookup returns any non-public address (`private-address`); otherwise it returns the parsed `URL`.",
+        "Create server/mcp/ip-guard.test.ts with the table of addresses below and the URL cases."
+      ],
+      "acceptanceCriteria": [
+        "`isPublicAddress` returns true for `8.8.8.8`, `1.1.1.1`, `172.32.0.1` and `2606:4700:4700::1111`",
+        "`isPublicAddress` returns false for `0.0.0.1`, `10.1.2.3`, `100.64.0.1`, `127.0.0.1`, `169.254.169.254`, `172.16.0.1`, `172.31.255.255`, `192.168.1.1`, `192.0.0.8`, `198.18.0.1`, `224.0.0.1`, `255.255.255.255`, `::`, `::1`, `fd12::1`, `fe80::1`, `ff02::1`, `::ffff:127.0.0.1` and `::ffff:a00:1`",
+        "`assertPublicHttpsUrl('http://example.com/a.png', lookup)` rejects with code `bad-scheme`; `https://u:p@example.com/` rejects with `credentials-in-url`; `https://10.0.0.1/` rejects with `private-address` and the injected `lookup` is not called",
+        "A host whose lookup returns `[8.8.8.8, 10.0.0.5]` rejects with `private-address`; a host returning `[8.8.8.8]` resolves to a `URL` whose `hostname` is the host",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Product image input: URL fetch and base64 decode",
+      "description": "As a client developer, I want the product photo accepted as an https URL or base64 with strict limits so that uploads cannot abuse the server.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md section 5.2 (limits, magic bytes, redirects) and server/mcp/ip-guard.ts.",
+        "Create server/mcp/image-input.ts exporting `MAX_IMAGE_BYTES = 10 * 1024 * 1024`, `class ImageInputError extends Error { code: 'bad-base64' | 'data-url' | 'too-large' | 'bad-type' | 'bad-status' | 'too-many-redirects' | 'timeout' | 'fetch-failed' }`, `sniffImageMime(bytes: Uint8Array): 'image/png' | 'image/jpeg' | 'image/webp' | undefined` (PNG `89 50 4E 47 0D 0A 1A 0A`; JPEG `FF D8 FF`; WebP `RIFF` + 4 bytes + `WEBP`) and `decodeBase64Image(b64: string): { bytes: Buffer; mime: string }` (rejects a `data:` prefix with `data-url`, invalid base64 with `bad-base64`, more than `MAX_IMAGE_BYTES` with `too-large`, an unknown signature with `bad-type`).",
+        "In the same file export `fetchProductImage(url: string, deps: { lookup: Lookup; fetchFn?: typeof fetch; timeoutMs?: number }): Promise<{ bytes: Buffer; mime: string }>`. It calls `assertPublicHttpsUrl` on the URL, fetches with `redirect: 'manual'` and `AbortSignal.timeout(deps.timeoutMs ?? 10000)`, follows at most 3 redirects re-validating each `Location` with `assertPublicHttpsUrl` (a fourth redirect throws `too-many-redirects`), throws `bad-status` for a non-2xx final status, reads the body as a stream and throws `too-large` as soon as the running byte count exceeds `MAX_IMAGE_BYTES`, then checks `sniffImageMime` (`bad-type`). An aborted request throws `timeout`; any other fetch error throws `fetch-failed` with no URL in the message.",
+        "Add a code comment that DNS pinning is not implemented (design section 5.2) and that the residual rebinding window is documented in docs/mcp.md.",
+        "Create server/mcp/image-input.test.ts with an injected `fetchFn` and `lookup`: a valid PNG, JPEG and WebP; an 11 MB body delivered in 1 MB chunks; a GIF; a 302 to `http://example.com/x`; a 302 to a host whose lookup returns `10.0.0.5`; four chained redirects; a 404; a `fetchFn` that waits for the abort signal with `timeoutMs: 10`."
+      ],
+      "acceptanceCriteria": [
+        "`fetchProductImage` returns `{ mime: 'image/png' }` for a body starting with the 8 PNG signature bytes, and `'image/jpeg'` for `FF D8 FF`",
+        "An 11 MB streamed body throws `ImageInputError` with code `too-large` after at most 11 chunks are read",
+        "A 302 whose `Location` is `http://example.com/x` throws `ImageUrlError` with code `bad-scheme`, and one whose host resolves to `10.0.0.5` throws code `private-address`; four chained redirects throw `too-many-redirects`",
+        "`decodeBase64Image('data:image/png;base64,AAAA')` throws code `data-url`; a GIF body (`GIF89a`) throws `bad-type`; a `fetchFn` that never answers with `timeoutMs: 10` throws `timeout`",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Film service port and createFilm",
+      "description": "As a client developer, I want create_film to return a film id immediately while the director works in the background so that my tool call does not time out.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md sections 4, 5.3 and 5.5, docs/hackathon/06-contracts.md sections 3 and 4 (`FilmState`, `FilmStore`, `AssetStore`, `FilmEvent`), server/test-utils/film.ts (`makeTestFilm`) and server/store/film-store.ts.",
+        "Create server/mcp/film-service.ts exporting `class ServiceError extends Error { code: 'invalid-input' | 'not-found' | 'not-ready' | 'image-rejected' | 'internal' }`, the interface `McpFilmService { createFilm(input): Promise<CreateFilmResult>; getFilm(filmId): Promise<GetFilmResult>; listFilms(limit): Promise<ListFilmsResult>; editFilm(filmId, message, selection?): Promise<EditFilmResult>; getPlayerUrl(filmId): Promise<GetPlayerUrlResult> }` and `interface ServiceDeps { films: FilmStore; assets: AssetStore; runDirector: (filmId: string) => Promise<void>; runEdit: (filmId: string, message: string, selection?: { sceneId?: string; layerId?: string }, opts?: { local?: boolean }) => Promise<unknown>; subscribe: (filmId: string, fn: (e: FilmEvent) => void) => () => void; emit: (e: FilmEvent) => void; lookup: Lookup; fetchFn?: typeof fetch; publicBaseUrl: string; editWaitMs?: number; now?: () => Date }`.",
+        "Export `makeFilmService(deps: ServiceDeps): McpFilmService`. Implement `createFilm`: validate with `createFilmSchema` (`invalid-input`), obtain the bytes through `decodeBase64Image` or `fetchProductImage` (any `ImageUrlError` or `ImageInputError` becomes `image-rejected` with a fixed message that does not echo the URL), `assets.put(bytes, mime, { role: 'product-photo' })`, `films.create({ aspect, brief: { text: brief, productAssetId: asset.id }, assets: [asset], createdAt: (deps.now ?? (() => new Date()))().toISOString() })` (`createdAt` is required since D-12), then start `deps.runDirector(film.id)` without awaiting it.",
+        "Attach a `.catch` to the background run that sets the film status to `failed` through `films.update` and emits `{ type: 'error', filmId, at: <ISO time>, where: 'mcp.create_film', message }`. Return `{ filmId, status: 'planning', playerUrl: `${publicBaseUrl}/?film=${filmId}`, note: 'The director is building the film; poll get_film until status is ready.' }`.",
+        "Leave `getFilm`, `listFilms`, `editFilm` and `getPlayerUrl` as methods that throw `new Error('not implemented')` for the following stories.",
+        "Create server/mcp/film-service.test.ts using `makeTestFilm` stores and a controllable `runDirector` (a deferred promise)."
+      ],
+      "acceptanceCriteria": [
+        "`createFilm` resolves with `status: 'planning'` and a `playerUrl` ending `/?film=<filmId>` while the `runDirector` promise is still pending",
+        "The stored asset has role `product-photo`, the created film's `brief.productAssetId` equals the asset id, and its `createdAt` equals the injected `now()` as an ISO string",
+        "A URL whose lookup returns `10.0.0.5` makes `createFilm` reject with `ServiceError` code `image-rejected`, a message that does not contain the hostname, and no film is created",
+        "When `runDirector` rejects with `new Error('boom')` the film status becomes `failed` and an `error` event with `where: 'mcp.create_film'` is emitted",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002",
+        "US-004"
+      ],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Film service: getFilm, listFilms, getPlayerUrl",
+      "description": "As a client developer, I want to poll a film's status and scenes so that I can tell when it is ready.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md sections 4 and 5.5, server/mcp/film-service.ts, server/store/film-store.ts (how `get` behaves for an unknown id) and `summariseComposition` in server/authoring/api.ts.",
+        "Implement `getFilm(filmId)` in `makeFilmService`: validate the id with the `filmId` schema (`invalid-input`); `films.get` failing or returning nothing becomes `ServiceError` `not-found`; build the result of design section 4: `scenes` from `film.storyboard.scenes` (id, durationSec, intent, mode, modeReason; an empty array when there is no storyboard yet), `summary` from `summariseComposition(film.composition)` cut at `MAX_SUMMARY_CHARS` with the suffix `...(truncated)` appended when cut (empty string when there is no composition), `costUsd`, `clippyCredits`, `version`, `aspect`, `status`, `title` and `playerUrl`.",
+        "Implement `listFilms(limit)`: map `films.list()` to `{ filmId, title, status, version, createdAt }`, sorted by `createdAt` descending (ISO strings compare lexicographically; ties keep the store's order), cut at `limit`.",
+        "Implement `getPlayerUrl(filmId)`: `not-found` for an unknown film, else `{ filmId, playerUrl: `${publicBaseUrl}/?film=${filmId}` }`.",
+        "Extend server/mcp/film-service.test.ts with these cases using `makeTestFilm` and a film that has a storyboard and a composition."
+      ],
+      "acceptanceCriteria": [
+        "`getFilm` for a film with the 3-scene storyboard of fixtures/seed/spark-storyboard-response.json returns 3 scenes, and the scene `scene-2-pour` has `mode: 'generate'` and a non-empty `modeReason`",
+        "`getFilm` of a composition whose summary is longer than 4000 characters returns a summary of at most 4014 characters ending with `...(truncated)`",
+        "`getFilm('nope')` rejects with `ServiceError` code `not-found`, and `getFilm('../x')` rejects with `invalid-input`",
+        "`listFilms(2)` for 3 films with `createdAt` 2026-11-01, 2026-11-03 and 2026-11-02 returns 2 items: the 2026-11-03 film first, then the 2026-11-02 film, each item carrying its `createdAt`",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Film service: editFilm with a bounded wait",
+      "description": "As a client developer, I want edit_film to return when the edit finishes or after a bounded wait so that tool calls do not hang.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md section 5.4 (the wait race), docs/hackathon/06-contracts.md section 3 (the `tool.call` event) and server/mcp/film-service.ts.",
+        "Implement `editFilm(filmId, message, selection?)` in `makeFilmService`: validate with the `editFilmInput` shapes (`invalid-input`); load the film (`not-found`); if its status is not `ready` throw `ServiceError` `not-ready` with the message `film is still building; poll get_film`.",
+        "Subscribe to the film's events with `deps.subscribe` before starting, collecting the `name` of every `tool.call` event with `ok: true`; start `deps.runEdit(filmId, message, selection)`; race it against a timer of `deps.editWaitMs ?? 45000` milliseconds; always unsubscribe in a `finally`.",
+        "If the edit finishes first return `{ filmId, done: true, version, appliedTools }` with `version` read from `films.get` after the edit. If the timer wins return `{ filmId, done: false, version, appliedTools: <names so far>, note: 'still running; poll get_film' }` and leave the edit running; a later rejection of the pending edit emits an `error` event with `where: 'mcp.edit_film'` and is never thrown.",
+        "A rejection of `runEdit` before the timer throws `ServiceError` `internal` with the message `edit failed`.",
+        "Extend server/mcp/film-service.test.ts using vitest fake timers and a fake `subscribe` that lets the test emit `tool.call` events."
+      ],
+      "acceptanceCriteria": [
+        "With a fake `runEdit` that emits one `tool.call` event named `setTransform` and resolves, `editFilm` returns `done: true` and `appliedTools: ['setTransform']`",
+        "With a `runEdit` that never resolves and `editWaitMs: 45000`, advancing fake timers by 45000 ms makes `editFilm` return `done: false` with the note `still running; poll get_film`",
+        "A film with status `building` rejects with `ServiceError` code `not-ready`; an unknown film rejects with `not-found`; the `selection` `{ sceneId: 's2' }` reaches `runEdit` unchanged",
+        "The unsubscribe function returned by `subscribe` is called exactly once in the done path and once in the timeout path",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Default wiring of the film service",
+      "description": "As an owner, I want one function that builds the real service from the app dependencies and the agent entry points so that the route stays thin.",
+      "steps": [
+        "Read docs/hackathon/06-contracts.md section 6 (D-2 `AppDeps`, D-8 env keys, D-10 entry points), then server/boot.ts (to find where `AppDeps` is imported from), server/agent/director.ts, server/agent/edit-loop.ts, server/events/bus.ts (`emit`, `subscribe`) and server/env.ts (`loadEnv`, `PORT`, `PUBLIC_BASE_URL`, `MCP_EDIT_WAIT_MS`).",
+        "Create server/mcp/wire-default.ts exporting `makeDefaultService(opts: { deps: AppDeps; env?: Env }): McpFilmService`, where `AppDeps` is the type exported by S2 and `Env` is the validated config returned by `loadEnv` (default `loadEnv()`).",
+        "It builds `ServiceDeps` from `opts.deps.films`, `opts.deps.assets` and `opts.deps.bus` (`bus.emit` and `bus.subscribe`), the contract entry points `runDirector` and `runEdit` imported from the real modules (D-10: `runDirector(filmId): Promise<void>` and `runEdit(filmId, message, selection?, opts?)`; if a real name or signature differs, adapt only inside this file and write the difference in `notes`), `lookup` as `(host) => dns.promises.lookup(host, { all: true })`, `publicBaseUrl` as `env.PUBLIC_BASE_URL` with any trailing slash removed, and `editWaitMs` as `env.MCP_EDIT_WAIT_MS` (the validated key, default 45000). It never reads `process.env` directly.",
+        "Create server/mcp/wire-default.test.ts that mocks the director and edit-loop modules with `vi.mock`, builds fake `AppDeps` with `makeTestFilm` stores, passes `env` objects built with `loadEnv({...})`, and checks the wiring."
+      ],
+      "acceptanceCriteria": [
+        "`makeDefaultService` with an env whose `MCP_EDIT_WAIT_MS` is 1000 passes `editWaitMs: 1000` to the service, and with the default env passes 45000",
+        "`publicBaseUrl` has no trailing slash when `PUBLIC_BASE_URL` is `https://x.example/`, and defaults to the validated `PUBLIC_BASE_URL` of `loadEnv({})`",
+        "With the director module mocked, `createFilm` calls the mocked `runDirector` with the new film id, and with the edit-loop module mocked, `editFilm` on a ready film calls the mocked `runEdit` with the message and no `opts`",
+        "The file contains no `process.env` reference",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006",
+        "US-007"
+      ],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "The five MCP tools over an in-memory transport",
+      "description": "As an MCP client user, I want five well-described tools so that my assistant can make and edit films.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md sections 4, 4.1 (the exact tool descriptions and annotations) and 5.5 (result and error mapping), and server/mcp/film-service.ts.",
+        "Create server/mcp/tools.ts exporting `TOOL_NAMES = ['create_film', 'get_film', 'edit_film', 'list_films', 'get_player_url'] as const` and `registerFilmTools(server: McpServer, service: McpFilmService, opts?: { log?: (line: Record<string, unknown>) => void }): void`.",
+        "Register each tool with `server.registerTool(name, { title, description, inputSchema, annotations }, callback)`, using the descriptions and annotations of design section 4.1 verbatim and the raw shapes from server/mcp/schemas.ts (`edit_film` passes `sceneId` and `layerId` as the selection).",
+        "Each callback returns `{ content: [{ type: 'text', text: JSON.stringify(result) }], structuredContent: result }` on success. A `ServiceError` becomes `{ isError: true, content: [{ type: 'text', text: error.message }] }`. Any other error becomes `{ isError: true, content: [{ type: 'text', text: 'internal error' }] }`. Every call logs `{ event: 'mcp.request', tool, ms, ok }` through `opts.log` (default `console.info` of the JSON string) and never logs arguments or error messages.",
+        "Create server/mcp/tools.test.ts: connect a `Client` to a `McpServer` over `InMemoryTransport.createLinkedPair()` with a fake `McpFilmService` and test listing, each call, and the error mapping."
+      ],
+      "acceptanceCriteria": [
+        "`client.listTools()` returns exactly the five names of `TOOL_NAMES`, each with a non-empty description, and `get_film`, `list_films` and `get_player_url` have `annotations.readOnlyHint === true`",
+        "`callTool` of `create_film` with a fake service returning `{ filmId: 'f1', status: 'planning', playerUrl: 'http://x/?film=f1', note: 'n' }` returns `structuredContent.filmId === 'f1'` and a `content[0].text` that parses to the same object",
+        "A fake service that throws `new ServiceError('not-found', 'film not found')` gives `isError: true` and the text `film not found`; one that throws `new Error('boom')` gives `isError: true`, the text `internal error`, and the log line has `ok: false` and does not contain `boom`",
+        "A `get_film` call with `filmId: '../x'` either rejects or returns `isError: true`, and the fake service's `getFilm` is not called",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006",
+        "US-007"
+      ],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "The /mcp route: passcode, stateless transport, DNS-rebinding protection",
+      "description": "As an owner, I want the MCP endpoint protected by the passcode and served statelessly so that it is safe to expose.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md sections 3.1, 5.1, 7 and 10, docs/hackathon/06-contracts.md section 1 (secrets) and server/http/middleware.ts (S2's passcode middleware accepts both header forms; this route checks too).",
+        "Create server/mcp-server.ts exporting `checkPasscode(headers: Headers, passcode: string | undefined): boolean` (true when `passcode` is empty or undefined; otherwise compares the value of `x-director-passcode`, or the token of `Authorization: Bearer <token>` (scheme case-insensitive), with `crypto.timingSafeEqual` on equal-length buffers, and returns false on a length mismatch) and `registerMcp(app: Hono, deps: AppDeps, opts?: { service?: McpFilmService; env?: Env; log?: (line: Record<string, unknown>) => void }): void` (`AppDeps` as exported by S2; this is the signature the boot hook calls).",
+        "`registerMcp` adds `app.all('/mcp', handler)`. The handler returns HTTP 401 with the JSON body `{ jsonrpc: '2.0', error: { code: -32001, message: 'unauthorized' }, id: null }` when `checkPasscode` fails (and logs `mcp.auth.denied` without any header value). Otherwise it creates a new `McpServer({ name: 'pixitween-director', version: '1.0.0' })`, calls `registerFilmTools` with `opts?.service ?? makeDefaultService({ deps, env })`, creates a new `WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true, maxRequestBodySize: 16 * 1024 * 1024, ... })`, calls `await server.connect(transport)`, returns `await transport.handleRequest(c.req.raw)` and closes the server in a `finally`.",
+        "Always pass `allowedHosts` (`localhost`, `localhost:<PORT>`, `127.0.0.1`, `127.0.0.1:<PORT>` and the host of `env.PUBLIC_BASE_URL`, which has a default in `loadEnv`) and `enableDnsRebindingProtection: true`.",
+        "Create server/mcp-server.test.ts with a bare Hono app, a fake service and the real SDK: a `Client` over `StreamableHTTPClientTransport(new URL('http://localhost/mcp'), { fetch: (url, init) => app.request(url.toString(), init), requestInit: { headers } })`."
+      ],
+      "acceptanceCriteria": [
+        "With `DIRECTOR_PASSCODE='p'`, a `Client` using header `x-director-passcode: p` connects and `listTools` returns the 5 tool names; using `Authorization: Bearer p` also connects",
+        "A POST to `/mcp` with a wrong or missing passcode returns HTTP 401 and a body whose `error.message` is `unauthorized`; with `DIRECTOR_PASSCODE` unset it is accepted",
+        "A POST with `Accept: application/json` only (no `text/event-stream`) returns HTTP 406, and a POST whose `Host` header is `evil.example` is refused with a non-2xx status",
+        "`checkPasscode(new Headers({ 'x-director-passcode': 'ab' }), 'abc')` is false (length mismatch) and `checkPasscode(new Headers({ authorization: 'bearer abc' }), 'abc')` is true",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-009"
+      ],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Append the MCP boot hook",
+      "description": "As an owner, I want the MCP route mounted through the shared boot hooks so that the main server file stays untouched.",
+      "steps": [
+        "Read docs/hackathon/06-contracts.md section 6 (D-3 boot hooks), server/boot.ts (the exported `bootHooks` array and any hooks other PRDs already appended), server/main.ts (read only: how `bootHooks` are run) and server/http/middleware.ts.",
+        "Edit server/boot.ts (an S2 file; a named shared edit listed in this PRD's `sharedEdits`): add `import { registerMcp } from './mcp-server';` and append exactly ONE entry to the `bootHooks` array: `({ app, deps }) => registerMcp(app, deps)`. Keep every existing entry and the existing order.",
+        "Never edit server/main.ts. If `bootHooks` is not exported or is not run by main.ts, write `blocked: boot hooks missing (S2, D-3)` in `notes` and stop.",
+        "Create server/mcp-wiring.test.ts: import `bootHooks`, run every hook in order on a bare `new Hono()` with fake `deps` built from `makeTestFilm`, then send `initialize` and `tools/list` to `/mcp` through a `Client` over `StreamableHTTPClientTransport` with `fetch: (url, init) => app.request(url.toString(), init)`; run it with `DIRECTOR_PASSCODE` unset and with the passcode middleware of server/http/middleware.ts applied when it can be applied to a bare app."
+      ],
+      "acceptanceCriteria": [
+        "After running `bootHooks` on a bare Hono app, `tools/list` through `/mcp` returns the 5 tool names",
+        "`bootHooks` in server/boot.ts has exactly one more entry than before this story and every earlier entry is still present in the same order",
+        "`git diff` shows changes only to server/boot.ts (the import and one array entry), server/mcp-wiring.test.ts and the PRD file; server/main.ts is unchanged",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-008",
+        "US-010"
+      ],
+      "labels": [
+        "backend",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Live script for a real MCP client (manual gate)",
+      "description": "As an owner, I want a script that drives the running server through a real MCP client so that I can verify the demo end to end.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md section 9 (manual gate), docs/hackathon/06-contracts.md section 1 (the `scripts/live/<step>.ts` contract: `describe`, `estimateUsd`, `run`) and scripts/live/run.ts (the dispatcher) with one existing script under scripts/live/.",
+        "Create scripts/live/s11-mcp.ts exporting `describe(): string` (what it does, and that it spends about $0.25 on one film and one edit), `estimateUsd(): number` (returns 0.25), `runWithClient(client: { callTool(p: { name: string; arguments?: Record<string, unknown> }): Promise<any> }, opts: { brief: string; imageBase64: string; editMessage: string; sleep?: (ms: number) => Promise<void>; maxPolls?: number }): Promise<{ filmId: string; status: string; version: number; costUsd: number; edit: { done: boolean; appliedTools: string[] } }>` and `run(): Promise<void>`.",
+        "`runWithClient` calls `create_film` (aspect `16:9`), polls `get_film` every 10 seconds (through `opts.sleep`) up to `maxPolls` (default 30) until the status is `ready` or `failed` (throwing on `failed` and on running out of polls), then calls `edit_film` with `editMessage` and returns the summary. It reads `structuredContent` from each result and throws when a result has `isError`.",
+        "`run()` builds the base URL from `PUBLIC_BASE_URL` or `http://localhost:${PORT ?? 8787}`, connects a real `Client` with `StreamableHTTPClientTransport(new URL(`${base}/mcp`), { requestInit: { headers: { 'x-director-passcode': DIRECTOR_PASSCODE } } })` (omit the header when the variable is unset), reads fixtures/seed/mug-product.png as base64, calls `runWithClient` with the brief `A calm 12 second film of a white mug on a cafe counter at sunrise.` and the edit `make the mug bigger in the last scene`, and prints the summary. It never prints the passcode.",
+        "Create scripts/live/s11-mcp.test.ts testing `describe`, `estimateUsd` and `runWithClient` with a scripted fake client and a fake `sleep`."
+      ],
+      "acceptanceCriteria": [
+        "`estimateUsd()` returns 0.25 and `describe()` mentions the word `estimate` or the dollar amount",
+        "With a scripted fake client (create returns planning, `get_film` returns `building` then `ready`, `edit_film` returns `done: true`) `runWithClient` returns `status: 'ready'` and calls `get_film` exactly twice",
+        "A `get_film` result with status `failed` makes `runWithClient` reject, and a result with `isError: true` makes it reject",
+        "With `maxPolls: 3` and a client that always answers `building`, `runWithClient` rejects after exactly 3 polls",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-011"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "mcp",
+        "test"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "docs/mcp.md: connect a client",
+      "description": "As an MCP client user, I want connection instructions that say what is verified and what is not so that I can set up quickly and trust the guide.",
+      "steps": [
+        "Read docs/hackathon/steps/step-11-stretch/design.md sections 4.1, 10 and 11 (verified facts and the Unverified list), server/mcp/tools.ts (`TOOL_NAMES`) and server/mcp-server.ts.",
+        "Create docs/mcp.md with the headings `# Use the director from an MCP client`, `## Connect`, `## Tools`, `## Security` and `## Troubleshooting`.",
+        "`## Connect`: how to run the server with `DIRECTOR_PASSCODE` and `PUBLIC_BASE_URL`; then three client recipes. Muse Code: a fenced `json` block `{ \"mcp_servers\": { \"pixitween-director\": { \"transport\": \"streamable_http\", \"url\": \"https://<host>/mcp\", \"headers\": { \"x-director-passcode\": \"${DIRECTOR_PASSCODE}\" } } } }` and the sentence that the settings file path is not documented on the page the keys were read from. Claude Code: the command `claude mcp add --transport http pixitween-director https://<host>/mcp --header \"x-director-passcode: <passcode>\"` marked `check claude mcp add --help for the current syntax`. An inspector: `npx @modelcontextprotocol/inspector` marked `check its README for the current options`.",
+        "`## Tools`: a table of the five tools (name, what it does, input, result) copied from the descriptions in server/mcp/tools.ts. `## Security`: the passcode forms, the image URL rules (https only, public addresses, 3 redirects, 10 s, 10 MB, magic bytes), the DNS-rebinding setting, and the residual rebinding window because DNS pinning is not implemented.",
+        "`## Troubleshooting`: HTTP 401 (passcode), 406 (missing `Accept` header), `film is still building; poll get_film`, `image URL is not allowed`, and the 45-second edit wait.",
+        "Create server/mcp/docs.test.ts asserting: the five headings exist; every name in `TOOL_NAMES` appears in the Tools table; the first fenced `json` block parses and has `mcp_servers['pixitween-director'].transport === 'streamable_http'` with `url` and `headers`; the document contains the text `check claude mcp add --help`."
+      ],
+      "acceptanceCriteria": [
+        "docs/mcp.md has the five headings and every tool name from `TOOL_NAMES` appears in the Tools table (asserted by server/mcp/docs.test.ts)",
+        "The first fenced json block in docs/mcp.md parses, and its `mcp_servers['pixitween-director']` has `transport: 'streamable_http'`, a `url` and a `headers` object",
+        "The document states that DNS pinning is not implemented and names the residual rebinding window",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-011"
+      ],
+      "labels": [
+        "docs",
+        "mcp",
+        "test"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-11-stretch/requirements.md",
+      "docs/hackathon/steps/step-11-stretch/design.md",
+      "docs/hackathon/steps/step-11-stretch/contract-issues.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/ralph/AUTHORING-BRIEF.md (rules for every PRD)",
+      "docs/hackathon/06-contracts.md (types, interfaces, authoring core, helpers and test doubles, HTTP, and section 6: decisions D-1 to D-14)",
+      "docs/hackathon/steps/step-11-stretch/design.md (SDK facts verified against @modelcontextprotocol/sdk 1.32.2, security rules, test plan)",
+      "docs/hackathon/steps/step-11-stretch/contract-issues.md (assumptions about S2, S3b, S6, S8a)"
+    ],
+    "requires": [
+      "prd-s03b-director-agent",
+      "prd-s06-chat-edit"
+    ],
+    "owns": [
+      "server/mcp-server.ts",
+      "server/mcp-server.test.ts",
+      "server/mcp-wiring.test.ts",
+      "server/mcp/*",
+      "fixtures/s11/*",
+      "scripts/live/s11-mcp.ts",
+      "scripts/live/s11-mcp.test.ts",
+      "docs/mcp.md"
+    ],
+    "sharedEdits": [
+      "server/boot.ts"
+    ],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "Pin @modelcontextprotocol/sdk to the v1 API (1.32.2). Never install or import @modelcontextprotocol/server, @modelcontextprotocol/client or @modelcontextprotocol/node.",
+      "server/boot.ts is an S2 file: US-011 may only add the registerMcp import and append ONE hook to `bootHooks` (a named shared edit). server/main.ts and every other S2 file are never edited.",
+      "Tool results and errors never contain secrets, the passcode, signed URLs, hostnames of rejected image URLs or raw exception messages. Logs never contain tool arguments.",
+      "Tests use in-memory transports and injected fetch, lookup, stores and agents; no test opens a real port or resolves a real DNS name."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner records the go/no-go by Tue 3 Nov 12:00 ET (Option A only if S0-S9 are green; Option B is no-go per design section 13).",
+      "MG-2: owner connects Muse Code with the config in docs/mcp.md, runs `/mcp` in a session, confirms the five tools list, and records Muse Code's settings file path and whether the x-director-passcode header is forwarded.",
+      "MG-3: owner runs `npm run live -- s11-mcp` (prints the estimate), then `npm run live -- s11-mcp --yes` (about $0.25: one film and one edit through a real MCP client) and records the output.",
+      "MG-4: owner records the 15-second demo clip three times and ships it only if all three runs worked."
+    ]
+  }
+}

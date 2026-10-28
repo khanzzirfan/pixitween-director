@@ -1,0 +1,519 @@
+{
+  "name": "PixiTween Director S03b: director agent (brief to storyboard to composition), listener, create-film route, panels",
+  "branchName": "ralph/s03b-director-agent",
+  "description": "Turns a product photo and a typed or spoken brief into a storyboard (Spark strict json_schema), then builds every scene through the S3a authoring tools (parallel tool calls, repair loop, deterministic fallbacks), exposes runDirector(filmId) and the POST /api/films route (handlers/films.ts), a listener for voice memos, a DIRECTOR_FAKE development mode, and the NewFilm and Storyboard panels. Excludes art (S4), review (S5), chat (S6) and generate-mode clips (S7).",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Spark storyboard JSON schema and normaliseStoryboard (server/agent/storyboard.ts part 1)",
+      "description": "As a director author, I want a strict schema for Spark and a deterministic normaliser so that whatever the model returns becomes a valid Storyboard.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 5.9 (normalisation rules) and 4.3 (storyboard example), shared/storyboard.ts (storyboardSchema, MAX_GENERATE_SCENES) and fixtures/seed/spark-storyboard-response.json.",
+        "Create fixtures/s03b/storyboard-spark-raw.json: a hand-made raw Spark answer {title, palette, scenes: [...]} with 4 scenes whose ids are model-style ('scene-1-hero-reveal'), every scene having all nine fields (id, durationSec, intent, shotType, camera, layersWanted, text, mode, modeReason); scenes 2, 3 and 4 have mode 'generate'; scene 1 text is 'Slow mornings' and the others ''; one palette entry is 'red' (invalid) and one '#F5E6D3' (upper case).",
+        "Create server/agent/storyboard.ts exporting SPARK_STORYBOARD_SCHEMA (the hand-written strict JSON schema of design 5.9: type object, additionalProperties false, required title, palette, scenes; each scene requires all nine fields; shotType, camera, layersWanted items and mode are enums; no numeric bounds) and normaliseStoryboard(raw: unknown, o: {aspect: Aspect; title?: string}): Storyboard following design 5.9 exactly (ids s1..sN assigned by code; title trimmed to 80 and o.title used when the model's is empty; palette lower-cased, invalid hex dropped, defaults ['#111827', '#f59e0b'] when none left, at most 6; durationSec clamped to [2, 8] and rounded to 0.1; text '' -> undefined and trimmed to 120; layersWanted de-duplicated with 'bg' always present and 'product' added unless shotType is 'lifestyle'; generate kept for the first MAX_GENERATE_SCENES scenes, the rest demoted to 'motion' with modeReason + ' (demoted: at most 2 generate scenes)' truncated to 240; estCredits 25 for generate and absent for motion; aspect forced to o.aspect; top-level durationSec = sum of scene durations).",
+        "The function throws StoryboardError (export the class; message names the first failing field) when the result still fails storyboardSchema, except that a total above 30 s is first scaled down proportionally (each scene at least 2 s) before validation.",
+        "Create server/agent/storyboard.test.ts: normalising the fixture gives scene ids s1..s4, the palette ['#f5e6d3'] plus nothing invalid, scenes 2 and 3 generate with estCredits 25 and scene 4 demoted to motion with the suffix in modeReason, scene 1 text 'Slow mornings' and others undefined, every scene durationSec within [2, 8]; a raw storyboard whose scenes sum to 40 s is scaled to at most 30 s; a missing scenes array throws StoryboardError naming 'scenes'; every property name of SPARK_STORYBOARD_SCHEMA's scene object exists in shared/storyboard.ts's sceneSchema shape (assert by key comparison) and every required key is listed in `required`."
+      ],
+      "acceptanceCriteria": [
+        "Normalising fixtures/s03b/storyboard-spark-raw.json yields scene ids s1..s4, keeps scenes 2 and 3 as generate (the cap of 2, estCredits 25 each) and demotes scene 4 to motion with the suffix ' (demoted: at most 2 generate scenes)'",
+        "A raw storyboard whose scene durations sum to 40 s is scaled so the normalised total is at most 30 s with every scene at least 2 s",
+        "SPARK_STORYBOARD_SCHEMA lists all nine scene keys under `required` and sets additionalProperties false at both levels",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "agent",
+        "llm"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Director prompts: storyboard system prompt, messages builder, scene build prompt",
+      "description": "As a director author, I want the prompts in one tested module so that the mode rule, the hint sentence and the recipe cannot drift from the design.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 6 (6.1 storyboard prompt text with two worked examples, 6.2 scene build prompt, the art-tool variant) and shared/storyboard.ts.",
+        "Create server/agent/prompts/director.ts exporting parseTargetSeconds(brief: string): number | undefined (finds 'N seconds'/'N sec'/'N s' in the brief, clamps to 8..30), buildStoryboardSystemPrompt({aspect, sceneCount, targetSec}) returning the text of design 6.1 with the placeholders filled (rules 1-9 and both worked examples verbatim from the design), buildStoryboardMessages({brief, title?, aspect, productJpeg?: Buffer}): ChatMessage[] (system + one user message with the brief, the product name and, when productJpeg is given, an image_url part 'data:image/jpeg;base64,...'), where sceneCount defaults to 3 and targetSec to min(30, max(8, 4 * sceneCount)).",
+        "Add buildScenePrompt(o: {canvas: {width, height, aspect}, scene: Scene, palette: string[], product: {assetId, width, height}, toolNames: string[]}): string = the text of design 6.2 with placeholders filled: recipe A (bg shape, product image, headline + opacity keyframes using the argument name `prop`, product entrance scale keyframes skipped for dolly-in, setCamera last) when toolNames lacks generatePlate or placeProduct; recipe B when both exist: steps 1 and 2 become generatePlate({sceneId}) and placeProduct({sceneId, source:'photo', noun:'<short noun phrase naming the product, for example mug>'}) plus the sentence 'When you call placeProduct or addSubject always pass `noun`: a short noun phrase naming the thing to cut out (for example mug, bottle, hand); it is used to find the object in the picture.'",
+        "Both builders append nothing else; keep the exact sentence 'You may call several tools in one turn. Prefer calling every tool needed for the whole scene in a single turn, then answer DONE.' in the build prompt.",
+        "Create server/agent/prompts/director.test.ts asserting substrings: the storyboard prompt contains 'motion by default' semantics (the exact text `choose \"motion\" by default`), the generate list 'liquids pouring or splashing, cloth moving, a person walking or turning, hands using the product', 'at most 2 scenes', 'Never invent claims', both example headers 'Example 1' and 'Example 2', and the filled values for aspect and sceneCount; parseTargetSeconds('make it 15 seconds') is 15, ('a 5 second ad') is 8 (clamped), ('no length') is undefined, ('45 seconds') is 30; buildStoryboardMessages without a photo has no image_url part and with a photo has one whose url starts 'data:image/jpeg;base64,'; the scene prompt for tool names [addLayer] contains 'setKeyframes({layerId:\"s1:headline\", prop:\"opacity\"' and not 'generatePlate'; for toolNames including generatePlate and placeProduct it contains 'noun' and 'generatePlate({sceneId:\"s1\"})'; dolly-in scenes omit the product entrance step; the build prompt contains the hint sentence exactly once."
+      ],
+      "acceptanceCriteria": [
+        "The storyboard system prompt contains the exact text `choose \"motion\" by default`, the generate list and both worked examples, with {aspect} and {sceneCount} filled",
+        "parseTargetSeconds('a 5 second ad') returns 8 and parseTargetSeconds('45 seconds') returns 30",
+        "With toolNames including generatePlate and placeProduct the scene prompt tells the model to pass `noun`; without them it uses recipe A with `prop` in the setKeyframes example",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "agent",
+        "llm"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "planStoryboard: one Spark call, strict schema, photo, repair retry, cost",
+      "description": "As a director, I want a reliable storyboard call so that a bad model answer is repaired or rejected cleanly instead of breaking the film.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 5.9 and 5.11, server/agent/storyboard.ts, server/agent/prompts/director.ts, shared/ports.ts (MetaClients, ChatResponse) and server/pricing.ts (priceSpark).",
+        "In server/agent/storyboard.ts add planStoryboard(o: {ctx: ToolCtx; film: FilmState; model: string; productJpeg?: Buffer}): Promise<Storyboard>. It builds messages with buildStoryboardMessages, calls ctx.meta.spark.chat({model, messages, response_format: {type: 'json_schema', json_schema: {name: 'storyboard', strict: true, schema: SPARK_STORYBOARD_SCHEMA}}}), records cost with ctx.ledger.add(film.id, model, `${in} in / ${out} out tokens`, priceSpark(model, in, out)) from response.usage (skip when usage is absent), emits ctx.emit({type: 'agent.turn', backend: 'spark', ms, calls: 0}), parses response.content as JSON and normalises.",
+        "Failure handling: a MetaApiError with status 400 while a photo is attached is retried once without the photo (emit an 'error' event {where: 'storyboard', message: 'retrying without the product photo'}); invalid JSON or a normalise/validation error triggers ONE repair call whose messages append the assistant content and a user message `Your JSON was invalid: <message>. Return the corrected JSON only.`; a second failure throws StoryboardError.",
+        "Create server/agent/plan.test.ts with makeTestFilm and makeFakeMeta({sparkScript}) (ChatResponse items {content, toolCalls: [], usage: {promptTokens: 1000, completionTokens: 1200}, ms: 5, model}): a valid answer returns a Storyboard with ids s1.. and the film's aspect; the first request carries response_format.json_schema.strict true and an image_url part when productJpeg is given (inspect meta.calls); an invalid answer followed by a valid one makes exactly 2 spark.chat calls and the second request's last message starts 'Your JSON was invalid'; two invalid answers throw StoryboardError after 2 calls; a fake spark client that throws MetaApiError(400) on the first call when an image is attached succeeds on the second call without the image and emits an error event; the ledger total after one call equals priceSpark(model, 1000, 1200) within 1e-9 and exactly one cost event is emitted."
+      ],
+      "acceptanceCriteria": [
+        "A valid answer after one call returns a Storyboard and the first spark.chat request has response_format type 'json_schema' with strict true",
+        "An invalid answer then a valid one results in exactly 2 spark.chat calls, the second ending with a user message starting 'Your JSON was invalid'",
+        "After one call the ledger total equals priceSpark(model, 1000, 1200) and exactly one 'cost' event exists (no double counting)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "backend",
+        "agent",
+        "llm"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "server/listener.ts: voice memo to text",
+      "description": "As a user, I want to speak my brief so that the director gets text without me typing it.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.13, server/media/ffmpeg.ts (toWav16kMono), shared/ports.ts (MetaClients.transcribe) and fixtures/seed/transcribe-brief-response.json + brief-16k.wav.",
+        "Replace the S2 stub in server/listener.ts: export class BriefTooLongError, class EmptyBriefError, MAX_BRIEF_SECONDS = 60, and transcribeBrief(audio: Buffer, o: {meta: MetaClients; keywords?: string[]; convert?: (b: Buffer) => Promise<Buffer>}): Promise<{text: string; audioDurationMs: number}>. Steps: wav = await (o.convert ?? toWav16kMono)(audio); duration = (wav.length - 44) / 32000 seconds (16 kHz mono 16-bit); above MAX_BRIEF_SECONDS throw BriefTooLongError; result = await o.meta.transcribe.file(wav, {keywords}); an empty or whitespace transcript throws EmptyBriefError; return {text: transcript.trim(), audioDurationMs: result.audioDurationMs ?? duration * 1000}. Doubled words are passed through unchanged.",
+        "Create server/listener.test.ts (no ffmpeg needed, inject convert): a 10 s synthetic WAV buffer (44 zero bytes plus 320000 zero bytes) with makeFakeMeta({transcript: \"it's our our new cold brew\"}) returns that exact text and the fake's transcribe call receives keywords ['Coffee Co']; a 61 s buffer (44 + 61*32000 bytes) throws BriefTooLongError and makes no transcribe call; a whitespace-only transcript throws EmptyBriefError; the real brief-16k.wav passes through toWav16kMono when ffmpeg is available (describe.skipIf) and yields a WAV whose derived duration is within 0.2 s of 10."
+      ],
+      "acceptanceCriteria": [
+        "A 61 s synthetic WAV throws BriefTooLongError without any transcribe call; a 10 s one returns the fake transcript unchanged including doubled words",
+        "An empty transcript throws EmptyBriefError",
+        "The keywords array is passed through to meta.transcribe.file unchanged",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "buildScene: the per-scene tool loop with repair and stall detection",
+      "description": "As a director, I want a bounded tool loop per scene so that parallel calls, errors and stalls are all handled without crashing.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.10, server/tools/registry.ts (allTools, runTool), server/llm/messages.ts (assistantMessageFrom, toolResultMessage), server/agent/prompts/director.ts and fixtures/seed/spark-tool-loop-turns.json.",
+        "Create server/agent/build-scene.ts: export const EDIT_ONLY_TOOLS = ['removeLayer','reorderLayer','removeScene','swapScenes','setSceneDuration'] and buildScene(o: {ctx: ToolCtx; backend: LlmBackend; scene: Scene; canvas: {width, height, aspect}; palette: string[]; product: {assetId, width, height}; maxTurns?: number}): Promise<{turns: number; calls: number; ok: number; failures: string[]; stalled: boolean}>.",
+        "Loop (max 6 turns): tools = allTools() minus EDIT_ONLY_TOOLS; messages start with the system prompt from buildScenePrompt (toolNames = tools' names) and a user message JSON.stringify of the scene brief; each turn result = backend.chatWithTools(messages, tools, {parallelHint: true}); emit ctx.emit({type: 'agent.turn', backend: backend.id, ms: result.ms, calls: result.toolCalls.length}); record cost from result.usage with ctx.ledger when it has promptTokens and completionTokens; stop when toolCalls is empty; otherwise run every call in order with runTool(ctx, name, args), push assistantMessageFrom(result) then one toolResultMessage per call (the ToolResult JSON, including the error text); count successes.",
+        "Stop with stalled true after two consecutive turns that had tool calls but zero successes. A tool failure never throws out of buildScene; a backend exception is caught, pushed to failures, and ends the loop.",
+        "Create server/agent/build-scene.test.ts with makeTestFilm and makeFakeBackend: a film prepared with scene s1 (use the pure API + ctx.films.commit) and the product asset registered; script A: turn 1 returns six correct calls (addLayer bg shape fill '#111827', addLayer product image with the product assetId, addLayer headline text 'Slow mornings', setKeyframes {layerId:'s1:headline', prop:'opacity', keys:[[0,0],[0.6,1]], ease:'easeOut'}, setKeyframes product scale, setCamera s1 pan), turn 2 is {content:'DONE'}: result ok 6, turns 2, the stored composition has the three layers with ids s1:bg, s1:product, s1:headline and 6 tool.call events with ok true; script B built from the seed turn: its first turn calls setKeyframes with layerId 'headline' (a real failure) after the three addLayer calls, then a second turn repairs with layerId 's1:headline': failures has one entry, the second turn's tool results given to the backend contain the text 'Did you mean s1:headline?' (inspect the messages the fake backend received by wrapping it), final ok count 6; script C: three consecutive turns of only invalid calls give stalled true after 2 and turns 2; script D: a backend that always returns one valid call stops at 6 turns; the tool list passed to the backend contains none of EDIT_ONLY_TOOLS."
+      ],
+      "acceptanceCriteria": [
+        "Script A produces ok 6 over 2 turns and the stored composition contains s1:bg, s1:product and s1:headline",
+        "In script B the failed setKeyframes (layerId 'headline') is fed back with 'Did you mean s1:headline?' and the repaired call succeeds, ending with 6 successful calls",
+        "Two consecutive all-failure turns set stalled true and end the loop; the tool list given to the backend never includes removeLayer, reorderLayer, removeScene, swapScenes or setSceneDuration",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "ensureSceneBasics and placeholder captions for generate scenes",
+      "description": "As a director, I want every scene to end up playable even when the model fails so that the film never has an empty scene.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 5.10 (ensureSceneBasics) and 7 (error table), server/authoring/api.ts (layerIdsByRole, markPlaceholder) and server/tools/authoring.ts.",
+        "Create server/agent/scene-basics.ts: PLACEHOLDER_TEXT = 'Clip pending approval' and ensureSceneBasics(o: {ctx: ToolCtx; scene: Scene; product: {assetId: string}; palette: string[]}): Promise<{added: string[]}>: load the film's composition; for scene.id add through runTool(ctx, 'addLayer', ...) only what is missing: a bg shape (fill palette[0]) when layerIdsByRole(c, 'bg', scene.id) is empty, a product image layer (assetId) when no product exists, a headline text layer (scene.text, fill '#ffffff') when scene.text is set and no headline exists; for scene.mode 'generate' add a caption layer with PLACEHOLDER_TEXT (if none with that text exists) and mark it with markPlaceholder through ctx.films.commit(markPlaceholder(...), 'director', 'placeholder'); return the ids added.",
+        "Create server/agent/scene-basics.test.ts: on an empty scene with text 'Hi' it adds s1:bg, s1:product and s1:headline in that order; on a scene that already has all three it adds nothing; for a generate scene it also adds a caption whose text is 'Clip pending approval' with meta.director.layers[id].placeholder true; calling it twice adds nothing the second time; every result composition passes lightValidate."
+      ],
+      "acceptanceCriteria": [
+        "On an empty scene with text 'Hi' it adds exactly s1:bg, s1:product and s1:headline",
+        "A generate scene also gets a caption 'Clip pending approval' flagged placeholder true in meta.director.layers",
+        "A second call adds nothing (idempotent)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "initFilmComposition: scenes and the product asset as version 1",
+      "description": "As a director, I want the empty film skeleton (all scenes plus the registered product photo) committed before the model starts so that the model only adds layers.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 3.1 (steps 2-3) and 5.5, server/authoring/api.ts (newFilmComposition, registerAsset, addScene) and shared/composition.ts (FilmState.assets, AssetRef).",
+        "Create server/agent/init-composition.ts: initFilmComposition(o: {ctx: ToolCtx; film: FilmState; storyboard: Storyboard}): Promise<{version: number; product: AssetRef}>: product = film.assets.find(a => a.id === film.brief.productAssetId) (throw Error('product asset missing') otherwise); comp = newFilmComposition({aspect: film.aspect, title: storyboard.title, palette: storyboard.palette}); registerAsset(comp, {id: product.id, kind: 'image', src: product.url, width: product.width, height: product.height}); then addScene for every storyboard scene ({id, durationSec, mode}) in order; commit through ctx.films.commit(filmId, comp, 'director', 'storyboard skeleton'); a failed commit throws with the first issue; return {version, product}.",
+        "Create server/agent/init-composition.test.ts with makeTestFilm (put the product ref into the film's assets with width 384 height 672 and a 32-hex id): a 3-scene storyboard of 4 + 4 + 4 s gives version 1, composition durationInFrames 360, three precomps s1..s3, root assets containing the product id with width 384, meta.director.scenes[s2].mode 'generate' for a generate scene, and the composition passes lightValidate; a film without the product asset throws 'product asset missing'."
+      ],
+      "acceptanceCriteria": [
+        "A three-scene storyboard of 4 s each yields version 1, durationInFrames 360 and precomps s1, s2, s3",
+        "The product asset is registered at the root with width 384 and height 672",
+        "A film whose assets lack brief.productAssetId makes initFilmComposition throw 'product asset missing'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "runDirector(filmId): orchestration, statuses, failure handling",
+      "description": "As an owner, I want one entry point that takes a film from 'new' to 'ready' (or 'failed') so that the route handler and later steps just call runDirector.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 3.1, 5.9-5.11, 7 and 8, server/http/deps.ts (AppDeps, makeToolCtx), server/llm/router.ts (pickBackend) and the S3b modules created so far.",
+        "Replace the S2 stub in server/agent/director.ts: export createDirector(deps: AppDeps, o?: {backend?: LlmBackend; model?: string; delayMs?: number}) returning {runDirector(filmId): Promise<void>; isRunning(filmId): boolean}, bindDirector(deps) (stores a module-level director built with createDirector(deps)) and `export async function runDirector(filmId: string): Promise<void>` that delegates to the bound director (throws Error('director not bound') if bindDirector was never called).",
+        "Flow of one run (design 3.1): refuse a second concurrent run for the same film id; ctx = deps.makeToolCtx(filmId); film = await deps.films.get(filmId); set status 'planning' (films.update + ctx.emit film.status); productJpeg = resizeFit(await deps.assets.read(film.brief.productAssetId), 768, 'jpeg') (skip on failure); storyboard = await planStoryboard(...); films.update({storyboard, title}); ctx.emit director.storyboard; initFilmComposition; status 'building'; for each scene: buildScene (backend = o.backend ?? pickBackend('build')) then ensureSceneBasics; status 'ready' (films.update + emit).",
+        "Failure handling: StoryboardError or any unexpected exception sets status 'failed', emits {type: 'error', where: 'director', message} and resolves (never rejects); a scene whose buildScene reports stalled or zero ok calls emits an 'error' warning event {where: 'build-scene', message: `scene <id> filled with defaults`} and continues; the in-memory running set is always cleared in a finally block.",
+        "Create server/agent/director.test.ts with makeTestFilm (film with brief text and the product asset), makeFakeMeta({sparkScript: [storyboard answer built from fixtures/s03b/storyboard-spark-raw.json]}) and makeFakeBackend scripts that build each scene correctly (build the script in the test from the normalised storyboard): the final film status is 'ready', the stored composition has all scenes with bg and product layers and validates, events appear in the order film.status planning, director.storyboard, film.status building, agent.turn..., film.status ready, the number of stored versions is greater than 3 * 6, ledger total > 0 for the fake usage; a backend that returns no tool calls at all still ends 'ready' with bg/product/headline defaults from ensureSceneBasics and one error warning per scene; two invalid storyboard answers end with status 'failed', an error event and a resolved promise; calling runDirector twice at once on one film runs the work once (assert spark.chat calls); runDirector without bindDirector rejects with 'director not bound'."
+      ],
+      "acceptanceCriteria": [
+        "A scripted successful run ends with film status 'ready' and every scene containing bg and product layers, with events ordered film.status planning, director.storyboard, film.status building, ..., film.status ready",
+        "A backend that never returns tool calls still yields a playable film (defaults from ensureSceneBasics) and one 'error' warning per scene",
+        "Two invalid storyboard answers end with status 'failed' plus an error event and the returned promise resolves",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-007",
+        "US-003"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "POST /api/films input parsing and validation (handlers/films-input.ts)",
+      "description": "As a user, I want clear errors when my upload is wrong so that I can fix it immediately.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.12 (fields, limits, error codes), server/media/image.ts (imageSize) and the S2 stub server/http/handlers/films.ts.",
+        "Create server/http/handlers/films-input.ts: type CreateFilmInput = {product: {bytes: Buffer; mime: 'image/png'|'image/jpeg'|'image/webp'}; brief?: string; audio?: {bytes: Buffer; mime: string}; aspect: Aspect; title?: string}; class InputError {status: 400|413|415|429; code: string; message: string}; parseCreateFilm(body: Record<string, unknown>, o: {maxBytes: number}): Promise<CreateFilmInput> taking the object returned by Hono's c.req.parseBody() (File objects for files).",
+        "Rules in this order: `product` must be a File (code product_required, 400); its mime is decided by magic bytes (PNG 89504E47, JPEG FFD8, WEBP 'RIFF....WEBP'), not by the client (unsupported_media, 415); bytes over o.maxBytes -> too_large 413; exactly one of `brief` and `audio` (brief_or_audio 400 when both or neither); brief trimmed, longer than 2000 characters -> brief_too_long 400, empty after trimming -> brief_or_audio; audio mime must start with audio/ or be video/webm (unsupported_media 415) and bytes <= o.maxBytes; aspect default '16:9', anything else not in the three -> bad_aspect 400; title trimmed and cut to 80.",
+        "Create server/http/handlers/films-input.test.ts building bodies with File objects from the seed (mug-product.png, brief-16k.wav): a valid typed brief parses with aspect '16:9'; a valid audio brief parses; each error code above is produced by one test (product missing; a text file named x.png rejected as unsupported_media by its magic bytes; a 2 KB product with maxBytes 1024 -> too_large; both brief and audio; neither; a 2001-character brief; aspect '4:3'); a title of 100 characters is cut to 80."
+      ],
+      "acceptanceCriteria": [
+        "A text file named product.png is rejected with code unsupported_media and status 415 because its magic bytes are not an image",
+        "A body with both `brief` and `audio`, or with neither, is rejected with code brief_or_audio and status 400",
+        "A valid typed brief parses with aspect '16:9' and a 100-character title is cut to 80",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "registerFilmsRoutes: POST /api/films creates the film and starts the director",
+      "description": "As a user, I want to submit a photo and a brief and get a film id straight away while the director works in the background.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md sections 3.1 (steps 1) and 5.12-5.13, server/http/handlers/films.ts (the S2 stub), server/http/handlers/films-input.ts, server/listener.ts, server/agent/director.ts and server/http/deps.ts.",
+        "Replace the stub body of server/http/handlers/films.ts, keeping the exports STUB_OWNER and registerFilmsRoutes(app, deps): register POST /api/films (the passcode middleware already ran): parseBody -> parseCreateFilm (maxBytes from loadEnv().MAX_UPLOAD_MB * 1024 * 1024; an InputError becomes c.json({error: code, message}, status)); busy check: `const admission = getAdmission(deps)` (server/admission.ts, S2; call it at request time, never cache it) and `const gate = admission.canAccept()`; when !gate.ok respond 429 {error: 'busy', message, retryAfterSec: gate.retryAfterSec} with a Retry-After header BEFORE anything is stored (contract D-16); store the product with deps.assets.put(bytes, mime, {role: 'product-photo'}); if audio: text = (await transcribeBrief(audio, {meta: deps.meta, keywords: title ? [title] : []})).text, mapping BriefTooLongError to 400 audio_too_long and EmptyBriefError to 400 empty_brief (the film is NOT created); film = deps.films.create({aspect, brief: {text, transcript?: text when audio}, title, assets: [productRef]}); when audio, emit film's listener.transcript through deps.makeToolCtx(film.id).emit({type: 'listener.transcript', text}); bindDirector(deps) (once) and hand the run to the admission seam without awaiting it: `const queue = admission.submit(film.id, () => runDirector(film.id).catch((e) => emit an 'error' event))`; if queue.state is 'rejected' (the crew filled up between the check and the submit) set the film's status to 'failed', emit an 'error' event and respond 429 busy; otherwise respond 202 {filmId, queue}.",
+        "Create server/http/handlers/films.test.ts with makeTestFilm-style deps (build AppDeps in the test, a fake backend/director via vi.mock('../../agent/director') so no real run happens) and app.request with FormData: a valid typed brief returns 202 with a filmId that exists in the store with status 'new' and assets containing the product ref (role 'product-photo') and runDirector called once with that id; an audio brief (use makeFakeMeta transcript 'hello brief' and mock listener convert) creates the film with brief.text 'hello brief' and a listener.transcript event; a 61 s audio returns 400 audio_too_long and creates no film; an empty transcript returns 400 empty_brief; each validation error code from films-input is returned with its status; with a fake admission whose canAccept returns {ok: false, retryAfterSec: 90} the request returns 429 busy with a Retry-After header of '90' and no film is created; with a fake admission whose submit returns {state: 'queued', position: 2, etaSec: 200} the response is 202 {filmId, queue: {state: 'queued', position: 2, etaSec: 200}} and runDirector is not called by the handler itself; with one whose submit returns rejected the film ends 'failed' and the response is 429; with DIRECTOR_PASSCODE set a request without credentials returns 401 before any parsing."
+      ],
+      "acceptanceCriteria": [
+        "A valid typed-brief request returns 202 {filmId}, the film exists with status 'new' and a product asset with role 'product-photo', and runDirector is invoked exactly once with that id",
+        "An audio brief longer than 60 s returns 400 audio_too_long and no film is created",
+        "When the admission gate says busy the request returns 429 {error: 'busy', retryAfterSec} and creates no film; a queued submit returns 202 with queue.position; without the passcode (when set) the request returns 401 first",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-009",
+        "US-008",
+        "US-004"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "DIRECTOR_FAKE: a scripted offline director for UI work",
+      "description": "As a UI developer, I want a deterministic director that needs no API key so that the panels can be built and checked in the browser offline.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 10 (DIRECTOR_FAKE is dev-only), server/agent/director.ts, server/meta/fakes.ts, server/llm/fake-backend.ts and fixtures/s03b/storyboard-spark-raw.json.",
+        "Create server/agent/fake-director.ts: isFakeDirector(): boolean (process.env.DIRECTOR_FAKE === '1'); createFakeParts(o: {delayMs?: number}): {meta: MetaClients; backendFor(storyboard: Storyboard, productAssetId: string): LlmBackend} where meta = makeFakeMeta({sparkScript: [a ChatResponse whose content is JSON.stringify of the raw fixture with 3 scenes, usage {promptTokens: 900, completionTokens: 1100}]}) and backendFor builds a scripted backend with one turn per scene (addLayer bg shape, addLayer product image with the asset id, addLayer headline when the scene has text, setKeyframes headline opacity, setCamera with the scene's camera) followed by {content: 'DONE'}; every turn awaits `delayMs` first (default 400 ms from env DIRECTOR_FAKE_DELAY_MS) so the UI shows progress.",
+        "In server/agent/director.ts, when isFakeDirector() is true use the fake meta for the storyboard call (by passing a ctx whose meta is replaced) and backendFor(...) for building; production behaviour is unchanged when the variable is absent (cover with a test).",
+        "Create server/agent/fake-director.test.ts with delayMs 0: running the director with DIRECTOR_FAKE=1 on a test film ends 'ready' with 3 scenes and no real network client created; with the variable unset the real path is used (assert createFakeParts is not called via a spy)."
+      ],
+      "acceptanceCriteria": [
+        "With DIRECTOR_FAKE=1 and delay 0 the director finishes a 3-scene film with status 'ready' and never touches a real Meta client",
+        "Without DIRECTOR_FAKE the fake parts are never created",
+        "DIRECTOR_FAKE and DIRECTOR_FAKE_DELAY_MS appear nowhere in .env.example or README.md",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-008"
+      ],
+      "labels": [
+        "backend",
+        "agent",
+        "test"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "NewFilm panel: photo, brief, aspect, submit",
+      "description": "As a user, I want a form to upload a product photo and type a brief so that I can start a film.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.14 (NewFilm), web/src/panels/NewFilm.tsx (S2 stub), web/src/api/client.ts (createFilm, ApiRequestError, passcode in localStorage 'director.passcode') and shared/api.ts.",
+        "Replace web/src/panels/NewFilm.tsx (default export, props {film, events} ignored): a form with a product file input (accept image/png,image/jpeg,image/webp) and an <img alt=\"Product preview\"> from URL.createObjectURL (revoked on change and unmount), a product-name input (max 80), a brief <textarea> (max 2000, live counter 'n / 2000'), aspect radios 16:9, 9:16, 1:1 (default 16:9) and a Start button disabled until a product and a non-empty brief exist.",
+        "On submit build FormData {product, brief, aspect, title?} and call api.createFilm(form); on success set the URL query film=<filmId> with history.pushState and dispatch a 'popstate' event so App reloads; show 'Starting…' while pending; on ApiRequestError show the server's `message` (or the code) in a role=alert element; on a 401 also reveal a passcode input; submitting again stores the value in localStorage 'director.passcode' (in try/catch) and retries.",
+        "Create web/src/panels/NewFilm.test.tsx with a mocked api module: Start is disabled initially, enabled after a file and a brief; submit sends FormData whose fields product, brief, aspect equal what was entered; success pushes ?film=film_3fa9c2d41b7e to the URL; a rejected createFilm with {status: 415, body: {error: 'unsupported_media', message: 'Use a PNG, JPEG or WebP photo.'}} shows that message in role=alert; a 401 shows the passcode field and a retry stores the passcode and succeeds; the brief counter shows '5 / 2000' after typing 5 characters."
+      ],
+      "acceptanceCriteria": [
+        "The Start button is disabled until a product file and a non-empty brief are provided",
+        "A 415 response shows the server's message in an element with role 'alert'; a 401 reveals the passcode field and the retry stores it in localStorage 'director.passcode'",
+        "Successful submit updates the URL to ?film=<filmId>",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-010"
+      ],
+      "labels": [
+        "frontend",
+        "ui",
+        "test"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "useRecorder hook and the voice-brief button in NewFilm",
+      "description": "As a user, I want to speak my brief (up to 60 seconds) so that I do not have to type it.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.14 (recorder: MediaRecorder, audio/webm, auto-stop at 60 s, playback before sending) and web/src/panels/NewFilm.tsx.",
+        "Create web/src/panels/useRecorder.ts: useRecorder(o?: {maxSeconds?: number}) returning {state: 'idle'|'recording'|'recorded'|'error', seconds: number, blob: Blob | null, error: string | null, start(): Promise<void>, stop(): void, reset(): void}; start uses navigator.mediaDevices.getUserMedia({audio: true}) and `new MediaRecorder(stream, {mimeType})` with 'audio/webm' when MediaRecorder.isTypeSupported says so (else the default); a 1 s interval updates seconds; at maxSeconds (default 60) it stops automatically; stop releases every track of the stream; a permission error sets state 'error' with the message 'Microphone permission was denied.'.",
+        "In NewFilm add a record button (aria-label 'Record a voice brief'), the elapsed time while recording, an <audio controls> element for the recorded blob (object URL) and a 'Remove recording' button; when a recording exists the brief textarea is disabled and the form sends `audio` (File named brief.webm) instead of `brief`; Start is enabled with a product plus either a brief or a recording.",
+        "Create web/src/panels/useRecorder.test.tsx with a fake MediaRecorder class and a fake getUserMedia (and fake timers): start -> state 'recording' and seconds advance; stop -> state 'recorded' with a blob of type 'audio/webm'; auto-stop after maxSeconds 3 at 3 s; denied permission -> state 'error' with the message; tracks are stopped; add to NewFilm.test.tsx: with a recording the submitted FormData has an `audio` file and no `brief`, and the textarea is disabled."
+      ],
+      "acceptanceCriteria": [
+        "With maxSeconds 3 the recorder stops by itself at 3 s and ends in state 'recorded' with a blob of type 'audio/webm'",
+        "A denied microphone permission sets state 'error' with 'Microphone permission was denied.'",
+        "With a recording present the submitted FormData contains `audio` and no `brief`, and the brief textarea is disabled",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-012"
+      ],
+      "labels": [
+        "frontend",
+        "ui",
+        "test"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Storyboard panel: status, transcript, scene cards with mode badges, tool ticker, cost",
+      "description": "As a viewer, I want to watch the director plan and build so that I understand each scene and why it is motion or generate.",
+      "steps": [
+        "Read docs/hackathon/steps/step-03-brief-to-composition/design.md section 5.14 (Storyboard panel), web/src/panels/Storyboard.tsx (S2 stub) and shared/events.ts.",
+        "Replace web/src/panels/Storyboard.tsx (default export, props {film: FilmState | null; events: FilmEvent[]}): a status line from the latest film.status event (labels: planning 'Planning the film…', building 'Building scenes…', ready 'Ready', failed 'Something went wrong', none 'Waiting for a brief'); a 'We heard: “…”' block from the latest listener.transcript; scene cards (data-testid 'scene-card') from the latest director.storyboard event showing intent, duration, camera, the headline text and a badge reading MOTION or GENERATE (data-testid 'mode-badge') with the modeReason beneath (and '~25 credits' for generate scenes); a ticker (data-testid 'tool-ticker') of the last 20 tool.call events as '✓ addLayer' or '✗ setKeyframes: <error>'; a cost line `Cost $<sum of cost.usd, 4 decimals>` plus ` · <sum credits> credits` when credits exist.",
+        "Create web/src/panels/Storyboard.test.tsx with a fixed event list (film.status planning, listener.transcript 'hello brief', director.storyboard with three scenes of which s2 is generate, five tool.call events one of them ok false, film.status building, two cost events 0.0011 and 0.0009, a cost event with credits 25): three scene-card elements, mode badges MOTION, GENERATE, MOTION in order, the generate reason visible, a ticker with 5 entries and one starting '✗', status text 'Building scenes…', 'We heard' block present, cost line 'Cost $0.0020 · 25 credits'; with no events it shows 'Waiting for a brief'."
+      ],
+      "acceptanceCriteria": [
+        "A storyboard event with three scenes renders three scene cards whose mode badges read MOTION, GENERATE, MOTION and the generate scene shows its reason",
+        "The cost line sums to 'Cost $0.0020 · 25 credits' for cost events 0.0011, 0.0009 and one with credits 25",
+        "With no events the panel shows 'Waiting for a brief'; a failed tool.call appears in the ticker starting with '✗'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-013"
+      ],
+      "labels": [
+        "frontend",
+        "ui",
+        "test"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "Live script s03-director and the browser check with DIRECTOR_FAKE",
+      "description": "As an owner, I want one safe command to try the real director and a way to see the whole flow in the browser without keys so that I can judge the film.",
+      "steps": [
+        "Read docs/hackathon/06-contracts.md section 1 (Spend / network), scripts/live/run.ts (LiveScript), docs/hackathon/steps/step-03-brief-to-composition/design.md section 9 (manual gate) and server/main.ts (buildDeps).",
+        "Create scripts/live/s03-director.ts implementing LiveScript: describe() 'Runs the real director (Spark storyboard + tool loop) on fixtures/seed/mug-product.png with a typed brief and writes debug/s03/iteration-NN/{storyboard.json,composition.json,events.jsonl,summary.md}'; estimateUsd() returns 0.2; run(ctx): builds deps with buildDeps(loadEnv()), stores the seed photo as an asset, creates a film with brief 'A 12 second ad for our white ceramic mug: calm sunrise mornings, end on the mug.', binds and awaits createDirector(deps).runDirector, then writes the four files (next free iteration-NN folder) and logs scenes, modes, version count and the film's costUsd.",
+        "Create scripts/live/s03-director.test.ts: describe() mentions mug-product.png and debug/s03; estimateUsd() is 0.2; the test never calls run().",
+        "Verify in the browser: `DIRECTOR_FAKE=1 DIRECTOR_FAKE_DELAY_MS=600 npm run dev`, open http://localhost:5173, upload fixtures/seed/mug-product.png (use the file picker), type a brief, press Start. Confirm and record in `notes`: the URL becomes ?film=<id>, the Storyboard panel moves through planning and building and shows three scene cards with mode badges, the tool ticker fills, the Player updates to the built film within a few seconds, and the cost line is shown. Also try submitting without a photo (button disabled) and with a 3 MB text file renamed .png (error message shown). Record any console error."
+      ],
+      "acceptanceCriteria": [
+        "scripts/live/s03-director.ts exports estimateUsd() equal to 0.2 and its test never invokes run()",
+        "In the browser with DIRECTOR_FAKE=1 the flow upload, brief, Start shows storyboard cards, a filling ticker and an updating Player (recorded in notes)",
+        "A renamed text file (.png) is rejected with a visible error message and no film appears (recorded in notes)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-014",
+        "US-011"
+      ],
+      "labels": [
+        "frontend",
+        "ui",
+        "scripts"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-03-brief-to-composition/requirements.md",
+      "docs/hackathon/steps/step-03-brief-to-composition/design.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (sections 3-6: ToolCtx.emit stamping, AppDeps, D-1 handlers, D-2 makeToolCtx, D-4 cost via ctx.ledger, D-10 runDirector signature)",
+      "docs/hackathon/steps/step-03-brief-to-composition/design.md (sections 5.9-5.14 flow and rules, 6 full prompts, 7 errors, 11 verified facts)",
+      "server/authoring/api.ts and server/tools/authoring.ts (S3a: the tools the director calls; layer ids are '<sceneId>:<role>')",
+      "server/test-utils/film.ts, server/meta/fakes.ts, server/llm/fake-backend.ts (S2 doubles) and fixtures/seed/spark-tool-loop-turns.json + spark-storyboard-response.json"
+    ],
+    "requires": [
+      "prd-s03a-authoring-core"
+    ],
+    "owns": [
+      "server/agent/director.ts",
+      "server/agent/prompts/director.ts",
+      "server/agent/storyboard.ts",
+      "server/agent/build-scene.ts",
+      "server/agent/scene-basics.ts",
+      "server/agent/init-composition.ts",
+      "server/agent/fake-director.ts",
+      "server/listener.ts",
+      "server/http/handlers/films.ts",
+      "server/http/handlers/films-input.ts",
+      "web/src/panels/NewFilm.tsx",
+      "web/src/panels/Storyboard.tsx",
+      "web/src/panels/useRecorder.ts",
+      "scripts/live/s03-director.ts",
+      "fixtures/s03b/*"
+    ],
+    "sharedEdits": [],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "Cost is recorded through ctx.ledger (from deps.makeToolCtx(filmId)); the Meta clients never write to the ledger. The ledger emits the cost event itself, so do not emit a second one.",
+      "The director talks to the film only through the S3a tools (runTool) and FilmStore; it never edits composition JSON by hand, except through the pure authoring API for the initial scene skeleton.",
+      "DIRECTOR_FAKE is read directly from process.env in fake-director.ts and is never documented in .env.example (production must not set it)."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner runs `npm run live -- s03-director` (prints the estimate, about $0.20) and then `npm run live -- s03-director --yes`; it writes debug/s03/iteration-NN/{storyboard.json,composition.json,events.jsonl,summary.md}. Check the storyboard (modes sensible, at most 2 generate scenes) and open the film in the Player.",
+      "MG-2: the strict json_schema together with an image_url part was not tested in S1: MG-1 confirms it works (otherwise the code falls back to text only on a 400, and the summary says so).",
+      "MG-3: owner tries a real voice memo (<= 60 s) in the NewFilm panel once Meta credits are available; confirm the transcript appears in the Storyboard panel."
+    ]
+  }
+}

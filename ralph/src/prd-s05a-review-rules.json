@@ -1,0 +1,443 @@
+{
+  "name": "PixiTween Director S05a: deterministic review rules",
+  "branchName": "ralph/s05a-review-rules",
+  "description": "Pure, offline review rules: an engine geometry model (layerBoxAt), text-box estimate, contrast maths, pixel samplers, rules R1-R5 with numeric evidence, computed and self-verified suggested fixes, and a six-case synthetic calibration set. No model calls, no browser. The contract entry point is runRules(comp, assets, opts) in server/review/rules.ts (decision D-10), a thin node-side wrapper over the isomorphic rules-core.ts. Leaves out frame capture, Spark visual review and the fix loop (prd-s05b-review-visual).",
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-05-self-review-loop/requirements.md",
+      "docs/hackathon/steps/step-05-self-review-loop/design.md",
+      "docs/hackathon/steps/step-05-self-review-loop/contract-issues.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (sections 3, 3a, 4a, 4b and section 6: decision D-10 fixes the entry point runRules(comp, assets) in server/review/rules.ts)",
+      "docs/hackathon/steps/step-05-self-review-loop/design.md (sections 4.1, 5.1-5.5 hold every formula, threshold and worked number)",
+      "docs/hackathon/steps/step-05-self-review-loop/contract-issues.md",
+      "fixtures/seed/README.md"
+    ],
+    "requires": [
+      "prd-s03a-authoring-core"
+    ],
+    "owns": [
+      "server/review/types.ts",
+      "server/review/sample.ts",
+      "server/review/geometry.ts",
+      "server/review/text-box.ts",
+      "server/review/contrast.ts",
+      "server/review/pixels.ts",
+      "server/review/rules-core.ts",
+      "server/review/rules.ts",
+      "server/review/fixes.ts",
+      "server/review/test-support.ts",
+      "scripts/calibrate/s05a.ts",
+      "fixtures/s05a/*"
+    ],
+    "extraGuardrails": [
+      "server/review/types.ts, sample.ts, geometry.ts, text-box.ts, contrast.ts and rules-core.ts must stay isomorphic: no 'node:' imports, no 'sharp', no runtime import of 'reacthub-pixitweenjs' (type-only imports are fine). Only pixels.ts may use sharp.",
+      "Do not use the clock or randomness anywhere in the rules; round every reported number to 2 decimals."
+    ],
+    "manualGates": [
+      "MG-1: owner runs `npx tsx scripts/calibrate/s05a.ts` after merge and checks fixtures/s05a/calibration.md shows 6/6 (offline, free).",
+      "MG-2: if the engine-parity tests were skipped because the package root cannot be imported under Vitest, decide whether to add the ENGINE-NEEDS.md row (a pure-subpath export of the keyframe sampler)."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Review types, GeometryError and box helpers",
+      "description": "As a rules author, I want shared types and box helpers so that every rule reports findings the same way.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 4.1 and 5.3 and shared/events.ts (review.finding).",
+        "Create server/review/types.ts exporting type Box = { left:number; top:number; right:number; bottom:number }, type Rule = 'R1'|'R2'|'R3'|'R4'|'R5', interface Finding and interface RuleDeps exactly as in design 4.1 (plateLuminance and maskCoverage take a NORMALISED 0..1 region), type SkipNote = { rule: Rule | '*'; sceneId?: string; reason: string }, and class GeometryError extends Error { constructor(readonly code: 'precomp-transform-unsupported'|'unknown-layer'|'unknown-scene'|'text-size-unavailable', message: string) }.",
+        "Export pure helpers boxW(b), boxH(b), boxArea(b), intersect(a: Box, b: Box): Box | null (null when the overlap has no area) and round2(n: number): number (rounds half away from zero to 2 decimals and never returns -0).",
+        "Create server/review/types.test.ts."
+      ],
+      "acceptance": [
+        "intersect({left:0,top:0,right:10,bottom:10},{left:5,top:5,right:15,bottom:15}) equals {left:5,top:5,right:10,bottom:10}; two boxes that only share an edge return null",
+        "boxArea({left:190,top:800,right:1730,bottom:867.2}) is within 0.001 of 103488",
+        "round2(2.3456) is 2.35 and Object.is(round2(-0.004), 0) is true",
+        "new GeometryError('unknown-layer','x') is an Error with code 'unknown-layer'"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Keyframe sampler copy with engine parity test",
+      "description": "As a geometry-model author, I want a dependency-free copy of the engine's keyframe sampler so that boxes are computed at exactly the values the renderer shows.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.1 step 3 and, in the engine checkout ~/Documents/code/trolio/reacthub-pixitweenjs/src, hooks/aep/sampleAnimatable.ts lines 27-118 (cubicBezierEase, sampleAnimatable, sampleScalar, sampleVec2, lerp helpers).",
+        "Create server/review/sample.ts exporting cubicBezierEase(handles: [number,number,number,number], x: number), sampleAnimatable<T>(field, fallback, frame, lerp), lerpNumber, lerpVec2, sampleScalar(field, fallback, frame) and sampleVec2(field, fallback, frame) with the engine's exact semantics: static values pass through; before the first key return the first value; at or after the last key return the last value; a key with hold:true steps; otherwise lerp with eased = a.easeOut ? cubicBezierEase(a.easeOut, raw) : raw where a is the LEFT key (8 Newton iterations). The module imports nothing.",
+        "Create server/review/sample.test.ts with the numeric cases below.",
+        "Create server/review/sample.parity.test.ts starting with the line `// @vitest-environment jsdom`: dynamically import 'reacthub-pixitweenjs' inside try/catch; use it.skipIf(!engine) and compare sampleScalar and sampleVec2 against the engine's exports on 200 random keyframe sets (seeded PRNG, no Math.random) within 1e-9."
+      ],
+      "acceptance": [
+        "sampleScalar([{t:0,v:0},{t:30,v:1}], 0, 15) returns 0.5; at frame -5 returns 0; at frame 99 returns 1; sampleScalar(7, 0, 15) returns 7",
+        "sampleScalar([{t:0,v:0,hold:true},{t:30,v:1}], 0, 15) returns 0",
+        "sampleScalar([{t:0,v:0,easeOut:[0.4,0,0.2,1]},{t:30,v:1}], 0, 15) is within 1e-6 of 0.7755613",
+        "sampleVec2([{t:0,v:[0,0]},{t:30,v:[100,200]}], [0,0], 15) returns [50,100]",
+        "The parity test passes, or is reported as skipped with a reason when the package root cannot be imported (never failing silently)"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "layerBoxAt for image, shape and null layers",
+      "description": "As a rules author, I want layerBoxAt to reproduce how the engine draws a layer so that rules see the same rectangles the viewer sees.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.1 completely, docs/hackathon/06-contracts.md section 3a (meta.director, ids, precomp scenes) and, in the engine src, components/AepComposition/useAepLayerTransform.ts lines 30-106, components/AepComposition/AepLayerRouter.tsx lines 60-70 and hocs/AbstractContainer.tsx lines 255-268.",
+        "Create fixtures/s05a/geometry-basic.comp.json: an engine-valid 1920x1080 30 fps composition with root precomp layer 'scene:s1' (compId 's1', identity transform, frames 0-120), meta.director scenes/layers for s1, and inner comp 's1' (assets plate_1 1920x1080 and cut_1 532x442) with image layers s1:bg (position [960,540], anchor [960,540], scale [1,1]) and s1:product (position [960,561.6], anchor [266,221], scale [1.466,1.466], inPoint 15, outPoint 60), plus a null layer 'parent' (position [100,100], scale [2,2]) and an image layer 'child' (asset cut_1 resized by scale [0.1,0.1], parent 'parent', position [10,20], anchor [0,0]).",
+        "Create server/review/geometry.ts exporting interface LayerBox { box: Box; position: [number, number]; rotation: number; opacity: number; visible: boolean; drawIndex: number; size: { w: number; h: number } } and layerBoxAt(comp, layerId, frame, opts?: { textSize?: (layer, scale: {sx:number;sy:number}) => { w:number; h:number } | undefined; measuredTextBox?: Box }): LayerBox implementing design 5.1 steps 1-7: locate the scene precomp through meta.director, throw GeometryError('precomp-transform-unsupported') unless the root precomp layer is the static identity placement, fold the parent chain root to leaf with the engine's composeTransforms, sample with server/review/sample.ts, use asset size (inner assets merged over root assets) else inner comp size as intrinsic size, anchorFrac = anchorPx / intrinsic, top-left = position - anchorFrac * size, and return the axis-aligned bounds of the rotated rectangle. Text layers use opts.textSize (US-005 supplies the default).",
+        "Create server/review/geometry.test.ts using the fixture."
+      ],
+      "acceptance": [
+        "layerBoxAt(comp,'s1:product',30) box is within 0.1 of {left:570.04,top:237.61,right:1349.96,bottom:885.58}; layerBoxAt(comp,'s1:bg',30) box is {left:0,top:0,right:1920,bottom:1080}",
+        "visible is false at frame 14 and 60 and true at frames 15 and 59 for s1:product (inPoint 15, outPoint 60, half-open)",
+        "For the parent/child pair the child box is {left:120,top:140,right:?,bottom:?} where left and top are exactly 120 and 140 (parent position 100 + parent scale 2 * child position 10 and 20) and the box width equals 532*0.1*2 within 0.01",
+        "A 100x50 image layer with anchor [50,25], position [500,500] and rotation 90 has box {left:475,top:450,right:525,bottom:550} within 0.01",
+        "A position keyframed [{t:0,v:[0,0]},{t:30,v:[100,0]}] gives position [50,0] at frame 15; opacity is the product of the layer and parent opacities",
+        "An unknown layer id throws GeometryError code 'unknown-layer'; a root precomp layer with position [10,0] throws code 'precomp-transform-unsupported'; drawIndex of s1:product is greater than that of s1:bg"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Sample frames, scene list and visibility",
+      "description": "As a rules author, I want sample frames and a scene list so that every rule looks at the same four moments of each scene.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.1 (sampleSceneFrames) and 5.3 (visibility for R4), and server/review/geometry.ts.",
+        "In server/review/geometry.ts add sampleSceneFrames(durationFrames: number, n = 4): number[] returning Math.floor((i + 0.5) * durationFrames / n) for i in 0..n-1, listScenes(comp): Array<{ sceneId: string; precompId: string; startFrame: number; durationFrames: number; mode: 'motion' | 'generate'; width: number; height: number; fps: number }> (from meta.director.scenes, ordered by startFrame) and isProductVisible(lb: LayerBox, frameSize: {w:number;h:number}): boolean (lb.visible, lb.opacity >= 0.3 and at least 50 percent of the box area inside [0,w] x [0,h]).",
+        "Extend server/review/geometry.test.ts."
+      ],
+      "acceptance": [
+        "sampleSceneFrames(120) equals [15,45,75,105]; sampleSceneFrames(96) equals [12,36,60,84]; sampleSceneFrames(90,3) equals [15,45,75]",
+        "listScenes on the geometry-basic fixture returns one scene {sceneId:'s1', startFrame:0, durationFrames:120, mode:'motion', width:1920, height:1080, fps:30}",
+        "isProductVisible is true for a fully inside box, false when only 40 percent of the box is inside the frame, false when opacity is 0.2, and true at exactly 50 percent inside"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Text box estimate and wiring into layerBoxAt",
+      "description": "As a rules author, I want an estimated text box so that text rules work without a browser.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.2 and, in the engine src, components/PixiTextSprite/PixiTextSprite.tsx lines 175-185 and 262-268 (wordWrapWidth default), components/AepComposition/shouldSplitText.ts lines 25-46 and utils/textLayout/types.ts lines 11-42.",
+        "Create server/review/text-box.ts exporting isSplitText(layer) (the shouldSplitText predicate: splitMode other than 'single', non-empty animators, non-empty style.runs, a style.align starting with 'justify', or an animated style.fill), advanceFactor(weight) (0.60 when weight is a number >= 700 or the string 'bold', else 0.55), wrapWords(text, boxWidth, size, k) (greedy: a word joins the current line while lineWidth + space + word <= boxWidth; space = size*k; line height 1.2*size) and estimateTextSize(layer): { w: number; h: number } (flat path: split on '\\n', w = longest line chars * size * k, h = lines * size * 1.2; split path: wrapWords with style.boxWidth when set, else the flat result). Use the first keyframe value when style.size is animated.",
+        "In server/review/geometry.ts make layerBoxAt use estimateTextSize for text layers by default (size multiplied by |world scale|) while still honouring opts.textSize and opts.measuredTextBox (the measured box wins and is returned as-is).",
+        "Create server/review/text-box.test.ts and extend geometry.test.ts; add a text layer 's1:caption' to a second fixture fixtures/s05a/geometry-text.comp.json (copy of geometry-basic plus caption: text 'One careful pour turns into a finish guests notice', size 56, position [960,800], anchor [960,0], scale [1,1]).",
+        "Create server/review/text-box.parity.test.ts with `// @vitest-environment jsdom` comparing wrapWords bounds with the engine's layoutText (same injected metrics provider) on 5 sample texts within 1 percent; skipIf the package root cannot be imported."
+      ],
+      "acceptance": [
+        "estimateTextSize for the 50-character caption at size 56 returns w 1540 and h 67.2 (within 0.01); with weight 700 w is 1680",
+        "estimateTextSize of 'ab\\ncdefgh' at size 10 returns w 33 and h 24",
+        "wrapWords('aaaa bbbb cccc dddd', 100, 20, 0.55) yields 2 lines and bounds w 99, h 48",
+        "layerBoxAt(textComp,'s1:caption',30) box is within 0.01 of {left:190,top:800,right:1730,bottom:867.2} (anchor [960,0] on a 1920 wide comp means anchorFrac 0.5,0); with scale [0.5,0.5] the box width is 770 and height 33.6",
+        "isSplitText is true for splitMode 'words', for a justify-full align and for non-empty animators, and false for a plain layer; opts.measuredTextBox is returned unchanged"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Contrast maths",
+      "description": "As a rules author, I want exact WCAG contrast helpers so that the 4.5:1 threshold is computed the same way everywhere.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.3 (R3 contrast maths and the verified numbers).",
+        "Create server/review/contrast.ts exporting parseColor(c: string): { r:number; g:number; b:number } (accepts #RGB, #RRGGBB and #RRGGBBAA, alpha ignored, throws on anything else), linearise(channel0to255: number), relLuminance(rgb): number (0.2126 R + 0.7152 G + 0.0722 B on linearised channels), ratioFromLuminance(a: number, b: number): number ((hi + 0.05) / (lo + 0.05)) and bestFlatTextColor(plateLuminance: number): { color: '#FFFFFF' | '#111111'; ratio: number; reaches: boolean } (the higher ratio of white and #111111; reaches = ratio >= 4.5).",
+        "Create server/review/contrast.test.ts."
+      ],
+      "acceptance": [
+        "relLuminance(parseColor('#e6e6e6')) is within 0.001 of 0.7913 and relLuminance(parseColor('#1e1e1e')) within 0.001 of 0.0130",
+        "ratioFromLuminance(1, 0.7913) is within 0.005 of 1.248; ratioFromLuminance(1, 0.1812) within 0.005 of 4.542; ratioFromLuminance(1, 0.1878) within 0.005 of 4.415",
+        "bestFlatTextColor(0.7913) returns color '#111111', ratio within 0.05 of 15.13 and reaches true; bestFlatTextColor(0.1878) returns color '#FFFFFF', ratio within 0.01 of 4.415 and reaches false",
+        "parseColor('#fff') equals {r:255,g:255,b:255}; parseColor('#11223380') equals {r:17,g:34,b:51}; parseColor('red') throws"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Pixel samplers (plate luminance, mask coverage)",
+      "description": "As a rules author, I want sampled pixel statistics from stored assets so that contrast and occlusion use real pixels.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.3 (region mapping, 256 px downsample) and server/media/image.ts (imageSize).",
+        "Create server/review/pixels.ts exporting makeSharpPixelDeps(readAsset: (assetId: string) => Promise<Buffer>): Required<Pick<RuleDeps,'plateLuminance'|'maskCoverage'>>. Both decode the asset with sharp once per id (cache), downscale to at most 256 px on the long side, and take a region in NORMALISED 0..1 coordinates. plateLuminance returns the mean over the region of per-pixel LINEAR relative luminance (use a 256-entry linearisation table); maskCoverage returns the fraction of region pixels whose grey (or alpha when the PNG has alpha) is >= 128. A region that is empty after clamping to 0..1 throws RangeError('empty region').",
+        "Create server/review/pixels.test.ts that builds solid-colour and half-and-half PNGs with sharp (create) in memory; no fixture files are needed."
+      ],
+      "acceptance": [
+        "Solid grey 30, 120 and 230 PNGs give plateLuminance over {0,0,1,1} within 0.002 of 0.013, 0.1878 and 0.7913",
+        "A PNG whose left half is grey 30 and right half grey 230 gives a mean within 0.003 of 0.4022 over the full region and within 0.002 of 0.013 over {left:0,top:0,right:0.5,bottom:1}",
+        "A mask PNG with the left half 255 and the right half 0 gives maskCoverage 0.5 (within 0.01) over the full region, 1 over the left half and 0 over the right half",
+        "A region {left:0.4,top:0.4,right:0.4,bottom:0.9} rejects with RangeError; two calls with the same asset id call readAsset once"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Test composition builder and runRules skeleton",
+      "description": "As a rules author, I want a composition builder and the runRules shell so that each rule can be added and tested in isolation.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 4.1, 5.3 and 5.4 and docs/hackathon/06-contracts.md section 3a. In the engine src read types/aep/composition.ts lines 76-100 and 156-199 (precomp and asset reference rules) so the builder output validates.",
+        "Create server/review/test-support.ts exporting buildReviewComp(o?: { scenes?: number; sceneFrames?: number | number[]; caption?: { text?: string; x?: number; y?: number; size?: number; color?: string; weight?: number; opacity?: number; animatedY?: boolean } | null; headline?: { text?: string; x?: number; y?: number; size?: number; color?: string; behind?: boolean } | null; product?: { outFrame?: number } | null; plate?: { grey?: number; as?: 'image' | 'shape' }; modes?: Array<'motion'|'generate'>; storyboard?: boolean }): { comp: AepCompositionJson; storyboard?: Storyboard; assets: Record<string, Buffer> } and plateAssetPng(grey: number, w = 64, h = 36): Promise<Buffer> and makeAssetReader(assets: Record<string, Buffer>): { read(id: string): Promise<Buffer> } (an AssetStore-like reader that rejects with a clear message for an unknown id). Defaults reproduce the CLEAN calibration film: 1 scene of 120 frames, plate image grey 30 (asset plate_1 1920x1080 at s1:bg), product s1:product (asset cut_1 532x442, position [960,561.6], anchor [266,221], scale [1.466,1.466]), caption s1:caption (text 'One careful pour turns into a finish guests notice', size 56, white, position [960,930], anchor [960,0]), layer order [bg, product, caption] (headline behind: [bg, headline, product, caption]), meta.director scenes and layers filled, assets registered in BOTH the root and the scene precomp, root precomp layers laid end to end, and a matching Storyboard (scene durationSec = frames/30).",
+        "Create server/review/rules-core.ts exporting runRulesCore(comp, o?: { storyboard?: Storyboard; deps?: RuleDeps; sceneIds?: string[]; safeInset?: number }): Promise<{ findings: Finding[]; skipped: SkipNote[] }> (isomorphic, no sharp): iterate scenes in order with listScenes; a generate-mode scene adds a skipped note { rule:'*', sceneId, reason:'generate-mode scene' } and is not evaluated; build a per-scene context (sample frames, a memoised boxAt(layerId, frame), layer list with roles and drawIndex, the storyboard scene) and run the registered rule functions (none yet); sort findings by scene order, rule, layerId, atSec; round every number with round2.",
+        "Create server/review/rules.ts exporting the contract entry runRules(comp: AepCompositionJson, assets: { read(id: string): Promise<Buffer> } | null, o?: { storyboard?: Storyboard; deps?: Partial<RuleDeps>; sceneIds?: string[]; safeInset?: number }) (decision D-10): deps = { ...(assets ? makeSharpPixelDeps(assets.read) : {}), ...o.deps }, then runRulesCore(comp, { ...o, deps }). From here on every rule is added to rules-core.ts and tested through runRules.",
+        "Create server/review/rules.test.ts."
+      ],
+      "acceptance": [
+        "parseAepCompositionSafe(buildReviewComp().comp) reports success (also for scenes: 2 and for headline: { behind: true })",
+        "runRules(buildReviewComp().comp, null) resolves with findings [] and skipped []; runRules(comp, makeAssetReader(assets)) gives the same result",
+        "With modes ['motion','generate'] runRules(comp, null) returns skipped [{ rule:'*', sceneId:'s2', reason:'generate-mode scene' }]",
+        "plateAssetPng(30) decodes to a PNG whose first pixel is [30,30,30]; makeAssetReader(assets).read('nope') rejects with a clear message",
+        "The builder places both captions and headline layers with ids 's1:caption' and 's1:headline' and records their roles in meta.director.layers"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "test"
+      ],
+      "dependsOn": [
+        "US-004",
+        "US-005",
+        "US-007"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Rule R1: text over or behind the product",
+      "description": "As a viewer, I want text that neither sits on the product nor is hidden behind it so that both stay readable.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.3 (R1 rows, evidence template and thresholds 15 and 40 percent) and server/review/rules-core.ts, rules.ts and test-support.ts.",
+        "In server/review/rules-core.ts add rule R1 for every text layer and the layer with role 'product': at each sample frame where the text layer's opacity is >= 0.3 and the product is visible, coverage = deps.maskCoverage (used only when it is provided AND meta.director.layers[productLayerId].maskAssetId exists; the region is the intersection mapped into normalised mask coordinates through the product box) else intersection area of the two boxes divided by the text box area. When the text layer's drawIndex is GREATER than the product's (text in front): kind 'text-over-product', fails when coverage > 0.15. When it is LOWER (behind): kind 'text-occluded', fails when coverage > 0.40.",
+        "Report one Finding per (rule, layer, kind) at the sample with the highest coverage (ties to the earliest), with samplesFailing (scene-relative seconds = frame/30, rounded), metrics { coverage, limit }, severity 'error', id `R1:<layerId>:<kind>` and evidence like \"text 's1:caption' covers 50.6% of its area with the product at 0.50 s (text 190,800 → 1730,867; product 570,238 → 1350,886)\" with coordinates rounded to integers.",
+        "If there is no product layer add a skipped note { rule:'R1', sceneId, reason:'no product layer' }. Extend server/review/rules.test.ts."
+      ],
+      "acceptance": [
+        "Caption at y 800 (buildReviewComp caption.y 800) yields exactly one R1 finding of kind 'text-over-product' with metrics.coverage within 0.005 of 0.506 and samplesFailing [0.5,1.5,2.5,3.5]; evidence contains '50.6%'",
+        "Caption y 867 yields no R1 finding (coverage 0.140); caption y 864 yields a finding with coverage within 0.003 of 0.163",
+        "Headline behind the product ('Slow mornings, slow coffee' size 96, y 500, behind true) yields kind 'text-occluded' with coverage within 0.01 of 0.568; the 43-character headline 'Slow mornings, slow coffee, slow everything' behind the product yields no R1 finding",
+        "With o.deps.maskCoverage returning 0.05 the y 800 caption yields no finding (the mask value wins over the box); a caption with opacity 0.2 yields none",
+        "With product null the result has no R1 finding and skipped contains { rule:'R1', sceneId:'s1', reason:'no product layer' }"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Rule R2: safe area",
+      "description": "As a viewer, I want text kept inside the title-safe area so that nothing is cut off on any screen.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.3 (R2 row and evidence template) and server/review/rules-core.ts.",
+        "In server/review/rules-core.ts add rule R2 for every text layer: safe area = [inset*W, (1-inset)*W] x [inset*H, (1-inset)*H] with inset 0.05 (parameter o.safeInset, default 0.05); at each sample frame where the text opacity is >= 0.3 the box must lie inside; report one Finding per layer at the worst sample (largest total overflow), kind 'outside-safe-area', metrics { overflowLeft, overflowRight, overflowTop, overflowBottom } in pixels (0 when inside), evidence like \"text 's1:headline' extends 271 px past the left and 271 px past the right safe edge at 0.50 s (safe 96,54 → 1824,1026)\" (mention only the sides that overflow).",
+        "Extend server/review/rules.test.ts using buildReviewComp headline and caption options."
+      ],
+      "acceptance": [
+        "Headline 'Slow mornings, slow coffee, slow everything' size 96 at x 960, y 300 yields one R2 finding with overflowLeft and overflowRight each within 0.5 of 271.2 and evidence containing '271 px past the left' and '271 px past the right'",
+        "Caption x 866 (box left exactly 96) yields no R2 finding; x 865 yields a finding with overflowLeft within 0.01 of 1",
+        "Caption y 1000 (bottom 1067.2) yields a finding with overflowBottom within 0.01 of 41.2 and no left or right overflow",
+        "Caption opacity 0.2 yields no finding; with o.safeInset 0 the y 1000 caption (bottom 1067.2 <= 1080) yields no finding"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Rule R3: contrast against the plate",
+      "description": "As a viewer, I want text that is readable against what is behind it so that captions never wash out.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.3 (R3 maths, region mapping, skips, verified numbers), server/review/contrast.ts and server/review/pixels.ts.",
+        "In server/review/rules-core.ts add rule R3 for every text layer at each sample frame where the opacity is >= 0.3: find the bg layer (role 'bg') and its LayerBox; if the bg is an image, map the text box into NORMALISED plate coordinates through the bg box (u = (x - box.left)/(box.right - box.left), clamped to 0..1; skip the sample on an empty intersection) and call deps.plateLuminance; if the bg is a shape with a static hex fill use that colour's luminance; text colour = style.fill (hex string, or the 'default' of a themed object, or the first keyframe value). ratio = ratioFromLuminance. Fail when ratio < 4.5.",
+        "One Finding per layer at the worst (lowest-ratio) sample: kind 'low-contrast', metrics { ratio, plateLuminance, required: 4.5 }, evidence like \"contrast 1.25:1 (text #ffffff on plate luminance 0.79; need 4.5:1) at 0.50 s\".",
+        "Add skipped notes with reasons: 'plate pixel sampler not provided' (image bg and no deps.plateLuminance), 'text has a stroke' (style.stroke with width >= 2), 'bg layer is rotated or not an image or flat shape'. Extend server/review/rules.test.ts using plateAssetPng and runRules(comp, makeAssetReader(assets)) (the wrapper builds the pixel samplers from the reader)."
+      ],
+      "acceptance": [
+        "White caption on a grey-230 plate yields one R3 finding with metrics.ratio within 0.01 of 1.25 and evidence containing '1.25:1'",
+        "A grey-118 plate yields no R3 finding (ratio 4.54); a grey-120 plate yields a finding with ratio within 0.01 of 4.42 (4.415)",
+        "A plate that is grey 30 on the left half and grey 230 on the right half (full-frame, caption box 190..1730) yields ratio within 0.01 of 2.32",
+        "A flat shape bg with fill '#e6e6e6' yields the 1.25:1 finding with runRules(comp, null); an image bg with runRules(comp, null) (no reader) yields no finding and skipped contains the 'plate pixel sampler not provided' reason",
+        "A caption with style.stroke width 3 is skipped with reason 'text has a stroke'"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-006",
+        "US-007",
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Rule R4: product stays visible",
+      "description": "As a viewer, I want the product on screen for most of its scene so that the film sells the product.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.3 (R4 row) and server/review/geometry.ts (isProductVisible, sampleSceneFrames).",
+        "In server/review/rules-core.ts add rule R4 for scenes that have a layer with role 'product': count the samples (4 per scene) where isProductVisible is true; fail when visible/4 < 0.6. Finding kind 'product-hidden', severity 'error', layerId = the product layer, atSec = the first failing sample (scene-relative seconds), samplesFailing, metrics { visibleSamples, samples, fraction, limit: 0.6 }, evidence \"product visible in 2 of 4 samples (50% < 60%)\".",
+        "A scene without a product layer adds skipped { rule:'R4', sceneId, reason:'no product layer' }. Extend server/review/rules.test.ts."
+      ],
+      "acceptance": [
+        "product.outFrame 60 on a 120-frame scene yields one R4 finding with metrics.visibleSamples 2, fraction 0.5, atSec 2.5, samplesFailing [2.5,3.5] and evidence exactly equal to 'product visible in 2 of 4 samples (50% < 60%)'",
+        "product.outFrame 90 yields no R4 finding (3 of 4 visible)",
+        "A product whose position puts only 40 percent of its box inside the frame yields a finding; the default film yields none",
+        "A scene without a product layer yields no R4 finding and a skipped note for R4"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Rule R5: timing and scene layout",
+      "description": "As a viewer, I want scene lengths that match the plan so that the film is as long as promised.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.3 (R5 rows), docs/hackathon/06-contracts.md section 3 (Storyboard: durationSec of the film at most 30) and server/review/geometry.ts (listScenes).",
+        "In server/review/rules-core.ts add rule R5 evaluated once per film and per scene: 'scene-duration' when the scene's frames differ from round(storyboard scene durationSec * 30) by MORE than 1 frame (evidence \"scene s1 lasts 150 frames but the storyboard says 4.0 s (120 frames)\"; only when a storyboard is given); 'scene-gap' or 'scene-overlap' when the root precomp layer of scene i does not start at the sum of the previous scenes' frames (evidence \"scene s2 starts at frame 125, expected 120 (gap of 5 frames)\"); 'total-duration' when the root durationInFrames differs from the sum of scene frames or the storyboard total exceeds 30 s; 'layer-outlasts-scene' (severity 'warn') for an inner layer whose outPoint exceeds the scene's frames.",
+        "Findings carry sceneId (the film-level 'total-duration' uses the last scene id), metrics with the frame counts, and id `R5:<sceneId>:<kind>`. Extend server/review/rules.test.ts using buildReviewComp scenes and sceneFrames."
+      ],
+      "acceptance": [
+        "sceneFrames 150 with a storyboard of 4.0 s yields one 'scene-duration' finding whose evidence is exactly \"scene s1 lasts 150 frames but the storyboard says 4.0 s (120 frames)\"; sceneFrames 121 yields none and 122 yields one",
+        "Two scenes where the second root precomp layer starts at frame 125 instead of 120 yield 'scene-gap' with 5 frames; starting at 115 yields 'scene-overlap'",
+        "A root durationInFrames of 241 for two 120-frame scenes yields 'total-duration'; a storyboard whose scene durations sum to 31 s yields 'total-duration' mentioning 30 s",
+        "An inner layer with outPoint 130 in a 120-frame scene yields 'layer-outlasts-scene' with severity 'warn'",
+        "Without a storyboard no 'scene-duration' finding is produced but gap and overlap are still evaluated"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Computed, self-verified suggested fixes",
+      "description": "As a loop author, I want numerically justified fix suggestions so that deterministic problems are fixed without asking the model.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.5 (all four fix recipes and worked numbers), docs/hackathon/06-contracts.md section 4a (setTransform, setText, setSceneDuration signatures) and server/review/rules-core.ts.",
+        "Create server/review/fixes.ts exporting suggestFix(finding, ctx: { comp, sceneId, boxes..., storyboard? }): { tool: string; args: Record<string, unknown> } | undefined and applyFixInMemory(comp, fix): AepCompositionJson (maps 'setTransform' -> setTransform(comp, layerId, patch), 'setText' -> setText(comp, layerId, text, style), 'setSceneDuration' -> setSceneDuration(comp, sceneId, sec) from server/authoring/api.ts).",
+        "Rules: only for a layer whose position is static and rotation is 0. R1 text-over-product: candidate bands above and below the product box with a margin of 2 percent of the scene height, inside the safe area and tall enough; choose the smaller |dy|; fix { tool:'setTransform', args:{ layerId, y: position.y + dy } }. R2: vertical overflow -> shift y into the inset; horizontal overflow on a centred anchor (anchorFrac.x between 0.4 and 0.6) -> { tool:'setTransform', args:{ layerId, scale: floor(100 * 0.98 * safeWidth / textWidth) / 100 } }; other horizontal cases -> none. R3: { tool:'setText', args:{ layerId, text: <current source>, style:{ color } } } with bestFlatTextColor only when reaches is true, else none and append ' no flat colour reaches 4.5:1; add a scrim' to the finding evidence. R5 scene-duration: { tool:'setSceneDuration', args:{ sceneId, sec: storyboard seconds } }.",
+        "In runRulesCore attach suggestedFix to each finding, but DROP a suggestion unless re-running the same rule on applyFixInMemory(comp, fix) no longer reports that finding. Extend server/review/rules.test.ts and add server/review/fixes.test.ts."
+      ],
+      "acceptance": [
+        "Caption at y 800 yields suggestedFix { tool:'setTransform', args:{ layerId:'s1:caption', y } } with y within 0.05 of 907.2; applying it clears the R1 finding",
+        "The 43-character size-96 centred headline yields suggestedFix setTransform with scale 0.74 and the patched composition has no R2 finding",
+        "White caption on grey-230 yields suggestedFix setText with style.color '#111111' and the patched composition has no R3 finding; on a grey-120 plate there is NO suggestedFix and the evidence contains 'scrim'",
+        "A caption with animatedY true (position keyframes) gets no suggestedFix for R1; an R4 finding never has one",
+        "A scene-duration finding (150 frames vs 4.0 s) yields { tool:'setSceneDuration', args:{ sceneId:'s1', sec:4 } } and applying it clears the finding"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-009",
+        "US-010",
+        "US-011",
+        "US-013"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "Calibration fixtures and calibrate script",
+      "description": "As an owner, I want a six-case calibration with a confusion table so that I can see the rules classify seeded faults exactly.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.4 (the six cases and expected findings) and server/review/test-support.ts.",
+        "Create scripts/calibrate/s05a.ts exporting async runCalibration(): Promise<Array<{ name: string; expected: string[]; actual: string[]; pass: boolean }>> and a main that prints a table and writes fixtures/s05a/calibration.md (columns: case, expected, actual, PASS/FAIL, one line summary). Cases built with buildReviewComp: clean (default), caption-over-cup (caption.y 800), low-contrast (plate grey 230), overflow (headline 'Slow mornings, slow coffee, slow everything' size 96, centred at x 960, y 100), product-late-exit (product.outFrame 60), duration-drift (sceneFrames 150 with the 4.0 s storyboard). Actual = sorted list of finding ids from runRules(comp, makeAssetReader(assets), { storyboard }).",
+        "Write each case's composition to fixtures/s05a/<case>.comp.json and its expected finding ids to fixtures/s05a/<case>.expected.json (committed, generated by the script).",
+        "Create scripts/calibrate/s05a.test.ts that runs runCalibration() and compares the written markdown with toMatchFileSnapshot('../../fixtures/s05a/calibration.md')."
+      ],
+      "acceptance": [
+        "runCalibration() returns 6 entries and every entry has pass true (6/6)",
+        "clean yields actual [] ; caption-over-cup yields ['R1:s1:caption:text-over-product']; low-contrast yields ['R3:s1:caption:low-contrast']; product-late-exit yields ['R4:s1:product:product-hidden']; duration-drift yields ['R5:s1:scene-duration']; overflow yields ['R2:s1:headline:outside-safe-area']",
+        "For every case fixtures/s05a/<case>.expected.json lists exactly the finding ids runRules produces (the test fails when the lists differ in either direction); finding ids follow `<rule>:<layerId or sceneId>:<kind>`",
+        "fixtures/s05a/calibration.md exists with a table of 6 rows all marked PASS, and the script has no network or clock dependence (running it twice gives identical files)"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "scripts",
+        "test"
+      ],
+      "dependsOn": [
+        "US-014"
+      ]
+    },
+    {
+      "id": "US-016",
+      "title": "Determinism, purity and contract entry point",
+      "description": "As a loop and chat-tool author, I want a stable public API and proof that the rules are deterministic and isomorphic so that they can run on the server and in the browser.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 4.1 (determinism statement) and server/review/rules-core.ts and rules.ts.",
+        "In server/review/rules.ts re-export layerBoxAt, listScenes, sampleSceneFrames, estimateTextSize, makeSharpPixelDeps, suggestFix, applyFixInMemory, runRulesCore and the types Box, Finding, RuleDeps, SkipNote, GeometryError from their modules, and write a header comment explaining how S5b and S6 call runRules(comp, assets, opts) (inputs, outputs, skipped).",
+        "Create server/review/determinism.test.ts: run runRules twice on every calibration composition and compare JSON.stringify output; assert every number in every finding's metrics has at most 2 decimals and that findings are sorted by scene order, rule, layerId; read the source text of types.ts, sample.ts, geometry.ts, text-box.ts, contrast.ts and rules-core.ts and assert none contains \"from 'node:\", \"from 'sharp'\" or a non-type import of 'reacthub-pixitweenjs'.",
+        "Verify the contract name: import { runRules } from './rules' type-checks with the signature (comp, assets, opts?)."
+      ],
+      "acceptance": [
+        "Two runRules(comp, reader, { storyboard }) calls on each of the six calibration compositions produce byte-identical JSON",
+        "No finding metric has more than 2 decimal places and no finding contains NaN or Infinity",
+        "The purity test passes: the six isomorphic modules (types, sample, geometry, text-box, contrast, rules-core) contain no node: or sharp import and no runtime engine import",
+        "server/review/rules.ts exports every name listed in the steps (a test imports each and checks typeof) and runRules accepts (comp, assets, opts?)"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "test"
+      ],
+      "dependsOn": [
+        "US-015"
+      ]
+    }
+  ]
+}

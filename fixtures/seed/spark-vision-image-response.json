@@ -1,0 +1,29 @@
+{
+  "id": "chatcmpl-01a17af2-e5e7-7709-bd72-979b31910cc0",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "{\"pass\": false, \"issues\": [{\"kind\": \"text-over-product\", \"where\": \"bottom-center subtitle across white coffee cup\", \"evidence\": \"the phrase 'careful pour turns into a finish guests notice' sits directly on the body of the white cup\"}, {\"kind\": \"low-contrast\", \"where\": \"bottom-center subtitle\", \"evidence\": \"white/light-gray lettering over bright white cup and metallic grate washes out; only yellow 'One' remains readable\"}], \"fix\": \"Move caption clear of the cup into a dedicated lower safe area and add a dark semi-transparent scrim/bar behind white text to restore contrast\"}",
+        "refusal": null,
+        "role": "assistant"
+      },
+      "logprobs": null
+    }
+  ],
+  "created": 1793064101,
+  "model": "muse-spark-1.3-contributor",
+  "object": "chat.completion",
+  "usage": {
+    "completion_tokens": 1247,
+    "prompt_tokens": 1289,
+    "total_tokens": 2536,
+    "completion_tokens_details": {
+      "reasoning_tokens": 1107
+    },
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    }
+  }
+}

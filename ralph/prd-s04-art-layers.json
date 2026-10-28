@@ -1,0 +1,572 @@
+{
+  "name": "PixiTween Director S04: Muse Image plates + SAM cut-out layers",
+  "branchName": "ralph/s04-art-layers",
+  "description": "The five art tools (generatePlate, replacePlate, placeProduct, addSubject, setHeadlineBehindProduct) and their pure helpers: prompt lint, placement maths, SAM cut-out pipeline, plate generation and crop, role-ordered layer upsert. Offline only: Muse Image and SAM are faked with makeFakeMeta and the seed fixtures. Deliberately leaves out the director agent (S3b), self-review (S5), generate-mode clips (S7) and any engine change.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Art errors, prices and event helpers",
+      "description": "As a tool author, I want shared error, price and event helpers so that every art tool reports failures, costs and assets the same way.",
+      "steps": [
+        "Read docs/hackathon/steps/step-04-muse-image-sam-layers/design.md sections 7 and 8, shared/tools.ts (ToolCtx, ToolResult), shared/events.ts (art.asset, cost, error) and server/ledger.ts.",
+        "Create server/art/errors.ts exporting type ArtErrorCode = 'no-object' | 'alpha-size-mismatch' | 'bad-image' | 'too-large' | 'order-invalid' | 'unknown-scene' | 'lint' | 'generate-mode' | 'plate-exists' | 'no-plate' and class ArtError extends Error { constructor(readonly code: ArtErrorCode, message: string) }, plus toolError(e: unknown): { ok: false; error: string } that returns ArtError messages as-is and 'internal error' (no stack) for anything else.",
+        "Create server/art/prices.ts exporting const PRICE = { museImageUsd: 0.01, samImageUsd: 0.0025 } as const.",
+        "Create server/art/events.ts exporting emitAsset(ctx: ToolCtx, asset: AssetRef) (emits { type:'art.asset', filmId: ctx.filmId, at: new Date().toISOString(), asset }) and charge(ctx: ToolCtx, model: string, units: string, usd: number) (calls ctx.ledger.add(ctx.filmId, model, units, usd) once).",
+        "Create server/art/errors.test.ts and server/art/events.test.ts using makeTestFilm from server/test-utils/film.ts."
+      ],
+      "acceptanceCriteria": [
+        "toolError(new ArtError('no-object','no mug found in the photo')) returns { ok:false, error:'no mug found in the photo' }",
+        "toolError(new Error('boom at /secret/path')) returns { ok:false, error:'internal error' } and the result contains no 'boom' and no path",
+        "emitAsset pushes exactly one event with type 'art.asset', the film id and an ISO-8601 'at' string into makeTestFilm().events",
+        "charge(ctx,'sam-3.1','1 image',PRICE.samImageUsd) increases ctx.ledger.total(ctx.filmId) by 0.0025",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "tools"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Prompt lint: brand names and named people",
+      "description": "As a safety-minded owner, I want image prompts linted before they are sent so that no real brand or real person is requested from Muse Image.",
+      "steps": [
+        "Read design.md section 6.2 and docs/hackathon/steps/step-01-meta-api-probes/findings.md (U-3 transcript example).",
+        "Create server/art/lint.ts exporting DENYLIST (at least 30 lower-case well-known marks including 'nike', 'adidas', 'coca-cola', 'pepsi', 'starbucks', 'iphone', 'macbook', 'samsung', 'sony', 'ikea', 'lego', 'disney', 'netflix', 'tesla', 'gucci', 'rolex', 'red bull'; do NOT include common words such as 'apple').",
+        "Export lintPrompt(prompt: string, opts?: { brandTerms?: string[]; subject?: boolean }): { ok: boolean; violations: Array<{ rule: 'brand-name' | 'named-person'; term: string }> }: whole-word, case-insensitive brand match against DENYLIST plus opts.brandTerms; when opts.subject is true also flag 'named-person' for two consecutive capitalised words that are not a brand term and for the phrases 'looks like', 'resembling', 'likeness of', 'celebrity', 'famous actor'.",
+        "Export extractBrandTerms(text: string): string[]: capitalised word sequences (3+ letters, optional trailing 'Co'-style suffix word) that are not at the start of a sentence, minus a stop-list of common capitalised words; trailing periods are stripped.",
+        "Create server/art/lint.test.ts with the cases in the acceptance criteria."
+      ],
+      "acceptanceCriteria": [
+        "lintPrompt('A Nike shoe on a table') returns ok:false with violations [{ rule:'brand-name', term:'nike' }]",
+        "lintPrompt('warm oak counter at sunrise. No people.') returns ok:true with an empty violations array",
+        "lintPrompt('an apple orchard at dawn') returns ok:true (the word 'apple' is not denylisted)",
+        "extractBrandTerms(\"it's our our new cold brew from Coffee Co. I want a 22nd film of a white a white mug\") returns exactly ['Coffee Co']",
+        "lintPrompt('Coffee Co mug', { brandTerms: ['Coffee Co'] }) returns ok:false with term 'coffee co'",
+        "lintPrompt('Portrait of Tom Hanks', { subject: true }) returns a violation with rule 'named-person'; the same prompt without subject:true returns ok:true",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "art"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Placement maths: trimBox, coverBox, productBox",
+      "description": "As an art-pipeline author, I want pure placement functions so that cut-outs and plates are positioned the same way every time.",
+      "steps": [
+        "Read design.md sections 5.2 and 5.4 (formulas and worked examples).",
+        "Create server/art/geometry.ts exporting type Box = { left:number; top:number; right:number; bottom:number }, type Rect = { x:number; y:number; w:number; h:number }, trimBox(bounds: Box, imgW: number, imgH: number): Box, coverBox(img: {w:number;h:number}, comp: {w:number;h:number}, overscan?: number): Rect and productBox(img, comp, opts?: { heightFrac?: number; cx?: number; baseline?: number }): Rect with the defaults heightFrac 0.6, cx 0.5, baseline 0.82.",
+        "trimBox grows bounds by m = max(2, round(0.01 * max(width, height))) on every side and clamps to [0,imgW] x [0,imgH]. productBox caps the width at 0.8 * comp.w and recomputes the height from the aspect ratio.",
+        "Create server/art/geometry.test.ts with the numeric cases below."
+      ],
+      "acceptanceCriteria": [
+        "trimBox({left:180,top:705,right:702,bottom:1137}, 768, 1344) returns {left:175,top:700,right:707,bottom:1142}",
+        "trimBox({left:725,top:599,right:1338,bottom:1101}, 1920, 1280) returns {left:719,top:593,right:1344,bottom:1107}",
+        "trimBox({left:0,top:0,right:100,bottom:50}, 100, 50) returns {left:0,top:0,right:100,bottom:50} (clamped)",
+        "coverBox({w:1920,h:1280},{w:1920,h:1080}) equals {x:0,y:-100,w:1920,h:1280}; with overscan 1.15 equals {x:-144,y:-196,w:2208,h:1472}; coverBox({w:1920,h:1280},{w:1080,h:1920}) equals {x:-900,y:0,w:2880,h:1920}; coverBox({w:1920,h:1080},{w:1920,h:1080},1.15) equals {x:-144,y:-81,w:2208,h:1242}",
+        "productBox({w:532,h:442},{w:1920,h:1080}) is within 0.05 of {x:570.05,y:237.6,w:779.9,h:648}",
+        "productBox({w:532,h:442},{w:1080,h:1920}) is within 0.05 of {x:108,y:856.6,w:864,h:717.8} (width cap applied)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "art"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "SAM cut-out core: selectObject and cutout()",
+      "description": "As an art-pipeline author, I want a tested cut-out function so that any scene image can yield a trimmed transparent PNG and a mask from SAM output.",
+      "steps": [
+        "Read design.md sections 4.3 and 5.1-5.3, server/meta/sam.ts (parseSamImageEvents), server/media/image.ts (alphaCutout, imageSize), server/meta/fakes.ts and server/test-utils/film.ts, and fixtures/seed/README.md.",
+        "Create server/art/test-support.ts exporting loadSeedSamObjects(which: 'product' | 'scene'): SamObject[] (parseSamImageEvents on fixtures/seed/sam-image-<which>.sse.txt) and loadSeedSource(which): Promise<Buffer> (sharp-resize fixtures/seed/mug-product.png to 768x1344, or fixtures/seed/cafe-with-mug.jpg to 1920x1280, with fit 'fill', output PNG).",
+        "Create server/art/cutout.ts exporting selectObject(objects: SamObject[], minConfidence = 0.5): SamObject | undefined (largest bounds area with confidence >= minConfidence, undefined confidence passes; ties go to the higher confidence) and async cutout(ctx: ToolCtx, o: { source: Buffer; noun: string; sceneId?: string; minConfidence?: number; feather?: number; cacheKey?: string }): Promise<{ cutout: AssetRef; mask: AssetRef; bounds: Box; confidence?: number; objectId: string }>.",
+        "cutout(): imageSize(source); ctx.meta.sam.segmentImage(source, noun); charge(sam-3.1, '1 image', PRICE.samImageUsd); selectObject else throw ArtError('no-object', `no ${noun} found in the photo`); throw ArtError('alpha-size-mismatch', ...) when alpha.length !== w*h; alphaCutout(source, alpha, { feather: o.feather ?? 1.5 }); crop RGBA and an 8-bit greyscale mask PNG with trimBox; ctx.assets.put both (roles 'cutout' and 'mask', with sceneId, width and height); emitAsset twice. Keep a module-level Map cache keyed by o.cacheKey so a repeated call makes no second SAM call.",
+        "Create server/art/cutout.test.ts using makeTestFilm and makeFakeMeta({ samObjects: loadSeedSamObjects('product') })."
+      ],
+      "acceptanceCriteria": [
+        "Seed product pair: the returned cutout asset is 532 x 442; its decoded RGBA pixel (0,0) has alpha 0 and the pixel at the centre has alpha >= 250; the mask asset has the same size and role 'mask'",
+        "Seed scene pair (loadSeedSource('scene') with loadSeedSamObjects('scene')): the cutout asset is 625 x 514",
+        "One cutout() call emits exactly two 'art.asset' events and raises ctx.ledger.total by 0.0025",
+        "Calling cutout() twice with the same cacheKey makes exactly one ctx.meta.sam.segmentImage call (assert with the fake's calls list)",
+        "selectObject([{objectId:'a',confidence:0.4,...large},{objectId:'b',confidence:0.9,...small}]) returns object 'b'; when no object has confidence >= 0.5 it returns undefined",
+        "A SamObject whose alpha length differs from width*height makes cutout() reject with an ArtError whose code is 'alpha-size-mismatch'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-003"
+      ],
+      "labels": [
+        "backend",
+        "art",
+        "meta-api"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Layer helpers: inner assets, mask meta, camera re-apply",
+      "description": "As a tool author, I want small pure helpers over the composition so that art tools satisfy the engine's per-composition asset rule and keep camera motion.",
+      "steps": [
+        "Read design.md sections 4.4, 5.9 and 11 (V-6), contract-issues.md, docs/hackathon/06-contracts.md section 4a (addLayer copies the asset into the scene precomp; setCamera is idempotent) and section 3a (meta.director.productNoun), and server/authoring/api.ts (S3a).",
+        "Create server/art/layers.ts exporting ROLE_RANK = ['bg','subject','product','headline','caption'] as const, ROLE_Z = { bg:10, subject:5, headline:3, product:1, caption:0 }, ensureInnerAsset(comp, sceneId, assetId) (a defensive guard: structuredClone; copies comp.assets[assetId] into comp.precomps[sceneId].assets only if it is missing, so it is a no-op when addLayer already copied it; idempotent; throws ArtError('unknown-scene') or a plain Error naming the asset when either is absent), withMaskAsset(comp, layerId, maskAssetId) (sets meta.director.layers[layerId].maskAssetId on a clone; throws when the layer is unknown), withProductNoun(comp, noun) (sets meta.director.productNoun on a clone) and reapplyCamera(comp, film: FilmState, sceneId) (move = film.storyboard?.scenes.find(s => s.id === sceneId)?.camera ?? 'static'; returns setCamera(comp, sceneId, move)).",
+        "Create server/art/layers.test.ts that builds a film with newFilmComposition, addScene, registerAsset and addLayer from server/authoring/api.ts."
+      ],
+      "acceptanceCriteria": [
+        "After registerAsset + addLayer of an image layer (which already copies the asset into precomps.s1.assets per the amended 4a), ensureInnerAsset(comp,'s1',assetId) returns a deep-equal composition (a no-op) that passes parseAepCompositionSafe; after deleting precomps.s1.assets[assetId] from a clone, ensureInnerAsset restores it and the composition validates again",
+        "ensureInnerAsset is idempotent: calling it twice returns deep-equal compositions, and the input composition is never mutated (compare with a structuredClone taken before the call)",
+        "withMaskAsset(comp,'s1:product','mask_1').meta.director.layers['s1:product'].maskAssetId === 'mask_1'; an unknown layer id throws; withProductNoun(comp,'mug').meta.director.productNoun === 'mug' and the input is not mutated",
+        "reapplyCamera with a storyboard camera 'dolly-in' called twice yields deep-equal compositions (idempotency of setCamera); with no storyboard it applies 'static'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "art",
+        "contracts"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "replaceRoleLayer: upsert keeping z-order and opacity",
+      "description": "As a tool author, I want to replace or add a role layer without disturbing the rest of the scene so that art tools never reshuffle what the director built.",
+      "steps": [
+        "Read design.md section 5.8 and 5.5, docs/hackathon/06-contracts.md section 4a (the amended box semantics: x,y top-left, position = (x+w/2, y+h/2), anchor = (assetW/2, assetH/2), scale = (w/assetW, h/assetH)), and server/authoring/api.ts (addLayer, removeLayer, reorderLayer, layerIdsByRole).",
+        "In server/art/layers.ts add replaceRoleLayer(comp, sceneId, role, spec: Parameters<typeof addLayer>[1], opts?: { keepOpacity?: boolean }): Comp. When an old layer exists: remember the layer immediately below it and its transform.opacity, removeLayer(old), addLayer(spec), then reorderLayer(new,'back') if nothing was below else { above: prevId }, then copy the opacity value or keyframes onto the new layer on a clone. For role 'bg' the result is always index 0. When no old layer exists insert by ROLE_RANK: directly above the highest layer whose role rank is lower.",
+        "Add a test helper displayedRect(layerJson, assetJson) to server/art/test-support.ts returning { x, y, w, h } from transform.position, anchor, scale and the asset size (x = position.x - anchor.x*scale.x, w = assetW*scale.x, the same for y/h).",
+        "Extend server/art/layers.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "With scene layers [bg, product(raw photo), headline], replaceRoleLayer(...,'product', newSpec) yields the id order [s1:bg, s1:product, s1:headline] and the new layer references the new assetId",
+        "An old product layer with opacity keyframes [{t:0,v:0},{t:15,v:1}] passes them to the replacement unchanged",
+        "Adding a 'subject' to [bg, product, headline] yields [bg, subject, product, headline]; adding a 'caption' puts it last; replacing 'bg' always yields index 0",
+        "For addLayer box {x:570.05,y:237.6,w:779.9,h:648} on a 532x442 asset, displayedRect of the emitted layer equals that box within 0.5 px (pins the amended 4a contract: fails loudly if S3a's addLayer deviates)",
+        "The input composition is not mutated and the result passes parseAepCompositionSafe",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "backend",
+        "art",
+        "contracts"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Prompt templates, plate sizing and cover crop",
+      "description": "As an art-pipeline author, I want exact prompt templates and crop helpers so that plates are always empty and always the film's aspect.",
+      "steps": [
+        "Read design.md sections 5.6 and 6.1 and docs/hackathon/steps/step-01-meta-api-probes/findings.md (Muse Image: returned size 1920x1280 for 1536x1024).",
+        "Create server/art/stills.ts exporting platePrompt(setting: string, mood?: string), productEditPrompt(noun: string, lighting = 'soft warm light from the left'), subjectPrompt(description: string), plateSizeFor(aspect: Aspect): '1536x1024' | '1024x1536' and coverCrop(png: Buffer, aspect: Aspect): Promise<Buffer> (sharp resize with fit 'cover', centred, never upscaling, PNG out).",
+        "Use the exact template texts from design.md section 6.1; platePrompt must end with the string 'Clear empty space where the product will stand. No products, no cups, no people, no text, no logos.'",
+        "Create server/art/stills.test.ts; build the 1920x1280 test image with sharp (create a solid colour image) so the test needs no fixture."
+      ],
+      "acceptanceCriteria": [
+        "platePrompt('warm oak cafe counter at sunrise','quiet') equals 'warm oak cafe counter at sunrise. Cinematic photograph, shallow depth of field, soft natural light, quiet. Clear empty space where the product will stand. No products, no cups, no people, no text, no logos.'",
+        "platePrompt('a sunlit desk') ends with 'No products, no cups, no people, no text, no logos.' and contains no 'undefined' and no double spaces",
+        "plateSizeFor('16:9') and plateSizeFor('1:1') return '1536x1024'; plateSizeFor('9:16') returns '1024x1536'",
+        "coverCrop of a 1920x1280 image returns 1920x1080 for '16:9', 1280x1280 for '1:1' and 720x1280 for '9:16' (read back with sharp metadata)",
+        "productEditPrompt('mug') contains 'unchanged in shape, colour and printed details' and 'No added text, no added logos.'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ],
+      "labels": [
+        "backend",
+        "art"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Muse wrappers: plate image and product edit",
+      "description": "As an art-pipeline author, I want wrappers around Muse Image that read real sizes, retry a rejected size and store plates compactly so that tools stay simple.",
+      "steps": [
+        "Read design.md sections 5.6, 5.7 and 7, server/meta/image.ts and server/meta/http.ts (MetaApiError), and server/meta/fakes.ts.",
+        "In server/art/stills.ts add async generatePlateImage(ctx: ToolCtx, o: { setting: string; mood?: string; aspect: Aspect; sceneId: string }): Promise<AssetRef>: lintPrompt first (throw ArtError('lint', ...) listing violations before any Meta call); ctx.meta.image.generate(prompt, plateSizeFor(aspect)); on MetaApiError with status 400 whose message matches /size/i retry once with '1536x1024'; imageSize on the result; coverCrop; encode JPEG quality 90; ctx.assets.put(role 'plate', sceneId, width, height); charge('muse-image-1.0','1 image',PRICE.museImageUsd); emitAsset.",
+        "Add async editProductImage(ctx, o: { photo: Buffer; noun: string; lighting?: string; sceneId: string }): Promise<{ asset: AssetRef; bytes: Buffer }> calling ctx.meta.image.edit(productEditPrompt(...), [photo], '1536x1024'), charging $0.01, and storing the PNG with ctx.assets.put(role 'still', sceneId, width and height from imageSize) plus emitAsset (decision D-11: the product-in-scene still is kept).",
+        "Extend server/art/stills.test.ts with makeFakeMeta-based tests; override ctx.meta.image with vi.fn implementations."
+      ],
+      "acceptanceCriteria": [
+        "For aspect '9:16' with a fake whose generate rejects MetaApiError(400,'invalid size') for '1024x1536' and returns a 1920x1280 PNG for '1536x1024': the call list shows two generate calls, and the stored plate is 720 x 1280",
+        "The stored plate asset has mime 'image/jpeg' (sharp metadata format 'jpeg'), role 'plate', the real width/height and the given sceneId",
+        "A setting containing 'Nike' rejects with ArtError code 'lint' and the fake's image calls list is empty",
+        "generatePlateImage raises the ledger by exactly 0.01 on success; editProductImage passes exactly one reference buffer, returns the fake's bytes and stores them as an asset with role 'still' and the given sceneId (one 'art.asset' event, ledger +0.01)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-007"
+      ],
+      "labels": [
+        "backend",
+        "art",
+        "meta-api"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Tool generatePlate",
+      "description": "As a director agent, I want a generatePlate tool so that a scene's placeholder background becomes a real empty plate.",
+      "steps": [
+        "Read design.md sections 3, 4.1, 5.6 and 7, contract-issues.md (item 8), shared/tools.ts, server/tools/registry.ts (how stubs export tools) and the current stub server/tools/art.ts.",
+        "In server/tools/art.ts define the zod params for generatePlate exactly as in design 4.1 and export generatePlateTool: ToolDef. run(): load film and composition (ctx.films.get); refuse unknown scene, a generate-mode scene (ArtError('generate-mode')) and a scene that already has an image bg whose asset role is 'plate' (ArtError('plate-exists', 'scene s1 already has a plate; use replacePlate')); generatePlateImage; registerAsset on the root; addLayer via replaceRoleLayer(role 'bg', kind 'image', assetId, box = coverBox(plateSize, comp, overscan) with overscan 1.15 when the storyboard camera is not 'static' else 1, z ROLE_Z.bg); ensureInnerAsset; reapplyCamera; re-read the latest composition and retry once if the film version moved; ctx.films.commit(..., 'director', 'generatePlate <sceneId>'); return { ok:true, version, data: ArtData }.",
+        "Map every thrown error through toolError; a commit rejection returns { ok:false, error, zodIssues }.",
+        "Create server/tools/art.test.ts with a helper that builds a scene (newFilmComposition, addScene, a placeholder bg shape layer via addLayer) in makeTestFilm."
+      ],
+      "acceptanceCriteria": [
+        "After run, layer 's1:bg' has kind 'image' at index 0, and both comp.assets and comp.precomps['s1'].assets contain its asset with width 1920 and height 1080 when the fake returns a 1920x1280 PNG for aspect 16:9",
+        "With storyboard camera 'parallax' the displayed rectangle of s1:bg is {x:-144,y:-81,w:2208,h:1242} within 0.5 px; with camera 'static' it is {x:0,y:0,w:1920,h:1080}",
+        "ctx.films.get(...).version increases by exactly 1; an 'art.asset' event with asset role 'plate' is emitted; the ledger total rises by 0.01",
+        "A second generatePlate on the same scene returns { ok:false } whose error contains 'use replacePlate'; setting 'a Nike store' returns { ok:false } and no image call was made; an unknown scene and a generate-mode scene return { ok:false }",
+        "The resulting composition passes parseAepCompositionSafe (the commit succeeded)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006",
+        "US-008"
+      ],
+      "labels": [
+        "backend",
+        "tools",
+        "art"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Tool placeProduct: photo cut-out path",
+      "description": "As a director agent, I want placeProduct so that the real product photo becomes a transparent product layer with a mask recorded for review.",
+      "steps": [
+        "Read design.md sections 4.1, 5.3, 5.4, 5.8 and 7, contract-issues.md (items 3, 5 and 9), and server/art/cutout.ts and server/art/layers.ts.",
+        "In server/tools/art.ts add the zod params for placeProduct (design 4.1; noun is required, min length 1, with the error text \"noun is required: the short noun phrase for the product, e.g. 'mug'\") and export placeProductTool. For source 'photo': read ctx.assets.read(film.brief.productAssetId); cutout(ctx, { source, noun, sceneId, cacheKey: `${ctx.filmId}:${film.brief.productAssetId}:${noun.toLowerCase()}` }); registerAsset (root); box = productBox(trimmed size, comp, { heightFrac, cx, baseline }); replaceRoleLayer(role 'product', kind 'image', z ROLE_Z.product); ensureInnerAsset; withMaskAsset(layerId, mask.id); withProductNoun(noun); reapplyCamera; commit with note 'placeProduct <sceneId>'.",
+        "Refuse unknown or generate-mode scenes. On ArtError('no-object') return { ok:false, error: `no ${noun} found in the photo` } and leave the film version unchanged.",
+        "Extend server/tools/art.test.ts; store loadSeedSource('product') as the film's product asset and use makeFakeMeta({ samObjects: loadSeedSamObjects('product') })."
+      ],
+      "acceptanceCriteria": [
+        "After run on a 16:9 film, layer 's1:product' exists, its index is greater than 's1:bg', and displayedRect equals {x:570.05,y:237.6,w:779.9,h:648} within 0.5 px",
+        "composition.meta.director.layers['s1:product'].maskAssetId equals the mask asset id returned in data.assetIds and the inner comp assets contain the cutout, and composition.meta.director.productNoun equals the noun argument ('mug')",
+        "The fake's calls list shows zero ctx.meta.image.generate calls and zero image.edit calls",
+        "A second placeProduct with the same noun on another scene makes the SAM call count stay at 1 (cache)",
+        "noun '' returns { ok:false } containing 'noun is required'; a SAM result with no objects returns { ok:false, error:'no mug found in the photo' } and the film version is unchanged",
+        "An existing placeholder product layer is replaced in place: id order is unchanged, and its opacity keyframes are kept",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004",
+        "US-006"
+      ],
+      "labels": [
+        "backend",
+        "tools",
+        "art"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "placeProduct scene-edit path and fallback ladder",
+      "description": "As a director agent, I want an optional relit product shot with a safe fallback so that scenes can match their lighting without risking product identity.",
+      "steps": [
+        "Read design.md section 5.7 and 7, and server/art/stills.ts (editProductImage).",
+        "In placeProductTool implement source 'scene-edit': ensure the photo cut-out exists (cutout with the cacheKey, reused if cached) and note its aspect ratio ar_photo = width/height; editProductImage(...) (which stores the edit as an asset with role 'still' and the sceneId); cutout of the edited image with cacheKey `${ctx.filmId}:edit:${sceneId}:${noun.toLowerCase()}`; accept it only when |ar_edit / ar_photo - 1| <= 0.25.",
+        "Fall back to the photo cut-out and return data.source 'photo-fallback' with a data.warning string when editProductImage throws any MetaApiError, when the edited image yields no object, or when the aspect check fails; otherwise data.source is 'scene-edit'.",
+        "Extend server/tools/art.test.ts; override ctx.meta.sam.segmentImage with a vi.fn returning loadSeedSamObjects('product') on the first call and loadSeedSamObjects('scene') on the second, and ctx.meta.image.edit with a vi.fn returning (await loadSeedSource('scene'))."
+      ],
+      "acceptanceCriteria": [
+        "Scene-edit success: data.source is 'scene-edit', the placed cutout is 625 x 514 (|1.216/1.2036 - 1| = 0.0103 <= 0.25), and the image.edit call received exactly one reference buffer and a prompt containing 'unchanged in shape, colour and printed details'",
+        "When image.edit rejects MetaApiError(500,'upstream'), the result is ok:true with data.source 'photo-fallback' and the placed cutout is the 532 x 442 photo cut-out",
+        "When the edited image's SAM result is empty, the result falls back to 'photo-fallback'",
+        "When the second SAM call returns an object whose trimBox aspect ratio is 2.0, the result falls back to 'photo-fallback' with a warning that mentions 'aspect'",
+        "Total SAM calls for one scene-edit run with an empty cache is 2 and the ledger total is 0.0025*2 + 0.01 = 0.015",
+        "The scene-edit run leaves one asset with role 'still' and sceneId 's1' in the asset store (the Muse edit), including when the result later falls back to the photo",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-010",
+        "US-008"
+      ],
+      "labels": [
+        "backend",
+        "tools",
+        "art",
+        "meta-api"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Tool addSubject",
+      "description": "As a director agent, I want addSubject so that a generated person or hand can appear as a cut-out between the plate and the product.",
+      "steps": [
+        "Read design.md sections 4.1, 5.5, 6.1, 6.2 and 7.",
+        "In server/tools/art.ts add the zod params for addSubject (design 4.1) and export addSubjectTool: lintPrompt(subjectPrompt(description), { subject:true, brandTerms: extractBrandTerms(film.brief.text + ' ' + (film.brief.transcript ?? '')) }) and refuse on any violation before calling Meta; ctx.meta.image.generate(subjectPrompt(description), '1536x1024') charged $0.01; cutout(noun default 'person'); box = productBox(trimmed size, comp, { heightFrac: 0.75, cx: 0.28, baseline: 0.92 }); replaceRoleLayer(role 'subject', z ROLE_Z.subject); ensureInnerAsset; reapplyCamera; commit.",
+        "Extend server/tools/art.test.ts with makeFakeMeta whose image.generate returns the upscaled cafe-with-mug.jpg and whose SAM objects are loadSeedSamObjects('scene')."
+      ],
+      "acceptanceCriteria": [
+        "In a scene with [bg, product, headline], addSubject yields the id order [s1:bg, s1:subject, s1:product, s1:headline]",
+        "description 'photo of Tom Hanks drinking coffee' returns { ok:false } mentioning 'named-person' and the fake's image calls list is empty",
+        "A brief containing 'from Coffee Co.' and a description containing 'Coffee Co' is rejected with 'brand-name'",
+        "On success the ledger rises by 0.01 + 0.0025 and the subject layer's z in the plan is 5 (the layer was added with z ROLE_Z.subject; assert through the emitted addLayer call recorded by a spy)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-010",
+        "US-008"
+      ],
+      "labels": [
+        "backend",
+        "tools",
+        "art",
+        "meta-api"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Tool replacePlate",
+      "description": "As a chat agent, I want replacePlate so that a scene's background can be regenerated without touching other layers.",
+      "steps": [
+        "Read design.md sections 5.6, 5.8, 5.9 and 7 and the generatePlate tool in server/tools/art.ts.",
+        "In server/tools/art.ts export replacePlateTool with the same params as generatePlate. It requires an existing image bg whose asset role is 'plate' (otherwise ArtError('no-plate'): \"scene s1 has no plate; use generatePlate\"); it reuses generatePlateImage and replaceRoleLayer(role 'bg'), keeps opacity keyframes, removes the old plate asset entry from comp.assets and comp.precomps[sceneId].assets, then reapplyCamera and commit with note 'replacePlate <sceneId>'.",
+        "Extend server/tools/art.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "After generatePlate then replacePlate on scene s1, 's1:bg' references a new asset id, is at index 0, and the old plate asset id is absent from both assets maps",
+        "An opacity animation on the old bg layer is preserved on the new one",
+        "replacePlate on a scene whose bg is still a placeholder shape returns { ok:false } containing 'use generatePlate'",
+        "Calling replacePlate twice in a row leaves exactly one 'plate' asset entry per assets map for that scene",
+        "The resulting composition passes parseAepCompositionSafe",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-009"
+      ],
+      "labels": [
+        "backend",
+        "tools",
+        "art"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Tool setHeadlineBehindProduct",
+      "description": "As a director agent, I want setHeadlineBehindProduct so that the headline can sit behind the product with a single call.",
+      "steps": [
+        "Read design.md section 5.5 (why draw order and not trackMatte) and section 7.",
+        "In server/tools/art.ts export setHeadlineBehindProductTool: params { sceneId, behind?: boolean (default true) }; find the headline and product layer ids with layerIdsByRole; reorderLayer(headline, { below: productId }) when behind, { above: productId } otherwise; verify bg < headline < product (behind) or bg < product < headline (front) by index, else ArtError('order-invalid'); if the order is already correct return { ok:true } WITHOUT committing (version unchanged); otherwise commit with note 'headline behind product s1'.",
+        "Extend server/tools/art.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "From [s1:bg, s1:product, s1:headline] the call yields [s1:bg, s1:headline, s1:product] and the film version increases by 1",
+        "A second identical call returns ok:true and the film version does not change",
+        "behind:false on [bg, headline, product] yields [bg, product, headline]",
+        "A scene without a headline returns { ok:false } containing 'no headline'; a scene whose layer order is [headline, bg, product] returns { ok:false } with the 'order-invalid' message",
+        "The resulting composition passes parseAepCompositionSafe",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006"
+      ],
+      "labels": [
+        "backend",
+        "tools",
+        "art"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "Export tools, JSON schemas and the layered-scene snapshot",
+      "description": "As a tool registry, I want the five art tools exported with JSON-schema-safe params so that the director and chat agents can call them, and a committed snapshot for later steps.",
+      "steps": [
+        "Read server/tools/registry.ts (how steps export tools and how the registry lists them), server/tools/authoring.ts if present, and design.md section 9.",
+        "At the bottom of server/tools/art.ts export const tools: ToolDef[] = [generatePlateTool, replacePlateTool, placeProductTool, addSubjectTool, setHeadlineBehindProductTool] with tool names 'generatePlate', 'replacePlate', 'placeProduct', 'addSubject', 'setHeadlineBehindProduct' and one-sentence descriptions that tell the model when to use each (placeProduct: 'needs the short product noun').",
+        "Add server/tools/art.snapshot.test.ts: build a film with the seed assets through the tools (generatePlate with the fake returning the upscaled cafe-plate.jpg, placeProduct, setHeadlineBehindProduct), replace random asset ids with stable ones (plate_1, cut_1, mask_1) and compare with toMatchFileSnapshot('../../fixtures/s04/layered-scene.comp.json').",
+        "Extend server/tools/art.test.ts with the registry and schema checks."
+      ],
+      "acceptanceCriteria": [
+        "The registry's tool listing (the export server/tools/registry.ts documents) includes exactly the five names above, once each",
+        "zod-to-json-schema converts every tool's params without throwing; the placeProduct schema lists 'sceneId' and 'noun' as required",
+        "fixtures/s04/layered-scene.comp.json exists, passes parseAepCompositionSafe, contains no random-looking asset ids (only plate_1, cut_1, mask_1) and has the id order [s1:bg, s1:headline, s1:product] in precomps.s1.layers",
+        "Running the snapshot test twice produces an identical file",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-009",
+        "US-010",
+        "US-011",
+        "US-012",
+        "US-013",
+        "US-014"
+      ],
+      "labels": [
+        "backend",
+        "tools",
+        "art",
+        "test"
+      ]
+    },
+    {
+      "id": "US-016",
+      "title": "Manual-gate script scripts/live/s04-art.ts",
+      "description": "As an owner, I want a guarded live script so that I can verify Muse Image and SAM on real calls before relying on the art tools.",
+      "steps": [
+        "Read scripts/live/run.ts (the dispatcher contract: a module exports { describe, estimateUsd, run }) and scripts/live/s02-smoke.ts (how real MetaClients are constructed from the environment), and design.md section 9 (manual gate).",
+        "Create scripts/live/s04-art.ts exporting describe(): string (what it does: 2 scenes, plate + product cut-out + subject on scene 2, outputs to debug/s04/iteration-NN/, prints returned Muse sizes, SAM confidences, cut-out alpha coverage, per-call cost and the ledger total), estimateUsd(): number returning 0.3, and async run(): Promise<void> that performs it with real clients using makeTestFilm-style stores on a temp directory, the product photo from the path in env LIVE_PRODUCT_PHOTO (default fixtures/seed/mug-product.png), and the 16:9 aspect.",
+        "run() must write plate.jpg, cutout.png, mask.png, composition.json and report.json to debug/s04/iteration-NN/ (next free NN) and must refuse to start when META_API_KEY is empty. The module must have no side effects at import time.",
+        "Create scripts/live/s04-art.test.ts that imports the module with global fetch stubbed to throw."
+      ],
+      "acceptanceCriteria": [
+        "Importing scripts/live/s04-art.ts performs no network call and reads no environment variable (test with fetch stubbed to throw and process.env cleared)",
+        "describe() mentions '2 scenes' and 'debug/s04'; estimateUsd() returns 0.3",
+        "run() with META_API_KEY unset rejects with a message that contains 'META_API_KEY'",
+        "The file never calls run() itself: grep -c \"run()\" on the module shows only the export declaration",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-015"
+      ],
+      "labels": [
+        "scripts",
+        "art"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-04-muse-image-sam-layers/requirements.md",
+      "docs/hackathon/steps/step-04-muse-image-sam-layers/design.md",
+      "docs/hackathon/steps/step-04-muse-image-sam-layers/contract-issues.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (sections 3, 3a, 4, 4a, 4b and section 6: D-4 cost, D-11 assets and productNoun)",
+      "docs/hackathon/steps/step-04-muse-image-sam-layers/design.md (all of it; sections 5 and 6 hold the algorithms and prompts)",
+      "docs/hackathon/steps/step-04-muse-image-sam-layers/contract-issues.md (assumptions about S3a that tests verify)",
+      "docs/hackathon/steps/step-01-meta-api-probes/findings.md (Muse Image and SAM sections)",
+      "fixtures/seed/README.md (real SAM and image fixtures used by tests)"
+    ],
+    "requires": [
+      "prd-s03a-authoring-core"
+    ],
+    "owns": [
+      "server/tools/art.ts",
+      "server/art/*",
+      "scripts/live/s04-art.ts",
+      "fixtures/s04/*"
+    ],
+    "sharedEdits": [],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "Compose and edit the film only through the section 4a authoring API plus the documented pure JSON helpers in server/art/layers.ts (ensureInnerAsset, withMaskAsset, withProductNoun, opacity carry-over). Never write composition JSON by hand elsewhere.",
+      "Muse Image never receives a text-only prompt for the product: placeProduct has no image.generate path (test-enforced)."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner runs `npm run live -- s04-art` (prints the estimate), then `npm run live -- s04-art --yes` (about $0.08 expected, $0.30 ceiling): 2 scenes with plate, product cut-out and a subject. Check edges at 200 percent (no halo), product identity vs the photo, the Muse sizes returned (design U-1), then load the saved composition.json in the Player for parallax and text-behind-product. Record the output in the PR."
+    ]
+  }
+}

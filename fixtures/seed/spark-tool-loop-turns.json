@@ -1,0 +1,45 @@
+[
+  {
+    "turn": 0,
+    "status": 200,
+    "ms": 15483,
+    "calls": [
+      "addScene({\"durationSec\":4.0,\"id\":\"scene1\",\"intent\":\"white ceramic mug warm morning scene\"})",
+      "addLayer({\"kind\":\"image\",\"layerId\":\"bg\",\"role\":\"bg\",\"sceneId\":\"scene1\",\"z\":10.0})",
+      "addLayer({\"kind\":\"image\",\"layerId\":\"mug\",\"role\":\"product\",\"sceneId\":\"scene1\",\"z\":1.0})",
+      "addLayer({\"kind\":\"text\",\"layerId\":\"headline\",\"role\":\"headline\",\"sceneId\":\"scene1\",\"text\":\"Slow mornings\",\"z\":5.0})",
+      "setKeyframes({\"ease\":\"easeOut\",\"keys\":[[1,0],[2,1]],\"layerId\":\"headline\",\"property\":\"opacity\"})",
+      "setKeyframes({\"ease\":\"easeInOut\",\"keys\":[[0,0.9],[4,1.0]],\"layerId\":\"mug\",\"property\":\"scale\"})"
+    ],
+    "content": "Building your warm mug scene — setting the background, product, and headline.",
+    "usage": {
+      "completion_tokens": 1988,
+      "prompt_tokens": 1010,
+      "total_tokens": 2998,
+      "completion_tokens_details": {
+        "reasoning_tokens": 1324
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  },
+  {
+    "turn": 1,
+    "status": 200,
+    "ms": 2561,
+    "calls": [],
+    "content": "DONE",
+    "usage": {
+      "completion_tokens": 246,
+      "prompt_tokens": 1825,
+      "total_tokens": 2071,
+      "completion_tokens_details": {
+        "reasoning_tokens": 236
+      },
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    }
+  }
+]

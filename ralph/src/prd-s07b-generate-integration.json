@@ -1,0 +1,415 @@
+{
+  "name": "PixiTween Director S07b: generate-mode integration (poll, download, swap-in, SAM check, caps, resume)",
+  "branchName": "ralph/s07b-generate-integration",
+  "description": "The second half of generate mode: poll a Clippy job with backoff, download the finished clip immediately, swap it into the scene as a video layer below the text, check the product with SAM 3.1, offer one retry, cap submissions per hour, persist jobs so a restart resumes them, and register the runner with S7a's routes. Offline only: tests use makeFakeClippy, a fake fetch and makeFakeMeta; the one real-clip run is the owner's manual gate (s07-generate). Leaves out: the approval panel, request builder and routes (S7a).",
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-07-generate-mode-mcp/design.md",
+      "docs/hackathon/steps/step-07-generate-mode-mcp/requirements.md",
+      "docs/hackathon/steps/step-07-generate-mode-mcp/contract-issues.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (types, interfaces, authoring core 4a, helpers and test doubles 4b, HTTP 5, decisions D-1..D-14 in section 6)",
+      "docs/hackathon/ralph/README.md (rules every story follows)",
+      "docs/hackathon/steps/step-07-generate-mode-mcp/design.md",
+      "docs/hackathon/steps/step-07-generate-mode-mcp/contract-issues.md",
+      "docs/hackathon/steps/step-01-meta-api-probes/findings.md (SAM video payload and timing)",
+      "fixtures/seed/README.md"
+    ],
+    "requires": [
+      "prd-s04-art-layers",
+      "prd-s07a-clippy-client"
+    ],
+    "sharedEdits": [
+      "server/boot.ts"
+    ],
+    "owns": [
+      "server/tools/generate.ts",
+      "server/generate/poll.ts",
+      "server/generate/download.ts",
+      "server/generate/swap.ts",
+      "server/generate/clip-check.ts",
+      "server/generate/retry.ts",
+      "server/generate/rate.ts",
+      "server/generate/jobs.ts",
+      "server/generate/product-noun.ts",
+      "server/generate/runner.ts",
+      "scripts/dev/make-test-clip.ts",
+      "web/clip-check.html",
+      "web/src/panels/clip-check-main.tsx",
+      "web/public/dev/*",
+      "scripts/live/s07-generate.ts",
+      "fixtures/s07b/*"
+    ],
+    "extraGuardrails": [
+      "No story calls Clippy, Meta or any network service. Tests use makeFakeClippy, a fake fetch and makeFakeMeta. The signed resultUrl is used once, never stored, never logged with its query string.",
+      "A token is a capability: it never appears in a tool result, a log line or any model prompt.",
+      "The only browser check that needs a file is the generated test clip web/public/dev/clip-testsrc.mp4 (ffmpeg testsrc, our own synthetic asset).",
+      "S7b's only edit to a file it does not own is appending ONE hook to bootHooks in server/boot.ts (a named shared edit, D-3, listed in metadata.sharedEdits); it never touches server/main.ts or server/http/routes.ts."
+    ],
+    "manualGates": [
+      "MG-1: owner runs `npm run live -- s07-generate --yes` ONCE (25 Clippy credits plus about 0.06 USD; prints the estimate first; needs CLIPPY_MCP_URL, CLIPPY_TOKEN, META_API_KEY and a public https PUBLIC_BASE_URL, which is the deployed server or a tunnel the owner approves). Records time to done, credits charged, clip size, productVisibleFrac and composition validity in the PR; this also measures the unknown fast-h3 render time. Every further clip needs its own explicit approval.",
+      "MG-2: owner reviews the one-line shared edit to server/boot.ts (the resumeGenerations hook).",
+      "MG-3: owner reviews the browser-check result of US-014 (clip alignment inside a precomp) and any ENGINE-NEEDS.md row it produced."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Job poller with backoff and a 15-minute ceiling",
+      "description": "As a server developer, I want a poller that waits politely and gives up cleanly so that a stuck render never hangs the server or burns requests.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 5.5 and 7, server/clippy/mcp.ts (ClippyClient, ClippyError, getLiveAnimateStatus, cancelLiveAnimate) and server/clippy/fake.ts.",
+        "Create server/generate/poll.ts exporting POLL_DELAYS_SEC = [10, 10, 10, 15, 15, 20, 20, 30] (the last value repeats), POLL_CEILING_MS = 900000, type PollOutcome = { kind: 'done'; status: StatusResult } | { kind: 'failed'; status: StatusResult | null; message: string } | { kind: 'cancelled'; status: StatusResult } | { kind: 'timed_out' } and pollJob(client, jobId, deps?: { sleep?(ms): Promise<void>; now?(): number; onStatus?(s: StatusResult): void }): Promise<PollOutcome>.",
+        "Behaviour: sleep the next delay, read the status, call onStatus only when the status string changed; 'done' requires a non-null resultUrl (otherwise a failed outcome 'done without a result URL'); 'failed' returns the status error text as the message; a status read that throws ClippyError is tolerated (continue to the next tick) and 5 consecutive read failures return failed 'status unavailable'; when now() - start exceeds POLL_CEILING_MS call client.cancelLiveAnimate(jobId) (errors swallowed) and return timed_out.",
+        "Create server/generate/poll.test.ts with an injected clock where sleep advances now()."
+      ],
+      "acceptance": [
+        "With a fake client scripted queued, rendering, rendering, done the recorded sleeps are [10000, 10000, 10000, 10000] and onStatus is called three times (queued, rendering, done in change order)",
+        "With a script that always returns 'rendering' the outcome is timed_out after at least 900000 ms of simulated sleeping, cancelLiveAnimate was called exactly once, and the sleeps follow [10000, 10000, 10000, 15000, 15000, 20000, 20000, 30000, 30000, ...]",
+        "Two consecutive status read failures followed by done return done; five consecutive failures return failed with message 'status unavailable'",
+        "A done status with resultUrl null returns failed with 'done without a result URL'; a failed status with error 'pro_plan_required' returns failed whose message contains that text"
+      ],
+      "labels": [
+        "backend",
+        "generate"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Clip downloader with safety checks",
+      "description": "As a server developer, I want to fetch the finished clip safely and immediately so that an expiring signed URL is used once and never stored.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 5.6 and 10 and server/generate/public-url.ts (assertPublicUrl).",
+        "Create server/generate/download.ts exporting class DownloadError extends Error { status?: number; retryable: boolean }, redactUrl(url: string): string (protocol, host and path only; no query, no hash) and downloadClip(url, deps?: { fetchImpl?: typeof fetch; sleep?(ms): Promise<void>; maxBytes?: number; timeoutMs?: number; retries?: number; retryDelayMs?: number }): Promise<Buffer> with defaults maxBytes 200 * 1024 * 1024, timeoutMs 120000, retries 3, retryDelayMs 5000.",
+        "Rules: https only; the host must pass assertPublicUrl; use redirect 'manual' and follow at most 3 redirects, re-validating each Location; reject unless content-type starts with 'video/' or equals 'application/octet-stream'; reject when content-length exceeds maxBytes before reading; count streamed bytes and abort above maxBytes; require the bytes 'ftyp' at offset 4; retry on network errors and 5xx (sleep retryDelayMs between tries), never on 4xx. Every error message uses redactUrl and never contains the query string.",
+        "Create server/generate/download.test.ts with a fake fetch returning Response objects."
+      ],
+      "acceptance": [
+        "A 2 KB buffer whose bytes 4 to 8 are 'ftyp' with content-type video/mp4 is returned equal; http://, a host of 10.0.0.1, content-type text/html, bytes without 'ftyp' and a body longer than maxBytes 1000 are each rejected with DownloadError",
+        "A content-length of 300 MB is rejected without reading the body (the body stream's read function is never called)",
+        "A 503 followed by a 200 returns the buffer after one retry (sleep called once with 5000); a 404 is not retried (fetch called once); three 503s in a row reject with a retryable error after 4 fetch calls",
+        "For the URL https://cdn.example.test/out.mp4?sig=SECRET123 every thrown error message contains 'cdn.example.test/out.mp4' and does not contain 'SECRET123'; a redirect to http:// is rejected"
+      ],
+      "labels": [
+        "backend",
+        "generate"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "Swap a clip into a scene (pure)",
+      "description": "As a server developer, I want a pure function that places a clip as a video layer under the text and hides the motion layers so that the generated clip replaces the still scene without losing the text.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 5.7 and 11, docs/hackathon/06-contracts.md section 4a (registerAsset takes an optional `duration` in frames; addLayer `box` x,y is the TOP-LEFT and addLayer copies the asset entry into the scene precomp's assets; setLayerHidden exists) and server/authoring/api.ts (registerAsset, addLayer, setLayerHidden, reorderLayer, layerIdsByRole, sceneInfo, setSceneDuration).",
+        "Create server/generate/swap.ts exporting coverBox(frame: { width; height }, clip: { width; height }): { x; y; w; h } (scale s = max(frame.width / clip.width, frame.height / clip.height); size = clip * s; x,y is the TOP-LEFT so that the box is centred on the frame) and swapInClip(comp, { sceneId, asset, clipSec, frame, clipSize }): Comp. Use the authoring core's setLayerHidden; do not write a local copy.",
+        "swapInClip: registerAsset (kind 'video', src asset.url, width and height from clipSize, duration Math.round(clipSec * 30) frames); addLayer role 'clip' kind 'video' with the cover box (id `<sceneId>:clip`); if the scene has text layers (roles headline or caption) reorderLayer the clip `{ below: <first text layer id> }` so text stays on top; hide the scene's bg, product and subject layers with the authoring core's setLayerHidden; when clipSec < the scene's duration - 0.2 shorten the scene with setSceneDuration(comp, sceneId, clipSec).",
+        "Create server/generate/swap.test.ts with scenes built by the S3a functions."
+      ],
+      "acceptance": [
+        "coverBox({ width: 1920, height: 1080 }, { width: 320, height: 180 }) gives x 0, y 0, w 1920, h 1080; coverBox({ width: 1080, height: 1920 }, { width: 1920, height: 1080 }) gives h 1920, w about 3413.33 and x about -1166.67 (top-left coordinates)",
+        "After swapInClip on a scene with bg (shape), product (image) and headline (text) the scene's layer order has `<scene>:clip` after bg and product and before headline; bg and product have hidden true; headline has no hidden flag; the result passes parseAepCompositionSafe",
+        "A scene without text layers gets the clip as its last layer; a clip of 5.2 s in an 8 s scene shortens the scene to 5.2 s and later scenes' start frames move earlier by 84 frames",
+        "The input composition is not mutated; composition.meta.director.layers contains the clip layer with role 'clip' and the assetId; the scene precomp's assets and the root assets both contain the clip asset with duration set; swap.ts exports no setLayerHidden of its own"
+      ],
+      "labels": [
+        "backend",
+        "generate"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-004",
+      "title": "Revert a scene to motion (pure)",
+      "description": "As a user, I want 'Keep as motion' and failed generations to restore the original scene so that nothing is lost.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 5.7 (revertToMotion) and server/generate/swap.ts, and removeLayer and setSceneDuration in server/authoring/api.ts.",
+        "Add `revertToMotion(comp, sceneId, originalDurationSec): Comp` to server/generate/swap.ts: remove the layer `<sceneId>:clip` if present (through removeLayer), delete its asset entry from composition.assets and from the scene precomp's assets when nothing else references it, unhide the scene's bg, product and subject layers (setLayerHidden from the authoring core), and restore the scene duration with setSceneDuration when it differs from originalDurationSec by more than 0.01 s.",
+        "Add tests to server/generate/swap.test.ts."
+      ],
+      "acceptance": [
+        "swapInClip followed by revertToMotion returns a composition deep-equal to the one before the swap (layers, hidden flags, assets, meta.director and scene durations), including the case where the scene had been shortened",
+        "revertToMotion on a scene without a clip layer returns an equal composition without throwing",
+        "A video asset still referenced by another layer is kept in composition.assets and in that scene precomp's assets"
+      ],
+      "labels": [
+        "backend",
+        "generate"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Clip preparation and SAM product-visibility check",
+      "description": "As a server developer, I want the finished clip checked for the product so that the user is told when generation lost it.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 5.8 and 9, findings.md in docs/hackathon/steps/step-01-meta-api-probes (the SAM video run: 640 px, no audio, 240 frames in 13 s), server/media/ffmpeg.ts (hasFfmpeg, runFfmpeg, probeVideo), server/meta/sam.ts (trackVideo) and server/ledger.ts.",
+        "Create server/generate/clip-check.ts exporting MIN_VISIBLE_FRAC = 0.6, prepareClipForSam(clip: Buffer): Promise<Buffer> (ffmpeg: no audio, scale to at most 640 px wide keeping the aspect, libx264 preset veryfast crf 28, +faststart) and checkClip(ctx: ToolCtx, { clip, noun, sceneId }): Promise<{ productVisibleFrac: number; frames: number; framesWithObject: number } | { error: string }>.",
+        "checkClip prepares the clip, calls ctx.meta.sam.trackVideo(prepared, noun), computes productVisibleFrac = framesWithObject.length / frames, records ledger.add(filmId, 'sam-3.1', '<frames> frames', max(frames, 50) * 0.20 / 1000) and emits a cost event; every failure (no ffmpeg, SAM error, frames 0) returns { error } and never throws.",
+        "Create server/generate/clip-check.test.ts using makeFakeMeta for the SAM part; the ffmpeg part runs only when hasFfmpeg() is true (it.skipIf) on a clip generated with ffmpeg testsrc."
+      ],
+      "acceptance": [
+        "With a fake SAM result of frames 240 and 216 frames with the object, checkClip returns productVisibleFrac 0.9, framesWithObject 216, and the ledger records 0.048 USD for 240 frames; with 30 frames the recorded cost is 0.01 (50-frame minimum)",
+        "A SAM client that throws returns { error } containing the message; frames 0 returns { error: 'no frames' }",
+        "prepareClipForSam on a generated 1280x720 testsrc clip with an audio track returns an MP4 whose probeVideo width is 640 and which has no audio stream (skipped when ffmpeg is absent)"
+      ],
+      "labels": [
+        "backend",
+        "generate",
+        "meta-api"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-006",
+      "title": "Retry offer after a failed product check",
+      "description": "As a user, I want one more try offered when the product went missing so that I can fix a bad clip without re-planning the film.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 5.8 (one retry only) and 7, server/generate/approval.ts (propose, attemptFor), server/generate/request.ts (adjust flag) and shared/events.ts (review.finding, generate.proposed).",
+        "Create server/generate/retry.ts exporting shouldOfferRetry(attempt: number, frac: number): boolean (frac < MIN_VISIBLE_FRAC and attempt < 2) and offerRetry(ctx, { sceneId, frac, attempt, approvals }): the function emits review.finding { sceneId, kind: 'product-missing-in-clip', evidence: 'product visible in N% of frames', deterministic: true } when frac < MIN_VISIBLE_FRAC, and, when attempt < 2, also proposes a new approval (approvals.propose(filmId, sceneId, 25)) and emits generate.proposed with the reason 'The product was visible in N% of frames. Retry with a stricter prompt?' and estCredits 25.",
+        "Create server/generate/retry.test.ts."
+      ],
+      "acceptance": [
+        "frac 0.4 at attempt 1 emits one finding with evidence 'product visible in 40% of frames' and one generate.proposed with a 32-hex token; the proposal's attempt is 2",
+        "frac 0.4 at attempt 2 emits only the finding and no proposal; frac 0.6 emits nothing; frac 0.59 emits the finding",
+        "shouldOfferRetry(1, 0.5) is true, (2, 0.5) false, (1, 0.7) false"
+      ],
+      "labels": [
+        "backend",
+        "generate"
+      ],
+      "dependsOn": [
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Hourly generation cap",
+      "description": "As an owner, I want a server-wide limit on clip submissions per hour so that a public demo cannot burn my credits.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 5.9, docs/hackathon/06-contracts.md section 6 (D-8: GENERATE_MAX_PER_HOUR is validated in server/env.ts with default 4) and server/env.ts (how the validated value is exposed).",
+        "Create server/generate/rate.ts exporting createRateLimiter({ now?: () => number; max?: number; windowMs?: number }): { peek(): { ok: true } | { ok: false; retryAfterSec: number }; tryAcquire(): same } with a sliding window (default 3600000 ms, in memory) and a module-level getRateLimiter(). When `max` is not passed it uses the validated GENERATE_MAX_PER_HOUR from server/env.ts (do not parse process.env here).",
+        "retryAfterSec = ceil((oldestTimestampInWindow + windowMs - now) / 1000); peek never records, tryAcquire records on success.",
+        "Create server/generate/rate.test.ts with a fake clock; mock server/env.ts for the default-max test."
+      ],
+      "acceptance": [
+        "With max 4, four tryAcquire calls succeed and the fifth returns { ok: false } with retryAfterSec 3600 when no time has passed; after the clock advances 3601 s tryAcquire succeeds again",
+        "peek() does not consume a slot (calling it 10 times leaves tryAcquire able to succeed 4 times)",
+        "With server/env.ts mocked so GENERATE_MAX_PER_HOUR is 2 and no `max` passed, the third tryAcquire returns { ok: false }",
+        "With the oldest entry 1000 s old and max reached, retryAfterSec is 2600"
+      ],
+      "labels": [
+        "backend",
+        "generate"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-008",
+      "title": "Job store for resume after a restart",
+      "description": "As an owner, I want in-flight generation state saved to disk so that a server restart does not lose a paid clip.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 4.2 (JobRecord) and 5.10, server/env.ts (DATA_DIR) and server/store/film-store.ts (the data directory layout).",
+        "Create server/generate/jobs.ts exporting type JobRecord (the design's fields plus assetId?, productVisibleFrac?, creditsCharged?, error?), isActiveStatus(status) (submitted, rendering, downloading, placing, checking) and createJobStore({ filmsDir?: string }) (default <env.DATA_DIR>/films): { save(record): Promise<void>; get(filmId, sceneId): Promise<JobRecord | undefined>; listActive(): Promise<JobRecord[]> } storing JSON at <filmsDir>/<filmId>/generate/<sceneId>.json with an atomic write (temp file then rename).",
+        "listActive scans every film directory; a corrupt or unreadable file is skipped with one logged warning and never throws.",
+        "Create server/generate/jobs.test.ts with a temp directory."
+      ],
+      "acceptance": [
+        "save then get returns an equal record; save overwrites the same scene's file; get for an unknown scene is undefined",
+        "listActive returns only records whose status is submitted, rendering, downloading, placing or checking, across two films",
+        "A file containing 'not json' is skipped and the other records are still returned"
+      ],
+      "labels": [
+        "backend",
+        "generate"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-009",
+      "title": "Product noun for the clip check",
+      "description": "As a server developer, I want the product's noun so that SAM knows what to look for.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 5.8 and 6, server/meta/spark.ts (ChatRequest and ChatResponse shapes), shared/composition.ts (FilmState.brief) and server/meta/fakes.ts (makeFakeMeta sparkScript).",
+        "Create server/generate/product-noun.ts exporting sanitizeNoun(text: string): string (lowercase, keep letters and spaces only, collapse spaces, at most 3 words and 40 characters; empty becomes 'product') and resolveProductNoun(ctx: ToolCtx, film: FilmState, comp: Comp, deps: { cacheDir: string }): Promise<string>.",
+        "Order: composition.meta.director.productNoun when it is a non-empty string; else a cached value in <cacheDir>/product-noun.json; else one meta.spark.chat call with response_format json_object asking for {\"noun\": \"<one lowercase noun phrase naming the product>\"} from the first 300 characters of film.brief.text (record the cost in the ledger); any failure returns 'product'. Cache the successful result.",
+        "Create server/generate/product-noun.test.ts."
+      ],
+      "acceptance": [
+        "sanitizeNoun('White Ceramic Mug.') is 'white ceramic mug'; sanitizeNoun('') and sanitizeNoun('!!!') are 'product'; a 5-word input is cut to 3 words",
+        "With composition.meta.director.productNoun 'mug' no Spark call is made and the result is 'mug'",
+        "With a fake Spark reply {\"noun\":\"White Ceramic Mug.\"} the result is 'white ceramic mug' and a second call reads the cache (Spark called once); an invalid JSON reply or a thrown error gives 'product'"
+      ],
+      "labels": [
+        "backend",
+        "generate",
+        "meta-api"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-010",
+      "title": "Runner part 1: preflight, submit, poll",
+      "description": "As a user, I want an approved scene to be submitted exactly once and followed through rendering so that I can watch progress.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 3, 5.4, 5.5, 5.9 and 7, server/generate/runner-registry.ts, guard.ts, request.ts, source-still.ts, public-url.ts, services.ts (S7a), poll.ts, rate.ts, jobs.ts (this PRD) and shared/events.ts.",
+        "Create server/generate/runner.ts exporting createRunner(deps): GenerationRunner (the type from runner-registry.ts) where deps = { clippy(): ClippyClient; approvals; jobs; rate; filmsDir; poll?; sleep?; now?; env? } with sensible defaults taken from getGenerateServices().",
+        "preflight(ctx, sceneId): return { ok: false, status: 429, error: 'rate_limited', retryAfterSec } when rate.peek() fails, else { ok: true }.",
+        "run(ctx, { sceneId, approval }) part 1: emit generate.progress 'approved'; rate.tryAcquire (failure -> progress 'failed: rate_limited' and stop); load the film; remember the scene's original duration; prepareSourceStill; publicAssetUrl(env.PUBLIC_BASE_URL, ctx.assets.url(asset.id)); buildAnimateRequest; submitApproved; save a JobRecord { status 'submitted' } and emit progress 'submitted', record the credits with ctx.ledger.addCredits(filmId, 25, 'animate_image <model> scene <id>') and emit a cost event { usd: 0, model: 'clippy:<model>', units: 'credits', credits: 25 } (D-4); pollJob with onStatus emitting generate.progress for each new status and saving the job; on a failed, cancelled or timed_out outcome emit progress 'failed: <message>' | 'cancelled' | 'timed_out', an error event { where: 'generate' } for failed and timed_out, save the job status, leave the composition untouched and stop.",
+        "Any error thrown before submission (for example a public-URL error) emits error { where: 'generate', message } and progress 'failed: <message>'; run() itself never rejects.",
+        "Create server/generate/runner.test.ts (part 1 cases) with makeFakeClippy, makeTestFilm and fake clocks."
+      ],
+      "acceptance": [
+        "Happy path up to the poll: events in order are progress 'approved', 'submitted', a cost event with credits 25 and usd 0, then progress 'queued' and 'rendering' (one per distinct status); ledger.credits(filmId) is 25; the fake Clippy recorded exactly one animateImage call with idempotencyKey 'film1:s2:1' (attempt 1); the job record status ends as 'downloading' when the poll reports done",
+        "failSubmit makes the run emit 'approved', an error event and progress starting with 'failed:', with no job record in an active status and the composition unchanged",
+        "A poll outcome failed with message 'pro_plan_required' emits progress 'failed: pro_plan_required' and an error event; timed_out emits progress 'timed_out'; neither changes the composition",
+        "preflight returns { ok: false, status: 429, error: 'rate_limited', retryAfterSec } after four recorded submissions in the hour and { ok: true } before"
+      ],
+      "labels": [
+        "backend",
+        "generate"
+      ],
+      "dependsOn": [
+        "US-001",
+        "US-007",
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Runner part 2: download, place, check, done",
+      "description": "As a user, I want the finished clip placed in my film and checked so that I see it right away and know if the product was lost.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 3, 5.6 to 5.9 and 7, server/generate/runner.ts, download.ts, swap.ts, clip-check.ts, retry.ts, product-noun.ts and server/media/ffmpeg.ts (probeVideo).",
+        "Extend run() after a 'done' poll outcome: re-read the film; if the scene's mode is no longer 'generate' (the user chose Keep as motion) emit progress 'cancelled', save the job 'cancelled' and stop without placing anything.",
+        "Otherwise emit progress 'downloading', downloadClip(status.resultUrl) (never store or log the URL), ctx.assets.put(bytes, 'video/mp4', { role: 'clip', sceneId }), probeVideo for width and height; emit progress 'placing', build the next composition with swapInClip (frame = film size, clipSec = the request's durationSec) and ctx.films.commit(filmId, next, 'generate', note); a commit rejection emits an error and progress 'failed: <message>' and leaves the film unchanged.",
+        "Then emit progress 'checking', resolveProductNoun, checkClip; emit generate.done { sceneId, asset, productVisibleFrac? } (omit the fraction when the check returned an error and emit review.finding { kind: 'clip-check-failed', deterministic: false }); when a fraction exists call offerRetry; save the job 'done' with the fraction and assetId.",
+        "Any failure at download or probe time emits an error and progress 'failed: <message>', saves the job as failed with the jobId kept, and leaves the composition untouched.",
+        "Extend server/generate/runner.test.ts with part 2 cases (fake fetch for the download, fake SAM)."
+      ],
+      "acceptance": [
+        "Full happy path events in order: progress approved, submitted, queued, rendering, downloading, placing, checking, then generate.done with productVisibleFrac 0.9; the final composition has the `<scene>:clip` layer below the headline with bg and product hidden; the asset has role 'clip' and the scene id; the job record is 'done' with productVisibleFrac 0.9; ledger.credits(filmId) is 25 and the ledger has a 'sam-3.1' usd line",
+        "A fake SAM reporting 0.4 still places the clip and emits generate.done with productVisibleFrac 0.4, one review.finding product-missing-in-clip and one generate.proposed for the retry",
+        "If the scene's mode is set to 'motion' before the poll finishes, the run ends with progress 'cancelled', no asset is stored and the composition is unchanged",
+        "A download failure (fake fetch returns 404) ends with progress starting 'failed:' and an error event; the composition is unchanged and the job record keeps its jobId; no event or log line contains the result URL's query string"
+      ],
+      "labels": [
+        "backend",
+        "generate"
+      ],
+      "dependsOn": [
+        "US-002",
+        "US-003",
+        "US-005",
+        "US-006",
+        "US-009",
+        "US-010"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Generate tool, runner registration and revert handler",
+      "description": "As a server developer, I want the generate tools registered and the runner plugged into the routes so that approvals actually start clips.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md sections 2, 3 and 12.4, server/tools/generate.ts (S2 stub), server/tools/registry.ts, server/generate/runner-registry.ts, services.ts and approval.ts, and shared/tools.ts.",
+        "Replace the stub server/tools/generate.ts: export `tools: ToolDef[]` with proposeGenerate (zod params { sceneId }): the scene must exist and have mode 'generate' (else { ok: false, error: 'scene is not a generate scene' }); it proposes an approval, emits generate.proposed and returns { ok: true, data: { proposed: true, estCredits: 25 } } WITHOUT the token (a token is a capability and must never enter the model's context).",
+        "In the same module, at import time, call setGenerationRunner(createRunner(<defaults from getGenerateServices()>)) and setRevertHandler(async (ctx, sceneId) => ...) where the handler loads the job record for the scene, applies revertToMotion with its originalDurationSec when a clip layer exists, and commits with source 'user'.",
+        "Create server/tools/generate.test.ts."
+      ],
+      "acceptance": [
+        "After importing server/tools/generate.ts, getGenerationRunner() and getRevertHandler() return functions",
+        "proposeGenerate on a motion scene returns { ok: false } with 'scene is not a generate scene'; on a generate scene it emits one generate.proposed event and the returned data object contains no 'token' key (JSON.stringify of the result does not contain the token string)",
+        "After a swap, the revert handler restores the original composition (deep-equal) and a second call changes nothing"
+      ],
+      "labels": [
+        "backend",
+        "tools",
+        "generate"
+      ],
+      "dependsOn": [
+        "US-004",
+        "US-011"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Resume in-flight generations after a restart",
+      "description": "As an owner, I want a restart in the middle of a clip to continue it so that the live demo survives a platform restart.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 5.10, docs/hackathon/06-contracts.md section 6 (D-3: boot hooks), server/boot.ts (the S2 file exporting `bootHooks: Array<(ctx: { app, deps }) => void | Promise<void>>`), server/main.ts (read only; never edit it), server/generate/jobs.ts and server/generate/runner.ts.",
+        "Add to server/generate/runner.ts `resume(ctx, record): Promise<void>` continuing a stored job: 'submitted' and 'rendering' continue polling from the stored jobId (no new submission); 'downloading' reads the status again for a fresh signed resultUrl and downloads; 'placing' and 'checking' re-run from the stored assetId and skip the swap if the `<scene>:clip` layer already exists.",
+        "Export `resumeGenerations(makeCtx: (filmId: string) => ToolCtx | Promise<ToolCtx>, opts?: { jobs?; runner? }): Promise<number>` from server/tools/generate.ts: for every active record call resume (defaults: the job store on <DATA_DIR>/films and the runner from getGenerateServices) and return the number resumed; failures are logged per job and never thrown.",
+        "SHARED EDIT: append exactly one hook to `bootHooks` in server/boot.ts: `async ({ deps }) => { await resumeGenerations(deps.makeToolCtx); }` (import it from './tools/generate.js'); touch no other line of boot.ts and never touch main.ts.",
+        "Add tests to server/generate/runner.test.ts and server/tools/generate.test.ts, plus a test that imports server/boot.ts and checks that running every hook with fake deps calls resume for the active records."
+      ],
+      "acceptance": [
+        "A stored record with status 'rendering' and a jobId continues polling with the fake client without a new animateImage call and ends with the clip placed and generate.done emitted",
+        "A stored record with status 'placing' and an existing assetId places the clip once; when the clip layer already exists the composition is unchanged and the job still ends 'done'",
+        "resumeGenerations returns 2 for two active records, returns 0 for none, and a record whose resume throws is logged and counted as not resumed without rejecting",
+        "server/boot.ts's bootHooks contains the S7b hook in addition to whatever S2 or S11 added (the diff of boot.ts is one added line plus its import), and running the hooks with fake deps resumes the active records; server/main.ts is unchanged"
+      ],
+      "labels": [
+        "backend",
+        "generate"
+      ],
+      "dependsOn": [
+        "US-011",
+        "US-012"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Browser check: clip playback aligned inside a scene",
+      "description": "As a developer, I want to see a generated clip play in sync inside a later scene so that I know the engine aligns video layers inside precomps.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 11 (the unverified alignment item), web/src/player/Player.tsx (how to mount a composition and seek) and server/generate/swap.ts and server/authoring/api.ts.",
+        "Create scripts/dev/make-test-clip.ts that uses server/media/ffmpeg.ts to write web/public/dev/clip-testsrc.mp4 (ffmpeg testsrc, 320x180, 6 s, 30 fps, H.264, +faststart, a burned-in timestamp) when it does not exist, and commit that small file under web/public/dev/.",
+        "Create web/clip-check.html and web/src/panels/clip-check-main.tsx: a standalone dev page (not linked from the app) that builds a 2-scene composition with the S3a functions (s1: 3 s with a shape and a text layer; s2: 4 s generate scene with bg, product and headline), applies swapInClip with the test clip (asset src '/dev/clip-testsrc.mp4', size 320x180, frame 1920x1080) and shows it in the Player with a button 'Seek to scene 2 + 0.5 s' and a text readout of the current time.",
+        "Run the browser check (below) and write what you observed (the burned-in timestamp value at scene 2 + 0.5 s, and whether the headline stays on top) into the story notes; if the clip is misaligned, add a row to ENGINE-NEEDS.md and describe the workaround in notes."
+      ],
+      "acceptance": [
+        "Opening /clip-check.html in the dev server shows the heading 'Clip alignment check' and the Player with the composition (no console errors)",
+        "After clicking 'Seek to scene 2 + 0.5 s' the visible video frame's burned-in timestamp reads between 0.2 and 0.8 s (aligned to the scene start) and the headline text is drawn above the video; the observed values are written into notes",
+        "web/public/dev/clip-testsrc.mp4 exists, is under 300 KB, and `npm test` does not depend on the browser"
+      ],
+      "labels": [
+        "frontend",
+        "ui",
+        "test"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "Live script s07-generate (one real clip, owner-approved)",
+      "description": "As an owner, I want one command that generates exactly one real clip end to end so that I can verify generate mode with my own account.",
+      "steps": [
+        "Read docs/hackathon/steps/step-07-generate-mode-mcp/design.md section 9 (manual gates), scripts/live/run.ts (the dispatcher and the exported shape { describe, estimateUsd, run }), scripts/live/s07-connect.ts, server/generate/runner.ts, public-url.ts, source-still.ts and server/store/asset-store.ts.",
+        "Create scripts/live/s07-generate.ts exporting describe() (states plainly: generates ONE real clip, reserves 25 Clippy credits on a Pro account, about 0.05 USD for the SAM check, needs CLIPPY_MCP_URL, CLIPPY_TOKEN, META_API_KEY and a public https PUBLIC_BASE_URL; the scene image is sent to Clippy), estimateUsd() returning 0.06 and run().",
+        "run(): verify the four environment variables (throw naming the missing ones) and assertPublicUrl(PUBLIC_BASE_URL); start a minimal node:http server on ASSET_PORT (default 8788) that serves only GET /api/assets/:id from the temp asset store (the owner exposes this port through a tunnel they approved, or points PUBLIC_BASE_URL at a deployed server); build the fixture film (a one-scene generate film made with the S3a functions from fixtures/seed/cafe-with-mug.jpg and mug-product.png, saved as fixtures/s07b/film-with-generate-scene.json by a helper export `buildLiveFilm()`), wrap the real Clippy client so that a second animateImage call throws ('one clip per run'), propose and consume exactly one approval, run the runner, and record: jobId, time to done, every status with its timestamp, clip size and dimensions, productVisibleFrac, whether the final composition validates, and credits charged if the status has creditsCharged.",
+        "Write the full report to debug/s07/iteration-NN/report.json (gitignored; no URLs with queries, no token) and append a redacted summary table to docs/hackathon/steps/step-07-generate-mode-mcp/live-results.md; stop the asset server in a finally block.",
+        "Export renderLiveReport(result): string (pure) and missingEnv(env): string[] (pure). Create scripts/live/s07-generate.test.ts for the pure parts and for buildLiveFilm validating with parseAepCompositionSafe (never running run())."
+      ],
+      "acceptance": [
+        "estimateUsd() returns 0.06 and describe() contains 'ONE real clip', '25' and 'sent to Clippy'",
+        "missingEnv({}) returns ['CLIPPY_MCP_URL', 'CLIPPY_TOKEN', 'META_API_KEY', 'PUBLIC_BASE_URL'] and missingEnv with all four set returns []; run() with PUBLIC_BASE_URL 'http://localhost:8788' rejects with a message containing 'PUBLIC_BASE_URL' before any network call",
+        "buildLiveFilm() returns a film whose composition passes parseAepCompositionSafe and has exactly one scene in generate mode",
+        "renderLiveReport for a fake result contains the job id, the seconds to done and productVisibleFrac, and contains no 'http' substring with a '?' query and no 'Bearer'"
+      ],
+      "labels": [
+        "scripts",
+        "generate",
+        "test"
+      ],
+      "dependsOn": [
+        "US-012"
+      ]
+    }
+  ]
+}

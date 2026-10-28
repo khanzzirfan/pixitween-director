@@ -1,0 +1,491 @@
+{
+  "name": "PixiTween Director S05b: Spark frame review, fix loop and Review UI",
+  "branchName": "ralph/s05b-review-visual",
+  "description": "Browser frame capture, POST /api/films/:id/frames, grounded Spark visual review, the bounded review loop with regression undo, the reviewScene tool, the auto-review hook and the Review panel, plus synthetic calibration frames and the manual-gate script. Offline only: Spark is faked, Pixi is faked behind small interfaces. Uses the S5a rules through runRules(comp, assets, opts) from server/review/rules.ts and leaves out deterministic rule logic itself.",
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-05-self-review-loop/requirements.md",
+      "docs/hackathon/steps/step-05-self-review-loop/design.md",
+      "docs/hackathon/steps/step-05-self-review-loop/contract-issues.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (sections 3, 3a, 4, 4a, 4b, 5 and section 6: D-1 route handlers, D-2 makeToolCtx, D-5 pickReviewer, D-7 PlayerHandle, D-10 runRules)",
+      "docs/hackathon/steps/step-05-self-review-loop/design.md (sections 3-9: flow, verdict schema, loop, capture, grounding, prompt)",
+      "docs/hackathon/steps/step-05-self-review-loop/contract-issues.md (Player handle, route wiring, commit source)",
+      "docs/hackathon/steps/step-01-meta-api-probes/findings.md (Spark image review payload)",
+      "fixtures/seed/README.md",
+      "server/review/rules.ts (the S5a API this PRD calls: runRules(comp, assets, opts), decision D-10)"
+    ],
+    "requires": [
+      "prd-s03b-director-agent",
+      "prd-s04-art-layers",
+      "prd-s05a-review-rules"
+    ],
+    "owns": [
+      "server/review/prompts.ts",
+      "server/review/visual.ts",
+      "server/review/loop.ts",
+      "server/review/frames.ts",
+      "server/http/handlers/review.ts",
+      "server/review/geometry-check.ts",
+      "server/review/synth-frames.ts",
+      "server/tools/review.ts",
+      "web/src/capture/*",
+      "web/src/panels/Review.tsx",
+      "web/src/panels/review-fixture-mount.tsx",
+      "scripts/live/s05-review.ts",
+      "fixtures/s05b/*"
+    ],
+    "extraGuardrails": [
+      "Route registration lives only in server/http/handlers/review.ts (registerReviewRoutes(app, deps), decision D-1, S2 creates it as a 501 stub); never edit server/http/routes.ts, web/src/App.tsx, web/src/player/* or server/tools/registry.ts. Build every ToolCtx with deps.makeToolCtx(filmId) (D-2).",
+      "Every film change made by a review goes through the tool registry's runTool and is committed with source 'review' (withCommitSource). Never write composition JSON directly.",
+      "Visual review gets its model through pickReviewer() from server/llm/router.ts (D-5), never meta.spark.reviewImages directly, so Local mode covers it. Spark output is untrusted: ground it (image index, time, evidence length), allowlist its fixes and scope them to the scene before applying anything."
+    ],
+    "manualGates": [
+      "MG-1: owner runs `npm run live -- s05-review` (prints the estimate), then `--yes` (about $0.05, ceiling $0.50): the 4 synthetic frames go to real Spark; the clean frame must return no grounded issue and each faulty frame must report its fault with a valid image/time. Record the output in the PR.",
+      "MG-2 (M1): in the browser, generate the Coffee Co. mug film, let the auto-review run, and check: at least one real fix with before/after thumbnails, the geometry-model error badge at or below 3 percent, no blank frames. Record screenshots in the PR."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Visual review prompt builder",
+      "description": "As a review-loop author, I want a prompt builder so that Spark always gets the same grounded, scoped instructions.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 6 (the full prompt text, schema and reasoning), docs/hackathon/06-contracts.md section 4a (summariseComposition) and server/tools/authoring.ts (zod params of the authoring tools).",
+        "Create server/review/prompts.ts exporting ALLOWED_FIX_TOOLS = ['setTransform','setKeyframes','setText','setCamera','setSceneDuration','reorderLayer','setHeadlineBehindProduct'] as const, VISUAL_SCHEMA (a JSON-schema object: required ['sceneId','pass','issues','fixes']; issue kind enum text-over-product, low-contrast, product-hidden, product-cropped, off-brief, artefact, other; image integer >= 1; atSec number >= 0; evidence string minLength 20 maxLength 300; issues and fixes maxItems 6), toolUsageLines(tools: ToolDef[], allowed: readonly string[]): string[] (one line per allowed tool that exists in tools, derived with zod-to-json-schema, format '- name { a: string, b?: number }') and buildVisualPrompt(o: { sceneId: string; intent: string; camera: string; summary: string; frames: Array<{ index: number; atSec: number }>; findings: Finding[]; tools: ToolDef[]; width: number; height: number }): string.",
+        "buildVisualPrompt follows design section 6 with the labelled sections SYSTEM, SCENE, FRAMES, WHAT TO CHECK, HOW TO FIX, OUTPUT; the FRAMES line reads 'Image 1 = 0.8 s, Image 2 = 2 s, Image 3 = 3.2 s' (times printed without trailing zeros); the deterministic findings are listed one evidence sentence per line after 'Automatic checks already found:' or the word 'none'; HOW TO FIX names the scope 'layers whose id starts with \"<sceneId>:\"'.",
+        "Create server/review/prompts.test.ts with fake ToolDefs built from zod."
+      ],
+      "acceptance": [
+        "With frames at 0.8, 2 and 3.2 s the prompt contains exactly 'Image 1 = 0.8 s, Image 2 = 2 s, Image 3 = 3.2 s'",
+        "With no findings the prompt contains 'Automatic checks already found: none'; with one finding its evidence sentence appears on its own line",
+        "Given fake tools named setTransform, replacePlate and generatePlate, the HOW TO FIX section lists only setTransform, and its line is '- setTransform { layerId: string, x?: number, y?: number, scale?: number }' for a zod object with those fields",
+        "The prompt contains 'layers whose id starts with \"s1:\"' for sceneId 's1' and is shorter than 6000 characters for a 6-layer summary",
+        "VISUAL_SCHEMA.required equals ['sceneId','pass','issues','fixes'] and ALLOWED_FIX_TOOLS has exactly the 7 names"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "agent"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Parse and ground the visual verdict",
+      "description": "As a review-loop author, I want the model's answer validated and grounded so that only issues tied to a real frame and time are acted on.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 4.2 and 5.9 and fixtures/seed/spark-vision-image-response.json (the real S1 verdict shape).",
+        "Create server/review/visual.ts exporting class VisualParseError extends Error, class ReviewError extends Error { constructor(readonly code: 'spark-failed' | 'spark-invalid' | 'no-frames', message: string) }, the zod VisualIssue and VisualVerdict schemas (design 4.2) and parseVisualVerdict(raw: unknown, frames: Array<{ atSec: number }>, sceneId: string): { verdict: VisualVerdict; dropped: Array<{ reason: string; issue: unknown }> }. raw may be an object, a JSON string, or a string fenced with ```json. Drop an issue when image is outside 1..frames.length ('image out of range'), when |atSec - frames[image-1].atSec| > 0.05 ('time mismatch'), or when evidence is shorter than 20 characters ('evidence too short'); recompute pass = (kept issues is empty); ignore the model's pass. Unparseable input throws VisualParseError.",
+        "Accept the S1 shape ({ pass, issues:[{ kind, where, evidence }], fix: string }) ONLY when exactly one frame is given: fill image 1 and atSec = that frame's time, treat 'where' as an evidence prefix, ignore the free-text fix. With several frames those issues are dropped with reason 'missing image/atSec'.",
+        "Create server/review/visual.test.ts."
+      ],
+      "acceptance": [
+        "The seed verdict (choices[0].message.content of fixtures/seed/spark-vision-image-response.json) with one frame at 1.25 s yields 2 issues of kinds ['text-over-product','low-contrast'], each image 1 and atSec 1.25, pass false and no fixes; with three frames both issues are dropped with reason 'missing image/atSec'",
+        "A rich verdict with an issue { image: 1, atSec: 0.8, evidence: 'caption text sits across the middle of the mug body' } and frames at [0.8, 2, 3.2] is kept; the same issue with atSec 1.0 is dropped with 'time mismatch'; image 4 of 3 frames is dropped with 'image out of range'; evidence 'too short' is dropped",
+        "pass is recomputed: a verdict claiming pass true with one kept issue returns pass false; a claimed pass false with no kept issues returns pass true",
+        "A ```json fenced string and a plain JSON string both parse; the text 'not json' throws VisualParseError"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "agent"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "Allowlist and scope the proposed fixes",
+      "description": "As a review-loop author, I want the model's fixes filtered so that it can only make small, free, in-scene edits.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.9 (allowlist and scoping) and server/review/prompts.ts (ALLOWED_FIX_TOOLS).",
+        "In server/review/visual.ts export filterFixes(fixes: Array<{ tool: string; args: unknown }>, sceneId: string, layerIdsInScene: string[]): { accepted: Array<{ tool: string; args: Record<string, unknown> }>; refused: Array<{ fix: unknown; reason: string }> }. Refuse with these exact reasons: 'tool not allowed' (not in ALLOWED_FIX_TOOLS), 'args must be an object', 'other scene' (a layerId not starting with `${sceneId}:`, or a sceneId argument different from sceneId), 'unknown layer' (a layerId not in layerIdsInScene), 'too many' (more than 6 accepted).",
+        "Extend server/review/visual.test.ts."
+      ],
+      "acceptance": [
+        "setTransform on 's1:caption' with y 900 is accepted for sceneId 's1' when 's1:caption' is in layerIdsInScene",
+        "replacePlate, generatePlate, addScene, removeLayer and removeScene are each refused with reason 'tool not allowed'",
+        "A setTransform on 's2:caption' is refused with 'other scene'; setSceneDuration with sceneId 's2' is refused with 'other scene'; setTransform on 's1:ghost' (not in the list) is refused with 'unknown layer'",
+        "A fix whose args is a string is refused with 'args must be an object'; 8 valid fixes yield 6 accepted and 2 refused with 'too many'"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "agent"
+      ],
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "visualReview: one Spark call with a repair retry",
+      "description": "As a review-loop author, I want a single function that sends frames to Spark and returns a grounded verdict so that the loop stays simple.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 5.9, 6, 7 and 8, contract-issues.md (flat cost), server/llm/router.ts (pickReviewer, decision D-5) and server/media/image.ts (resizeFit).",
+        "In server/review/visual.ts export async visualReview(ctx: ToolCtx, o: { sceneId: string; frames: Array<{ atSec: number; jpeg: Buffer }>; findings: Finding[]; intent: string; camera: string; summary: string; tools: ToolDef[]; size: { w: number; h: number }; layerIds: string[]; local?: boolean }, reviewer: { reviewImages(images: Buffer[], prompt: string, schema?: object): Promise<unknown> } = pickReviewer({ local: o.local })): Promise<{ verdict: VisualVerdict; dropped: unknown[]; refused: unknown[]; calls: number }>.",
+        "Flow: throw ReviewError('no-frames') for an empty frame list; resizeFit each jpeg to 1280 px (jpeg); prompt = buildVisualPrompt(...); raw = await reviewer.reviewImages(images, prompt, VISUAL_SCHEMA); parseVisualVerdict; on VisualParseError make exactly one more call with the prompt plus the line 'Your previous answer was not valid JSON (<message>). Return only the JSON object.'; a second failure throws ReviewError('spark-invalid'); any other error from the reviewer (for example MetaApiError) throws ReviewError('spark-failed') without a retry; apply filterFixes to the verdict fixes.",
+        "Each call is charged with ctx.ledger.add(ctx.filmId, 'muse-spark-1.3-contributor', '1 call', 0.002) (decision D-4: the step records the cost; the flat price is used because the reviewer returns only parsed JSON) unless o.local is true, in which case nothing is charged.",
+        "Extend server/review/visual.test.ts with vi.fn stand-ins passed as the reviewer argument, and one vi.mock of '../llm/router' for the default-reviewer case."
+      ],
+      "acceptance": [
+        "Success: one call, calls 1, ledger +0.002, verdict returned, the injected reviewer received exactly frames.length Buffers and a schema equal to VISUAL_SCHEMA",
+        "First answer 'not json', second valid: calls 2, ledger +0.004 and the second prompt contains 'Your previous answer was not valid JSON'; two invalid answers reject with ReviewError code 'spark-invalid'",
+        "A reviewer rejection with MetaApiError(500,'upstream') rejects with code 'spark-failed' after exactly one call",
+        "A 2000 px wide JPEG input is sent as an image whose decoded width is 1280",
+        "With no reviewer argument visualReview calls pickReviewer once with { local: false }; with o.local true it calls pickReviewer with { local: true } and the ledger is unchanged; an empty frames array rejects with code 'no-frames' and makes no reviewer call; a verdict fix on another scene's layer ends up in refused, not in verdict.fixes"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "agent",
+        "meta-api"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Commit-source decorator and applyFixes",
+      "description": "As a review-loop author, I want review edits recorded as source 'review' and applied through the tool registry so that every fix is validated and attributable.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.6 and contract-issues.md item 4, server/tools/registry.ts (runTool: validates args with zod and emits tool.call) and the FilmStore interface in docs/hackathon/06-contracts.md section 4.",
+        "Create server/review/loop.ts exporting withCommitSource(films: FilmStore, source: FilmVersion['source']): FilmStore (every method forwards to films; commit(id, comp, _source, note) calls films.commit(id, comp, source, note)) and async applyFixes(ctx: ToolCtx, fixes: Array<{ tool: string; args: Record<string, unknown> }>, runToolFn = runTool): Promise<{ applied: Array<{ fix: { tool: string; args: Record<string, unknown> }; version?: number }>; failed?: { fix: { tool: string; args: Record<string, unknown> }; error: string } }> that runs the fixes in order and stops at the first result with ok false.",
+        "Create server/review/loop.test.ts using makeTestFilm({ composition: buildReviewComp({ caption: { y: 800 } }).comp }) from server/review/test-support.ts."
+      ],
+      "acceptance": [
+        "After applyFixes(reviewCtx, [{ tool:'setTransform', args:{ layerId:'s1:caption', y: 907.2 } }]) with reviewCtx = { ...ctx, films: withCommitSource(ctx.films, 'review') } the newest entry of films.versions(filmId) has source 'review' and the caption layer's static position y is 907.2",
+        "Two fixes where the first names an unknown layer return failed with that fix and the error text, applied is empty and the second fix is not run (the film version did not change)",
+        "withCommitSource forwards get, versions, undo and list unchanged (spy-verified) and only changes the source argument of commit"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "The review loop: rules, visual, fixes, rules",
+      "description": "As a viewer, I want the film to check and repair itself with bounded effort so that obvious faults disappear before I see them.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.6 in full (pseudo-code, bounds, ordering) and sections 7 and 8, and server/review/rules.ts (runRules, suggestFix).",
+        "In server/review/loop.ts add async reviewFilm(ctx: ToolCtx, input: { frames: Array<{ sceneId: string; atSec: number; assetId: string }>; sceneIds?: string[]; measuredTextBoxes?: Record<string, Box>; local?: boolean }, deps?: Partial<{ runRules; visual; applyFixes }>): Promise<{ scenes: Array<{ sceneId: string; rounds: number; applied: number; reverted: boolean; unresolved: number }> }> implementing design 5.6 with reviewCtx = { ...ctx, films: withCommitSource(ctx.films, 'review') }: set status 'reviewing' (films.update plus a film.status event); run visual reviews for the motion scenes that have frames in parallel (at most 2 at a time) on the original frames, reading frame bytes with ctx.assets.read; then per scene in order: F1 = runRules(composition, ctx.assets, { storyboard, sceneIds: [scene], deps: { measuredTextBoxes } }) (re-read the composition from ctx.films.get before every call); fixes = F1 suggested fixes first, then the verdict's accepted fixes, skipping any visual fix whose (tool, layerId) equals one already planned; applyFixes; F2 = runRules; apply F2's suggested fixes (deterministic only); F3 = runRules. Generate-mode scenes are skipped. Finally set status 'ready'.",
+        "Events: review.finding for every F1 finding (deterministic true, atSec scene-relative) and every kept visual issue (deterministic false); review.fix for every applied fix with note `<tool> <layerId or sceneId>: <finding evidence>`; for every F3 error finding a review.finding whose evidence is the original evidence plus ' (unresolved after 2 rounds)'. A visual failure (ReviewError) emits an error event with where 'review.visual' and the scene continues deterministically.",
+        "Extend server/review/loop.test.ts; frames are tiny JPEGs made with sharp and stored with ctx.assets.put role 'frame'; wrap ctx.assets.read so comp asset ids from buildReviewComp resolve to its PNG buffers; inject deps.visual as a vi.fn (the loop passes input.local to it)."
+      ],
+      "acceptance": [
+        "caption.y 800 with a visual verdict of no issues: after the loop the caption position y is within 0.05 of 907.2, the events contain a review.finding of kind 'text-over-product' with deterministic true and a review.fix whose note contains 'setTransform', and the event order shows film.status 'reviewing' before and 'ready' after",
+        "A grounded visual issue with the accepted fix setTransform { layerId:'s1:product', scale: 1.4 } is applied after the deterministic fixes; its review.finding has deterministic false; the product layer's static scale is 1.4",
+        "A visual fix with the same (tool, layerId) as a planned deterministic fix is skipped: exactly one tool.call event exists for setTransform on s1:caption",
+        "An unfixable finding (product.outFrame 60 gives R4): runRules is called exactly 3 times for the scene (F1, F2, F3), visual exactly once, the film version is unchanged and an event contains 'unresolved after 2 rounds'",
+        "With modes ['motion','generate'] visual is called once (the generate scene is skipped); every version committed during the loop has source 'review'",
+        "When deps.visual rejects with ReviewError('spark-failed','x'), an error event with where 'review.visual' is emitted and the deterministic fix is still applied"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "agent"
+      ],
+      "dependsOn": [
+        "US-001",
+        "US-002",
+        "US-003",
+        "US-004",
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Regression guard: undo fixes that make things worse",
+      "description": "As a viewer, I want a fix that creates new problems undone so that review can never leave the film worse than it found it.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 5.6 (regression guard) and 7, and the undo/versions methods of FilmStore in docs/hackathon/06-contracts.md section 4.",
+        "In server/review/loop.ts count the versions committed for each scene during reviewFilm; when errors(F3) > errors(F1) (error severity only) call ctx.films.undo(ctx.filmId) once per committed version, mark the scene reverted and emit a review.fix with note 'reverted: fixes increased findings (<n1> -> <n3>)'.",
+        "Extend server/review/loop.test.ts."
+      ],
+      "acceptance": [
+        "A clean film (caption y 930, no findings) with an accepted visual fix setTransform { layerId:'s1:caption', y: 800 } ends with a composition deep-equal to the original and a review.fix event whose note contains 'reverted: fixes increased findings (0 -> 1)'",
+        "The loop result for that scene has reverted true and applied 0 visible edits; ctx.films.get(filmId).version equals the pre-review pointer",
+        "When fixes reduce the error count (caption y 800 to 907.2) nothing is undone and reverted is false"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-006"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Frame store, POST /api/films/:id/frames and stale-review reset",
+      "description": "As a browser-client author, I want an endpoint that accepts captured frames so that the server can review the film in the background.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 4.3, 5.6 and 7, contract-issues.md (items 3 and 8), server/http/handlers/review.ts (the 501 stub S2 created, with the deps type { films, assets, meta, ledger, bus, makeToolCtx(filmId) }; decisions D-1 and D-2) and one neighbouring handler for the house style.",
+        "Create server/review/frames.ts exporting type ReviewFrame = { sceneId: string; atSec: number; assetId: string; phase: 'before' | 'after'; unstable?: boolean }, a process-memory ReviewState per film { frames: ReviewFrame[]; fixes: Array<{ sceneId: string; note: string; atSec?: number; beforeFrame?: string; afterFrame?: string }> } with getReviewState(filmId) and resetReviewState(filmId), and isImage(bytes): 'png' | 'jpeg' | null by magic bytes (89 50 4E 47 and FF D8 FF).",
+        "Replace the stub body of server/http/handlers/review.ts so that registerReviewRoutes(app: Hono, deps: AppDeps & { review?: typeof reviewFilm }): void registers POST /api/films/:id/frames per design 4.3 for phase 'before': validate multipart (field frames repeated, field meta JSON array of { sceneId, atSec, unstable? } with the same length; at most 24 files; at most 4 MB each; magic bytes); unknown film 404; film without storyboard scenes 400 'film has no scenes yet'; status 'reviewing' 409; unknown scene id or count mismatch 400; too large 413; not an image 415; store each frame with assets.put (role 'frame', sceneId); set the film status to 'reviewing' (films.update and a film.status event); start deps.review in the background (errors become an error event and status 'ready'); respond 202 { review:'started', frames: n, geometry: null }. Build the ToolCtx for the background review with deps.makeToolCtx(filmId).",
+        "registerReviewRoutes also resets stale reviews once at registration: every film whose status is 'reviewing' becomes 'ready' (a film.status event is emitted).",
+        "Create server/http/handlers/review.test.ts using a new Hono app and app.request with FormData, and a deps object built from makeTestFilm."
+      ],
+      "acceptance": [
+        "A valid request with 3 PNG frames and a meta array of 3 entries returns 202 with body { review:'started', frames:3, geometry:null }, stores 3 assets with role 'frame' and the right sceneId, and sets the film status to 'reviewing' before the injected review function runs",
+        "A second request while the status is 'reviewing' returns 409; a meta array of 2 for 3 files returns 400; an unknown sceneId returns 400 naming it; a text file named frame.png returns 415; a 4.5 MB file returns 413; 25 files return 413",
+        "When the injected review function throws, an error event is emitted and the film status returns to 'ready'",
+        "registerReviewRoutes sets a film left in status 'reviewing' back to 'ready' and emits one film.status event for it",
+        "The route is reachable at POST /api/films/:id/frames through the real server app factory S2 documents (routes.ts already delegates to handlers/review.ts, decision D-1): an empty body returns 400, not 501"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-006"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "phase=after frames and review.fix thumbnails",
+      "description": "As a viewer, I want before and after pictures for every fix so that I can see what the review changed.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 3 (step 6) and 4.3 (phase=after) and server/review/frames.ts and server/http/handlers/review.ts.",
+        "In server/review/loop.ts record, for every applied fix, an entry in getReviewState(filmId).fixes with sceneId, note, atSec of the nearest captured frame to the finding (or the first frame of the scene) and beforeFrame = that frame's assetId.",
+        "In server/http/handlers/review.ts handle phase=after: same validation, but no status change, no review; store the frames (phase 'after'); for every recorded fix whose (sceneId, atSec) matches an uploaded after frame set afterFrame and emit a review.fix event { sceneId, beforeFrame, afterFrame, note }; respond 200 { stored: n }.",
+        "Extend server/http/handlers/review.test.ts."
+      ],
+      "acceptance": [
+        "After a review recorded a fix for s1 at 0.8 s with beforeFrame 'f1', POSTing one after frame { sceneId:'s1', atSec:0.8 } with phase=after returns 200 { stored: 1 } and emits exactly one review.fix with beforeFrame 'f1', a new afterFrame id and the same note",
+        "An after frame for a scene or time with no recorded fix is stored and emits no event; the film status is untouched",
+        "phase=after with an unknown film returns 404 and with a bad meta array returns 400"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Server-side geometry comparison",
+      "description": "As an owner, I want the server to compare measured text boxes with the geometry model so that the model's error is visible and bounded.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 5.8 and 4.3 (the geometry field of the 202 response) and server/review/rules.ts (layerBoxAt re-export).",
+        "Create server/review/geometry-check.ts exporting compareGeometry(comp, frames: Array<{ sceneId: string; atSec: number }>, boxes: Array<Record<string, Box>>): { maxRelError: number; layers: number } | null (for each frame i and measured layer: model = layerBoxAt(comp, layerId, Math.round(atSec * 30)).box; rel = max(|dLeft|, |dTop|, |dRight|, |dBottom|) / comp.width; unknown layers are ignored; null when nothing was measured) and measuredForRules(comp, boxes): Record<string, Box> (the first measurement of each layer whose position and scale are static).",
+        "In server/http/handlers/review.ts parse the optional textBoxes field (an array aligned with frames), include geometry in the 202 response and pass measuredForRules to deps.review as input.measuredTextBoxes.",
+        "Create server/review/geometry-check.test.ts and extend server/http/handlers/review.test.ts."
+      ],
+      "acceptance": [
+        "With the model box {190,800,1730,867.2} for s1:caption at frame 15 and a measured box {200,800,1740,870}, maxRelError is within 0.0001 of 0.00521 (10 / 1920) and layers is 1",
+        "compareGeometry with no boxes, or only unknown layer ids, returns null",
+        "measuredForRules omits a layer whose position is keyframed and keeps one with static position and scale",
+        "The 202 response includes geometry { maxRelError, layers } when textBoxes were sent and null otherwise"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "reviewScene tool and reviewDeterministic",
+      "description": "As a chat-agent and loop author, I want review exposed as a tool and a rules-only function so that S6 can check edits without calling Spark.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 3, 5.6 and 7, server/tools/registry.ts and the current stub server/tools/review.ts (exports tools: ToolDef[] = []), and server/review/frames.ts.",
+        "In server/tools/review.ts export reviewDeterministic(ctx: ToolCtx, sceneIds?: string[]): Promise<{ findings: Finding[]; skipped: SkipNote[] }> (runRules(composition, ctx.assets, { storyboard, sceneIds }) on the film's current composition; emits a review.finding event with deterministic true for every finding; never commits and never calls Spark).",
+        "Export reviewSceneTool: ToolDef with params { sceneId: string }: look up the latest 'before' frames of that scene in getReviewState(ctx.filmId); none -> { ok:false, error:'no frames for scene s1: capture frames first' }; otherwise run reviewFilm restricted to that scene and return { ok:true, data:{ rounds, applied, reverted, unresolved } }. Export const tools: ToolDef[] = [reviewSceneTool].",
+        "Create server/tools/review.test.ts."
+      ],
+      "acceptance": [
+        "reviewDeterministic on a film built with caption y 800 returns one R1 finding, emits one review.finding with deterministic true and leaves the film version unchanged",
+        "reviewDeterministic(ctx, ['s9']) returns no findings and a skipped note for the unknown scene instead of throwing",
+        "reviewScene for a scene without captured frames returns ok:false with the 'capture frames first' message and makes no Spark call",
+        "With frames recorded and a faked visual, reviewScene returns ok:true and the caption is fixed; the registry listing includes the name 'reviewScene' exactly once"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-006",
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Capture planning and coordinate conversion",
+      "description": "As a capture-code author, I want pure planning and conversion helpers so that frame times and measured boxes are exact and testable.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 5.7 and 5.8 and the engine's components/AepComposition/AepComposition.tsx lines 155-160 (fit-to-stage maths).",
+        "Create web/src/capture/plan.ts exporting planFrames(scenes: Array<{ id: string; startSec: number; durationSec: number; mode: 'motion' | 'generate' }>): Array<{ sceneId: string; atSec: number; rootSec: number }> (generate-mode scenes skipped; atSec = Math.round(frac * durationSec * 30) / 30 for frac 0.2, 0.5 and 0.8; rootSec = startSec + atSec), fitTransform(screen: { w: number; h: number }, comp: { w: number; h: number }): { scale: number; offsetX: number; offsetY: number } and toCompSpace(b: { x: number; y: number; width: number; height: number }, fit): Box.",
+        "Create web/src/capture/plan.test.ts (jsdom or node environment)."
+      ],
+      "acceptance": [
+        "planFrames for { id:'s1', startSec:0, durationSec:4 } returns atSec [0.8, 2, 3.2] and rootSec equal to atSec; for { id:'s2', startSec:4, durationSec:3.3 } atSec is [0.6667, 1.6667, 2.6333] (within 0.0001) and rootSec 4.6667, 5.6667, 6.6333",
+        "A generate-mode scene produces no plan items",
+        "fitTransform({w:960,h:540},{w:1920,h:1080}) is { scale:0.5, offsetX:0, offsetY:0 } and toCompSpace({x:100,y:50,width:200,height:40}, that) equals {left:200,top:100,right:600,bottom:180}",
+        "fitTransform({w:1000,h:1000},{w:1920,h:1080}) has scale within 0.0001 of 0.5208 and offsetY 218.75; toCompSpace({x:0,y:218.75,width:1000,height:562.5}, it) is {left:0,top:0,right:1920,bottom:1080} within 0.01"
+      ],
+      "labels": [
+        "frontend",
+        "review"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-013",
+      "title": "Stable-frame wait and captureFrames",
+      "description": "As a client author, I want frames captured only once the picture has settled so that the review never judges half-loaded images.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.7, web/src/player/Player.tsx (the PlayerHandle type, decision D-7: { getCanvas, getApp, play, pause, seek(sec), getTime }, Application created with preserveDrawingBuffer true) and, in the engine, hooks/aep/useAepCurrentFrame.ts and node_modules/pixi.js/lib/rendering/renderers/shared/extract/ExtractSystem.d.ts (extract.base64 options: target, format 'jpg', quality, resolution).",
+        "Create web/src/capture/captureFrames.ts importing type PlayerHandle from '../player/Player' (do not redefine it) and exporting async waitForStable(extractTiny: () => Promise<string>, o?: { maxMs?: number; intervalMs?: number; sleep?: (ms: number) => Promise<void> }): Promise<{ stable: boolean; attempts: number }> (two consecutive equal strings = stable; defaults maxMs 2500, intervalMs 120), and async captureFrames(deps: { plan: PlanItem[]; seek: (rootSec: number) => void; nextFrames: (n: number) => Promise<void>; extractTiny: () => Promise<string>; extractFull: () => Promise<Blob>; onProgress?: (done: number, total: number) => void }): Promise<Array<{ sceneId: string; atSec: number; blob: Blob; unstable: boolean }>> which for each item seeks, awaits nextFrames(3), waits for stability and extracts.",
+        "Export makePixiCaptureDeps(player: PlayerHandle, plan): the real implementations: nextFrames = n requestAnimationFrame promises; extractTiny = app.renderer.extract.base64({ target: app.stage, format: 'jpg', quality: 0.5, resolution: 0.25 }); extractFull = base64({ target: app.stage, format: 'jpg', quality: 0.85, resolution: Math.min(2, 1280 / app.screen.width) }) converted to a Blob. Also add web/src/capture/devHook.ts that, in development only, exposes window.__directorCapture = async () => captureFrames(...) for the current film.",
+        "Create web/src/capture/captureFrames.test.ts with fake dependencies and fake timers."
+      ],
+      "acceptance": [
+        "waitForStable returns { stable:true, attempts:2 } when two consecutive extracts are equal; with extracts that never repeat and maxMs 2500, intervalMs 120 it returns stable false after at most 21 attempts",
+        "captureFrames with a 3-item plan calls seek in plan order with the rootSec values, calls nextFrames(3) after every seek, calls onProgress 3 times and returns 3 results with unstable false when stable; an unstable picture yields unstable true but still returns the frame",
+        "extractFull is called exactly once per plan item after the stability wait (call-order assertion)",
+        "Verify in the browser: with a film loaded, `await window.__directorCapture()` in the console returns frames whose decoded width is 1280 (or the stage width) and whose mean pixel value is above 5 (not blank); record the numbers in notes"
+      ],
+      "labels": [
+        "frontend",
+        "review",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-012"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Measure text boxes from Pixi",
+      "description": "As a capture-code author, I want real text rectangles from the renderer so that rules can use measured boxes instead of estimates.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 5.8, and in the engine components/PixiTextSprite/PixiTextSprite.tsx lines 425-445 (an invisible full-size sprite sits next to the pixiText) and hocs/AbstractContainer.tsx line 257 (container label `container-${uniqueId}`).",
+        "Create web/src/capture/measure.ts exporting findTextNode(root: { getChildByLabel(label: string | RegExp, deep?: boolean): any }, layerId: string, isText: (node: any) => boolean): any | null (finds the labelled container 'container-<layerId>' with deep search, then the first descendant for which isText is true, depth-first) and measureTextBoxes(app, compSize: { w: number; h: number }, layerIds: string[], isText: (node: any) => boolean): Record<string, Box> (uses the node's getBounds() in world pixels, converts with fitTransform/toCompSpace from plan.ts using app.screen, omits layers it cannot find). In production isText is (n) => n instanceof Text with Text imported from pixi.js.",
+        "Create web/src/capture/measure.test.ts with fake node trees; no Pixi import in the test."
+      ],
+      "acceptance": [
+        "With a fake stage whose container 'container-s1:caption' has children [a sprite-like node, a text-like node with getBounds() = {x:100,y:50,width:200,height:40}] and a 960x540 screen for a 1920x1080 comp, measureTextBoxes returns { 's1:caption': { left:200, top:100, right:600, bottom:180 } }",
+        "The bounds of the sprite-like sibling (comp-sized) are never used",
+        "A layer id with no labelled container, or whose container has no text descendant, is absent from the result",
+        "findTextNode finds a text node nested two levels deep"
+      ],
+      "labels": [
+        "frontend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-012"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "useAutoReview hook",
+      "description": "As a viewer, I want the review to start by itself once per film and be re-runnable so that I never have to remember to run it.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 3 (steps 1-6) and 12 (open question 3), web/src/api/client.ts and web/src/api/sse.ts (how the app calls the server and reads FilmEvent[]), web/src/capture/captureFrames.ts and plan.ts.",
+        "Create web/src/capture/useAutoReview.ts exporting useAutoReview(o: { filmId: string | null; events: FilmEvent[]; film: { storyboard?: Storyboard } | null; player: PlayerHandle | null; api: { postFrames(filmId: string, form: FormData): Promise<{ review: string; frames: number; geometry: { maxRelError: number; layers: number } | null }> } }): { state: 'idle' | 'capturing' | 'reviewing' | 'done' | 'error'; geometry: { maxRelError: number; layers: number } | null; rerun(): void }.",
+        "Behaviour: when the latest film.status event for filmId is 'ready', the film has a storyboard with at least one motion scene, a player is available and the film was not reviewed in this session, plan and capture frames (phase before) with textBoxes measured at each capture, POST them (state 'capturing' then 'reviewing'); when the status returns to 'ready' after a review, capture the same (scene, time) frames again and POST them with phase 'after' (state 'done'); an exception sets 'error'. rerun() starts a new review for the film. A film is never auto-reviewed twice in one session.",
+        "Create web/src/capture/useAutoReview.test.tsx with renderHook (@testing-library/react), fake player/api and a mutable events array."
+      ],
+      "acceptance": [
+        "With events [film.status 'building'] the state stays 'idle' and postFrames is not called; after a film.status 'ready' event with a 2-scene storyboard postFrames is called exactly once and the form contains 6 frames (3 per motion scene)",
+        "After a later film.status 'reviewing' then 'ready' the hook posts exactly one more form with phase 'after' and ends in state 'done'; a second 'ready' event for the same film does not trigger another review",
+        "rerun() posts a new 'before' form even though the film was already reviewed",
+        "When postFrames rejects the state becomes 'error' and no further auto-review starts",
+        "geometry is taken from the first postFrames response"
+      ],
+      "labels": [
+        "frontend",
+        "review"
+      ],
+      "dependsOn": [
+        "US-013",
+        "US-014"
+      ]
+    },
+    {
+      "id": "US-016",
+      "title": "Review panel and fixture mount",
+      "description": "As a viewer, I want a Review panel that shows what was found, what was fixed and how it changed so that I can trust the film.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md sections 4.4 and 3, web/src/App.tsx (how the Review slot stub is rendered and which props it gets; keep that props signature), web/src/api/sse.ts and shared/events.ts (review.finding, review.fix, film.status).",
+        "Replace the stub web/src/panels/Review.tsx with the panel: group events by sceneId into cards (data-testid `review-scene-<sceneId>`) showing the scene id, each review.finding as a row (data-testid `finding`) with a 'Rule' badge when deterministic is true and a 'Spark' badge when false, the kind, 'at <t> s' and the evidence text (rendered as text, never HTML), each review.fix as a row (data-testid `fix`) with the note and, when present, before and after thumbnails (<img> with src `/api/assets/<id>` and alt 'before'/'after'); a spinner (data-testid `review-spinner`) while the latest film.status is 'reviewing'; the text 'No issues found' when a review finished (status ready after reviewing) with no findings; a badge (data-testid `geometry-badge`, text 'Geometry model error <n>%') when the geometry prop's maxRelError exceeds 0.03; and a 'Re-run review' button wired to the rerun prop.",
+        "Create web/src/panels/review-fixture-mount.tsx exporting mountReviewFixture(o?: { status?: 'reviewing' | 'ready'; geometryError?: number }): void that appends a div to document.body and renders the panel with a built-in FilmEvent list (two scenes: s1 with a deterministic R1 finding, a visual low-contrast finding and one fix with before/after ids; s2 with no findings) using createRoot; it is for development only.",
+        "Create web/src/panels/Review.test.tsx with @testing-library/react."
+      ],
+      "acceptance": [
+        "With the built-in events the document has `review-scene-s1` containing 2 `finding` rows (one 'Rule' badge and one 'Spark' badge), 1 `fix` row with two images whose src ends with the before and after ids",
+        "With a trailing film.status 'reviewing' event the `review-spinner` is present; with 'ready' after reviewing and no findings for a scene list the text 'No issues found' is present",
+        "geometry maxRelError 0.05 shows `geometry-badge` with text 'Geometry model error 5%'; 0.02 shows no badge",
+        "Evidence containing '<b>x</b>' is shown as literal text (no element b); clicking 'Re-run review' calls the rerun prop once",
+        "Verify in the browser: run `npm run dev`, open the app, then in the console `(await import('/src/panels/review-fixture-mount.tsx')).mountReviewFixture()`; the cards, badges and thumbnails render with no console errors; repeat with { status: 'reviewing' } to see the spinner and with { geometryError: 0.05 } to see the badge. Record what you saw in notes"
+      ],
+      "labels": [
+        "frontend",
+        "review",
+        "ui"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-017",
+      "title": "Synthetic calibration frames",
+      "description": "As an owner, I want four deterministic frames with known faults so that I can check Spark's visual review without a browser.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 9 (manual live gate) and fixtures/seed/README.md (cafe-plate.jpg 960x640 and mug-cutout-rgba.png 960x640 RGBA).",
+        "Create server/review/synth-frames.ts exporting async makeSyntheticFrames(): Promise<Array<{ name: 'clean' | 'text-over-product' | 'low-contrast' | 'product-missing'; atSec: number; jpeg: Buffer; expected: { pass: boolean; kinds: string[] } }>> built with sharp: the plate (fixtures/seed/cafe-plate.jpg, cover-resized to 1280x720) plus the mug cut-out (resized to 400 px high, centred at x 640, bottom at y 560) plus a caption drawn as an SVG overlay (sharp composite). clean: caption on a dark translucent bar (rgba 0,0,0,0.6) below the mug; text-over-product: the same bar and caption placed across the mug body; low-contrast: white caption with no bar over the bright window area; product-missing: plate and caption (on the bar) without the mug. Expected: clean { pass:true, kinds:[] }, text-over-product ['text-over-product'], low-contrast ['low-contrast'], product-missing ['product-hidden']. atSec 1.0 for every frame; output JPEG quality 85.",
+        "Create server/review/synth-frames.test.ts."
+      ],
+      "acceptance": [
+        "makeSyntheticFrames returns 4 entries with names ['clean','text-over-product','low-contrast','product-missing'] in that order, each a JPEG (first bytes FF D8 FF) of decoded size 1280x720",
+        "The four JPEGs are pairwise different (sha256 of the bytes) and the product-missing frame is not identical to the clean frame",
+        "expected equals { pass:true, kinds:[] } for clean and the single listed kind for each other frame",
+        "Two calls produce byte-identical buffers (deterministic)"
+      ],
+      "labels": [
+        "backend",
+        "review",
+        "test"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-018",
+      "title": "Manual-gate script scripts/live/s05-review.ts",
+      "description": "As an owner, I want a guarded live script so that I can see real Spark review the four calibration frames before relying on it.",
+      "steps": [
+        "Read docs/hackathon/steps/step-05-self-review-loop/design.md section 9 (manual live gate), scripts/live/run.ts (the dispatcher contract: a module exports { describe, estimateUsd, run }) and scripts/live/s02-smoke.ts (how real MetaClients and the router are built from the environment), and server/review/visual.ts and synth-frames.ts.",
+        "Create scripts/live/s05-review.ts exporting describe(): string (what it does: 4 synthetic frames, one Spark call each, outputs to debug/s05/iteration-NN/), estimateUsd(): number returning 0.05 (ceiling 0.50 stated in describe) and async run(): Promise<void> that, for each synthetic frame, calls visualReview with a minimal scene (intent 'a white ceramic mug on a cafe counter with a caption', camera 'static', empty findings, a 3-layer summary, the allowlisted tools) using the real reviewer (pickReviewer) and clients, compares verdict kinds with expected, prints a table (name, expected kinds, grounded kinds, dropped count, pass/fail) and writes report.json and verdicts.md to debug/s05/iteration-NN/ (next free NN). It refuses to start when META_API_KEY is empty. No side effects at import time.",
+        "Create scripts/live/s05-review.test.ts that imports the module with global fetch stubbed to throw and process.env cleared."
+      ],
+      "acceptance": [
+        "Importing scripts/live/s05-review.ts performs no network call and reads no environment variable",
+        "describe() mentions '4 synthetic frames' and 'debug/s05'; estimateUsd() returns 0.05",
+        "run() with META_API_KEY unset rejects with a message containing 'META_API_KEY'",
+        "The module never calls run() itself and the table-printing function (exported as formatReport for the test) renders a header and 4 rows for a given in-memory result list"
+      ],
+      "labels": [
+        "scripts",
+        "review"
+      ],
+      "dependsOn": [
+        "US-004",
+        "US-017"
+      ]
+    }
+  ]
+}

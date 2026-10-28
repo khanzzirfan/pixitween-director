@@ -1,0 +1,20 @@
+node_modules/
+dist/
+web/dist/
+.env
+.env.*
+!.env.example
+data/
+debug/
+.ralph-tui/iterations/
+.ralph-tui/session*.json
+.ralph-tui/progress.md
+.DS_Store
+*.log
+
+## ralphtui
+.ralph-tui/
+# Hackathon specs: kept local, not published. Worktrees symlink to the main checkout copy.
+docs/hackathon
+
+opencode.json

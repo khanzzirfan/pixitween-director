@@ -1,0 +1,829 @@
+{
+  "name": "PixiTween Director S10: submission docs, cost calculator and preflight",
+  "branchName": "ralph/s10-docs",
+  "description": "Offline PRD for the submission pack: a pure-function preflight (licence, docs and headings, engine dependency, secrets, env hygiene, asset credits, engine-needs stamp, PRD completion, git provenance) with a CLI, a cost-per-film calculator, and the documents (README, new-vs-existing, architecture, demo script, submission answers, X post, S1 evidence). Recording, uploading, submitting, posting and making the repo public are owner manual gates.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Preflight result model, runner and formatter",
+      "description": "As an owner, I want a small preflight runner so that every submission check reports pass, fail or pending the same way.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 11.1 (result model and exit codes) and vitest.config.ts (read only: which test globs are included).",
+        "Create scripts/preflight/types.ts exporting `type Status = 'pass' | 'fail' | 'pending'`, `interface CheckResult { id: string; title: string; status: Status; detail: string }` and `interface PreflightCtx` exactly as in design section 11.1.",
+        "Create scripts/preflight/run.ts exporting `type Check = (ctx: PreflightCtx) => CheckResult[]`, `runChecks(ctx, checks): CheckResult[]` (concatenates results; a check that throws becomes one `fail` result with id `<index>.error` and the error message), `exitCode(results, strict): 0 | 1` and `formatResults(results): string` (one line per result: `PASS`, `FAIL` or `PEND`, two spaces, id, two spaces, detail; final line `<n> pass, <n> fail, <n> pending`).",
+        "Create scripts/preflight/testing.ts exporting `makeCtx(files: Record<string, string>, opts?: { firstCommitDate?: string }): PreflightCtx` that is fully in memory (`tracked` = the keys, `readText` returns the value or undefined, `sizeOf` = string length, `json` parses the text), for use by every later check test.",
+        "Create scripts/preflight/run.test.ts covering exit codes, the throwing check and the summary line.",
+        "Create scripts/preflight/vitest-include.test.ts that reads vitest.config.ts as text and asserts it contains the include glob `scripts/**/*.test.ts` (contract section 6 D-9). Never edit vitest.config.ts: if the glob is missing write `blocked: vitest include lacks scripts/**/*.test.ts (S2, D-9)` in `notes`."
+      ],
+      "acceptanceCriteria": [
+        "`exitCode` returns 0 for [pass, pending] with strict=false and 1 with strict=true; any `fail` returns 1 in both modes",
+        "`runChecks` turns a check that throws into exactly one `fail` result whose id ends with `.error` and whose detail contains the error message",
+        "`formatResults` for 2 pass, 1 fail and 1 pending results ends with the line `2 pass, 1 fail, 1 pending`",
+        "scripts/preflight/run.test.ts and scripts/preflight/vitest-include.test.ts appear in the `npm test` output, and vitest.config.ts is unchanged by this story",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Check: LICENSE is Apache-2.0",
+      "description": "As an owner, I want the preflight to verify the licence file so that the public repo is clearly open source.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 11.2 (row `license`) and scripts/preflight/types.ts and testing.ts.",
+        "Create scripts/preflight/checks/license.ts exporting `checkLicense: Check` that returns one result with id `license`: `fail` when `LICENSE` is missing; `fail` when its text lacks either `Apache License` or `Version 2.0`; otherwise `pass`.",
+        "Create scripts/preflight/checks/license.test.ts with three cases built with `makeCtx`: missing file, a file with only `MIT License`, and a file containing `Apache License` and `Version 2.0`."
+      ],
+      "acceptanceCriteria": [
+        "A context without LICENSE gives status `fail` and a detail that says the file is missing",
+        "A LICENSE containing `MIT License` gives `fail`; one containing `Apache License` and `Version 2.0` gives `pass`",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Required docs list, docs check and owner-marker check",
+      "description": "As an owner, I want every submission document and its headings checked so that nothing is missing or left as a draft marker.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md sections 4 to 10 (each document's required headings) and 11.2 (rows `docs:<path>` and `owner.markers`).",
+        "Create scripts/preflight/required-docs.ts exporting `REQUIRED_DOCS: Array<{ path: string; headings: Array<{ level: 1 | 2; text: string }> }>` with exactly these entries and headings: README.md (1 `PixiTween Director`; 2 `What it does`, `Demo`, `Meta models used`, `Architecture`, `Built during the hackathon`, `Pre-existing dependencies`, `Run it locally`, `Cost per film`, `Limitations`, `Licenses and credits`, `Team`; the README headings must appear in exactly this order); docs/new-vs-existing.md (1 `New vs existing`; 2 `Built during the hackathon`, `Pre-existing`, `Build process`, `How to verify`); docs/architecture.md (1 `Architecture`; 2 `System overview`, `Film lifecycle`, `Tools and the composition`, `Where Meta models are used`); docs/demo-script.md (1 `Demo script (3:00)`; 2 `Beats and timing`, `Narration`, `Shot list`, `On-screen labels`, `Recording checklist`); docs/submission-answers.md (1 `Submission answers`; 2 `Project description`, `Track and theme`, `Bonus prizes`, `Claim evidence`, `Links`); docs/x-post.md (1 `X post and Discord post`; 2 `X post`, `Discord post`, `Posting checklist`); docs/s1-evidence.md (1 `S1 evidence: what we measured on day 1`; 2 `What was probed`, `Results`, `How to reproduce`).",
+        "Create scripts/preflight/checks/docs.ts exporting `checkDocs: Check` (one result per entry, id `docs:<path>`: `fail` if the file is missing, `fail` naming the first missing heading (exact text and level), `fail` naming the first heading that appears before a heading listed earlier in `REQUIRED_DOCS` (order check), `fail` listing line numbers of any `<fill:` marker, else `pass`) and `checkOwnerMarkers: Check` (one result, id `owner.markers`: `pending` listing each distinct `<!-- OWNER:name -->` and its file when any exist in README.md or docs/*.md outside docs/hackathon/, else `pass`).",
+        "Create scripts/preflight/checks/docs.test.ts with `makeCtx` cases: all headings present; a missing `## Team`; a `<fill: x>` marker on line 7; a `### Team` (wrong level); `## Demo` placed before `## What it does`; two OWNER markers in two files."
+      ],
+      "acceptanceCriteria": [
+        "The `docs:README.md` result is `fail` with a detail naming `Team` when the `## Team` heading is absent, and `pass` when all 12 README headings are present in order",
+        "The `docs:README.md` result is `fail` with a detail naming `Demo` when `## Demo` appears before `## What it does`",
+        "A document containing the text `<fill: x>` on line 7 yields `fail` with a detail that contains `7`",
+        "`owner.markers` is `pending` and lists `gif` and `live-url` when README.md contains `<!-- OWNER:gif -->` and `<!-- OWNER:live-url -->`, and `pass` when no marker exists",
+        "`REQUIRED_DOCS` has 7 entries and the README entry has 12 headings",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Check: README relative links resolve",
+      "description": "As a judge, I want no dead links in the README so that the code references can be followed.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 11.2 (row `readme.links`) and scripts/preflight/testing.ts.",
+        "Create scripts/preflight/checks/readme-links.ts exporting `checkReadmeLinks: Check` with id `readme.links`. It extracts every markdown link target `](target)` from README.md, ignores targets beginning with `http://`, `https://`, `mailto:` or `#`, strips any `#fragment` or `?query`, resolves the rest relative to the repository root, and requires each to be a tracked file or a directory that contains a tracked file. `fail` lists up to 10 broken targets; `pass` otherwise; `fail` if README.md is missing.",
+        "Create scripts/preflight/checks/readme-links.test.ts with cases: all targets valid, one broken file, a directory target, an anchor-only link, an external link, a target with a `#fragment`."
+      ],
+      "acceptanceCriteria": [
+        "A README linking to `server/meta/spark.ts` passes when that path is tracked and fails with a detail containing the path when it is not",
+        "Links to `https://example.com`, `mailto:a@b.c` and `#architecture` never cause a failure",
+        "A link `docs/architecture.md#film-lifecycle` is valid when `docs/architecture.md` is tracked",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Check: engine is a registry dependency with a pinned lockfile",
+      "description": "As an owner, I want the preflight to prove the engine comes from npm so that the new-work claim is verifiable.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 11.2 (row `engine.dependency`) and section 17 (lockfile format notes), then package.json and package-lock.json in this repo if they exist.",
+        "Create scripts/preflight/checks/engine-dependency.ts exporting `isRegistrySpec(spec: string): boolean` (true for an exact version such as `0.3.0-alpha.1`, a range starting with `^`, `~`, `>=` or a digit, and a dist-tag matching `^[a-z][a-z0-9-]*$`; false for anything starting `file:`, `link:`, `git+`, `github:`, `http://`, `https://`, `workspace:`, `./` or `../`) and `checkEngineDependency: Check` returning two results.",
+        "Result `engine.dependency`: reads `dependencies['reacthub-pixitweenjs']` from package.json; `fail` if absent or if `isRegistrySpec` is false (detail names the spec); else `pass`.",
+        "Result `engine.lockfile`: reads package-lock.json; `fail` if missing or `lockfileVersion` is not 3; reads `packages['node_modules/reacthub-pixitweenjs']`; `fail` unless it has a string `version`, a `resolved` starting `https://registry.npmjs.org/` and an `integrity` starting `sha`; the failure detail says to re-run `npm install reacthub-pixitweenjs@alpha`; else `pass`.",
+        "Create scripts/preflight/checks/engine-dependency.test.ts with the cases: valid registry spec and complete lock entry; `file:../reacthub-pixitweenjs`; `link:`; a github spec; lock entry without `integrity`; lock entry `resolved` pointing to a non-registry URL; package-lock missing; dist-tag `alpha`."
+      ],
+      "acceptanceCriteria": [
+        "`isRegistrySpec('0.3.0-alpha.1')`, `isRegistrySpec('^0.3.0-alpha.1')` and `isRegistrySpec('alpha')` return true; `isRegistrySpec('file:../reacthub-pixitweenjs')`, `isRegistrySpec('github:khanzzirfan/x')` and `isRegistrySpec('../x')` return false",
+        "`engine.lockfile` is `fail` when the lock entry has no `integrity`, and `pass` when `version`, a registry `resolved` and `integrity` are all present",
+        "Both results are `fail` when package.json declares `file:../reacthub-pixitweenjs` and the lock entry has no `resolved`",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Check: no secrets in tracked files",
+      "description": "As an owner, I want a fast offline secret scan so that a key never reaches the public repo.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md sections 11.2 (row `secrets`) and 11.3 (the pattern table) and 11.4.",
+        "Create scripts/preflight/checks/secrets.ts exporting `SECRET_PATTERNS: Array<{ name: string; regex: RegExp }>` with the eight patterns of section 11.3 (names: `openai-style-key`, `aws-access-key-id`, `github-token`, `bearer-token`, `inline-base64-data-url`, `key-assignment`, `private-key-block`, `signed-cloudfront-url`) and `checkSecrets: Check`.",
+        "`checkSecrets` scans every tracked text file line by line. Skip a file when its extension is binary (png jpg jpeg webp gif mp4 webm mov wav mp3 ogg ttf otf woff woff2 pdf zip), when it is `package-lock.json`, or when `sizeOf` exceeds 2 MB. Each hit is one `fail` result with id `secrets:<file>:<line>:<patternName>` and a detail that names the pattern; the detail must never contain the matched text. With no hits return one `pass` result with id `secrets`.",
+        "Create scripts/preflight/checks/secrets-allowlist.ts exporting `ALLOWLIST: Array<{ path: string; pattern: string; reason: string }>` (empty) and make `checkSecrets` skip a hit whose file path equals an entry's `path` and whose pattern name equals its `pattern`.",
+        "Create scripts/preflight/checks/secrets.test.ts: one positive and one negative line per pattern (build the positive strings at runtime by concatenation so the test file itself does not trip the scan), a binary file skipped, a 3 MB file skipped, an allowlisted hit skipped, and `.env.example` lines such as `META_API_KEY=` and `CLIPPY_TOKEN=${CLIPPY_TOKEN}` passing."
+      ],
+      "acceptanceCriteria": [
+        "A line `export META_API_KEY=abcd1234efgh5678` yields a `fail` with id ending `:key-assignment`, and `META_API_KEY=` yields no hit",
+        "The `fail` detail for a hit never contains the matched secret text (asserted with `not.toContain`)",
+        "A line `Authorization: Bearer <token>` yields no hit, and `Bearer ` followed by 24 alphanumeric characters yields a `bearer-token` hit",
+        "A 3 MB text file and a `.png` file are skipped even when they contain a matching string",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Checks: .env is untracked and .env.example holds no secrets",
+      "description": "As an owner, I want the environment template verified so that real values never ship.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 11.2 (rows `env.tracked` and `env.example`) and the repo's `.env.example` and `.gitignore` if they exist.",
+        "Create scripts/preflight/checks/env.ts exporting `checkEnvTracked: Check` (id `env.tracked`: `fail` if any tracked path equals `.env` or starts with `.env.` other than `.env.example`; else `pass`) and `checkEnvExample: Check` (id `env.example`: `fail` if `.env.example` is missing; otherwise parse `KEY=VALUE` lines ignoring blank lines and `#` comments, strip surrounding quotes from the value, and `fail` for every key whose name matches `/KEY|TOKEN|PASSCODE|SECRET/i` and whose value is non-empty; else `pass`).",
+        "Create scripts/preflight/checks/env.test.ts with cases: `.env` tracked; `.env.local` tracked; only `.env.example` tracked; `META_API_KEY=sk-live` (fail); `META_API_KEY=` (pass); `GLIMMER_BASE_URL=http://localhost:11434` (pass because the name does not match); `DIRECTOR_PASSCODE=\"\"` (pass)."
+      ],
+      "acceptanceCriteria": [
+        "`env.tracked` fails when `.env` is tracked and passes when only `.env.example` is tracked",
+        "`env.example` fails with the key name in the detail for `CLIPPY_TOKEN=abc` and passes for `CLIPPY_TOKEN=`, `GLIMMER_BASE_URL=http://localhost:11434` and `DIRECTOR_PASSCODE=\"\"`",
+        "`env.example` fails when the file is missing",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Check: every media file is credited",
+      "description": "As an owner, I want every image, audio and video file listed in ASSET-CREDITS.md so that no asset without rights ships.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 11.2 (row `assets.credits`) and ASSET-CREDITS.md and fixtures/seed/README.md in this repo.",
+        "Create scripts/preflight/checks/assets.ts exporting `MEDIA_EXTENSIONS` (png jpg jpeg webp gif svg mp4 webm mov wav mp3 ogg ttf otf woff woff2) and `checkAssetCredits: Check` with id `assets.credits`: `fail` if ASSET-CREDITS.md is missing; list tracked media files outside `node_modules/`, `dist/` and `web/dist/`; a file is credited when ASSET-CREDITS.md contains its full path, or contains a directory-glob entry `<dir>/*` where the file lives under `<dir>/`; `fail` listing up to 10 uncredited paths; `pass` otherwise.",
+        "Create scripts/preflight/checks/assets.test.ts with cases: all credited by full path; one uncredited; a `fixtures/seed/*` glob covering `fixtures/seed/mug-product.png`; a file under `node_modules/` ignored; ASSET-CREDITS.md missing; an uppercase `.PNG` extension is still media."
+      ],
+      "acceptanceCriteria": [
+        "`fixtures/seed/mug-product.png` is credited by the line `fixtures/seed/*` and uncredited when no such line or full path exists",
+        "A tracked `docs/media/demo.gif` that is not mentioned gives a `fail` whose detail lists `docs/media/demo.gif`",
+        "Files under `node_modules/` and `web/dist/` are never reported",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Check: ENGINE-NEEDS.md carries the owner's review stamp",
+      "description": "As an owner, I want a visible reminder to review every engine gap so that none is forgotten at submission.",
+      "steps": [
+        "Read ENGINE-NEEDS.md in this repo and the design section 11.2 (row `engine.needs`).",
+        "Create scripts/preflight/checks/engine-needs.ts exporting `checkEngineNeeds: Check` with id `engine.needs`: `fail` if ENGINE-NEEDS.md is missing; `pass` if it contains a line matching `^Reviewed: \\d{4}-\\d{2}-\\d{2}\\s*$`; otherwise `pending` with the detail `owner must review each row and add 'Reviewed: <date>'`.",
+        "Create scripts/preflight/checks/engine-needs.test.ts with the three cases."
+      ],
+      "acceptanceCriteria": [
+        "A file without a `Reviewed:` line gives `pending`; adding the line `Reviewed: 2026-11-03` gives `pass`; a missing file gives `fail`",
+        "The line `Reviewed: 03/11/2026` does not count as a stamp and keeps the result `pending`",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Checks: all 14 PRD files exist; every story is passing or explained",
+      "description": "As an owner, I want unfinished stories surfaced so that nothing is silently left undone.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 11.2 (row `prd.complete`) and one file under ralph/ matching prd-*.json to see the `userStories`, `passes` and `notes` fields.",
+        "Create scripts/preflight/checks/prd.ts exporting `EXPECTED_PRDS` (the 14 stems: prd-s02-skeleton, prd-s03a-authoring-core, prd-s03b-director-agent, prd-s04-art-layers, prd-s05a-review-rules, prd-s05b-review-visual, prd-s06-chat-edit, prd-s07a-clippy-client, prd-s07b-generate-integration, prd-s08a-export-gallery, prd-s08b-deploy, prd-s09-local-mode, prd-s10-docs-submission, prd-s11-mcp-server), `checkPrdExpected: Check` (one result, id `prd.expected`: `fail` listing every expected `ralph/<stem>.json` that is not a tracked path, else `pass` with the detail `14 PRD files`) and `checkPrdComplete: Check`. For every tracked path matching `^ralph/prd-.*\\.json$` produce one result with id `prd.complete:<path>`: `pass` if every story has `passes: true`; `pending` if some story is not passing but each such story has a non-empty `notes`; `fail` if any story is not passing and has empty `notes`; `fail` if the file is not valid JSON or has no `userStories` array. The detail reports `<passed>/<total> passing` and lists the ids that are not passing.",
+        "Create scripts/preflight/checks/prd.test.ts with the five cases.",
+        "If the repo has no `ralph/prd-*.json` file, return one `pending` result with id `prd.complete` and detail `no PRD files found`."
+      ],
+      "acceptanceCriteria": [
+        "A PRD with 3 of 3 stories `passes: true` gives `pass` and a detail containing `3/3`",
+        "A PRD with one failing story whose `notes` is `blocked: engine` gives `pending`; the same story with `notes: \"\"` gives `fail` listing its id",
+        "Invalid JSON in a PRD file gives `fail`",
+        "`checkPrdExpected` is `fail` with the missing stem `prd-s11-mcp-server` in its detail when 13 of the 14 files are tracked, and `pass` when all 14 are",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Check: git history starts at the hackathon",
+      "description": "As a judge, I want the repository history to begin when the event began so that the new-work claim is checkable.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 11.2 (row `git.provenance`) and the context field `firstCommitDate` in scripts/preflight/types.ts.",
+        "Create scripts/preflight/checks/git.ts exporting `checkGitProvenance: Check` with id `git.provenance`: `pending` with detail `not a git repository` when `ctx.firstCommitDate` is undefined; `fail` when the date (`YYYY-MM-DD`) is earlier than `2026-10-26`; `pass` otherwise, with the date in the detail.",
+        "Create scripts/preflight/checks/git.test.ts with undefined, `2026-10-25`, `2026-10-26` and `2026-11-04`."
+      ],
+      "acceptanceCriteria": [
+        "`firstCommitDate: '2026-10-25'` gives `fail`; `'2026-10-26'` and `'2026-11-04'` give `pass`",
+        "An undefined date gives `pending` and never `fail`",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Preflight context builder and CLI",
+      "description": "As an owner, I want one command that runs every check so that I can see what still blocks submission.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md sections 3 and 11.1 and the exports of every file under scripts/preflight/checks/ and scripts/preflight/run.ts.",
+        "Create scripts/preflight/checks/index.ts exporting `ALL_CHECKS: Check[]` in this order: checkLicense, checkDocs, checkOwnerMarkers, checkReadmeLinks, checkEngineDependency, checkSecrets, checkEnvTracked, checkEnvExample, checkAssetCredits, checkEngineNeeds, checkPrdExpected, checkPrdComplete, checkGitProvenance.",
+        "Create scripts/preflight/context.ts exporting `buildContext(root: string, io?: { gitLsFiles?: () => string[] | undefined; gitFirstCommitDate?: () => string | undefined }): PreflightCtx`. By default `gitLsFiles` runs `git ls-files` and `gitFirstCommitDate` runs `git log --reverse --format=%ad --date=short` with `child_process.execFileSync` inside try/catch (read-only git commands only; no network). When `gitLsFiles` returns undefined, walk the directory skipping `node_modules`, `dist`, `.git`, `data`, `debug`, `.ralph-tui`.",
+        "Create scripts/preflight-submission.ts exporting `runCli(argv: string[], deps?: { ctx?: PreflightCtx; checks?: Check[] }): { code: number; output: string }` and running it when executed directly. Flags: `--strict`, `--json` (output is `JSON.stringify(results, null, 2)`), `--only <idPrefix>` (keep results whose id starts with the prefix), `--root <dir>` (default the current directory).",
+        "Create scripts/preflight/context.test.ts using a temporary directory and injected git functions, and scripts/preflight-submission.test.ts using injected `ctx` and `checks` for the exit-code and flag cases."
+      ],
+      "acceptanceCriteria": [
+        "`runCli(['--strict'], ...)` returns code 1 when the only non-pass result is `pending`, and `runCli([], ...)` returns code 0 for the same results",
+        "`runCli(['--only', 'license'], ...)` prints only results whose id starts with `license`",
+        "`runCli(['--json'], ...)` output parses as a JSON array whose items have `id`, `title`, `status` and `detail`",
+        "`buildContext` on a temporary directory with injected `gitLsFiles` returning undefined lists files from a directory walk and skips `node_modules`",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002",
+        "US-003",
+        "US-004",
+        "US-005",
+        "US-006",
+        "US-007",
+        "US-008",
+        "US-009",
+        "US-010",
+        "US-011"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Cost-per-film library with synthetic sample fixtures",
+      "description": "As an owner, I want per-model costs summed from a film's cost events so that the README quotes measured numbers.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 12 (types, rounding, exact table layout) and docs/hackathon/06-contracts.md section 3 (the `cost` FilmEvent) and section 4 (`Ledger.add`).",
+        "Create scripts/lib/cost-report.ts exporting `LedgerEntry`, `Ledger`, `CostSummary`, `summariseLedger`, `ledgerFromEvents` and `formatCostTable` exactly as in design section 12. `LedgerEntry` has an optional `credits` (Clippy credits). Sum USD in integer micro-dollars (`Math.round(usd * 1e6)`), sort rows by usd descending then model ascending, and format USD with `(micro / 1e6).toFixed(4)`. `clippyCredits` of the summary is the ledger's own `clippyCredits` when it is defined, otherwise the sum of the entries' `credits` (never both, so nothing is counted twice). `ledgerFromEvents` keeps each cost event's `credits`; a `cost` event whose `usd` or `credits` is negative or not finite is counted in `skipped`; a credits-only event (usd 0) still counts as one call of its model.",
+        "`formatCostTable` layout: first line `Cost summary: film <id>` (`<id>` is `unknown` when absent); header row `model` padded to the longest model name (minimum 5), `calls` right-aligned in 7, `USD` right-aligned in 10; one row per model in the same widths; a `TOTAL` row; last line `Clippy credits: <n>`; add a line `Skipped lines: <n>` before the credits line only when `skipped` > 0.",
+        "Create fixtures/s10/sample-ledger.json with a `_comment` field saying `synthetic test data, not a measurement`, `filmId` `f_sample`, 7 entries of model `muse-image-1.0` (units `1 image`, usd 0.01) and 12 entries of model `muse-spark-1.3-contributor` (units `tokens`, usd 0.00036), and `clippyCredits` 0.",
+        "Create fixtures/s10/sample-events.jsonl with 6 lines: one `film.status` event, two `cost` events for `muse-image-1.0` (usd 0.01), one `cost` event for `sam-3.1` (usd 0.0025), one `cost` event for the synthetic model name `clippy-animate-image` with usd 0, units `1 clip` and credits 25 (the shape a tool records through `Ledger.addCredits`), and one line that is not JSON. Each event has `filmId`, `at` and `type`. The file is synthetic test data.",
+        "Create scripts/lib/cost-report.test.ts covering the sample ledger, the sample events, `0.1 + 0.2` rounding and an empty ledger."
+      ],
+      "acceptanceCriteria": [
+        "`formatCostTable(summariseLedger(sampleLedger))` equals the string `Cost summary: film f_sample` + newline + `model                       calls       USD` + newline + `muse-image-1.0                  7    0.0700` + newline + `muse-spark-1.3-contributor     12    0.0043` + newline + `TOTAL                          19    0.0743` + newline + `Clippy credits: 0`",
+        "Entries with usd 0.1 and 0.2 sum to a total printed as `0.3000`",
+        "`ledgerFromEvents` on sample-events.jsonl keeps 4 cost entries and reports `skipped: 1`; the summary total is 0.0225 over 4 calls, `clippyCredits` is 25, and the rows are `muse-image-1.0` (2 calls, 0.0200), `sam-3.1` (1 call, 0.0025) and `clippy-animate-image` (1 call, 0.0000)",
+        "A ledger with `clippyCredits: 10` and entries carrying `credits: 25` reports 10 credits (the explicit value wins, no double counting); the same entries without `clippyCredits` report 25",
+        "An empty ledger prints `TOTAL` with 0 calls and `0.0000`",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Cost-per-film CLI",
+      "description": "As an owner, I want to run one command on a film's events file so that I can paste real numbers into the README.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 12 and scripts/lib/cost-report.ts.",
+        "Create scripts/cost-per-film.ts exporting `runCostCli(argv: string[], io?: { readFile?: (path: string) => string }): { code: number; output: string }` and running it when executed directly. The first argument is a path: a `.jsonl` file is read with `ledgerFromEvents`, a `.json` file is parsed as a `Ledger` (a parse error returns code 2); other extensions return code 2 with a usage line `usage: npx tsx scripts/cost-per-film.ts <events.jsonl | ledger.json>`. A missing file returns code 2 with the path in the message. On success the output is `formatCostTable(summariseLedger(...))` and the code is 0.",
+        "Create scripts/cost-per-film.test.ts with injected `readFile` for the five cases."
+      ],
+      "acceptanceCriteria": [
+        "`runCostCli(['x.jsonl'], { readFile })` with the sample events returns code 0 and an output containing the row `sam-3.1`, the line `Skipped lines: 1` and the line `Clippy credits: 25`",
+        "`runCostCli(['x.txt'])` returns code 2 and an output starting with `usage:`",
+        "`runCostCli(['missing.json'], { readFile })` where `readFile` throws returns code 2 and the output contains `missing.json`",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-013"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "docs/new-vs-existing.md",
+      "description": "As a judge, I want a plain statement of what was built during the hackathon versus what pre-existed so that the new-work rule is clearly met.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 5, docs/hackathon/05-repo-decision.md section 5, package.json, package-lock.json (versions of reacthub-pixitweenjs, @modelcontextprotocol/sdk, @meta-sam/parser, hono, react, pixi.js) and the output of `git ls-files` for the top-level directories.",
+        "Create docs/new-vs-existing.md with the headings `# New vs existing`, `## Built during the hackathon`, `## Pre-existing`, `## Build process` and `## How to verify`.",
+        "Under `## Built during the hackathon`: the sentence `The repository history starts on 27 Oct 2026; no code was copied from Clippy's private monorepo.` and a table with one row per top-level tracked directory (excluding node_modules and dist) giving its purpose and the step that built it, with step ids taken from docs/hackathon/06-contracts.md section 2.",
+        "Under `## Pre-existing`: a table of reacthub-pixitweenjs (our open-source npm library), the Clippy MCP (remote API, approved GENERATE clips only), Meta's models, @meta-sam/parser (SAM License) and the main libraries, with the versions read from package-lock.json; then the paragraph about engine patches published as `0.3.0-alpha.N` being engine work.",
+        "Under `## Build process`: state that the repository was built with Ralph TUI from 14 PRDs (offline-tested agent iterations plus owner-run live gates); a table of the 14 PRD stems (the `EXPECTED_PRDS` list in scripts/preflight/checks/prd.ts) with each one's branch and its story count read from ralph/prd-*.json; and a list of the live gates with their estimates read from docs/hackathon/ralph/README.md section 6: `s02-smoke`, `s03-director`, `s04-art`, `s05-review`, `s06-chat`, `s07-generate`, `s09-local`, `s11-mcp`. Mark `prd-s11-mcp-server` and `s11-mcp` as `not built` if its stories are not passing.",
+        "Under `## How to verify`: the three shell commands of design section 5 in a fenced block.",
+        "Create scripts/preflight/new-vs-existing.test.ts asserting: every top-level tracked directory name appears in the document; the version of reacthub-pixitweenjs in package-lock.json appears in the document; the five headings exist; all 14 PRD stems and all eight live-gate names appear; no `<fill:` marker remains.",
+        "Run `npx tsx scripts/preflight-submission.ts --only docs:docs/new-vs-existing.md` and fix any FAIL for this file."
+      ],
+      "acceptanceCriteria": [
+        "docs/new-vs-existing.md has the five headings and the sentence `The repository history starts on 27 Oct 2026`",
+        "Each of the 14 PRD stems (for example `prd-s11-mcp-server`) and each of the eight live-gate names (`s02-smoke`, `s03-director`, `s04-art`, `s05-review`, `s06-chat`, `s07-generate`, `s09-local`, `s11-mcp`) appears in the Build process section (asserted by scripts/preflight/new-vs-existing.test.ts)",
+        "Every top-level tracked directory name appears in the document (asserted by scripts/preflight/new-vs-existing.test.ts)",
+        "The version of reacthub-pixitweenjs recorded in package-lock.json appears in the Pre-existing table",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 15,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-012"
+      ],
+      "labels": [
+        "docs",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-016",
+      "title": "docs/architecture.md",
+      "description": "As a judge, I want an accurate architecture document so that I can map the Meta models to the code.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 9, docs/hackathon/01-concept.md section 5 (diagram), shared/events.ts, shared/tools.ts, server/tools/registry.ts, the files under server/meta/ and server/tools/, and docs/hackathon/steps/step-01-meta-api-probes/findings.md (latencies).",
+        "Create docs/architecture.md with the headings `# Architecture`, `## System overview`, `## Film lifecycle`, `## Tools and the composition` and `## Where Meta models are used`.",
+        "`## System overview`: a fenced mermaid flowchart whose node labels are real paths found in the repo (web/, server/agent/, server/tools/, server/meta/, server/store/, server/clippy/), plus two sentences on the composition JSON being the single source of truth.",
+        "`## Film lifecycle`: a fenced mermaid sequenceDiagram from upload to export using only event names that exist in shared/events.ts (written in backticks in the surrounding prose as well).",
+        "`## Tools and the composition`: a table of every tool name registered by server/tools/registry.ts with the file that defines it.",
+        "`## Where Meta models are used`: the model table of design section 9 with the latency figures copied from findings.md.",
+        "Create scripts/preflight/architecture.test.ts asserting: at least two mermaid fenced blocks; every backticked dotted event name matching `[a-z]+\\.[a-z]+` occurs in shared/events.ts; every tool name in the tools table occurs in server/tools/*.ts.",
+        "Run `npx tsx scripts/preflight-submission.ts --only docs:docs/architecture.md` and fix any FAIL for this file."
+      ],
+      "acceptanceCriteria": [
+        "docs/architecture.md has the five headings and at least 2 fenced mermaid blocks",
+        "Every backticked dotted event name in the document occurs in shared/events.ts (asserted by scripts/preflight/architecture.test.ts)",
+        "The Where Meta models are used table contains rows for muse-spark-1.3-contributor, muse-image-1.0, sam-3.1 and muse-voice-transcribe-1.0",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 16,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-012"
+      ],
+      "labels": [
+        "docs",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-017",
+      "title": "README top half: pitch, demo, models, architecture",
+      "description": "As a judge, I want the first screen of the README to say what the project is, show it, and name the Meta models with links to the code.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 4 (the README skeleton), package.json scripts, the files under server/meta/ and server/llm/, and docs/hackathon/00-hackathon-brief.md (rubric).",
+        "Edit README.md: keep any text S2 or the bootstrap wrote that is still true, and write the heading `# PixiTween Director`, the quote line, the OWNER gif marker, the live/video/track line (with the markers `<!-- OWNER:live-url -->` and `<!-- OWNER:video-url -->`), then `## What it does`, `## Demo`, `## Meta models used` and `## Architecture` as in section 4.",
+        "In `## Meta models used`, one row per model whose call-site file exists in the repo (read server/meta/spark.ts, image.ts, sam.ts, transcribe.ts and the Glimmer backend under server/llm/); delete any row whose file does not exist; use relative links.",
+        "In `## Architecture`, embed the mermaid diagram from docs/architecture.md and link to it.",
+        "In `## Demo`, write three bullets: the gallery, the video (`<!-- OWNER:video-url -->`), and a one-paragraph description of the self-review fix.",
+        "Create scripts/preflight/readme-top.test.ts asserting: the five headings above exist in order; every relative link target in the Meta models table is a tracked file; the three OWNER markers `gif`, `live-url`, `video-url` are present; no `<fill:` marker remains in the top half."
+      ],
+      "acceptanceCriteria": [
+        "README.md contains `# PixiTween Director` and the headings `What it does`, `Demo`, `Meta models used`, `Architecture` in that order",
+        "Every link target in the Meta models used table is a tracked file (asserted by scripts/preflight/readme-top.test.ts)",
+        "README.md contains the markers `<!-- OWNER:gif -->`, `<!-- OWNER:live-url -->` and `<!-- OWNER:video-url -->` and no `<fill:` text",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 17,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-012"
+      ],
+      "labels": [
+        "docs",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-018",
+      "title": "README bottom half: built vs pre-existing, run locally, cost, limitations",
+      "description": "As a judge, I want honest, verifiable setup and limitation sections so that I can run the project and trust the claims.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 4 (the README skeleton), docs/new-vs-existing.md, package.json scripts, .env.example, scripts/lib/cost-report.ts and docs/hackathon/steps/step-01-meta-api-probes/findings.md.",
+        "Edit README.md: add `## Built during the hackathon` (including the sentence that it was built with Ralph TUI from 14 PRDs and a link to docs/new-vs-existing.md), `## Pre-existing dependencies`, `## Run it locally`, `## Cost per film`, `## Limitations`, `## Licenses and credits` and `## Team` after the top half, as in section 4.",
+        "`## Run it locally` contains a fenced bash block whose every `npm run <script>` line names a script that exists in package.json; keep the offline-replay line only if `DIRECTOR_REPLAY` is read by server/env.ts, otherwise delete it.",
+        "`## Cost per film` contains the marker `<!-- OWNER:cost-table -->`, the command `npx tsx scripts/cost-per-film.ts data/films/<id>/events.jsonl`, the planning-price paragraph of section 4 (prices exactly as listed there) and the sentence that every Meta and Clippy call is recorded by the tool or agent that made it (one `cost` event each, Clippy credits separately), so the table is the complete record for the film.",
+        "`## Limitations` contains the six bullets of section 4 (coarse video review; no Meta video or speech generation; Transcribe repeats words and has turn-level timestamps; Glimmer is the local lane and not the fast one; Muse Image size and no transparency; plus any limitation recorded in a PRD story's `notes` or in ENGINE-NEEDS.md).",
+        "`## Team` contains the marker `<!-- OWNER:team -->`.",
+        "Create scripts/preflight/readme-bottom.test.ts asserting: the seven headings exist in order after `## Architecture`; every `npm run <name>` in the Run it locally block exists in package.json scripts; the Limitations section contains the substrings `coarse`, `no video- or speech-generation model`, `repeats some words`, `not the fast one` and `1920x1280`; the markers `cost-table` and `team` are present; the Built section contains `14 PRDs` and the Cost per film section contains `cost` event."
+      ],
+      "acceptanceCriteria": [
+        "README.md contains all 12 required headings in the order of docs/hackathon/steps/step-10-demo-and-submission/design.md section 4 (asserted by `npx tsx scripts/preflight-submission.ts --only docs:README.md`)",
+        "Every `npm run <name>` command in the Run it locally block names a script present in package.json (asserted by scripts/preflight/readme-bottom.test.ts)",
+        "The Limitations section contains the substrings `coarse`, `no video- or speech-generation model`, `repeats some words`, `not the fast one` and `1920x1280`",
+        "README.md contains `<!-- OWNER:cost-table -->` and `<!-- OWNER:team -->` and no `<fill:` text, its Built during the hackathon section contains `14 PRDs`, and its Cost per film section contains the phrase `cost` event",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 18,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-017",
+        "US-014"
+      ],
+      "labels": [
+        "docs",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-019",
+      "title": "docs/demo-script.md with a narration word-count test",
+      "description": "As an owner, I want a timed demo script so that the 3-minute video can be recorded in one pass.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 6 (beats, narration, shot list, labels, recording checklist) and docs/hackathon/04-submission-checklist.md (the beat list).",
+        "Create docs/demo-script.md with the headings `# Demo script (3:00)`, `## Beats and timing`, `## Narration`, `## Shot list`, `## On-screen labels` and `## Recording checklist`.",
+        "`## Beats and timing`: the table of section 6.1 and the cut rule paragraph. `## Narration`: the seven narration paragraphs of section 6.2, each starting with its bold timestamp, with the bracketed tags `[S7b]` and `[S8a]` kept on the sentences that depend on those steps.",
+        "`## Shot list`: a table with columns `time`, `screen`, `cursor or typing`, `audio`, `on-screen text` and at least 12 rows, one idea per shot and no shot longer than 12 seconds.",
+        "`## On-screen labels`: the four labels of section 6.4 as a table, with the label texts exactly as written there. `## Recording checklist`: the checklist of section 6.5.",
+        "Create scripts/preflight/demo-script.test.ts asserting: the narration (the text under `## Narration` without bold timestamps and bracketed tags) has between 250 and 380 words; the beats table's last end time is `3:00`; the Shot list table has at least 12 rows; the four exact label strings appear."
+      ],
+      "acceptanceCriteria": [
+        "The narration word count is between 250 and 380 (asserted by scripts/preflight/demo-script.test.ts)",
+        "The Shot list table has at least 12 rows and every `time` cell is a valid m:ss or m:ss–m:ss range",
+        "The strings `Built during the Meta Global AI Developer Hackathon, 27 Oct – 4 Nov 2026`, `Engine: reacthub-pixitweenjs (open source, pre-existing)`, `Video model: Clippy (pre-existing service), approved by the user` and `Muse Glimmer 30B, local, open weights` all appear in the On-screen labels section",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 19,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-012"
+      ],
+      "labels": [
+        "docs",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-020",
+      "title": "docs/submission-answers.md with a claim-evidence test",
+      "description": "As an owner, I want paste-ready form answers whose claims are all backed by files in the repo.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 7 (answers, claim table, evidence table) and docs/hackathon/00-hackathon-brief.md (bonus-prize definitions and rubric).",
+        "Create docs/submission-answers.md with the headings `# Submission answers`, `## Project description`, `## Track and theme`, `## Bonus prizes`, `## Claim evidence` and `## Links`.",
+        "`## Project description`: the description paragraph of section 7 (between 180 and 230 words). `## Track and theme`: Startups, Theme 1 (Build for Your World), with the one-line reason.",
+        "`## Bonus prizes`: the table of section 7. `## Claim evidence`: the evidence table with one row per claim and a column `Evidence paths` that lists backticked repo paths.",
+        "For each claim whose evidence path does not exist as a tracked file in this repo, delete that bonus claim from the Bonus prizes table and mark its evidence row `not claimed`. Never keep a claim without existing evidence files.",
+        "`## Links`: the marker `<!-- OWNER:links -->`.",
+        "Create scripts/preflight/submission-answers.test.ts asserting: the description has 180 to 230 words; every bonus claim text has at most 60 words; every backticked path in the Evidence paths column of a claimed row exists as a tracked file."
+      ],
+      "acceptanceCriteria": [
+        "The Project description has between 180 and 230 words (asserted by scripts/preflight/submission-answers.test.ts)",
+        "Every backticked path in the `Evidence paths` column of a claimed row exists as a tracked file",
+        "Each bonus claim text has at most 60 words and contains no backticked path",
+        "The document contains the headings Project description, Track and theme, Bonus prizes, Claim evidence and Links",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 20,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-012"
+      ],
+      "labels": [
+        "docs",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-021",
+      "title": "docs/x-post.md with a length test",
+      "description": "As an owner, I want paste-ready social posts so that submission day is not spent writing.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 8 (X post, Discord post, checklist).",
+        "Create docs/x-post.md with the headings `# X post and Discord post`, `## X post`, `## Discord post` and `## Posting checklist`.",
+        "`## X post`: the post text of section 8 as a blockquote, using the markers `<!-- OWNER:live-url -->` and `<!-- OWNER:repo-url -->` for the two links, with no `@` handle. `## Discord post`: the post of section 8 with `<url>` placeholders replaced by OWNER markers `live-url`, `repo-url` and `video-url`. `## Posting checklist`: the checklist of section 8.",
+        "Create scripts/preflight/x-post.test.ts asserting: the X post, with each OWNER marker counted as 23 characters, is at most 280 characters; it contains no `@`; the Discord post contains all three markers."
+      ],
+      "acceptanceCriteria": [
+        "The X post, counting each OWNER marker as 23 characters, is at most 280 characters (asserted by scripts/preflight/x-post.test.ts)",
+        "The X post contains no `@` character",
+        "The Discord post contains the markers `live-url`, `repo-url` and `video-url`",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 21,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-012"
+      ],
+      "labels": [
+        "docs",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-022",
+      "title": "docs/s1-evidence.md with a seed-fixture coverage test",
+      "description": "As a judge, I want to see what was measured on day one so that the Meta integration claims are credible.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md section 10, docs/hackathon/steps/step-01-meta-api-probes/findings.md and fixtures/seed/README.md.",
+        "Create docs/s1-evidence.md with the headings `# S1 evidence: what we measured on day 1`, `## What was probed`, `## Results` and `## How to reproduce`.",
+        "`## What was probed`: state that the probes ran on 27 Oct 2026, during the event, from the owner's private monorepo, that their scripts are not copied into this repository, and link `docs/hackathon/steps/step-01-meta-api-probes/findings.md`.",
+        "`## Results`: one table (model, what was tested, verdict, measured latency) summarising the findings.md summary table without changing any number, followed by a table of every file under fixtures/seed/ (excluding its README.md) with its provenance copied from fixtures/seed/README.md.",
+        "`## How to reproduce`: a table of the eight live gates with their estimates (from docs/hackathon/ralph/README.md section 6): `s02-smoke`, `s03-director`, `s04-art`, `s05-review`, `s06-chat`, `s07-generate`, `s09-local`, `s11-mcp`; and the explanation that each reruns through `npm run live -- <name>` (estimate first, `--yes` to run).",
+        "Create scripts/preflight/s1-evidence.test.ts asserting: the four headings exist; every tracked file under fixtures/seed/ other than README.md appears by basename in the document; the document contains the text `not copied`; all eight live-gate names appear."
+      ],
+      "acceptanceCriteria": [
+        "Every tracked file under fixtures/seed/ other than README.md appears by file name in docs/s1-evidence.md (asserted by scripts/preflight/s1-evidence.test.ts)",
+        "The document states that the S1 probe scripts are not copied into the repository and links findings.md",
+        "The How to reproduce section names all eight live gates, including `s11-mcp`",
+        "No latency or price in the Results table differs from findings.md",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 22,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-012"
+      ],
+      "labels": [
+        "docs",
+        "scripts",
+        "test"
+      ]
+    },
+    {
+      "id": "US-023",
+      "title": "Run the preflight and fix every failure",
+      "description": "As an owner, I want the preflight to be green apart from my own markers so that submission day has no surprises.",
+      "steps": [
+        "Read docs/hackathon/steps/step-10-demo-and-submission/design.md sections 11.2 and 15, then run `npx tsx scripts/preflight-submission.ts` once and keep the output.",
+        "For every `fail` whose cause is a file owned by this PRD (README.md hackathon sections, docs/*.md written by this PRD, scripts/preflight/*, scripts/lib/cost-report.ts, fixtures/s10/*), fix it and rerun until none remain.",
+        "For every `fail` whose cause is outside this PRD (for example an uncredited asset, a tracked `.env`, a `file:` engine spec, a failing story in another PRD), do not edit that file; add one line to `notes` of this story in the form `blocked: <check id> <file>: <detail>`.",
+        "Record in `notes` the final summary line printed by the preflight (`<n> pass, <n> fail, <n> pending`) and the list of `pending` ids (these are the owner's manual gates MG-1 to MG-3).",
+        "Do not fill any `<!-- OWNER:… -->` marker and do not invent a cost number."
+      ],
+      "acceptanceCriteria": [
+        "The last preflight run reports no `fail` for ids starting `docs:`, `readme.links`, `secrets` or `env.` unless each is listed in `notes` as `blocked:` with a file outside this PRD",
+        "`notes` contains the final summary line and the pending ids",
+        "No `<!-- OWNER:… -->` marker was removed or filled by this story",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 23,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-012",
+        "US-013",
+        "US-014",
+        "US-015",
+        "US-016",
+        "US-017",
+        "US-018",
+        "US-019",
+        "US-020",
+        "US-021",
+        "US-022"
+      ],
+      "labels": [
+        "docs",
+        "scripts"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-10-demo-and-submission/requirements.md",
+      "docs/hackathon/steps/step-10-demo-and-submission/design.md",
+      "docs/hackathon/steps/step-10-demo-and-submission/contract-issues.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/ralph/AUTHORING-BRIEF.md (rules for every PRD)",
+      "docs/hackathon/06-contracts.md (shared types, file ownership, repo rules, and section 6: decisions D-1 to D-14)",
+      "docs/hackathon/00-hackathon-brief.md (rules, rubric, bonus prizes)",
+      "docs/hackathon/04-submission-checklist.md (beat list and form checklist)",
+      "docs/hackathon/05-repo-decision.md section 5 (new vs existing)",
+      "docs/hackathon/steps/step-01-meta-api-probes/findings.md (verified Meta facts and measurements)",
+      "docs/hackathon/steps/step-10-demo-and-submission/design.md (the full drafts and the preflight design)"
+    ],
+    "requires": [
+      "prd-s03b-director-agent",
+      "prd-s04-art-layers",
+      "prd-s05a-review-rules",
+      "prd-s05b-review-visual",
+      "prd-s06-chat-edit",
+      "prd-s07a-clippy-client",
+      "prd-s07b-generate-integration",
+      "prd-s08a-export-gallery",
+      "prd-s08b-deploy",
+      "prd-s09-local-mode"
+    ],
+    "owns": [
+      "docs/new-vs-existing.md",
+      "docs/architecture.md",
+      "docs/demo-script.md",
+      "docs/submission-answers.md",
+      "docs/x-post.md",
+      "docs/s1-evidence.md",
+      "scripts/preflight/*",
+      "scripts/preflight-submission.ts",
+      "scripts/preflight-submission.test.ts",
+      "scripts/cost-per-film.ts",
+      "scripts/cost-per-film.test.ts",
+      "scripts/lib/cost-report.ts",
+      "scripts/lib/cost-report.test.ts",
+      "fixtures/s10/*"
+    ],
+    "sharedEdits": [
+      "README.md",
+      "ASSET-CREDITS.md"
+    ],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "README.md is S2's file (a stub): edit only the hackathon sections and leave anything else untouched (D-13). ASSET-CREDITS.md: add rows only.",
+      "Documents state only facts found in the repository, in findings.md or in the design's verified-facts table. Where a number or URL is not available write the `<!-- OWNER:name -->` marker; never invent one and never remove an OWNER marker.",
+      "scripts/preflight/* are pure functions except context.ts. The only subprocesses allowed are read-only `git ls-files` and `git log` inside context.ts. No network.",
+      "Preflight and test output never print matched secret text, only the file, line and pattern name.",
+      "The X post contains no @handle: official Meta and Cerebral Valley handles are not confirmed.",
+      "Sample ledgers and events under fixtures/s10 are synthetic test data and say so in their content; never present them as measurements."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner runs `npx tsx scripts/cost-per-film.ts data/films/<id>/events.jsonl` on a real finished film and pastes the table into the README (marker `cost-table`).",
+      "MG-2: owner fills every `<!-- OWNER:... -->` marker (gif, live-url, video-url, repo-url, team, links, cost-table).",
+      "MG-3: owner runs `npx tsx scripts/preflight-submission.ts --strict` until it exits 0, and saves the output.",
+      "MG-4: owner runs `gitleaks detect --no-git --source .` and `gitleaks detect` (history); both clean.",
+      "MG-5: owner makes the repository public and opens the repo, the live URL and the video in a private window.",
+      "MG-6: owner records, edits, captions and uploads the 3-minute demo (unlisted) following docs/demo-script.md, including the Local-mode terminal clip; verifies it plays logged out.",
+      "MG-7: owner submits on the Cerebral Valley platform with docs/submission-answers.md (all members listed) and saves the confirmation.",
+      "MG-8: owner posts docs/x-post.md on X and Discord and pastes the X link into the form; after 16 Nov tears down paid hosting (deploy/README.md)."
+    ]
+  }
+}

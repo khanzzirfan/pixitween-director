@@ -1,0 +1,558 @@
+{
+  "name": "PixiTween Director S06: chat editing through timeline tools",
+  "branchName": "ralph/s06-chat-edit",
+  "description": "Adds the edit loop that lets a user keep directing a film in plain words: four thin edit tools, runEditWithCtx (bounded, no extra DONE turn), a per-film lock, cost accounting, an optional post-edit rules hook, chat/undo/redo routes, six scripted edits as tests, the Chat panel with the backend badge, canvas picking as the primary selector (through the engine's own `container-<layer id>` labels, no engine change) and a keyboard-accessible layer list as the fallback. Offline only: the model is faked in every test; the live gate (s06-chat) is run by the owner. Leaves out: backend selection (S9), new art (S4), visual review (S5b).",
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-06-chat-edit-tools/design.md",
+      "docs/hackathon/steps/step-06-chat-edit-tools/requirements.md",
+      "docs/hackathon/steps/step-06-chat-edit-tools/contract-issues.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (types, interfaces, authoring core 4a, helpers and test doubles 4b, HTTP 5, decisions D-1..D-14 in section 6)",
+      "docs/hackathon/ralph/README.md (rules every story follows)",
+      "docs/hackathon/steps/step-06-chat-edit-tools/design.md",
+      "docs/hackathon/steps/step-06-chat-edit-tools/contract-issues.md",
+      "docs/hackathon/steps/step-01-meta-api-probes/findings.md (Spark and Glimmer tool-call latency)",
+      "fixtures/seed/README.md (real-shape seed fixtures)"
+    ],
+    "requires": [
+      "prd-s03a-authoring-core"
+    ],
+    "owns": [
+      "server/tools/edit.ts",
+      "server/tools/edit-helpers.ts",
+      "server/agent/edit-loop.ts",
+      "server/agent/edit-prompt.ts",
+      "server/agent/edit-cost.ts",
+      "server/agent/scripted-edits.ts",
+      "server/http/handlers/chat.ts",
+      "web/src/panels/Chat.tsx",
+      "web/src/panels/useChat.ts",
+      "web/src/selection/*",
+      "web/selection-check.html",
+      "web/src/panels/selection-check-main.tsx",
+      "scripts/live/s06-chat.ts",
+      "fixtures/s06/*"
+    ],
+    "extraGuardrails": [
+      "S6 never edits server/http/routes.ts (D-1): it fills registerChatRoutes in server/http/handlers/chat.ts, which S2 creates as a stub and S6 owns. S6 has no edit outside its own files. Chat.tsx renders the S2 <BackendBadge /> stub (owned by S9) and never edits it.",
+      "Canvas picking uses the engine as it is: layers are found through the `container-<layer id>` labels that AbstractContainer sets. Do not add an ENGINE-NEEDS.md row for it and do not edit the engine.",
+      "Tests drive the model through makeFakeBackend scripts; they verify the loop and the tools, never model quality.",
+      "Tool argument names always come from the registry's zod params (06-contracts.md section 4a); never type them from memory."
+    ],
+    "manualGates": [
+      "MG-1: owner runs `npm run live -- s06-chat --yes` (prints the estimate first; about $0.003, hard stop at $0.50) with META_API_KEY set; it writes docs/hackathon/steps/step-06-chat-edit-tools/edits.md. Record the table in the PR. At least 5 of 6 edits should pass on Spark; S9 compares Glimmer against it.",
+      "MG-2: owner confirms S5a exports runRules(comp, assets) from server/review/rules.ts (D-10); until then S6's post-edit warnings are skipped silently.",
+      "MG-3: owner reviews the US-020 browser-check notes (the pre-refinement label, scene 2 after a seek, picking during playback) and decides whether any observed gap needs an engine request."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Edit helpers: find a layer, map animatable values",
+      "description": "As a tool author, I want pure helpers that read the engine's layer and keyframe shapes so that every edit tool handles static and animated values the same way.",
+      "steps": [
+        "Read docs/hackathon/06-contracts.md sections 3a and 4a, docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 5.1 and 11, and server/authoring/api.ts (S3a) for newFilmComposition, addScene, addLayer, setKeyframes used to build test films.",
+        "Create server/tools/edit-helpers.ts exporting: class EditError extends Error { constructor(message: string, readonly nearest: string[] = []) }; isKeyframes(v: unknown): boolean (an array whose first element is an object with a numeric `t`); mapAnimatable<T>(v: AepAnimatable<T>, fn: (x: T) => T): AepAnimatable<T> (static -> fn(v); keyframes -> every keyframe's `v` mapped, with `t`, easeIn, easeOut and hold preserved); findLayer(comp, layerId): { layer: AepLayer; container: AepLayer[]; sceneId: string | null } searching comp.layers then every comp.precomps[*].layers; frameSize(comp): { width: number; height: number }.",
+        "findLayer throws EditError for an unknown id; its message names the id and lists up to 8 nearest existing ids by edit distance, and `nearest` holds them.",
+        "Create server/tools/edit-helpers.test.ts building a 2-scene composition with the S3a functions (assets are not needed: use shape layers for the cases that do not need images)."
+      ],
+      "acceptance": [
+        "findLayer(comp, 's1:headline') returns container === comp.precomps['s1'].layers and sceneId 's1'; findLayer(comp, 's1:headlne') throws EditError whose `nearest` includes 's1:headline'",
+        "isKeyframes([1, 1]) is false and isKeyframes([{ t: 0, v: [1, 1] }]) is true",
+        "mapAnimatable([1, 1], v => [v[0] * 2, v[1] * 2]) returns [2, 2]; applied to [{ t: 0, v: [1, 1] }, { t: 30, v: [2, 2], hold: true }] it returns the same keyframes with every v doubled and t and hold unchanged",
+        "frameSize returns the composition's width and height (1920 x 1080 for a 16:9 film from newFilmComposition)"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "scaleLayer tool",
+      "description": "As a user chatting with the director, I want to say 'make it bigger' and have the layer grow around its anchor so that I do not have to specify numbers.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 4 and 5.1, server/tools/edit-helpers.ts, shared/tools.ts (ToolDef, ToolCtx, ToolResult) and server/test-utils/film.ts (makeTestFilm) and server/store/film-store.ts (commit).",
+        "Create server/tools/edit.ts with `export const scaleLayer: ToolDef<{ layerId: string; factor: number }>`: name 'scaleLayer', a description that says larger factor = bigger (1 = unchanged), zod params { layerId: z.string(), factor: z.number().min(0.1).max(5) }.",
+        "run(ctx, args): read ctx.films.get(ctx.filmId).composition, structuredClone it, find the layer with findLayer, multiply `transform.scale` with mapAnimatable (static [sx, sy] -> [sx*f, sy*f]; keyframed -> every keyframe), then `ctx.films.commit(ctx.filmId, next, 'chat', note)` where note is like 'scaleLayer s3:product x1.25'. Return { ok: true, version } or { ok: false, error } (EditError message including the nearest ids; commit failures include zodIssues).",
+        "Create server/tools/edit.test.ts (shared with later stories) using makeTestFilm and a composition built with the S3a functions."
+      ],
+      "acceptance": [
+        "With a static scale [1, 1] and factor 1.25 the committed layer has scale [1.25, 1.25]; the film's version increases by exactly 1 and the last FilmVersion has source 'chat'",
+        "With scale keyframes made by setKeyframes (first value 0.9) every keyframe component after the edit equals the component before times 1.25 within 1e-9, and keyframe times are unchanged",
+        "The composition object returned by films.get before the edit is deep-equal to itself after the edit (the tool did not mutate its input)",
+        "factor 0 and factor 6 fail zod parsing; an unknown layer id returns { ok: false } with an error containing 'unknown layer id'"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "nudgeLayer tool",
+      "description": "As a user chatting with the director, I want to say 'move the headline up a bit' and have the layer move by a percentage of the frame so that the same words work on every aspect ratio.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md section 5.1 (nudgeLayer) and server/tools/edit.ts.",
+        "Add `export const nudgeLayer` to server/tools/edit.ts: name 'nudgeLayer', zod params { layerId: z.string(), dxPct: z.number().min(-100).max(100).optional(), dyPct: z.number().min(-100).max(100).optional() } refined so at least one of dxPct or dyPct is present (message 'give dxPct or dyPct'). The description says positive dyPct moves DOWN and percentages are of the film size.",
+        "run: add dxPct/100*comp.width to x and dyPct/100*comp.height to y of `transform.position` (static or every keyframe, via mapAnimatable); clamp each result to [-50%, 150%] of the frame size; commit with source 'chat'.",
+        "Add tests to server/tools/edit.test.ts."
+      ],
+      "acceptance": [
+        "On a 1920 x 1080 film, a layer at static position [960, 540] with dyPct -10 ends at [960, 432]; with dxPct 5 and no dyPct it ends at [1056, 540]",
+        "With position keyframes every keyframe's y is reduced by 108 for dyPct -10 and times are unchanged",
+        "dyPct -100 on a layer at y 100 clamps to y -540 (minus 50% of 1080)",
+        "Calling the tool with neither dxPct nor dyPct fails zod parsing with the message 'give dxPct or dyPct'"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "restyleText tool",
+      "description": "As a user chatting with the director, I want to change a headline's font, size or colour without retyping it so that edits stay small and safe.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md section 5.1 (restyleText) and the text style fields in docs/hackathon/06-contracts.md section 3a; read the engine's type declarations for AepTextStyle in node_modules/reacthub-pixitweenjs/dist (fields: font, size, fill, weight, italic, align) to confirm which values `fill` accepts.",
+        "Add `export const restyleText` to server/tools/edit.ts: name 'restyleText', params { layerId, font?, size? (positive), color? (hex #RRGGBB), weight? (number or string), italic?, align? ('left'|'center'|'right') } refined to require at least one style field.",
+        "run: only for layers of kind 'text' (otherwise { ok: false, error: 'not a text layer' }); merge the given fields into `layer.style` (color -> `fill`); leave `source` untouched; a keyframed size is replaced by the static number.",
+        "If the engine's fill type rejects a plain hex string, adapt the stored form to what parseAepCompositionSafe accepts and write the finding into the story notes.",
+        "Add tests to server/tools/edit.test.ts."
+      ],
+      "acceptance": [
+        "restyleText { layerId: 's1:headline', size: 96, color: '#FF8800' } sets style.size to 96 and the fill to that colour, keeps layer.source identical to before, and the composition passes parseAepCompositionSafe",
+        "Calling it on an image layer returns { ok: false } with 'not a text layer'; calling it with only layerId fails zod parsing",
+        "A layer whose style.size was keyframed ends with a static numeric size equal to the requested value"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "deleteLayer tool and the edit tool list",
+      "description": "As a user chatting with the director, I want to remove a layer by name so that I can drop things I do not want, without breaking the film.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md section 5.1 (deleteLayer), server/tools/registry.ts (how tools are registered and listed) and removeLayer in server/authoring/api.ts.",
+        "Add `export const deleteLayer` to server/tools/edit.ts: name 'deleteLayer', params { layerId }. run: refuse with a clear error when the layer is the only layer of its scene ('scene has only this layer; use removeScene') and when the layer is of kind 'camera'; otherwise call S3a's removeLayer and commit with source 'chat'.",
+        "Export `export const tools: ToolDef[] = [scaleLayer, nudgeLayer, restyleText, deleteLayer]` from server/tools/edit.ts (the registry already imports this module).",
+        "Add tests: removal, both refusals, and that meta.director.layers no longer lists the removed id."
+      ],
+      "acceptance": [
+        "deleteLayer on 's2:caption' in a scene with 3 layers removes it from the precomp and from composition.meta.director.layers, and the result passes parseAepCompositionSafe",
+        "deleteLayer on the only layer of a scene and on a camera layer each return { ok: false } and leave the version number unchanged",
+        "A test reads the registry's tool list (whatever server/tools/registry.ts exports for that) and finds scaleLayer, nudgeLayer, restyleText and deleteLayer by name"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Edit prompt and message builder",
+      "description": "As an edit agent, I want a stable system prompt and a compact film summary so that the model sees real ids and the right units.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md section 6 (the exact system prompt and the user message sections), summariseComposition and sceneInfo in server/authoring/api.ts, and ChatMessage in server/llm/backend.ts.",
+        "Create server/agent/edit-prompt.ts exporting EDIT_SYSTEM_PROMPT (copy the text from docs/hackathon/steps/step-06-chat-edit-tools/design.md section 6 verbatim), clampSummary(text: string, maxChars = 8000): string (cuts whole lines from the end and appends '... (N more lines)'), and buildEditMessages({ comp, selection, message, fps = 30 }): ChatMessage[] returning [system, user].",
+        "The user message has three sections in this order: '## Film' (the clamped summariseComposition output plus a line 'Frame: <w>x<h> px, <fps> fps'), '## Selection' ('The user selected layer s2:product (scene s2).' | 'The user selected scene s2.' | 'The user has not selected anything.') and '## Request' (the message trimmed).",
+        "Create server/agent/edit-prompt.test.ts."
+      ],
+      "acceptance": [
+        "For a 3-scene film the user message contains the three section headers in order, the line 'Frame: 1920x1080 px, 30 fps' and the selection sentence for a layer selection",
+        "The user message never contains 'http', the passcode, or a JSON object dump of the composition (no '\"layers\":' substring)",
+        "clampSummary with maxChars 100 on a 40-line text returns at most 100 characters plus the suffix and keeps whole lines; for a 6-scene x 5-layer film built with the S3a functions the summary section is at most 8000 characters",
+        "EDIT_SYSTEM_PROMPT contains the sentences 'Answer with tool calls only.' and 'Never delete the only layer of a scene or the only scene.'"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-007",
+      "title": "Edit loop: one turn, apply, stop",
+      "description": "As a user, I want one chat request to produce one set of validated edits and then stop so that edits are fast.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 3 and 5.2, docs/hackathon/06-contracts.md section 6 (D-2, D-5, D-10, D-12), shared/events.ts (note: ToolCtx.emit stamps filmId and at when omitted; agent.turn has an optional `reply`), server/llm/backend.ts, server/llm/router.ts (pickBackend(task, { local, onFallback })), server/llm/fake-backend.ts (makeFakeBackend), and runTool and makeToolCtx in server/tools/registry.ts.",
+        "Create server/agent/edit-loop.ts exporting EditSelection, RunEditInput { message; selection?; local? }, EditOutcome (see the design), the loop `runEditWithCtx(ctx: ToolCtx, input: RunEditInput, deps?: { backend?: LlmBackend; tools?: ToolDef[] }): Promise<EditOutcome>` and the contract entry point (D-10) `runEdit(filmId: FilmId, message: string, selection?: EditSelection, opts?: { local?: boolean }): Promise<unknown>`, which calls makeToolCtx(filmId) from '../tools/registry.js' and returns the EditOutcome of runEditWithCtx.",
+        "Flow: load the film; set status 'building' (films.update + a film.status event); buildEditMessages; backend = deps.backend ?? pickBackend('edit', { local: input.local, onFallback: info => emit error { where: 'llm.fallback', message: `${info.from} -> ${info.to}: ${info.reason}` } }); call backend.chatWithTools(messages, tools, { parallelHint: true }); emit one agent.turn { backend: backend.id, ms, calls, reply: <the backend's text content when non-empty> }; apply each returned tool call in order through runTool (it emits the tool.call events); if there were no calls, keep r.content as `reply` and stop; if every call succeeded, stop WITHOUT another model turn; finally set status 'ready' (film.status event) and return the outcome.",
+        "Create server/agent/edit-loop.test.ts using makeTestFilm and makeFakeBackend."
+      ],
+      "acceptance": [
+        "With a fake backend scripted with one scaleLayer call, backend.turns is 1, the emitted event types in order are film.status(building), agent.turn, tool.call(ok, with a version), film.status(ready), and the outcome has ok true, turns 1, applied 1, failed 0, versionAfter = versionBefore + 1",
+        "A fake backend whose first turn returns text only ('I cannot do that') produces no version change, applied 0 and a reply equal to that text, the agent.turn event carries reply 'I cannot do that', and the film ends with status 'ready'",
+        "runEdit(filmId, 'make it bigger', undefined, { local: false }) with makeToolCtx mocked (vi.mock of ../tools/registry.js) to return the makeTestFilm context runs the same loop and resolves to an outcome with ok true; pickBackend receives { local: false }",
+        "When pickBackend invokes the onFallback callback with { from: 'glimmer', to: 'spark', reason: 'unreachable' } one error event with where 'llm.fallback' is emitted",
+        "The film's final status is 'ready' after success and the stored composition equals the result of the tool call"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ],
+      "dependsOn": [
+        "US-005",
+        "US-006"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Edit loop: repair turns and limits",
+      "description": "As a user, I want the agent to fix a failing tool call once or twice and then give up cleanly so that a bad model answer never hangs the film.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 5.2 and 7 and server/agent/edit-loop.ts.",
+        "Extend runEditWithCtx: MAX_TURNS = 4 and MAX_CALLS_PER_TURN = 12 (exported constants). When any call in a turn fails, append the assistant message and one tool message per call (ok -> '{\"ok\":true}', failed -> '{\"ok\":false,\"error\":\"...\"}') and take another turn.",
+        "Calls beyond the 12th are not applied; emit one tool.call { ok: false, error: 'ignored: too many calls' } for them.",
+        "After 4 turns that still fail, stop, emit error { where: 'edit', message: 'gave up after 4 turns' } and return ok false.",
+        "If the backend throws (an Error with an optional numeric `status`), emit error { where: 'edit', status, message }, restore status 'ready' and return ok false with `error`; runEditWithCtx itself never throws for backend failures.",
+        "Add tests with makeFakeBackend scripts."
+      ],
+      "acceptance": [
+        "A script whose first turn has one failing call (unknown layer id) and whose second turn has a correct call yields turns 2, applied 1, failed 1, and the second backend request contains a tool message with '\"ok\":false' for the first call's id",
+        "A backend that fails every turn leads to exactly 4 backend turns, one error event with message 'gave up after 4 turns', and final status 'ready'",
+        "A turn with 13 correct calls applies 12 (the version increases by 12) and emits exactly one 'ignored: too many calls' tool.call",
+        "A backend that throws an error with status 402 yields an error event with status 402, outcome ok false, status 'ready', and no exception escaping runEditWithCtx"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ],
+      "dependsOn": [
+        "US-007"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Per-film lock and readiness checks",
+      "description": "As a user, I want edits to run one at a time so that two requests never interleave on one film.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 5.2 and 7 (lock, busy and not-ready rules) and server/agent/edit-loop.ts.",
+        "In server/agent/edit-loop.ts add a module-level lock (Map<FilmId, true>), export class FilmBusyError and class FilmNotReadyError, and export `assertEditable(film, versions, now = Date.now())`: throws FilmNotReadyError when film.composition is undefined; throws FilmBusyError when status is 'planning' or 'building' and the newest FilmVersion.at is less than 10 minutes old (a director run in progress); otherwise passes (an older 'building' status is treated as stale and reset to 'ready').",
+        "runEditWithCtx acquires the lock before doing any work and releases it in a finally block; a second concurrent runEditWithCtx on the same film rejects with FilmBusyError; different films do not block each other.",
+        "Add tests with fake timers or injected `now`."
+      ],
+      "acceptance": [
+        "Two overlapping runEditWithCtx calls on one film: the second rejects with FilmBusyError while the first is pending, and a third call after the first finishes succeeds",
+        "The lock is released after a backend failure (a following runEditWithCtx succeeds)",
+        "assertEditable throws FilmNotReadyError for a film without a composition, FilmBusyError for status 'building' with a version 1 minute old, and passes (and the caller resets status to 'ready') for status 'building' with a version 11 minutes old"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ],
+      "dependsOn": [
+        "US-007"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Edit cost accounting",
+      "description": "As an owner, I want every model turn priced so that the cost of editing is visible.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md section 8 (price table and the worked example), server/ledger.ts (Ledger.add) and server/agent/edit-loop.ts.",
+        "Create server/agent/edit-cost.ts exporting editCostUsd(model: string, usage?: { prompt_tokens?: number; completion_tokens?: number; input_tokens?: number; output_tokens?: number }): number and isPriced(model: string): boolean. Prices per 1M tokens: 'muse-spark-1.3-contributor' $0.10 in / $0.20 out; 'muse-spark-1.3' $1.25 / $4.25; models starting with 'muse-glimmer' cost 0; any other model is unpriced (cost 0, isPriced false).",
+        "In runEditWithCtx, after every backend turn call ctx.ledger.add(filmId, model, '<in>+<out> tokens', usd) and emit a cost event; the model id is process.env.META_SPARK_MODEL (default 'muse-spark-1.3-contributor') for backend id 'spark' and 'muse-glimmer' for 'glimmer'.",
+        "Create server/agent/edit-cost.test.ts and extend the loop test."
+      ],
+      "acceptance": [
+        "editCostUsd('muse-spark-1.3-contributor', { prompt_tokens: 1010, completion_tokens: 1988 }) equals 0.0004986 within 1e-9",
+        "editCostUsd('muse-spark-1.3', { prompt_tokens: 1010, completion_tokens: 1988 }) equals 0.0097115 within 1e-9; a glimmer model returns 0 and isPriced is true; an unknown model returns 0 and isPriced is false; undefined usage returns 0",
+        "A runEditWithCtx with a fake backend reporting that usage emits one cost event per turn and the ledger total for the film equals the sum"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ],
+      "dependsOn": [
+        "US-007"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Optional post-edit rules hook",
+      "description": "As a user, I want layout warnings after an edit when the review rules exist so that bad edits are flagged without slowing the loop.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md section 5.3 and server/review/rules.ts (S2 stub; S5a will export runRules) plus FilmEvent review.finding in shared/events.ts.",
+        "In server/agent/edit-loop.ts add `runPostEditRules(ctx, film)`: dynamically import '../review/rules.js' inside try/catch; if the module exports a function named runRules, call it with (composition, film.assets) and emit one review.finding event per result with deterministic: true; if the export is missing or the call throws, do nothing and log one debug line.",
+        "runEditWithCtx calls it after the final turn only when at least one tool call succeeded.",
+        "Add tests using vi.doMock('../review/rules.js') for the three cases."
+      ],
+      "acceptance": [
+        "With a mocked runRules returning two findings, two review.finding events with deterministic true are emitted after the last tool.call",
+        "With a module that has no runRules export, and with a runRules that throws, no review.finding events are emitted and the edit outcome is unchanged",
+        "An edit in which every call failed does not invoke runRules"
+      ],
+      "labels": [
+        "backend",
+        "agent"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Chat, undo and redo routes (registerChatRoutes)",
+      "description": "As a web client developer, I want the chat, undo and redo routes so that the panel can drive edits.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 2, 7 and 12, docs/hackathon/06-contracts.md section 2 (handlers), section 4 (FilmStore semantics) and section 6 (D-1, D-2), server/http/handlers/chat.ts (the S2 stub `registerChatRoutes(app, deps)`), server/http/routes.ts (only to see how it calls the register functions; never edit it), server/http/auth.ts and how S2 defines the AppDeps type (deps = { films, assets, meta, ledger, bus, makeToolCtx }).",
+        "Fill server/http/handlers/chat.ts: `registerChatRoutes(app, deps)` registers POST /api/films/:id/chat, /undo and /redo. Chat: validate the body with a local zod schema { message: string trimmed, 1..2000 chars; selection?: { sceneId?: string; layerId?: string }; local?: boolean } (400 { error: 'bad_message' } on failure); 404 for an unknown film; 409 { error: 'film_not_ready' | 'film_busy' } from assertEditable and the lock; otherwise start runEdit(filmId, message, selection, { local }) in the background (never awaited, errors caught and logged) and answer 202 { accepted: true }.",
+        "Undo and redo: 409 { error: 'film_busy' } while an edit runs; undo at version 1 -> 409 { error: 'nothing_to_undo' }; redo when FilmState.version equals the newest stored version -> 409 { error: 'nothing_to_redo' }; otherwise call deps.films.undo / redo, emit tool.call { name: 'undo' | 'redo', args: {}, ok: true, version } through deps.makeToolCtx(filmId).emit and answer 200 { version }.",
+        "Create server/http/handlers/chat.test.ts: build a Hono app, call registerChatRoutes(app, deps) with deps assembled from makeTestFilm (use S2's test-deps helper if one exists) and use app.request; assert the FilmStore semantics the contract states (version is the current pointer; a commit after an undo discards the redo tail)."
+      ],
+      "acceptance": [
+        "POST chat with a valid body returns 202 { accepted: true } and a later film.status 'ready' event appears; an empty message and a 2001-character message return 400 bad_message; an unknown film returns 404; a body with local true is accepted and reaches runEdit as opts.local true",
+        "A second chat request while the first is running returns 409 film_busy; a film without a composition returns 409 film_not_ready",
+        "Undo at version 1 returns 409 nothing_to_undo; after one edit, undo returns 200 { version } equal to the previous version and a tool.call named 'undo' is emitted; redo then returns the newer version; a second redo returns 409 nothing_to_redo; an edit committed after an undo makes redo return 409 nothing_to_redo (the redo tail was discarded)",
+        "A request without the passcode is rejected when DIRECTOR_PASSCODE is set (S2's middleware covers these routes); server/http/routes.ts is unchanged by this story (git diff shows no edit to it)"
+      ],
+      "labels": [
+        "backend",
+        "http"
+      ],
+      "dependsOn": [
+        "US-009",
+        "US-011"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Scripted edits as tests",
+      "description": "As an owner, I want six known edits encoded once so that tests and the live gate check the same behaviour.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md section 9 (the scripted-edits table and the film they use), server/test-utils/film.ts, server/media/image.ts and fixtures/seed/README.md (mug-product.png).",
+        "Create server/agent/scripted-edits.ts exporting buildScriptedFilm(): Promise<{ ctx: ToolCtx; filmId: FilmId }> (3 scenes s1..s3 of 4 s; each scene has bg, product and headline layers made with the S3a functions; scene s2 also has a caption text layer; the product image asset is fixtures/seed/mug-product.png stored through ctx.assets.put) and the `scriptedEdits` array of { id, message, selection?, calls: Array<{ name: string; args: unknown }>, expect(before: Comp, after: Comp): void }.",
+        "Build each call with a helper `call(name, args)` that finds the tool in the registry and runs its zod `params.parse(args)` at construction time, so a wrong argument name fails loudly.",
+        "Create server/agent/scripted-edits.test.ts that runs every scripted edit through runEditWithCtx with makeFakeBackend scripted with that edit's calls and runs its expect()."
+      ],
+      "acceptance": [
+        "All six scripted edits (bigger product scale x1.25 on s3:product; slower intro: scene s1 duration x1.5 up to 8 s; headline up: dyPct -10 on s2:headline; swap scenes 2 and 3; headline behind the product via reorderLayer below s1:product; delete s2:caption) pass their expect() after runEditWithCtx",
+        "The 'slower intro' expect checks that scene s1 is 50% longer, scenes s2 and s3 start later by the same number of frames, and durationInFrames grew by that amount",
+        "Constructing a scripted call with a wrong argument name throws a zod error naming the tool (verified by a test that builds one deliberately wrong call)"
+      ],
+      "labels": [
+        "backend",
+        "agent",
+        "test"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "useChat hook",
+      "description": "As a Chat panel developer, I want one hook that turns server events into messages so that the panel stays simple.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 4 and 5 and docs/hackathon/06-contracts.md section 3 (FilmEvent: agent.turn has an optional `reply`), web/src/api/client.ts and web/src/api/sse.ts (the typed client and the events hook from S2).",
+        "Create web/src/panels/useChat.ts exporting useChat({ filmId, version, events, api }): { messages, busy, elapsedSec, canUndo, canRedo, error, send(text, selection?), undo(), redo() } where api = { chat(filmId, body), undo(filmId), redo(filmId) } (use the S2 client; wrap fetch locally only if a function is missing and say so in notes).",
+        "Behaviour: send appends a user message and sets busy; busy ends when a film.status 'ready' event arrives after the send, or when the POST fails (error set); elapsedSec counts up each second while busy; tool.call events between send and ready are grouped into ONE 'applied' assistant message whose items are summaries such as 'scaleLayer s3:product x1.25' and 'nudgeLayer s2:headline dy -10%' (default summary: name plus layerId or sceneId), and whose `reply` is the last non-empty agent.turn.reply in that window; error events become an 'error' message; canUndo is version > 1; canRedo is true only right after an undo.",
+        "Create web/src/panels/useChat.test.tsx with @testing-library/react renderHook and fake timers."
+      ],
+      "acceptance": [
+        "After send('make it bigger'), busy is true; feeding events tool.call(scaleLayer s3:product, ok, version 5) and film.status ready produces exactly one applied message with one item and busy false",
+        "With fake timers advanced by 3000 ms while busy, elapsedSec is 3; an agent.turn event with reply 'Made the mug bigger.' before ready puts that text in the applied message's reply",
+        "A rejected POST (409 film_busy) sets error to 'film_busy' and busy to false and adds no applied message",
+        "undo() calls api.undo once and sets canRedo true; canUndo is false when version is 1"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-012"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "Selection model and layer list (fallback and keyboard path)",
+      "description": "As a user, I want to pick a layer or a scene from a list so that 'make this bigger' works from the keyboard and whenever the canvas cannot be clicked.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md section 5.4 (the layer list is the fallback and the keyboard-accessible path), sceneInfo and layerInfo in server/authoring/api.ts (use them from the web code only through a path the web tsconfig allows; otherwise re-derive the table from composition.meta.director as described in docs/hackathon/06-contracts.md section 3a).",
+        "Create web/src/selection/useSelection.ts exporting EditSelection ({ sceneId?: string; layerId?: string }) and useSelection(): { selection: EditSelection | undefined; select(s: EditSelection): void; clear(): void }.",
+        "Create web/src/selection/LayerList.tsx: props { comp: AepCompositionJson | undefined; selection?: EditSelection; onSelect(s: EditSelection): void }. Rows are grouped by scene in timeline order: a scene header button (id, duration in seconds, MOTION or GENERATE) and one button per layer showing its id and role. Every row is a real <button> (focusable; Enter and Space activate it); clicking a header selects { sceneId }, clicking a layer selects { sceneId, layerId }; the selected row has aria-pressed='true'. With no composition show 'No layers yet'.",
+        "Create web/src/selection/LayerList.test.tsx with a composition built from the S3a functions and @testing-library/user-event."
+      ],
+      "acceptance": [
+        "For a 3-scene film the list renders 3 scene headers in order and a button for every layer id (for example 's2:product'); clicking it calls onSelect with { sceneId: 's2', layerId: 's2:product' } and clicking the header of s2 calls onSelect with { sceneId: 's2' }",
+        "Tabbing to a layer button and pressing Enter calls onSelect with that layer (keyboard path); the selected row has aria-pressed='true' and the others do not",
+        "A scene with mode 'generate' shows 'GENERATE' in its header and the others 'MOTION'; with comp undefined the text 'No layers yet' is shown",
+        "useSelection: select({ layerId: 'a' }) then clear() returns undefined"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-014"
+      ]
+    },
+    {
+      "id": "US-016",
+      "title": "Chat panel with backend badge and layer list",
+      "description": "As a user, I want a chat box next to the player so that I can edit by talking.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 4, 5.4 and 9, docs/hackathon/06-contracts.md section 6 (D-6), web/src/panels/useChat.ts, web/src/selection/useSelection.ts, web/src/selection/LayerList.tsx, web/src/App.tsx (the Chat slot and its stub web/src/panels/Chat.tsx) and web/src/panels/BackendBadge.tsx (the S2 stub; do not edit it).",
+        "Replace the stub web/src/panels/Chat.tsx. Props { filmId?: string; comp?: AepCompositionJson; version: number; events: FilmEvent[]; player?: PlayerHandle | null } (the selection state is internal, from useSelection). A header row renders the title 'Edit' and `<BackendBadge />` imported from './BackendBadge' (do not add a headerSlot prop). Empty state when filmId is undefined ('Open or create a film to start editing'). A collapsible 'Layers' section (a <details>) embeds LayerList wired to the internal selection.",
+        "Below the header: the message list (user bubbles, applied cards listing the items and the reply, red error cards), a textarea (Enter sends, Shift+Enter inserts a newline, trimmed, max 2000 characters, disabled while busy), a Send button (disabled when empty or busy), a selection chip 'Editing: s2:product' with a remove button, Undo and Redo buttons, and while busy the text 'Thinking... N s'. Sending passes the current selection to useChat.send.",
+        "The message list has aria-live='polite'; every button has an accessible name; colours come from the app's CSS tokens (light and dark).",
+        "Create web/src/panels/Chat.test.tsx with @testing-library/react and user-event (mock './BackendBadge' with a span data-testid='backend-badge')."
+      ],
+      "acceptance": [
+        "Typing 'bigger' and pressing Enter calls the chat API once with message 'bigger'; Shift+Enter inserts a newline and sends nothing; Send is disabled for an empty or whitespace-only input",
+        "Choosing the layer 's2:product' in the embedded layer list shows the chip 'Editing: s2:product'; the next send includes selection { sceneId: 's2', layerId: 's2:product' }; clicking the chip's remove button clears it",
+        "The header contains the BackendBadge (the mocked element is inside the header); Chat.tsx has no headerSlot prop",
+        "While busy the textarea is disabled and 'Thinking... 3 s' is shown after 3 fake seconds; an error event renders a card with role='alert'; with filmId undefined the empty-state text is shown and no textarea is rendered"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-014",
+        "US-015"
+      ]
+    },
+    {
+      "id": "US-017",
+      "title": "Pixi label helpers: layer id from a click target (pure)",
+      "description": "As a UI developer, I want pure helpers that turn a Pixi event target into a layer id so that clicking the canvas can select layers with no engine change.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 5.4 and 11 (every AEP layer is wrapped by AbstractContainer whose OUTER container has label `container-<layer id>`, and a precomp's invisible hit sprite shadows its inner layers), and in the engine checkout ~/Documents/code/trolio/reacthub-pixitweenjs/src read hocs/AbstractContainer.tsx lines 245-310 and components/PixiPreComp/PixiPreComp.tsx lines 105-128.",
+        "Create web/src/selection/pixiTarget.ts exporting LAYER_LABEL_PREFIX = 'container-', type PixiNodeLike = { label?: string | null; parent?: PixiNodeLike | null; children?: PixiNodeLike[]; visible?: boolean; eventMode?: string; getBounds?(): { containsPoint(x: number, y: number): boolean } }, layerIdFromLabel(label: unknown): string | null (the label must be a string starting with the prefix and have a non-empty remainder; the remainder is the id, colons kept), containerFromPixiTarget(target, maxDepth = 200): PixiNodeLike | null and layerIdFromPixiTarget(target, maxDepth = 200): string | null (walk `.parent` from the target; the FIRST node whose label has the prefix wins, so an inner layer beats the precomp wrapper that contains it; null when none; a cycle or more than maxDepth hops returns null).",
+        "In the same file export innermostLayerAt(container: PixiNodeLike, point: { x: number; y: number }, opts?: { isSelectable?(layerId: string): boolean }): string | null and resolveLayerId(target, point, opts?): string | null. innermostLayerAt walks the container's descendants depth-first, LAST child first (the engine draws later children on top), skips any node whose `visible` is false or whose eventMode is 'none' (with its subtree), and skips labelled nodes the isSelectable callback rejects; a labelled descendant whose getBounds().containsPoint(point.x, point.y) is true counts only after its own labelled descendants were tried (the deepest match wins); it returns null when no labelled descendant contains the point. resolveLayerId = innermostLayerAt(containerFromPixiTarget(target), point, opts) ?? layerIdFromPixiTarget(target).",
+        "Export selectionFromLayerId(comp: AepCompositionJson, layerId: string): { sceneId?: string; layerId?: string } | null: when comp.meta.director.layers[layerId] exists return { sceneId, layerId } from it; when layerId is the id of a root layer of kind 'precomp' return { sceneId: that layer's compId }; otherwise null.",
+        "Create web/src/selection/pixiTarget.test.ts using plain fake nested objects with parent links and children arrays (no Pixi import)."
+      ],
+      "acceptance": [
+        "layerIdFromPixiTarget on a fake chain leaf -> inner(eventMode 'static') -> outer(label 'container-s2:product') -> sceneOuter(label 'container-scene-s2') -> stage returns 's2:product' (the inner layer beats its precomp wrapper); on a chain whose only labelled node is 'container-scene-s2' it returns 'scene-s2'",
+        "Labels 'foo', 'container-' (empty id), undefined and a non-string label are ignored; a target with no labelled ancestor returns null; a chain with a parent cycle returns null",
+        "innermostLayerAt on a wrapper node containing two labelled siblings whose bounds both contain the point returns the id of the LATER child; a sibling with visible false or eventMode 'none' is skipped; a point outside every labelled descendant returns null; a labelled child containing a labelled grandchild at the point returns the grandchild; isSelectable returning false for the later child makes the earlier one win",
+        "resolveLayerId for a target that is the scene wrapper's own container and a point inside the inner layer's bounds returns the inner layer id (the shadowing case); with the point outside every inner layer it returns the wrapper id",
+        "selectionFromLayerId maps 's2:product' to { sceneId: 's2', layerId: 's2:product' } through comp.meta.director.layers, maps a root precomp layer id to { sceneId: <its compId> }, and returns null for an unknown id"
+      ],
+      "labels": [
+        "frontend",
+        "tools",
+        "test"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-018",
+      "title": "Canvas selection hook (primary selector)",
+      "description": "As a user, I want to click the film and select the layer under the pointer so that I can say 'make this bigger' about what I see.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 5.4 and 11 (Pixi event rules: the stage must be eventMode 'static' because notifyTarget skips non-interactive containers; FederatedMouseEvent.global; hit-test order), web/src/selection/pixiTarget.ts and web/src/player/Player.tsx (the PlayerHandle: getApp(), getCanvas(), getTime(); use that exact API).",
+        "Create web/src/selection/useCanvasSelect.ts exporting useCanvasSelect({ player, comp, onPick }): void. When player?.getApp() is available (retry on animation frames up to 60 times while it is null) it saves app.stage.eventMode and app.stage.hitArea, sets stage.eventMode = 'static' and stage.hitArea = app.screen (so clicks on empty space hit the stage), and registers stage.on('pointerdown', handler).",
+        "handler(e): id = resolveLayerId(e.target, e.global, { isSelectable: id => !isLayerHidden(comp, id) }); call onPick(id ? selectionFromLayerId(comp, id) ?? undefined : undefined); a click that resolves to nothing calls onPick(undefined). Write a small local isLayerHidden(comp, id) in the same file (looks the layer up in comp.layers and every comp.precomps[*].layers and reads `hidden`).",
+        "On cleanup call stage.off('pointerdown', handler) and restore the saved eventMode and hitArea; clicks during playback work the same as when paused (the handler does not read the playhead).",
+        "Create web/src/selection/useCanvasSelect.test.tsx with a fake app { stage: { on, off, eventMode, hitArea }, screen } whose stage emits synthetic pointerdown events carrying fake targets and global points."
+      ],
+      "acceptance": [
+        "After the hook mounts, the fake stage has eventMode 'static' and hitArea equal to app.screen; after unmount both are restored and 'pointerdown' has no listener left",
+        "A synthetic pointerdown whose target chain contains a node labelled 'container-s1:product' and whose point is inside that layer calls onPick with { sceneId: 's1', layerId: 's1:product' }; a click on the stage itself calls onPick(undefined)",
+        "With a scene wrapper target and an inner layer under the point the hook picks the inner layer (via resolveLayerId); a layer with hidden true in the composition is not picked and the next candidate is",
+        "When getApp() returns null at first and an app on the third animation frame, the listener is attached then (fake requestAnimationFrame)"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-015",
+        "US-017"
+      ]
+    },
+    {
+      "id": "US-019",
+      "title": "Selection highlight overlay and Chat wiring",
+      "description": "As a user, I want to see which layer is selected on the film so that I know what my next words apply to.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md section 5.4 (overlay), web/src/selection/useCanvasSelect.ts, web/src/panels/Chat.tsx and the Player handle in web/src/player/Player.tsx; confirm in node_modules/pixi.js/lib that Container.getBounds() returns a Bounds with minX, minY, maxX, maxY and that Container.getChildByLabel(label, deep) exists.",
+        "Create web/src/selection/SelectionOverlay.tsx exporting boundsToCss(bounds: { minX; minY; maxX; maxY }, screen: { width; height }, canvasRect: { left; top; width; height }): { left; top; width; height } (css = canvasRect.left + bounds.minX / screen.width * canvasRect.width, and the same for top, width, height) and the component SelectionOverlay({ player, comp, selection }) that renders a portal into document.body with one position: fixed, pointer-events: none bordered div, updated on every animation frame from app.stage.getChildByLabel('container-' + selection.layerId, true)?.getBounds(). It renders nothing for a scene-only selection, for a missing container, or when the layer's scene is not active at player.getTime() (scene start and duration from comp.meta.director.scenes, frames at 30 fps).",
+        "Wire it into web/src/panels/Chat.tsx: call useCanvasSelect({ player, comp, onPick: sel => (sel ? select(sel) : clear()) }) and render <SelectionOverlay player comp selection />; without a `player` prop both are inert.",
+        "Create web/src/selection/SelectionOverlay.test.tsx (the pure helper, and the component with a fake player whose app.stage.getChildByLabel returns a fake container with getBounds) and extend web/src/panels/Chat.test.tsx for the wiring."
+      ],
+      "acceptance": [
+        "boundsToCss({ minX: 100, minY: 50, maxX: 300, maxY: 150 }, { width: 960, height: 540 }, { left: 10, top: 20, width: 480, height: 270 }) returns { left: 60, top: 45, width: 100, height: 50 }",
+        "The component renders a div with those pixel values and pointer-events none for a selected layer whose fake container has those bounds; it renders nothing for a scene-only selection and when the scene is not active at the fake player's time",
+        "In Chat, a fake stage pointerdown that resolves to 's1:product' makes the chip read 'Editing: s1:product'; without a player prop no listener is attached"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-016",
+        "US-018"
+      ]
+    },
+    {
+      "id": "US-020",
+      "title": "Browser check: canvas picking on a real Pixi stage",
+      "description": "As a developer, I want to click layers on the real stage so that the label-based picking is proven, including the precomp shadowing and playback cases.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md sections 5.4 and 11 (the unverified runtime items), web/src/player/Player.tsx (props and PlayerHandle), web/src/selection/pixiTarget.ts, web/src/selection/useCanvasSelect.ts and server/authoring/api.ts.",
+        "Create web/selection-check.html and web/src/panels/selection-check-main.tsx: a standalone dev page (not linked from the app) that builds a 2-scene composition with the S3a functions (shape layers only, no assets: scene s1 3 s with a bg and a product-like shape and a headline text; scene s2 3 s likewise at different positions), mounts the Player with a ref handle, wires useCanvasSelect and SelectionOverlay, and shows the current selection and the playhead time as text, plus buttons 'Seek to scene 2', 'Play' and 'Pause'.",
+        "Add a debug line (visible on the page) printing, for the last click, the label of event.target's nearest labelled ancestor BEFORE refinement and the final resolved id.",
+        "Perform the browser check (below) and write what you observed into the story notes: whether an inner layer click resolved to the scene wrapper before refinement (the shadowing case), whether clicks in scene 2 work right after 'Seek to scene 2', and whether clicks work during playback. If any case fails, describe the failure and the workaround in notes (do not edit the engine)."
+      ],
+      "acceptance": [
+        "Opening /selection-check.html in the dev server shows the heading 'Selection check' and the Player with both scenes (no console errors)",
+        "Clicking the product-like shape in scene 1 sets the displayed selection to 's1:product' (the observed pre-refinement label is written into notes); clicking the bg sets 's1:bg'; clicking empty canvas clears the selection",
+        "After 'Seek to scene 2' a click on scene 2's product shape selects 's2:product'; with playback running a click on a visible layer also selects it",
+        "The overlay box visibly surrounds the selected shape; `npm test` does not depend on the browser"
+      ],
+      "labels": [
+        "frontend",
+        "ui",
+        "test"
+      ],
+      "dependsOn": [
+        "US-019"
+      ]
+    },
+    {
+      "id": "US-021",
+      "title": "Live gate script s06-chat",
+      "description": "As an owner, I want one command that runs the six scripted edits on real Spark and records the results so that S9 has a baseline.",
+      "steps": [
+        "Read docs/hackathon/steps/step-06-chat-edit-tools/design.md section 9 (manual gate), scripts/live/run.ts (the dispatcher and the exported shape { describe, estimateUsd, run }), server/agent/scripted-edits.ts and server/agent/edit-cost.ts.",
+        "Create scripts/live/s06-chat.ts exporting describe() (what it does, that it needs META_API_KEY, that it makes 6 real Spark calls or more with repair turns), estimateUsd() returning 0.01 and run(): build the scripted film in temp stores, run every scripted edit through runEditWithCtx with the REAL backend from pickBackend('edit'), evaluate each expect(), stop everything if the accumulated cost exceeds 0.50, and write docs/hackathon/steps/step-06-chat-edit-tools/edits.md from renderEditsMarkdown(results).",
+        "Export renderEditsMarkdown(results): string (pure): a table with columns edit, message, pass/fail, turns, tool calls, latency ms, cost USD, plus a totals row and the model id; never include keys or URLs.",
+        "run() throws a clear error when META_API_KEY is not set. Create scripts/live/s06-chat.test.ts for the pure parts only (never calling run())."
+      ],
+      "acceptance": [
+        "estimateUsd() returns a number at most 0.50 and describe() mentions 'META_API_KEY' and 'real Spark'",
+        "renderEditsMarkdown for two fake results (one pass at 14000 ms, one fail with 2 turns) returns a markdown table with 2 data rows, a totals row and the model id, and contains no 'http' substring",
+        "run() without META_API_KEY rejects with a message containing 'META_API_KEY' and performs no network call (the test stubs fetch to fail the test if it is called)"
+      ],
+      "labels": [
+        "scripts",
+        "test"
+      ],
+      "dependsOn": [
+        "US-013"
+      ]
+    }
+  ]
+}

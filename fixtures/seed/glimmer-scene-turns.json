@@ -1,0 +1,35 @@
+[
+  {
+    "ms": 17004,
+    "status": 200,
+    "calls": [
+      "addScene({\"id\":\"scene1\",\"durationSec\":4,\"intent\":\"white ceramic mug hero intro with warm background and headline\"})"
+    ],
+    "content": ""
+  },
+  {
+    "ms": 20788,
+    "status": 200,
+    "calls": [
+      "addLayer({\"sceneId\":\"scene1\",\"layerId\":\"scene1_bg_plate\",\"kind\":\"image\",\"role\":\"bg\",\"z\":0})",
+      "addLayer({\"sceneId\":\"scene1\",\"layerId\":\"scene1_headline\",\"kind\":\"text\",\"role\":\"headline\",\"text\":\"Slow mornings\",\"z\":1})",
+      "addLayer({\"sceneId\":\"scene1\",\"layerId\":\"scene1_mug\",\"kind\":\"image\",\"role\":\"product\",\"z\":2})"
+    ],
+    "content": ""
+  },
+  {
+    "ms": 24309,
+    "status": 200,
+    "calls": [
+      "setKeyframes({\"layerId\":\"scene1_headline\",\"property\":\"opacity\",\"keys\":[[0,0],[1,0],[1.5,1]],\"ease\":\"easeIn\"})",
+      "setKeyframes({\"layerId\":\"scene1_mug\",\"property\":\"scale\",\"keys\":[[0,0.9],[4,1]],\"ease\":\"easeOut\"})"
+    ],
+    "content": ""
+  },
+  {
+    "ms": 4065,
+    "status": 200,
+    "calls": [],
+    "content": "DONE"
+  }
+]

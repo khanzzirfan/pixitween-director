@@ -1,0 +1,500 @@
+{
+  "name": "PixiTween Director S9: Local mode on Muse Glimmer",
+  "branchName": "ralph/s09-local-mode",
+  "description": "Local mode: chat edits (and frame review when the reviewer hook is adopted) run on Muse Glimmer 30B through Ollama's native API for privacy, offline use and zero cost, with automatic fallback when the Meta API fails, a typed Spark Open stub, a toggle and badge, and an owner-run A/B script. The route lives in handlers/local.ts, the UI in the BackendBadge stub S9 owns. Never positioned as faster than Spark.",
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-09-open-weight-lane/requirements.md",
+      "docs/hackathon/steps/step-09-open-weight-lane/design.md",
+      "docs/hackathon/steps/step-09-open-weight-lane/contract-issues.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (LlmBackend, ToolDef, FilmEvent, authoring core API)",
+      "docs/hackathon/steps/step-09-open-weight-lane/design.md (sections 3, 5, 6, 7 and 11: routing, Glimmer rules, verified Ollama facts)",
+      "docs/hackathon/steps/step-09-open-weight-lane/contract-issues.md (which gaps the contract update resolved; what remains)",
+      "docs/hackathon/06-contracts.md sections 5 (GET/PUT /api/local-mode) and 6 (D-1, D-5, D-6, D-8, D-10)",
+      "docs/hackathon/steps/step-01-meta-api-probes/findings.md (Glimmer section: measured behaviour)",
+      "fixtures/seed/README.md and fixtures/seed/glimmer-*.json (the seed transcripts are summaries)",
+      "server/llm/backend.ts, server/llm/router.ts, server/llm/spark-backend.ts and server/meta/http.ts (S2) before writing any adapter"
+    ],
+    "requires": [
+      "prd-s02-skeleton",
+      "prd-s06-chat-edit"
+    ],
+    "owns": [
+      "server/llm/glimmer-backend.ts",
+      "server/llm/spark-open-backend.ts",
+      "server/llm/router.ts",
+      "server/llm/local-mode.ts",
+      "server/http/handlers/local.ts",
+      "server/http/handlers/local.test.ts",
+      "server/llm/glimmer/*",
+      "web/src/panels/BackendBadge.tsx",
+      "web/src/panels/backend-badge/*",
+      "scripts/live/s09-local.ts",
+      "fixtures/s09/*",
+      "docs/local-mode.md"
+    ],
+    "extraGuardrails": [
+      "Never contact Ollama, Baseten or the Meta API from a story or a test: use the node:http mock server and the fixtures. The s09-local script is created, never run.",
+      "Always send think:false and use the format field (never response_format) on Ollama's native /api/chat; encode these rules in tests.",
+      "Never claim Muse Glimmer is faster than Muse Spark, and never write 'fully offline' for the product (design sections 1 and 10).",
+      "Do not edit server/http/routes.ts, server/http/middleware.ts or web/src/panels/Chat.tsx: routes register through handlers/local.ts (06 D-1), and S6's Chat already renders <BackendBadge /> (D-6).",
+      "Read GLIMMER_BASE_URL, GLIMMER_MODEL, LOCAL_MODE, EDIT_BACKEND, BASETEN_API_KEY and GLIMMER_NUM_CTX from the validated env object (06 D-8); never read process.env for them and never edit server/env.ts."
+    ],
+    "manualGates": [
+      "MG-1 (owner, Ollama running with muse-glimmer:30b-mlx pulled, $0): npm run live -- s09-local --yes. Paste the printed table into steps/step-09-open-weight-lane/ab.md. At least 5 of 6 edits correct; any 'context truncation suspected' warning explained.",
+      "MG-1b (optional, about $0.01 of API calls, owner approves): npm run live -- s09-local --with-spark --yes for the Spark side of the A/B.",
+      "MG-2 (optional, owner approves a 65 GB download): GLIMMER_MODEL=muse-glimmer:30b-mlx-bf16-dflash npm run live -- s09-local --yes; keep that build only if it is at least 1.5 times faster on the same edits.",
+      "MG-3 (owner): record the Wi-Fi-off clip with the checklist in design section 9 (terminal showing ollama ps, toggle on, three edits with the badge, the new-art boundary hint, one Spark edit for contrast).",
+      "MG-4 (owner): confirm on the hosted demo that the toggle is disabled with the reason 'Ollama is not reachable'."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Transcript fixtures: rebuild raw Ollama responses from seed summaries",
+      "description": "As a test author, I want the seed Glimmer transcripts turned into raw Ollama responses so that backend tests replay real shapes without a model.",
+      "steps": [
+        "Read fixtures/seed/README.md, fixtures/seed/glimmer-scene-turns.json and fixtures/seed/glimmer-edit-1-turns.json (they are per-turn summaries: ms, status, calls as 'name(argsJSON)' strings, content), and docs/hackathon/steps/step-09-open-weight-lane/design.md sections 4.1 and 4.2.",
+        "Create fixtures/s09/transcripts.ts exporting parseCallSummary(s: string): { name: string; args: Record<string, unknown> } (name = text before the first '(', args = JSON.parse of the text between the first '(' and the last ')'), type TranscriptTurn = { ms: number; status: number; calls: string[]; content: string }, loadTranscript(name: 'scene' | 'edit-1'): TranscriptTurn[] (reads the seed JSON with node:fs relative to the repository root), and toOllamaResponse(turn: TranscriptTurn, model = 'muse-glimmer:30b-mlx').",
+        "toOllamaResponse returns the documented shape { model, created_at: '2026-10-27T00:00:00Z', message: { role: 'assistant', content, tool_calls?: [{ function: { name, arguments } }] }, done: true, done_reason: 'stop', total_duration: turn.ms * 1e6, load_duration: 10000000, prompt_eval_count: 71, prompt_eval_duration: 590000000, eval_count: 104, eval_duration: 4900000000 }. Omit tool_calls when there are no calls. Comment the constants: they are shape-only sample values taken from the S1 throughput sample, not measurements for any run.",
+        "Create fixtures/s09/transcripts.test.ts."
+      ],
+      "acceptance": [
+        "loadTranscript('scene') has 4 turns with call counts [1, 3, 2, 0] and ms values [17004, 20788, 24309, 4065]; loadTranscript('edit-1') has 2 turns with call counts [2, 0]",
+        "parseCallSummary('setKeyframes({\"layerId\":\"mug\",\"property\":\"scale\",\"keys\":[[0,1],[6,1.25]],\"ease\":\"easeInOut\"})') returns name 'setKeyframes' and args.keys equal to [[0,1],[6,1.25]]",
+        "toOllamaResponse of the last scene turn has message.content 'DONE', no tool_calls key, done true and total_duration 4065000000",
+        "toOllamaResponse of the first edit-1 turn has message.tool_calls with 2 entries whose function.arguments are objects, not strings"
+      ],
+      "labels": [
+        "backend",
+        "llm",
+        "fixtures"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Parse Ollama chat responses into tool calls and usage",
+      "description": "As a backend developer, I want a pure parser for Ollama's native chat response so that tool calls, ids and timing are extracted in one tested place.",
+      "steps": [
+        "Read docs/hackathon/steps/step-09-open-weight-lane/design.md sections 4.1 and 4.3 (arguments is a JSON object, there is no tool-call id, durations are nanoseconds), server/llm/backend.ts (S2) for the ToolCall shape, and fixtures/s09/transcripts.ts.",
+        "Create server/llm/glimmer/errors.ts exporting class GlimmerError extends Error with a code of 'unreachable' | 'http' | 'tool-parse' | 'invalid-json' | 'timeout' | 'model-missing', an optional numeric status, and name 'GlimmerError'.",
+        "Create server/llm/glimmer/parse.ts exporting parseOllamaChat(raw: unknown, opts?: { turn?: number; wallMs?: number }): { toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }>; content: string; ms: number; usage: { promptTokens?: number; outputTokens?: number; tokPerSec?: number }; doneReason?: string }.",
+        "Rules: ids are 'glimmer-<turn>-<index>' (turn defaults to 0); arguments that are strings are JSON.parse'd and a parse failure throws GlimmerError('tool-parse'); a response without a message object throws GlimmerError('http', undefined, 'response has no message'); ms = Math.round(total_duration / 1e6) when numeric, else opts.wallMs ?? 0; tokPerSec = eval_count / (eval_duration / 1e9) rounded to one decimal when both are positive numbers; content is the message content string ('' when absent); the 'thinking' field is ignored.",
+        "Create server/llm/glimmer/parse.test.ts using toOllamaResponse from fixtures/s09/transcripts.ts."
+      ],
+      "acceptance": [
+        "For scene turn index 1 (3 calls) with opts.turn 1 the ids are 'glimmer-1-0', 'glimmer-1-1' and 'glimmer-1-2', content is '' and ms is 20788",
+        "With the sample stats (eval_count 104, eval_duration 4.9e9) usage.tokPerSec is 21.2 and usage.promptTokens is 71",
+        "A call whose arguments is the string '{\"a\":1}' yields args { a: 1 }, and the string '{bad' throws a GlimmerError whose code is 'tool-parse'",
+        "parseOllamaChat({}) throws a GlimmerError with code 'http'; with no total_duration and opts.wallMs 1234, ms is 1234"
+      ],
+      "labels": [
+        "backend",
+        "llm"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Convert tool definitions to Ollama tools with Glimmer hints",
+      "description": "As a backend developer, I want tool schemas converted with explicit z and keys descriptions so that the model uses depth and keyframes the way S1 showed it needs.",
+      "steps": [
+        "Read docs/hackathon/steps/step-09-open-weight-lane/design.md sections 5.1 and 6, shared/tools.ts (ToolDef) and server/llm/spark-backend.ts (S2) to see how it turns ToolDef.params (zod) into JSON schema; reuse an exported helper if one exists, otherwise use zodToJsonSchema from 'zod-to-json-schema' directly with $refStrategy 'none'.",
+        "Create server/llm/glimmer/schema.ts exporting type OllamaTool = { type: 'function'; function: { name: string; description: string; parameters: Record<string, unknown> } } and toOllamaTools(tools: ToolDef[]): OllamaTool[] preserving order, deleting any '$schema' key, and applying augmentToolSchemas.",
+        "Export Z_HINT = 'Depth. Larger = further from the camera; the background has the largest z.' and KEYS_HINT = 'Keyframes as [timeSec, value] pairs; timeSec is seconds from the scene start.'. augmentToolSchemas sets description to Z_HINT on any object property named 'z' that has no description, and to KEYS_HINT on any property named 'keys' that has no description; existing descriptions are kept.",
+        "Create server/llm/glimmer/schema.test.ts with two inline ToolDefs built with zod."
+      ],
+      "acceptance": [
+        "A tool with params z.object({ layerId: z.string(), z: z.number().optional() }) yields function.parameters.properties.z.description equal to Z_HINT",
+        "A property 'keys' typed as an array of [number, number] tuples gets KEYS_HINT, and a property that already has .describe('mine') keeps 'mine'",
+        "The output has type 'function', copies name and description, has no '$schema' key anywhere at the top level of parameters, and keeps the input order",
+        "A tool with no params properties still yields parameters of type 'object'"
+      ],
+      "labels": [
+        "backend",
+        "llm"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-004",
+      "title": "Map chat messages to Ollama messages",
+      "description": "As a backend developer, I want conversation messages translated to Ollama's format so that tool results are matched by tool_name and the local-model rules are added for edits.",
+      "steps": [
+        "Read server/llm/backend.ts (S2) to learn the exact ChatMessage and ToolCall shapes, in particular how an assistant turn records its tool calls and how a tool result records which call it answers; adapt the mapping to the real shapes and record any difference in notes. Read docs/hackathon/steps/step-09-open-weight-lane/design.md sections 4.1 and 6.",
+        "Create server/llm/glimmer/messages.ts exporting LOCAL_EDIT_ADDENDUM (the exact text: \"(Local model rules) Make every change the user asks for in ONE turn by calling all the tools you need together. Do not explain. Do not call tools you do not need.\\nTimes are seconds from the start of the scene. Scale is a fraction (1 = 100%). z is depth: larger = further from the camera, so the background has the largest z.\") and toOllamaMessages(messages: ChatMessage[], opts?: { task?: 'storyboard' | 'build' | 'edit' | 'review'; parallelHint?: boolean }): OllamaMessage[].",
+        "Mapping: system, user and plain assistant messages pass through; an assistant message with tool calls becomes { role: 'assistant', content, tool_calls: [{ function: { name, arguments: <object> } }] }; a tool result becomes { role: 'tool', tool_name, content } where tool_name is found by matching the result's call id to the earlier assistant message's calls (fall back to positional order when ids are missing).",
+        "When opts.task is 'edit', append '\\n' plus LOCAL_EDIT_ADDENDUM to the first system message (insert one if none exists). When opts.parallelHint is true also add the sentence 'You may call several tools in one turn.' once. For other tasks leave the system message unchanged.",
+        "Create server/llm/glimmer/messages.test.ts."
+      ],
+      "acceptance": [
+        "A conversation [system, user, assistant with calls glimmer-0-0 (addScene) and glimmer-0-1 (addLayer), tool result for glimmer-0-0, tool result for glimmer-0-1] maps to 5 messages whose two tool messages have tool_name 'addScene' and 'addLayer' in that order",
+        "With task 'edit' the system content ends with LOCAL_EDIT_ADDENDUM exactly; with task 'storyboard' the system content is unchanged",
+        "With parallelHint true the sentence 'You may call several tools in one turn.' appears exactly once in the system content",
+        "Assistant tool_calls arguments in the output are objects, never strings"
+      ],
+      "labels": [
+        "backend",
+        "llm"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Glimmer backend: native /api/chat with typed errors",
+      "description": "As a router maintainer, I want a Glimmer LlmBackend over Ollama's native chat API so that local edits use thinking off and the documented tool-call format.",
+      "steps": [
+        "Read server/llm/backend.ts and server/llm/spark-backend.ts (S2) for the LlmBackend interface and how Spark builds its result, server/llm/glimmer/{parse,schema,messages,errors}.ts, and docs/hackathon/steps/step-09-open-weight-lane/design.md sections 3.2, 5.1 and 7.",
+        "Create server/llm/glimmer-backend.ts (an S2 stub today; fill it) exporting makeGlimmerBackend(opts: { baseUrl: string; model: string; task?: 'storyboard' | 'build' | 'edit' | 'review'; fetchImpl?: typeof fetch; timeoutMs?: number; keepAlive?: string; numCtx?: number }): LlmBackend, with id 'glimmer'. Defaults: timeoutMs 300000, keepAlive '30m'.",
+        "chatWithTools(messages, tools, o) POSTs JSON to `${baseUrl}/api/chat` with { model, stream: false, think: false, keep_alive, messages: toOllamaMessages(messages, { task, parallelHint: o?.parallelHint }), tools: toOllamaTools(tools) } plus options: { num_ctx } only when numCtx is set. Never send response_format. The turn number passed to parseOllamaChat is the count of assistant messages already in the conversation.",
+        "Error mapping: a fetch rejection that is not a timeout throws GlimmerError('unreachable'); AbortSignal.timeout expiry throws 'timeout'; a 404 or a body whose error text contains 'not found' throws 'model-missing'; a 500 whose error text contains 'parse' and 'call' throws 'tool-parse'; any other non-2xx throws 'http' with the status.",
+        "Create server/llm/glimmer-backend.test.ts with a node:http mock server on an ephemeral port that replays toOllamaResponse(loadTranscript('scene')) turns in order and records each request body."
+      ],
+      "acceptance": [
+        "Driving the 4-turn scene transcript returns tool-call counts [1, 3, 2, 0], the last result has content 'DONE', and result.ms equals the transcript's ms for each turn",
+        "Every recorded request body has model 'muse-glimmer:30b-mlx', think false, stream false, keep_alive '30m', tools[0].type 'function', and no 'response_format' key",
+        "The backend's id is 'glimmer'; with numCtx 8192 the body has options.num_ctx 8192 and without numCtx it has no options key",
+        "A 404 reply with body {\"error\":\"model 'x' not found\"} throws GlimmerError code 'model-missing'; a closed port throws code 'unreachable'; a 500 reply with the text 'parse Glimmer call to addLayer: missing ATEM function_calls wrapper' throws code 'tool-parse'"
+      ],
+      "labels": [
+        "backend",
+        "llm"
+      ],
+      "dependsOn": [
+        "US-002",
+        "US-004"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Closing-turn skip, request serialisation and context guard",
+      "description": "As an editor in Local mode, I want the backend to skip the redundant DONE turn, serialise requests and warn about truncated prompts so that local edits are as quick and safe as the hardware allows.",
+      "steps": [
+        "Read server/llm/glimmer-backend.ts and docs/hackathon/steps/step-09-open-weight-lane/design.md sections 5.3, 5.6 and 5.7.",
+        "Edit server/llm/glimmer-backend.ts: add options skipClosingTurn?: boolean (the router sets it for task 'edit') and onWarning?: (message: string) => void. When skipClosingTurn is true and the conversation ends with one or more tool-result messages, every result content parses as JSON with ok true, and the preceding assistant message had at least one tool call, return { toolCalls: [], content: 'DONE', ms: 0, skipped: true } without any HTTP request. If any result has ok false (or is not valid JSON), send the request normally.",
+        "Serialise calls: chain chatWithTools through a per-backend promise queue so two concurrent calls never overlap; a rejected call must not block the queue.",
+        "Context guard: after each response compare usage.promptTokens with an estimate of the sent prompt (JSON.stringify of messages and tools, characters divided by 4). When promptTokens is below 60% of the estimate call onWarning('context truncation suspected (prompt_eval_count=<n> estimate=<m>)') and console.warn the same text.",
+        "Extend server/llm/glimmer-backend.test.ts using the edit-1 transcript and a mock server that counts requests and can delay replies."
+      ],
+      "acceptance": [
+        "With skipClosingTurn true, the edit-1 flow (turn 1 returns 2 tool calls, all results {\"ok\":true}) makes exactly 1 HTTP request and the second chatWithTools returns content 'DONE' with skipped true",
+        "If one result is {\"ok\":false,\"error\":\"x\"} the second chatWithTools does send a request (2 requests in total); with skipClosingTurn false it also sends the request",
+        "Two simultaneous chatWithTools calls against a mock server that delays 50 ms are processed one after the other (the second request arrives after the first reply was sent), and a failing first call does not block the second",
+        "A reply with prompt_eval_count 10 for a prompt of about 4000 characters triggers onWarning with text containing 'context truncation suspected'; prompt_eval_count 1000 does not"
+      ],
+      "labels": [
+        "backend",
+        "llm"
+      ],
+      "dependsOn": [
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "JSON mode with format, and local image review",
+      "description": "As a backend developer, I want JSON answers through Ollama's format field and an image reviewer so that structured outputs and frame review also work locally.",
+      "steps": [
+        "Read server/llm/glimmer-backend.ts, docs/hackathon/steps/step-09-open-weight-lane/design.md sections 3.4 and 5.1 (use format, never response_format; images are base64 strings in the message's images field), and 06-contracts.md section 4 (MetaClients.spark.reviewImages signature).",
+        "Edit server/llm/glimmer-backend.ts: add chatJson<T = unknown>(messages: ChatMessage[], schema: object, validate?: (v: unknown) => T): Promise<T> to the returned backend object. It sends { model, stream: false, think: false, keep_alive, messages (toOllamaMessages), format: schema } and returns JSON.parse of message.content, passed through validate when given; non-JSON content throws GlimmerError('invalid-json').",
+        "Create server/llm/glimmer/review.ts exporting glimmerReviewImages(images: Buffer[], prompt: string, schema?: object, opts: { baseUrl: string; model: string; fetchImpl?: typeof fetch }): Promise<unknown>. It builds one user message { role: 'user', content: prompt, images: images.map(b => b.toString('base64')) }, sends think false and format = schema ?? 'json', and returns the parsed JSON (same error mapping as the backend).",
+        "Create server/llm/glimmer/review.test.ts and extend the backend tests using the mock server."
+      ],
+      "acceptance": [
+        "chatJson sends a body whose format deep-equals the schema argument, with think false and stream false and no 'response_format' key, and returns the parsed object",
+        "Content '12s{' makes chatJson throw GlimmerError with code 'invalid-json'",
+        "glimmerReviewImages with two Buffers sends one user message whose images array has 2 base64 strings equal to buffer.toString('base64')",
+        "glimmerReviewImages with no schema sends format 'json'"
+      ],
+      "labels": [
+        "backend",
+        "llm",
+        "review"
+      ],
+      "dependsOn": [
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Local-mode state and Glimmer status with a 60 s cache",
+      "description": "As a developer of the router and the UI, I want one place for the Local-mode flag and Ollama's status so that decisions are consistent and cheap.",
+      "steps": [
+        "Read docs/hackathon/steps/step-09-open-weight-lane/design.md sections 3.3, 4.3 and 5.4, and server/env.ts (S2) for the validated GLIMMER_BASE_URL, GLIMMER_MODEL and LOCAL_MODE keys (never read process.env for them).",
+        "Create server/llm/local-mode.ts exporting getLocalMode(): boolean, setLocalMode(v: boolean): void (module state; the initial value is the validated LOCAL_MODE from server/env.ts, 06 D-8, read lazily on first use; resetLocalModeForTests(initial = false) resets it), resetLocalModeForTests(), and getGlimmerStatus(opts?: { baseUrl?: string; model?: string; fetchImpl?: typeof fetch; now?: () => number; forceRefresh?: boolean }): Promise<LocalModeStatus['glimmer']> with the shape in design 4.3.",
+        "getGlimmerStatus: GET `${baseUrl}/api/tags` with a 1.5 s timeout; reachable = the request succeeded with a JSON body; modelPresent = some models[].name equals the model; when reachable also GET `${baseUrl}/api/ps` and set loaded = some models[].name equals the model (null when /api/ps fails). On failure return { reachable: false, modelPresent: false, loaded: null, error: <message>, ... }. host = the URL's host (for example 'localhost:11434'); checkedAt is an ISO string from now(). Cache the result for 60 seconds per (baseUrl, model); forceRefresh bypasses it.",
+        "Create server/llm/local-mode.test.ts with an injected fetch and clock."
+      ],
+      "acceptance": [
+        "With /api/tags returning { models: [{ name: 'muse-glimmer:30b-mlx' }] } the status is reachable true and modelPresent true; with another model name modelPresent is false",
+        "When /api/ps lists the model loaded is true, when it lists nothing loaded is false, and when /api/ps fails loaded is null",
+        "Two calls 30 s apart cause 2 fetches in total (tags and ps once); a call 61 s later fetches again; forceRefresh fetches again immediately",
+        "A rejected fetch returns reachable false with a non-empty error string; getLocalMode is false when the injected env has LOCAL_MODE false, true when it has LOCAL_MODE true, and true after setLocalMode(true)"
+      ],
+      "labels": [
+        "backend",
+        "llm"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-009",
+      "title": "Router: Local mode, API-failure fallback and tool denylist",
+      "description": "As an edit-loop maintainer, I want pickBackend to choose Glimmer or Spark by the documented table so that Local mode and fallback work without the loop knowing about them.",
+      "steps": [
+        "Read server/llm/router.ts (the S2 stub: Spark-only bodies), server/llm/spark-backend.ts, server/meta/http.ts (the MetaApiError class and its status field), docs/hackathon/06-contracts.md section 6 D-5 and D-10, and docs/hackathon/steps/step-09-open-weight-lane/design.md sections 3.1, 5.2 and 5.5. Adapt names to the real code and record differences in notes.",
+        "Edit server/llm/router.ts: implement createRouter(deps: { makeSpark: () => LlmBackend; makeGlimmer: (task) => LlmBackend; getStatus: () => Promise<{ reachable: boolean }>; getLocal: () => boolean }) and export pickBackend(task, opts?: { local?: boolean; onFallback?: (info: { from: string; to: string; reason: string }) => void }): LlmBackend (the D-5 signature) built from the real defaults (makeGlimmerBackend with GLIMMER_BASE_URL, GLIMMER_MODEL, skipClosingTurn true for task 'edit').",
+        "Decision table: edit and review use Glimmer when opts.local === true or (opts.local === undefined and getLocal()) (an explicit opts.local, which S6's runEdit forwards from the chat request body per D-10, beats the global Local-mode default); storyboard and build use Glimmer only when opts.local === true; opts.local === false always means Spark without fallback. Otherwise Spark wrapped by withFallback.",
+        "shouldFallback(err): true for a MetaApiError with status 402 or >= 500, and for network failures (TypeError 'fetch failed', AbortError, TimeoutError); false for other 4xx and for anything else. withFallback tries Spark, and on shouldFallback and a reachable Glimmer calls opts.onFallback({ from: 'spark', to: 'glimmer', reason: <for example 'Meta API 402'> }) (console.warn when absent) and answers with Glimmer; when Glimmer is unreachable it rethrows Spark's original error.",
+        "Local edit tool denylist: when Glimmer serves task 'edit', wrap chatWithTools so tools named generatePlate, placeProduct, addSubject, replacePlate, proposeGenerate or reviewScene are removed before the call.",
+        "Create server/llm/router.test.ts with fake backends (makeFakeBackend from server/llm/fake-backend.ts or plain objects) covering the whole table."
+      ],
+      "acceptance": [
+        "Local flag off: edit -> spark; flag on: edit -> glimmer and review -> glimmer; flag on with opts.local false: edit -> spark; flag on: storyboard -> spark; opts.local true: storyboard -> glimmer",
+        "Spark throwing a MetaApiError with status 402 and Glimmer reachable returns Glimmer's result and calls onFallback once with from 'spark', to 'glimmer' and a reason containing '402'; status 503 behaves the same; status 400 is rethrown and Glimmer is not called",
+        "Spark throwing TypeError('fetch failed') falls back to Glimmer when reachable; with Glimmer unreachable the original Spark error is rethrown",
+        "In Local mode for task 'edit' a tool list [generatePlate, setKeyframes, replacePlate] reaches Glimmer as [setKeyframes] only, while Spark receives all three",
+        "opts.local false never falls back: Spark's 503 is rethrown even when Glimmer is reachable"
+      ],
+      "labels": [
+        "backend",
+        "llm",
+        "router"
+      ],
+      "dependsOn": [
+        "US-005",
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "pickReviewer: local or API frame review",
+      "description": "As a visual-review maintainer, I want one function that returns the right image reviewer so that Local mode covers frame review, as the contract requires S5b to call it.",
+      "steps": [
+        "Read server/llm/router.ts (D-5: pickReviewer(opts?: { local?: boolean }) is part of the contract and S5b must call it), server/llm/glimmer/review.ts, docs/hackathon/steps/step-09-open-weight-lane/design.md section 3.4, and how S2's stub obtains the Spark reviewer (MetaClients.spark.reviewImages in 06-contracts.md section 4).",
+        "Edit server/llm/router.ts: export pickReviewer(opts?: { local?: boolean; onFallback?: ... }): { id: 'spark' | 'glimmer'; reviewImages(images: Buffer[], prompt: string, schema?: object): Promise<unknown> }. Make the Spark reviewer and the Glimmer reviewer injectable through createRouter so tests need no network.",
+        "Rules mirror edit routing: Glimmer when opts.local === true or (opts.local === undefined and getLocalMode()); opts.local === false forces Spark without fallback; otherwise Spark with the same shouldFallback and reachability fallback to glimmerReviewImages.",
+        "Extend server/llm/router.test.ts."
+      ],
+      "acceptance": [
+        "With the local flag on, pickReviewer returns id 'glimmer' and calling reviewImages hits the injected Glimmer reviewer, never the Spark reviewer",
+        "With the flag off it returns id 'spark' and delegates to the injected Spark reviewer with the same arguments",
+        "Spark's reviewer rejecting with a 402 MetaApiError falls back to the Glimmer reviewer when reachable and calls onFallback once; a 400 is rethrown",
+        "With opts.local false a 503 from Spark is rethrown and the Glimmer reviewer is not used"
+      ],
+      "labels": [
+        "backend",
+        "llm",
+        "review"
+      ],
+      "dependsOn": [
+        "US-007",
+        "US-009"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Spark Open typed stub",
+      "description": "As a future integrator, I want a typed Spark Open backend stub and a selection rule so that Baseten can be wired later without touching the router's shape.",
+      "steps": [
+        "Read docs/hackathon/steps/step-09-open-weight-lane/design.md sections 7 and 12 (V12, V13: Baseten base URL https://inference.baseten.co/v1, slug meta-models/muse-spark-open-1026) and server/llm/router.ts.",
+        "Create server/llm/spark-open-backend.ts exporting BASETEN_BASE_URL, SPARK_OPEN_MODEL, class NotImplementedError and makeSparkOpenBackend(opts?: { apiKey?: string; baseUrl?: string; model?: string }): LlmBackend with id 'spark-open' whose chatWithTools throws NotImplementedError('spark-open backend is not implemented; it needs Baseten credits').",
+        "Edit server/llm/router.ts: when the validated env (06 D-8) has EDIT_BACKEND 'spark-open' and a BASETEN_API_KEY, tasks 'edit' and 'review' return the stub (before the Local-mode rules); when EDIT_BACKEND is 'spark-open' but the key is missing log one warning and ignore it. Make the env object injectable through createRouter.",
+        "Extend server/llm/router.test.ts."
+      ],
+      "acceptance": [
+        "With an injected env of EDIT_BACKEND 'spark-open' and BASETEN_API_KEY 'x' the router returns a backend with id 'spark-open' for task 'edit', and its chatWithTools rejects with a NotImplementedError",
+        "With an injected env of EDIT_BACKEND 'spark-open' and no key the router returns the normal choice and logs one warning (console.warn called once across two picks)",
+        "SPARK_OPEN_MODEL equals 'meta-models/muse-spark-open-1026' and BASETEN_BASE_URL equals 'https://inference.baseten.co/v1'"
+      ],
+      "labels": [
+        "backend",
+        "llm"
+      ],
+      "dependsOn": [
+        "US-009"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "GET/PUT /api/local-mode handler",
+      "description": "As a UI developer, I want the Local-mode endpoints so that the toggle can read and switch Local mode from the browser.",
+      "steps": [
+        "Read server/http/handlers/local.ts (the S2 501 stub registerLocalRoutes(app, deps) that S9 fills), server/http/routes.ts (how it calls it; never edit routes.ts), server/http/middleware.ts and auth.ts (S2: the passcode middleware guards mutating routes), docs/hackathon/06-contracts.md section 5 and D-1, D-6, and docs/hackathon/steps/step-09-open-weight-lane/design.md sections 5.4 and 7.",
+        "Replace the stub body in server/http/handlers/local.ts. registerLocalRoutes(app, deps, opts?: { getStatus?: typeof getGlimmerStatus }) adds GET /api/local-mode returning 200 JSON { local, reachable, modelPresent, loaded, model, host, checkedAt, error? } (the contract's { local, reachable } plus the extra fields), and PUT /api/local-mode with JSON body { local: boolean } validated with zod (invalid body: 400 { error: 'invalid_body' }).",
+        "PUT with local true: call getStatus with forceRefresh; answer 409 { error: 'glimmer_unreachable' } when not reachable or 409 { error: 'glimmer_model_missing' } when the model is absent, without changing the flag; otherwise set the flag and return the new status. PUT with local false sets it and returns the status.",
+        "Create server/http/handlers/local.test.ts that builds a Hono app, applies the real middlewares array from server/http/middleware.ts with DIRECTOR_PASSCODE set to 'pw', calls registerLocalRoutes with a minimal fake deps and an injected getStatus."
+      ],
+      "acceptance": [
+        "GET /api/local-mode returns 200 with local, reachable, modelPresent, loaded, model, host and checkedAt",
+        "PUT with { local: true } while the injected status is unreachable returns 409 'glimmer_unreachable' and getLocalMode() stays false; with modelPresent false it returns 409 'glimmer_model_missing'",
+        "PUT with { local: true } and a reachable status with the model present returns 200 and getLocalMode() is true; PUT { local: false } turns it off",
+        "PUT without the passcode returns 401 when DIRECTOR_PASSCODE is set; PUT with the body '{}' and the passcode returns 400",
+        "git diff shows no change to server/http/routes.ts or server/http/middleware.ts"
+      ],
+      "labels": [
+        "backend",
+        "http",
+        "llm"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "LocalModeToggle panel",
+      "description": "As an owner, I want a switch for Local mode that explains why it is unavailable so that I can turn private mode on and trust what it says.",
+      "steps": [
+        "Read web/src/api/client.ts (S2) for how requests add the passcode header, an existing panel and its test for conventions, and docs/hackathon/steps/step-09-open-weight-lane/design.md sections 3.1, 7 and 10.",
+        "Create web/src/panels/backend-badge/LocalModeToggle.tsx with props { fetchStatus?: () => Promise<LocalModeStatus>; putLocal?: (v: boolean) => Promise<LocalModeStatus | { error: string; message?: string }> } (LocalModeStatus is the flat shape returned by GET /api/local-mode) defaulting to GET and PUT on /api/local-mode through the client helper. Render a switch (role 'switch', aria-checked) labelled 'Local mode (Muse Glimmer)'.",
+        "Status line texts: ready -> 'Muse Glimmer 30B on <host> - ready'; unreachable -> 'Ollama is not reachable at <host>. Start it with `ollama serve`.' with the switch disabled; model missing -> 'Model not found. Pull it with `ollama pull <model>`.' with the switch disabled; a 409 reply shows its message under the switch. When on, also show 'Edits stay on this computer. New art still uses the Meta API.'",
+        "Poll fetchStatus every 30 seconds (clear the interval on unmount). Create web/src/panels/backend-badge/LocalModeToggle.test.tsx with fake timers and injected functions."
+      ],
+      "acceptance": [
+        "With a ready status the switch is enabled and the text 'Muse Glimmer 30B on localhost:11434 - ready' is shown; toggling it calls putLocal(true)",
+        "With reachable false the switch is disabled and the text mentions 'ollama serve'; with modelPresent false the text contains 'ollama pull muse-glimmer:30b-mlx'",
+        "When putLocal resolves { error: 'glimmer_unreachable', message: 'nope' } the text 'nope' appears and the switch stays off",
+        "Advancing fake timers by 30 seconds calls fetchStatus a second time, and unmounting stops further polling",
+        "When local is on the text 'New art still uses the Meta API.' is visible"
+      ],
+      "labels": [
+        "frontend",
+        "ui",
+        "llm"
+      ],
+      "dependsOn": [
+        "US-012"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "formatBadge: which model made the last edit",
+      "description": "As a viewer, I want a text that says which model made the last edit and how long it took so that Local mode is visible and honest.",
+      "steps": [
+        "Read shared/events.ts (FilmEvent: agent.turn { backend, ms, calls, reply? } and error { where, status?, message }) and docs/hackathon/steps/step-09-open-weight-lane/design.md sections 3.1, 4.3 and 8.",
+        "Create web/src/panels/backend-badge/format.ts exporting formatBadge(events: FilmEvent[]): { backend: 'spark' | 'glimmer' | 'spark-open'; seconds: number; local: boolean; fallbackFrom?: { status?: number }; text: string } | null.",
+        "formatBadge finds the last 'agent.turn' event. seconds = Math.round(ms / 1000). Texts: glimmer -> 'edited by Muse Glimmer (local) · <s> s'; spark -> 'edited by Muse Spark · <s> s'; spark-open -> 'edited by Muse Spark Open · <s> s'. When an 'error' event with where 'llm.fallback' lies between the previous agent.turn and the last one, the text becomes 'Meta API unavailable (<status>): used Muse Glimmer (local) · <s> s' using the event's status (or the first 3-digit status found in its message; omit the parentheses when none).",
+        "Create web/src/panels/backend-badge/format.test.ts."
+      ],
+      "acceptance": [
+        "An agent.turn event with backend 'glimmer' and ms 24300 gives the text 'edited by Muse Glimmer (local) · 24 s'; ms 24500 gives '25 s'",
+        "A spark turn with ms 14000 gives 'edited by Muse Spark · 14 s'",
+        "An llm.fallback error event with status 402 followed by a glimmer turn of 31000 ms gives 'Meta API unavailable (402): used Muse Glimmer (local) · 31 s'",
+        "With no agent.turn events formatBadge returns null"
+      ],
+      "labels": [
+        "frontend",
+        "llm"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-015",
+      "title": "Fill BackendBadge: badge plus Local-mode toggle",
+      "description": "As an owner, I want the chat header to show the model badge and the Local-mode switch so that I can see and control the model while editing.",
+      "steps": [
+        "Read web/src/panels/BackendBadge.tsx (the S2 stub that S9 owns), web/src/panels/Chat.tsx and its test (S6: Chat already renders <BackendBadge /> in its header, 06 D-6; do not edit Chat.tsx), web/src/api/sse.ts for the events hook, and the props the stub and Chat's call define.",
+        "Fill web/src/panels/BackendBadge.tsx keeping the props contract of the stub and Chat's usage. It renders <LocalModeToggle /> and the text from formatBadge(events), taking the events from the same source Chat uses (the SSE hook for the film id, or an events prop if the stub defines one).",
+        "Create web/src/panels/backend-badge/BackendBadge.integration.test.tsx that renders S6's Chat the way Chat's own test does, with fake fetch for /api/local-mode and a scripted event list, and asserts the behaviour below."
+      ],
+      "acceptance": [
+        "Rendering Chat shows a switch named 'Local mode (Muse Glimmer)'",
+        "After an agent.turn event with backend 'glimmer' and ms 24300 the Chat header shows the text 'edited by Muse Glimmer (local) · 24 s'",
+        "git diff shows no change to web/src/panels/Chat.tsx, and S6's existing Chat tests still pass"
+      ],
+      "labels": [
+        "frontend",
+        "ui",
+        "llm"
+      ],
+      "dependsOn": [
+        "US-013",
+        "US-014"
+      ]
+    },
+    {
+      "id": "US-016",
+      "title": "Scripted edits and a scorer for the A/B",
+      "description": "As an owner, I want six art-free scripted edits with automatic scoring so that the Glimmer vs Spark comparison is measured the same way every time.",
+      "steps": [
+        "Read docs/hackathon/06-contracts.md section 4a (authoring core API: addScene, addLayer, setTransform, setKeyframes, removeLayer, setSceneDuration, swapScenes, sceneInfo, layerInfo; layer ids are <sceneId>:<role>) and docs/hackathon/steps/step-09-open-weight-lane/design.md sections 9 and 13, and contract-issues.md item C-8.",
+        "Create server/llm/glimmer/ab.ts exporting buildSampleFilm(): AepCompositionJson (3 scenes s1, s2, s3 of 4 s each, motion mode, built with the authoring core: per scene a shape bg, an image product layer (registerAsset 'mug' with a fake src) and a text headline; scene s3 also has a caption text layer), SCRIPTED_EDITS: Array<{ id: string; message: string; selection?: { sceneId?: string; layerId?: string } }> and scoreEdit(editId: string, before: Comp, after: Comp): { pass: boolean; reasons: string[] }.",
+        "The six edits and their predicates: 'bigger-product-last-scene' ('Make the mug bigger in the last scene'): the final scale of s3:product (last keyframe value or static scale) is at least 1.2 times its starting scale; 'longer-intro' ('Make the first scene two seconds longer'): s1's duration grows by 1.9 to 2.1 s and s2 starts later by the same amount; 'headline-up' ('Move the headline up in scene 2'): s2:headline position y decreases by at least 40 px; 'swap-scenes' ('Swap scenes 2 and 3'): the scene order is s1, s3, s2; 'fade-headline-out' ('Fade the headline out over the last second of scene 1'): s1:headline opacity has a final keyframe value 0 at a time between 2.9 and 4 s; 'remove-caption' ('Remove the caption in scene 3'): s3:caption no longer exists.",
+        "Create server/llm/glimmer/ab.test.ts: for each edit apply the expected change to buildSampleFilm() with the authoring core functions and assert scoreEdit passes; assert scoreEdit fails when after equals before."
+      ],
+      "acceptance": [
+        "buildSampleFilm() passes parseAepCompositionSafe and sceneInfo reports scenes s1, s2, s3 with durations 4, 4 and 4",
+        "For each of the six edits, applying the expected change through the authoring core makes scoreEdit return pass true",
+        "For each of the six edits, scoreEdit(editId, sample, sample) returns pass false with at least one reason string",
+        "scoreEdit for 'longer-intro' fails when s1 grows by only 1 second"
+      ],
+      "labels": [
+        "backend",
+        "llm",
+        "scripts"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-017",
+      "title": "Live script s09-local: A/B on Ollama (owner-run)",
+      "description": "As an owner, I want one script that measures the six edits and a frame review on Glimmer so that I can fill in ab.md with real numbers.",
+      "steps": [
+        "Read scripts/live/run.ts (S2 dispatcher: modules export { describe, estimateUsd, run }), server/agent/edit-loop.ts (S6: the runEdit signature and the events it emits), server/test-utils/film.ts, server/llm/local-mode.ts and server/llm/glimmer/{ab,review}.ts. Adapt to S6's real names and record differences in notes.",
+        "Create scripts/live/s09-local.ts exporting describe (a string saying: needs Ollama running with the model pulled, six scripted edits plus one frame review, cost 0 locally, optional --with-spark adds about one cent of API calls), estimateUsd (a function returning 0, or 0.01 when args include --with-spark) and run(args).",
+        "run(args): refuse with a clear message when getGlimmerStatus({ forceRefresh: true }) is not reachable or the model is missing; create a test film with makeTestFilm({ composition: buildSampleFilm() }) using fake Meta clients; for each scripted edit call S6's runEdit(filmId, message, selection, { local: true }) (the D-10 signature) and record wall milliseconds, the agent.turn events, tool.call ok counts, score from scoreEdit, and any context-truncation warnings; for the frame review draw the text 'Slow mornings' across the mug on fixtures/seed/cafe-with-mug.jpg with sharp (an SVG overlay), call glimmerReviewImages with a short schema {pass, issues:[{kind, evidence}]} and record the verdict and milliseconds.",
+        "With --with-spark also run the same edits with runEdit(..., { local: false }) through the real Spark backend built from the environment (skip with a note when S2 provides no factory). The script never changes the global Local-mode flag.",
+        "Export pure helpers formatAbTable(results): string (a Markdown table: edit, backend, correct, ms, tool calls ok, tok/s) and nextIterationDir(existing: string[]): string (returns 'iteration-NN' with the next number, starting at 'iteration-01'), and write ab.json plus the table to debug/s09/<nextIterationDir>/. Create scripts/live/s09-local.test.ts for the helpers and for the export shapes; the test must not execute run."
+      ],
+      "acceptance": [
+        "The module exports describe (a non-empty string), estimateUsd and run as functions; importing it in the test does not start any request",
+        "estimateUsd([]) returns 0 and estimateUsd(['--with-spark']) returns 0.01",
+        "formatAbTable with two sample result rows returns a Markdown table with a header row, a separator row and 2 data rows",
+        "nextIterationDir([]) returns 'iteration-01' and nextIterationDir(['iteration-01', 'iteration-03']) returns 'iteration-04'"
+      ],
+      "labels": [
+        "scripts",
+        "llm"
+      ],
+      "dependsOn": [
+        "US-009",
+        "US-010",
+        "US-016"
+      ]
+    },
+    {
+      "id": "US-018",
+      "title": "docs/local-mode.md: what stays local and how to run it",
+      "description": "As a judge or user, I want an honest page on Local mode so that I know exactly what leaves the machine and what the speed trade-off is.",
+      "steps": [
+        "Read docs/hackathon/steps/step-09-open-weight-lane/design.md sections 1, 5.6 and 10 and requirements.md.",
+        "Create docs/local-mode.md with level-2 headings: What it is, Run it, What stays on your computer, What still uses the Meta API, Speed, Troubleshooting.",
+        "Document how an owner runs it (the owner does this as a manual gate; no story runs it): ollama pull muse-glimmer:30b-mlx, ollama serve, set GLIMMER_BASE_URL and GLIMMER_MODEL if different, flip the toggle in the Chat panel; on machines with under 24 GiB of VRAM start Ollama with OLLAMA_CONTEXT_LENGTH=32000 because Ollama's default context is 4k there and prompts would be truncated.",
+        "What stays local: chat edits and frame review (S5b calls pickReviewer, 06 D-5). What still uses the API: Muse Image, SAM 3.1, Voice Transcribe, the storyboard and build agent calls, and Clippy generate mode. Never write 'fully offline'.",
+        "Speed: state that Muse Glimmer is slower than Muse Spark through the API (S1 measured 19 to 33 s per tool turn against 13 to 16 s) and that Local mode is about privacy, offline use and cost; leave a table for the A/B numbers to be pasted from the live script.",
+        "Create server/llm/glimmer/docs.test.ts that reads docs/local-mode.md and asserts the headings and phrases below."
+      ],
+      "acceptance": [
+        "The file has the six level-2 headings in the stated order",
+        "It contains 'ollama pull muse-glimmer:30b-mlx', 'OLLAMA_CONTEXT_LENGTH', 'Muse Image', 'SAM 3.1' and the phrase 'slower than'",
+        "It does not contain the phrase 'fully offline' except inside the sentence 'This is not fully offline' (assert the count of occurrences is 0 or that every occurrence is preceded by 'not ')",
+        "It contains the figures '19 to 33 s' and '13 to 16 s' exactly as measured in S1"
+      ],
+      "labels": [
+        "docs",
+        "llm"
+      ],
+      "dependsOn": [
+        "US-012"
+      ]
+    }
+  ]
+}
