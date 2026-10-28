@@ -22,7 +22,7 @@ export default defineConfig({
         test: {
           name: 'web',
           environment: 'jsdom',
-          include: ['web/**/*.test.{ts,tsx}'],
+          include: ['web/**/*.test.{ts,tsx}', 'fixtures/**/*.test.ts'], // fixture tests may import the engine, which needs the jsdom project
           setupFiles: ['./web/src/test-setup.ts'],
           server: { deps: { inline: ['@pixi/react', 'reacthub-pixitweenjs'] } },
         },

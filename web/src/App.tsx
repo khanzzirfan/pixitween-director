@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useFilm } from './api/useFilm';
 import { FixturePage } from './dev/FixturePage';
 import Chat from './panels/Chat';
@@ -35,7 +35,7 @@ function Director({ filmId }: { filmId: string | null }) {
         <Slot name="review"><Review {...panelProps} /></Slot>
         <Slot name="chat"><Chat {...panelProps} player={playerRef.current} comp={film?.composition} /></Slot>
         <Slot name="generate"><GenerateApproval {...panelProps} /></Slot>
-        <Slot name="export"><ExportPanel {...panelProps} /></Slot>
+        <Slot name="export"><ExportPanel {...panelProps} getPlayer={() => playerRef.current} /></Slot>
         <Slot name="gallery"><Gallery {...panelProps} /></Slot>
       </main>
     </>
@@ -43,7 +43,14 @@ function Director({ filmId }: { filmId: string | null }) {
 }
 
 export function App() {
-  const params = new URLSearchParams(window.location.search);
+  // follow history changes, so the Gallery (which pushes ?film=<id>) can open a film without a reload
+  const [search, setSearch] = useState(window.location.search);
+  useEffect(() => {
+    const onPop = () => setSearch(window.location.search);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const params = new URLSearchParams(search);
   if (params.get('fixture') === '1') return <FixturePage />;
   return <Director filmId={params.get('film')} />;
 }
