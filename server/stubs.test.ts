@@ -14,7 +14,6 @@ const modules: Array<[string, string]> = [
   ['./review/rules', 'S5a'],
   ['./review/visual', 'S5b'],
   ['./agent/edit-loop', 'S6'],
-  ['./generate/clip-check', 'S7b'],
   ['./http/handlers/films', 'S3b'],
   ['./http/handlers/chat', 'S6'],
   ['./http/handlers/review', 'S5b'],
