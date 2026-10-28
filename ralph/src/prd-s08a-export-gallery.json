@@ -9,6 +9,7 @@
       "docs/hackathon/steps/step-08-export-and-deploy/contract-issues.md"
     ],
     "readFirst": [
+      "docs/engine/README.md (engine behaviour: composition JSON, Player slot props, layer kinds, effects, validation; read before writing code that touches the engine)",
       "docs/hackathon/06-contracts.md (shared types, file ownership, repo rules)",
       "docs/hackathon/steps/step-08-export-and-deploy/design.md (sections 3, 5 and 11: the audio design and the verified engine facts)",
       "docs/hackathon/steps/step-08-export-and-deploy/contract-issues.md (which gaps the contract update resolved; what remains)",

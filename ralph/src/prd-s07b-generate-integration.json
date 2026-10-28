@@ -9,6 +9,7 @@
       "docs/hackathon/steps/step-07-generate-mode-mcp/contract-issues.md"
     ],
     "readFirst": [
+      "docs/engine/README.md (engine behaviour: composition JSON, Player slot props, layer kinds, effects, validation; read before writing code that touches the engine)",
       "docs/hackathon/06-contracts.md (types, interfaces, authoring core 4a, helpers and test doubles 4b, HTTP 5, decisions D-1..D-14 in section 6)",
       "docs/hackathon/ralph/README.md (rules every story follows)",
       "docs/hackathon/steps/step-07-generate-mode-mcp/design.md",

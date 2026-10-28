@@ -31,7 +31,7 @@ git add -A && git commit -m "chore: scaffold from hackathon specs" && git push
 ```bash
 git worktree add ../pixitween-s02 -b ralph/s02-skeleton main
 cd ../pixitween-s02
-mkdir -p docs && ln -s ~/Documents/code/trolio/pixitween-director/docs/{hackathon,learn-improve} docs/   # specs are gitignored
+mkdir -p docs && ln -s ~/Documents/code/trolio/pixitween-director/docs/{hackathon,learn-improve,engine} docs/   # specs are gitignored
 ralph-tui run --prd ./ralph/prd-s02-skeleton.json --iterations 0
 ```
 Check `.ralph-tui/config.toml` first (`agent = "claude"`, `autoCommit = false`).

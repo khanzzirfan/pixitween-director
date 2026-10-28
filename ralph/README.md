@@ -58,7 +58,7 @@ One git worktree per concurrent Ralph run, so runs never share a working tree.
 cd ~/Documents/code/trolio/pixitween-director          # the main checkout, on main, clean
 git worktree add ../pixitween-s03 -b ralph/s03-director main
 cd ../pixitween-s03 && npm ci
-mkdir -p docs && ln -s ~/Documents/code/trolio/pixitween-director/docs/{hackathon,learn-improve} docs/   # specs are gitignored, not in the worktree
+mkdir -p docs && ln -s ~/Documents/code/trolio/pixitween-director/docs/{hackathon,learn-improve,engine} docs/   # specs are gitignored, not in the worktree
 ralph-tui run --prd ./ralph/prd-s03-director.json --iterations 0     # 0 = run until every story passes
 ```
 

@@ -9,6 +9,7 @@
       "docs/hackathon/steps/step-11-stretch/contract-issues.md"
     ],
     "readFirst": [
+      "docs/engine/README.md (engine behaviour: composition JSON, Player slot props, layer kinds, effects, validation; read before writing code that touches the engine)",
       "docs/hackathon/ralph/AUTHORING-BRIEF.md (rules for every PRD)",
       "docs/hackathon/06-contracts.md (types, interfaces, authoring core, helpers and test doubles, HTTP, and section 6: decisions D-1 to D-14)",
       "docs/hackathon/steps/step-11-stretch/design.md (SDK facts verified against @modelcontextprotocol/sdk 1.32.2, security rules, test plan)",
