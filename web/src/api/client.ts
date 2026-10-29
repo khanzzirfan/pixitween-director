@@ -37,7 +37,7 @@ function passcode(): string | null {
   }
 }
 
-async function request<T>(method: string, path: string, body?: BodyInit | null, json = false): Promise<T> {
+export async function request<T>(method: string, path: string, body?: BodyInit | null, json = false): Promise<T> {
   const headers: Record<string, string> = {};
   if (json) headers['Content-Type'] = 'application/json';
   const pass = method === 'GET' ? null : passcode();

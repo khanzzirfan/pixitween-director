@@ -1,5 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiRequestError, api } from '../api/client';
+import { ChatIntake } from '../crew/ChatIntake';
+import { PhoneView } from '../crew/PhoneFrame';
+import { getCrewConfig } from '../crew/api';
 import type { PanelProps } from './types';
 import { useRecorder } from './useRecorder';
 
@@ -14,7 +17,36 @@ const messageOf = (e: unknown) =>
         ? e.message
         : 'Unable to create film.';
 
-export default function NewFilm(_props: PanelProps) {
+/** Crew mode starts a film by chatting; off, or when the question fails, the classic form. */
+export default function NewFilm(props: PanelProps) {
+  // undefined until the server has answered: the form waits invisibly, so nobody sees it flash before the chat
+  const [crewOn, setCrewOn] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    if (typeof fetch === 'function') getCrewConfig().then((c) => live && setCrewOn(c.enabled === true), () => live && setCrewOn(false));
+    else setCrewOn(false);
+    return () => {
+      live = false;
+    };
+  }, []);
+  // one wrapper in both cases, so a form someone already started typing in is not remounted when the answer arrives
+  if (crewOn !== true) return <div style={crewOn === undefined ? { opacity: 0 } : undefined} aria-busy={crewOn === undefined}><ClassicNewFilm {...props} /></div>;
+  return (
+    <section>
+      <div className="panel-heading">
+        <div>
+          <span className="eyebrow">START WITH AN IDEA</span>
+          <h2>Make a new film</h2>
+        </div>
+      </div>
+      <PhoneView>
+        <ChatIntake />
+      </PhoneView>
+    </section>
+  );
+}
+
+function ClassicNewFilm(_props: PanelProps) {
   const [product, setProduct] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>();
   const [title, setTitle] = useState('');

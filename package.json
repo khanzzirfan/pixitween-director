@@ -16,6 +16,7 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "live": "tsx scripts/live/run.ts",
+    "e2e:crew": "E2E_CREW=1 playwright test",
     "check:bundle": "tsx scripts/check-bundle.ts",
     "start": "tsx server/main.ts"
   },

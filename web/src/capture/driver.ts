@@ -109,3 +109,31 @@ function textLayerIds(storyboard: Storyboard, sceneId: string): string[] {
   if (!scene) return [];
   return (scene.layersWanted as string[]).filter((r) => r === 'headline' || r === 'caption').map((r) => `${sceneId}:${r}`);
 }
+
+/** Captures the frames a crew critic asked for: times are seconds from the start of the scene, so the film time adds the scene's start. */
+export async function captureScene(player: PlayerHandle, storyboard: Storyboard, sceneId: string, timesSec: number[]): Promise<ReviewCapture> {
+  let start = 0;
+  let found = false;
+  for (const s of storyboard.scenes) {
+    if (s.id === sceneId) {
+      found = true;
+      break;
+    }
+    start += s.durationSec;
+  }
+  if (!found) throw new Error(`scene ${sceneId} is not in the storyboard`);
+  const plan = timesSec.map((atSec) => ({ sceneId, atSec, rootSec: Math.round((start + atSec) * 10000) / 10000 }));
+  const results = await captureFrames(plan, playerDriver(player));
+  const textBoxes: Record<string, MeasuredText> = {};
+  const app = player.getApp();
+  if (app && player.getCanvas()) {
+    const dims = ASPECT_SIZES[storyboard.aspect];
+    const screen = { w: app.screen.width, h: app.screen.height };
+    const stage = app.stage as unknown as PixiStageLike;
+    for (const r of results) {
+      const measured = measureTextBoxes(stage, screen, { w: dims.width, h: dims.height }, textLayerIds(storyboard, sceneId));
+      for (const [id, box] of Object.entries(measured)) if (!textBoxes[id]) textBoxes[id] = { frame: Math.round(r.atSec * CAPTURE_FPS), box };
+    }
+  }
+  return { frames: results.map((r) => ({ sceneId, atSec: r.atSec, blob: r.image, unstable: r.unstable, blank: r.blank })), textBoxes };
+}

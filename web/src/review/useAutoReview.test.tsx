@@ -28,6 +28,17 @@ function setup(initial: FilmEvent[] = [status('building')]) {
 }
 
 describe('useAutoReview', () => {
+  it('posts nothing for a crew film, even when it becomes ready', async () => {
+    const postFrames = vi.fn(async () => ({ geometry: null }));
+    const deps: ReviewDeps = { capture: async () => capture(6), postFrames };
+    const { result, rerender } = renderHook(({ events }: { events: FilmEvent[] }) => useAutoReview({ filmId: FILM, events, deps, crew: true }), { initialProps: { events: [status('building')] } });
+    rerender({ events: [status('building'), status('ready')] });
+    act(() => result.current.rerun());
+    await new Promise((r) => setTimeout(r, 30));
+    expect(postFrames).not.toHaveBeenCalled();
+    expect(result.current.state).toBe('idle');
+  });
+
   it('stays idle until the film is ready, then posts before frames once', async () => {
     const { result, rerender, postFrames } = setup();
     expect(result.current.state).toBe('idle');

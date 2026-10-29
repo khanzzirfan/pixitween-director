@@ -1,10 +1,11 @@
 // Owned by S12b. A whole crew with no network (DIRECTOR_FAKE=1): a scripted showrunner that reads the same BOARD text the real one gets,
 // and workers that build scenes with the authoring core after a delay, so four lanes are busy together in the offline run and the e2e.
-import type { JobKind } from '@shared/crew';
+import type { Job, JobKind } from '@shared/crew';
 import type { LlmBackend, ToolCall } from '@shared/ports';
 import { addLayer, removeLayer } from '../authoring/api';
 import { readDirector } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
+import type { CrewCtx } from './showrunner-tools';
 import type { WorkerFn } from './workers';
 
 type Call = { name: string; args: unknown };
@@ -135,12 +136,23 @@ export function createFakeWorkers(o: { delayMs?: number } = {}): Partial<Record<
   const delay = () => (o.delayMs ?? Number(process.env.DIRECTOR_FAKE_DELAY_MS ?? 400)) * 2;
   let findingSent = false;
 
-  const change: (kind: JobKind) => WorkerFn = (kind) => async (job, signal, crew) => {
+  // the lane events the real workers emit, so the offline run lights up the board and the map too
+  const lane = async <T>(job: Job, crew: CrewCtx, which: 'builder' | 'critic', run: () => Promise<T>): Promise<T> => {
+    const worker = which === 'critic' ? 'critic' : (job.worker ?? 'builder');
+    crew.emit({ type: 'crew.agent', lane: which, worker, state: 'working', jobId: job.id, model: 'muse-spark-fake' });
+    try {
+      return await run();
+    } finally {
+      crew.emit({ type: 'crew.agent', lane: which, worker, state: 'idle', jobId: job.id, model: 'muse-spark-fake' });
+    }
+  };
+
+  const change: (kind: JobKind) => WorkerFn = (kind) => (job, signal, crew) => lane(job, crew, 'builder', () => build(kind, job, signal, crew));
+  const build = async (kind: JobKind, job: Job, signal: AbortSignal, crew: CrewCtx) => {
     await sleep(delay(), signal);
     const film = await crew.films.get(job.filmId);
     const sc = film.storyboard?.scenes.find((s) => s.id === job.sceneId);
     if (!sc || !job.sceneId) throw new Error(`unknown scene ${job.sceneId}`);
-    const index = film.storyboard!.scenes.findIndex((s) => s.id === sc.id);
     const palette = film.styleBible?.palette ?? film.storyboard!.palette;
     const sceneId = job.sceneId;
     const r = await crew.films.mutate(
@@ -151,9 +163,9 @@ export function createFakeWorkers(o: { delayMs?: number } = {}): Partial<Record<
         const own = Object.entries(meta.layers).filter(([, m]) => m.sceneId === sceneId);
         if (kind === 'build-scene' || kind === 'rebuild-scene') {
           for (const [id, m] of own) if (m.role !== 'camera') c = removeLayer(c, id);
-          c = addLayer(c, { sceneId, role: 'bg', kind: 'shape', fill: palette[index % palette.length]! });
-          if (c.assets[film.brief.productAssetId]) c = addLayer(c, { sceneId, role: 'product', kind: 'image', assetId: film.brief.productAssetId });
-          if (sc.text) c = addLayer(c, { sceneId, role: 'headline', kind: 'text', text: sc.text });
+          c = addLayer(c, { sceneId, role: 'bg', kind: 'shape', fill: palette[0]! }); // the darkest colour keeps the white headline readable
+          if (c.assets[film.brief.productAssetId]) c = addLayer(c, { sceneId, role: 'product', kind: 'image', assetId: film.brief.productAssetId, box: { x: Math.round(c.width * 0.36), y: Math.round(c.height * 0.06), w: Math.round(c.width * 0.28), h: Math.round(c.height * 0.5) } }); // above the headline, so the two never overlap
+          if (sc.text) c = addLayer(c, { sceneId, role: 'headline', kind: 'text', text: sc.text, box: { x: Math.round(c.width * 0.12), y: Math.round(c.height * 0.78), w: Math.round(c.width * 0.76), h: Math.round(c.height * 0.14) } });
         } else if (kind === 'restyle-scene') {
           if (meta.layers[`${sceneId}:bg`]) c = removeLayer(c, `${sceneId}:bg`);
           c = addLayer(c, { sceneId, role: 'bg', kind: 'shape', fill: '#b45309' });
@@ -177,7 +189,7 @@ export function createFakeWorkers(o: { delayMs?: number } = {}): Partial<Record<
     'restyle-scene': change('restyle-scene'),
     edit: change('edit'),
     fix: change('fix'),
-    async critique(job, signal, crew) {
+    critique: (job, signal, crew) => lane(job, crew, 'critic', async () => {
       await sleep(delay() / 2, signal);
       // one finding, once, so the showrunner has something to answer with a fix
       if (!findingSent && job.sceneId) {
@@ -186,7 +198,7 @@ export function createFakeWorkers(o: { delayMs?: number } = {}): Partial<Record<
       }
       crew.toolCtx.ledger.add(job.filmId, 'muse-spark-1.3-contributor', 'fake critique', PRICE.critique ?? 0.01);
       return { summary: 'one finding', costUsd: PRICE.critique, model: 'fake' };
-    },
+    }),
     async continuity(_job, signal) {
       await sleep(10, signal);
       return { summary: 'no continuity errors' };

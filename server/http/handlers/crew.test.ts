@@ -41,6 +41,19 @@ async function setup() {
   return { app, deps, base, filmId: film.id, session, modelCalls };
 }
 
+describe('GET /api/crew/config', () => {
+  it('says whether crew mode is on, with no passcode', async () => {
+    process.env.DIRECTOR_PASSCODE = 'secret';
+    const t = await setup();
+    for (const [flag, enabled] of [['true', true], ['false', false]] as const) {
+      process.env.CREW_ENABLED = flag;
+      const res = await t.app.request('/api/crew/config');
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ enabled });
+    }
+  });
+});
+
 describe('GET /log and /crew', () => {
   it('returns the film events in order and needs no passcode', async () => {
     process.env.DIRECTOR_PASSCODE = 'secret';

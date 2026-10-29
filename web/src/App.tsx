@@ -9,6 +9,7 @@ import NewFilm from './panels/NewFilm';
 import Review from './panels/Review';
 import Storyboard from './panels/Storyboard';
 import Player, { type PlayerHandle } from './player/Player';
+import { CrewStudio } from './crew/CrewStudio';
 
 function Slot({ name, children }: { name: string; children: ReactNode }) {
   return (
@@ -22,6 +23,27 @@ function Director({ filmId }: { filmId: string | null }) {
   const { film, events } = useFilm(filmId);
   const playerRef = useRef<PlayerHandle>(null);
   const panelProps = { film, events };
+  if (film?.crew) {
+    return (
+      <>
+        <header className="app-header">
+          <h1>PixiTween Director</h1>
+          <span className="header-caption">Crew studio</span>
+          <div className="header-spacer" />
+          <span data-testid="film-status">{film.status}</span>
+        </header>
+        <CrewStudio film={film} events={events} playerRef={playerRef} />
+        <main className="grid crew-extras">
+          <Slot name="export">
+            <ExportPanel {...panelProps} getPlayer={() => playerRef.current} />
+          </Slot>
+          <Slot name="gallery">
+            <Gallery {...panelProps} />
+          </Slot>
+        </main>
+      </>
+    );
+  }
   return (
     <>
       <header className="app-header">

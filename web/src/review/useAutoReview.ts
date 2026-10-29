@@ -33,7 +33,7 @@ const REVIEW_KINDS = new Set(['review.finding', 'review.fix']);
  * Reviews a film once it is ready: 'before' frames when it first becomes ready, 'after' frames when the review
  * has finished. A film that already has review events (a replayed session) is not reviewed again on its own.
  */
-export function useAutoReview(o: { filmId?: string; events: FilmEvent[]; deps: ReviewDeps }): {
+export function useAutoReview(o: { filmId?: string; events: FilmEvent[]; deps: ReviewDeps; /** A crew film is reviewed by its critic, so this hook never starts a review for it. */ crew?: boolean }): {
   state: ReviewState;
   geometry: Geometry | null;
   error?: string;
@@ -87,7 +87,7 @@ export function useAutoReview(o: { filmId?: string; events: FilmEvent[]; deps: R
   };
 
   const rerun = () => {
-    if (stage.current === 'posting') return;
+    if (o.crew || stage.current === 'posting') return;
     void post('before');
   };
 
@@ -102,6 +102,7 @@ export function useAutoReview(o: { filmId?: string; events: FilmEvent[]; deps: R
   }, [o.filmId]);
 
   useEffect(() => {
+    if (o.crew) return;
     const fresh = o.events.slice(seen.current);
     if (!fresh.length) return;
     if (seen.current === 0 && o.events.some((e) => REVIEW_KINDS.has(e.type) || (e.type === 'film.status' && e.status === 'reviewing'))) {

@@ -1,0 +1,731 @@
+{
+ "events": [
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:00.000Z",
+   "type": "film.status",
+   "status": "planning"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:01.000Z",
+   "type": "crew.agent",
+   "lane": "showrunner",
+   "worker": "showrunner",
+   "state": "thinking",
+   "model": "muse-wonder-1.0"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:02.000Z",
+   "type": "style.bible",
+   "bible": {
+    "palette": [
+     "#1f2937",
+     "#f59e0b",
+     "#fde68a"
+    ],
+    "light": "warm late sun",
+    "camera": "slow and steady",
+    "type": {
+     "font": "Inter",
+     "weight": 700,
+     "case": "upper"
+    },
+    "productLine": "matte can, amber label",
+    "mood": "bright summery"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:03.000Z",
+   "type": "storyboard.revised",
+   "rev": 1,
+   "source": "showrunner",
+   "ops": [
+    {
+     "op": "add",
+     "scene": {
+      "id": "s1",
+      "durationSec": 4,
+      "intent": "Hero shot of the cold brew can on a warm bench",
+      "shotType": "hero",
+      "camera": "dolly-in",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "COLD. SMOOTH."
+     }
+    },
+    {
+     "op": "add",
+     "scene": {
+      "id": "s2",
+      "durationSec": 4,
+      "intent": "Detail of condensation on the can",
+      "shotType": "detail",
+      "camera": "pan",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Slow steeped"
+     }
+    },
+    {
+     "op": "add",
+     "scene": {
+      "id": "s3",
+      "durationSec": 4,
+      "intent": "Friends sharing a drink outdoors",
+      "shotType": "lifestyle",
+      "camera": "parallax",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Made for summer"
+     }
+    },
+    {
+     "op": "add",
+     "scene": {
+      "id": "s4",
+      "durationSec": 4,
+      "intent": "Closing pack shot with the product line",
+      "shotType": "closer",
+      "camera": "static",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Cold brew, any day"
+     }
+    }
+   ],
+   "storyboard": {
+    "title": "Cold brew launch",
+    "aspect": "16:9",
+    "durationSec": 16,
+    "palette": [
+     "#1f2937",
+     "#f59e0b",
+     "#fde68a"
+    ],
+    "scenes": [
+     {
+      "id": "s1",
+      "durationSec": 4,
+      "intent": "Hero shot of the cold brew can on a warm bench",
+      "shotType": "hero",
+      "camera": "dolly-in",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "COLD. SMOOTH."
+     },
+     {
+      "id": "s2",
+      "durationSec": 4,
+      "intent": "Detail of condensation on the can",
+      "shotType": "detail",
+      "camera": "pan",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Slow steeped"
+     },
+     {
+      "id": "s3",
+      "durationSec": 4,
+      "intent": "Friends sharing a drink outdoors",
+      "shotType": "lifestyle",
+      "camera": "parallax",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Made for summer"
+     },
+     {
+      "id": "s4",
+      "durationSec": 4,
+      "intent": "Closing pack shot with the product line",
+      "shotType": "closer",
+      "camera": "static",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Cold brew, any day"
+     }
+    ]
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:03.000Z",
+   "type": "film.status",
+   "status": "building"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:04.000Z",
+   "type": "showrunner.say",
+   "kind": "note",
+   "text": "Four scenes, four builders. Starting now."
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:05.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j1",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s1",
+    "reason": "build s1",
+    "origin": "showrunner",
+    "status": "queued",
+    "createdAt": "2026-10-30T14:00:05.000Z",
+    "costUsd": 0,
+    "sceneId": "s1"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:05.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j2",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s2",
+    "reason": "build s2",
+    "origin": "showrunner",
+    "status": "queued",
+    "createdAt": "2026-10-30T14:00:05.000Z",
+    "costUsd": 0,
+    "sceneId": "s2"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:05.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j3",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s3",
+    "reason": "build s3",
+    "origin": "showrunner",
+    "status": "queued",
+    "createdAt": "2026-10-30T14:00:05.000Z",
+    "costUsd": 0,
+    "sceneId": "s3"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:05.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j4",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s4",
+    "reason": "build s4",
+    "origin": "showrunner",
+    "status": "queued",
+    "createdAt": "2026-10-30T14:00:05.000Z",
+    "costUsd": 0,
+    "sceneId": "s4"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:06.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j1",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s1",
+    "reason": "build s1",
+    "origin": "showrunner",
+    "status": "running",
+    "createdAt": "2026-10-30T14:00:05.000Z",
+    "costUsd": 0,
+    "sceneId": "s1",
+    "worker": "w1",
+    "model": "muse-spark-1.0",
+    "startedAt": "2026-10-30T14:00:06.000Z"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:06.000Z",
+   "type": "crew.agent",
+   "lane": "builder",
+   "worker": "w1",
+   "state": "working",
+   "jobId": "j1",
+   "model": "muse-spark-1.0"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:06.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j2",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s2",
+    "reason": "build s2",
+    "origin": "showrunner",
+    "status": "running",
+    "createdAt": "2026-10-30T14:00:05.000Z",
+    "costUsd": 0,
+    "sceneId": "s2",
+    "worker": "w2",
+    "model": "muse-spark-1.0",
+    "startedAt": "2026-10-30T14:00:06.000Z"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:06.000Z",
+   "type": "crew.agent",
+   "lane": "builder",
+   "worker": "w2",
+   "state": "working",
+   "jobId": "j2",
+   "model": "muse-spark-1.0"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:06.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j3",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s3",
+    "reason": "build s3",
+    "origin": "showrunner",
+    "status": "running",
+    "createdAt": "2026-10-30T14:00:05.000Z",
+    "costUsd": 0,
+    "sceneId": "s3",
+    "worker": "w3",
+    "model": "muse-spark-1.0",
+    "startedAt": "2026-10-30T14:00:06.000Z"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:06.000Z",
+   "type": "crew.agent",
+   "lane": "builder",
+   "worker": "w3",
+   "state": "working",
+   "jobId": "j3",
+   "model": "muse-spark-1.0"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:06.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j4",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s4",
+    "reason": "build s4",
+    "origin": "showrunner",
+    "status": "running",
+    "createdAt": "2026-10-30T14:00:05.000Z",
+    "costUsd": 0,
+    "sceneId": "s4",
+    "worker": "w4",
+    "model": "muse-spark-1.0",
+    "startedAt": "2026-10-30T14:00:06.000Z"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:06.000Z",
+   "type": "crew.agent",
+   "lane": "builder",
+   "worker": "w4",
+   "state": "working",
+   "jobId": "j4",
+   "model": "muse-spark-1.0"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:07.000Z",
+   "type": "crew.agent",
+   "lane": "showrunner",
+   "worker": "showrunner",
+   "state": "idle",
+   "model": "muse-wonder-1.0"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:14.000Z",
+   "type": "showrunner.heard",
+   "inboxId": "inbox-1",
+   "from": "user",
+   "text": "add a sunset scene after scene 2"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:14.000Z",
+   "type": "crew.agent",
+   "lane": "showrunner",
+   "worker": "showrunner",
+   "state": "thinking",
+   "model": "muse-wonder-1.0"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:16.000Z",
+   "type": "storyboard.revised",
+   "rev": 2,
+   "source": "showrunner",
+   "ops": [
+    {
+     "op": "add",
+     "scene": {
+      "id": "s5",
+      "durationSec": 4,
+      "intent": "Sunset glow over the bench",
+      "shotType": "reveal",
+      "camera": "orbit",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Golden hour"
+     },
+     "after": "s2"
+    }
+   ],
+   "storyboard": {
+    "title": "Cold brew launch",
+    "aspect": "16:9",
+    "durationSec": 20,
+    "palette": [
+     "#1f2937",
+     "#f59e0b",
+     "#fde68a"
+    ],
+    "scenes": [
+     {
+      "id": "s1",
+      "durationSec": 4,
+      "intent": "Hero shot of the cold brew can on a warm bench",
+      "shotType": "hero",
+      "camera": "dolly-in",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "COLD. SMOOTH."
+     },
+     {
+      "id": "s2",
+      "durationSec": 4,
+      "intent": "Detail of condensation on the can",
+      "shotType": "detail",
+      "camera": "pan",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Slow steeped"
+     },
+     {
+      "id": "s5",
+      "durationSec": 4,
+      "intent": "Sunset glow over the bench",
+      "shotType": "reveal",
+      "camera": "orbit",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Golden hour"
+     },
+     {
+      "id": "s3",
+      "durationSec": 4,
+      "intent": "Friends sharing a drink outdoors",
+      "shotType": "lifestyle",
+      "camera": "parallax",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Made for summer"
+     },
+     {
+      "id": "s4",
+      "durationSec": 4,
+      "intent": "Closing pack shot with the product line",
+      "shotType": "closer",
+      "camera": "static",
+      "layersWanted": [
+       "bg",
+       "product",
+       "headline"
+      ],
+      "mode": "motion",
+      "modeReason": "a still with motion is enough",
+      "text": "Cold brew, any day"
+     }
+    ]
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:16.000Z",
+   "type": "showrunner.say",
+   "kind": "reply",
+   "text": "Heard you. A sunset scene goes in after scene 2."
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:17.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j5",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s5",
+    "reason": "build s5",
+    "origin": "auto",
+    "status": "queued",
+    "createdAt": "2026-10-30T14:00:17.000Z",
+    "costUsd": 0,
+    "sceneId": "s5"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:19.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j1",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s1",
+    "reason": "build s1",
+    "origin": "showrunner",
+    "status": "done",
+    "createdAt": "2026-10-30T14:00:05.000Z",
+    "costUsd": 0.041,
+    "sceneId": "s1",
+    "worker": "w1",
+    "model": "muse-spark-1.0",
+    "startedAt": "2026-10-30T14:00:06.000Z",
+    "endedAt": "2026-10-30T14:00:19.000Z",
+    "ms": 13000,
+    "summary": "7 tool calls, 7 ok"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:19.000Z",
+   "type": "crew.agent",
+   "lane": "builder",
+   "worker": "w1",
+   "state": "idle",
+   "jobId": "j1",
+   "model": "muse-spark-1.0"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:20.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j5",
+    "kind": "build-scene",
+    "filmId": "film_0123456789ab",
+    "brief": "build-scene s5",
+    "reason": "build s5",
+    "origin": "auto",
+    "status": "running",
+    "createdAt": "2026-10-30T14:00:17.000Z",
+    "costUsd": 0,
+    "sceneId": "s5",
+    "worker": "w1",
+    "model": "muse-spark-1.0",
+    "startedAt": "2026-10-30T14:00:20.000Z"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:20.000Z",
+   "type": "crew.agent",
+   "lane": "builder",
+   "worker": "w1",
+   "state": "working",
+   "jobId": "j5",
+   "model": "muse-spark-1.0"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:21.000Z",
+   "type": "review.finding",
+   "sceneId": "s1",
+   "kind": "headline-low-contrast",
+   "atSec": 2,
+   "evidence": "headline is hard to read over the bench",
+   "deterministic": false
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:22.000Z",
+   "type": "showrunner.say",
+   "kind": "ask",
+   "text": "The sunset scene is warm. Keep the palette or go cooler?",
+   "options": [
+    "Keep it",
+    "Make it night"
+   ]
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:23.000Z",
+   "type": "job.update",
+   "job": {
+    "id": "j6",
+    "kind": "take",
+    "filmId": "film_0123456789ab",
+    "brief": "take s3",
+    "reason": "three takes of s3",
+    "origin": "showrunner",
+    "status": "done",
+    "createdAt": "2026-10-30T14:00:22.000Z",
+    "costUsd": 0.03,
+    "sceneId": "s3",
+    "worker": "w2",
+    "model": "muse-spark-1.0",
+    "takeOf": "j6",
+    "takeLabel": "A"
+   }
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:30.000Z",
+   "type": "take.ready",
+   "jobId": "j6",
+   "takeOf": "j6",
+   "sceneId": "s3",
+   "label": "A",
+   "takeFilmId": "film_012345678901",
+   "thumbAssetId": "a1",
+   "score": 6,
+   "note": "take A"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:30.000Z",
+   "type": "take.ready",
+   "jobId": "j6",
+   "takeOf": "j6",
+   "sceneId": "s3",
+   "label": "B",
+   "takeFilmId": "film_012345678902",
+   "thumbAssetId": "b1",
+   "score": 9,
+   "note": "take B"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:30.000Z",
+   "type": "take.ready",
+   "jobId": "j6",
+   "takeOf": "j6",
+   "sceneId": "s3",
+   "label": "C",
+   "takeFilmId": "film_012345678903",
+   "thumbAssetId": "c1",
+   "score": 7,
+   "note": "take C"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:31.000Z",
+   "type": "cost",
+   "usd": 0.052,
+   "model": "muse-wonder-1.0",
+   "units": "1 turn"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:31.000Z",
+   "type": "cost",
+   "usd": 0.041,
+   "model": "muse-spark-1.0",
+   "units": "7 calls"
+  },
+  {
+   "filmId": "film_0123456789ab",
+   "at": "2026-10-30T14:00:32.000Z",
+   "type": "budget",
+   "spentUsd": 0.413,
+   "capUsd": 1.5,
+   "level": "ok"
+  }
+ ],
+ "marks": {
+  "fourBuilds": 19,
+  "afterUserMessage": 20
+ }
+}

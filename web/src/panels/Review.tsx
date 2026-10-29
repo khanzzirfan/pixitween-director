@@ -30,7 +30,7 @@ export default function Review({ film, events, getPlayer }: PanelProps & { getPl
       ),
     [getPlayer, storyboard],
   );
-  const review = useAutoReview({ filmId: film?.id, events, deps });
+  const review = useAutoReview({ filmId: film?.id, events, deps, crew: film?.crew });
   return (
     <ReviewView film={film} events={events} state={review.state} geometry={review.geometry} error={review.error} rerun={review.rerun} />
   );

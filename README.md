@@ -127,6 +127,7 @@ cp .env.example .env   # then fill in META_API_KEY (the app and tests run withou
 | `npm test` | Vitest, offline (no network) |
 | `npm run start` (or `npm start`) | Runs the server the way the container does (`tsx server/main.ts`), serving the built web app from `web/dist`. See `deploy/README.md` |
 | `npm run e2e` | Playwright browser flow: upload, brief, fake director, chat edit, undo/redo, layer select. Starts its own server and web app on ports 8799 and 5199, with a temp data dir, and uses the fake director (no Meta calls) |
+| `npm run e2e:crew` | The crew studio flow in the browser: chat intake, four builders working at once, a message mid-build that adds a scene, the film finishing. Own ports (8798 and 5198), temp data dir, fake crew with slowed workers, no Meta calls |
 | `npm run live -- <name> [--yes]` | Live or paid checks. A dry run by default: it prints the estimate and stops unless you pass `--yes` |
 
 **Layout**

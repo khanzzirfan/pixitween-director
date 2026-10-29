@@ -4,12 +4,15 @@ import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
 // The e2e run uses its own ports and data dir, so it never touches a dev server or ./data.
-const API_PORT = 8799;
-const WEB_PORT = 5199;
+// E2E_CREW=1 runs the crew studio flow (crew on, slower fake workers) on its own ports; the default run is the classic director.
+const crew = process.env.E2E_CREW === '1';
+const API_PORT = crew ? 8798 : 8799;
+const WEB_PORT = crew ? 5198 : 5199;
 const dataDir = mkdtempSync(join(tmpdir(), 'director-e2e-'));
 
 export default defineConfig({
   testDir: 'e2e',
+  testMatch: crew ? 'crew.spec.ts' : /^(?!.*crew).*\.spec\.ts$/,
   workers: 1,
   fullyParallel: false,
   retries: 0,
@@ -30,7 +33,8 @@ export default defineConfig({
       stderr: 'pipe',
       env: {
         DIRECTOR_FAKE: '1',
-        DIRECTOR_FAKE_DELAY_MS: '50',
+        DIRECTOR_FAKE_DELAY_MS: crew ? '1200' : '50',
+        CREW_ENABLED: crew ? 'true' : 'false', // crew mode is on by default; the classic flow tests the single director
         PORT: String(API_PORT),
         DATA_DIR: dataDir,
       },

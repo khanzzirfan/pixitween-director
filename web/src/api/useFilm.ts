@@ -37,7 +37,8 @@ export function useFilm(filmId: string | null): { film: FilmState | null; events
   useEffect(() => {
     const fresh = events.slice(handled.current);
     handled.current = events.length;
-    const relevant = fresh.some((e) => e.type === 'film.status' || (e.type === 'tool.call' && e.ok && e.version !== undefined));
+    // a crew job that finished, or a new storyboard revision, changes the film just as a tool call does
+    const relevant = fresh.some((e) => e.type === 'film.status' || e.type === 'storyboard.revised' || (e.type === 'job.update' && e.job.status === 'done') || (e.type === 'tool.call' && e.ok && e.version !== undefined));
     if (!relevant) return;
     clearTimeout(timer.current);
     timer.current = setTimeout(load, REFETCH_DEBOUNCE_MS);
