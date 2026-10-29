@@ -1,12 +1,11 @@
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { ChatMessage, LlmBackend, MetaClients, ToolSpec } from '@shared/ports';
 import type { ToolDef } from '@shared/tools';
+import { toolParameters } from './tool-schema';
 
 export const PARALLEL_HINT = 'You may call several tools in one turn. Prefer calling every tool needed for the whole step in a single turn.';
 
 function toolSpec(def: ToolDef): ToolSpec {
-  const { $schema: _drop, ...parameters } = zodToJsonSchema(def.params, { target: 'openApi3', $refStrategy: 'none' }) as Record<string, unknown>;
-  return { type: 'function', function: { name: def.name, description: def.description, parameters } };
+  return { type: 'function', function: { name: def.name, description: def.description, parameters: toolParameters(def.params) } };
 }
 
 function withHint(messages: ChatMessage[]): ChatMessage[] {
