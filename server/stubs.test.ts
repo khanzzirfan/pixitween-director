@@ -19,16 +19,11 @@ const modules: Array<[string, string]> = [
   ['./http/handlers/review', 'S5b'],
   ['./http/handlers/local', 'S9'],
 ];
-// ./tools/authoring (S3a), ./tools/review (S5b) and ./tools/art, ./tools/edit are filled in and no longer stubs
-const toolFiles: Array<[string, string]> = [['./tools/generate', 'S7b']];
 
 describe('step modules expose their owner', () => {
   it.each(modules)('%s is owned by %s', async (path, owner) => {
     const module = (await import(/* @vite-ignore */ path)) as { STUB_OWNER?: string };
     expect(module.STUB_OWNER).toBe(owner);
-  });
-  it.each(toolFiles)('%s exports an empty tools array', async (path) => {
-    expect(((await import(/* @vite-ignore */ path)) as { tools: unknown[] }).tools).toEqual([]);
   });
 });
 

@@ -70,8 +70,39 @@ export function createRunner(deps: RunnerDeps = {}): Runner {
 
   const scenesOf = (film: FilmState) => sceneInfo(film.composition as Comp);
 
+  const hasClipLayer = (film: FilmState, sceneId: string): boolean =>
+    ((film.composition?.precomps as Record<string, { layers?: Array<{ id: string }> }> | undefined)?.[sceneId]?.layers ?? []).some((l) => l.id === `${sceneId}:clip`);
+
   /** Part 2: the job is done at Clippy; fetch the clip, place it, check it. */
   async function finish(ctx: ToolCtx, job: JobRecord, status: StatusResult): Promise<void> {
+    const { sceneId } = job;
+    let rec = job;
+    if (!(await stillGenerating(ctx, sceneId))) {
+      progress(ctx, sceneId, 'cancelled');
+      await save(rec, 'cancelled');
+      return;
+    }
+    try {
+      rec = await save(rec, 'downloading', { creditsCharged: status.creditsCharged ?? CREDITS });
+      progress(ctx, sceneId, 'downloading');
+      const bytes = await downloadClip(status.resultUrl!, deps.download);
+      const asset = await ctx.assets.put(bytes, 'video/mp4', { role: 'clip', sceneId });
+      rec = await save(rec, 'placing', { assetId: asset.id });
+    } catch (e) {
+      fail(ctx, sceneId, message(e));
+      await save(rec, 'failed', { error: message(e) });
+      return;
+    }
+    await placeAndCheck(ctx, rec);
+  }
+
+  async function stillGenerating(ctx: ToolCtx, sceneId: string): Promise<boolean> {
+    const film = await ctx.films.get(ctx.filmId);
+    return !!film.composition && scenesOf(film).some((s) => s.id === sceneId && s.mode === 'generate');
+  }
+
+  /** Place the stored clip (unless it is already placed) and run the product check. Reads the clip back from the asset store. */
+  async function placeAndCheck(ctx: ToolCtx, job: JobRecord): Promise<void> {
     const { sceneId } = job;
     let rec = job;
     const stop = async (text: string) => {
@@ -79,22 +110,13 @@ export function createRunner(deps: RunnerDeps = {}): Runner {
       await save(rec, 'failed', { error: text });
     };
 
-    let film = await ctx.films.get(ctx.filmId);
-    const scene = film.composition ? scenesOf(film).find((s) => s.id === sceneId) : undefined;
-    if (!scene || scene.mode !== 'generate') {
-      progress(ctx, sceneId, 'cancelled');
-      await save(rec, 'cancelled');
-      return;
-    }
-
     let asset: AssetRef;
-    let size: { width: number; height: number };
     let bytes: Buffer;
+    let size: { width: number; height: number };
     try {
-      rec = await save(rec, 'downloading', { creditsCharged: status.creditsCharged ?? CREDITS });
-      progress(ctx, sceneId, 'downloading');
-      bytes = await downloadClip(status.resultUrl!, deps.download);
-      asset = await ctx.assets.put(bytes, 'video/mp4', { role: 'clip', sceneId });
+      asset = (await ctx.assets.list()).find((a) => a.id === rec.assetId)!;
+      if (!asset) throw new Error('the downloaded clip is missing from the asset store');
+      bytes = await ctx.assets.read(asset.id);
       const probe = await probeVideo(bytes);
       size = { width: probe.width, height: probe.height };
     } catch (e) {
@@ -102,26 +124,29 @@ export function createRunner(deps: RunnerDeps = {}): Runner {
       return;
     }
 
-    try {
-      rec = await save(rec, 'placing', { assetId: asset.id });
-      progress(ctx, sceneId, 'placing');
-      const clipSec = rec.clipSec ?? scene.durationSec;
-      const placed = await ctx.films.mutate(
-        ctx.filmId,
-        (f) => ({
-          next: swapInClip(f.composition as Comp, { sceneId, asset: { id: asset.id, url: asset.url }, clipSec, frame: { width: f.composition!.width, height: f.composition!.height }, clipSize: size }),
-          data: null,
-        }),
-        'generate',
-        `generated clip for scene ${sceneId}`,
-      );
-      if (!placed.ok) {
-        await stop('the film rejected the clip');
+    let film = await ctx.films.get(ctx.filmId);
+    if (!hasClipLayer(film, sceneId)) {
+      try {
+        rec = await save(rec, 'placing');
+        progress(ctx, sceneId, 'placing');
+        const clipSec = rec.clipSec ?? scenesOf(film).find((s) => s.id === sceneId)?.durationSec ?? 5;
+        const placed = await ctx.films.mutate(
+          ctx.filmId,
+          (f) => ({
+            next: swapInClip(f.composition as Comp, { sceneId, asset: { id: asset.id, url: asset.url }, clipSec, frame: { width: f.composition!.width, height: f.composition!.height }, clipSize: size }),
+            data: null,
+          }),
+          'generate',
+          `generated clip for scene ${sceneId}`,
+        );
+        if (!placed.ok) {
+          await stop('the film rejected the clip');
+          return;
+        }
+      } catch (e) {
+        await stop(message(e));
         return;
       }
-    } catch (e) {
-      await stop(message(e));
-      return;
     }
 
     rec = await save(rec, 'checking');
@@ -223,7 +248,22 @@ export function createRunner(deps: RunnerDeps = {}): Runner {
 
     async resume(ctx, job) {
       try {
-        await follow(ctx, job);
+        if (job.status === 'placing' || job.status === 'checking') {
+          if (!job.assetId) throw new Error('the stored job has no clip to place');
+          if (!(await stillGenerating(ctx, job.sceneId))) {
+            progress(ctx, job.sceneId, 'cancelled');
+            await save(job, 'cancelled');
+            return;
+          }
+          await placeAndCheck(ctx, job);
+        } else if (job.status === 'downloading') {
+          // the old signed URL may have expired, so ask for a fresh one
+          const status = await clippy().getLiveAnimateStatus(job.jobId);
+          if (status.status === 'done' && status.resultUrl) await finish(ctx, job, status);
+          else await follow(ctx, job);
+        } else {
+          await follow(ctx, job);
+        }
       } catch (e) {
         fail(ctx, job.sceneId, message(e));
       }

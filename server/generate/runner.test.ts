@@ -98,6 +98,34 @@ describe('runner part 1', () => {
   });
 });
 
+describe('resume', () => {
+  const rec = (s: { filmId: string }, over: Record<string, unknown>) => ({
+    filmId: s.filmId, sceneId: 's1', jobId: 'job_9', status: 'rendering' as const, attempt: 1, submittedAt: 'x', updatedAt: 'x', clipSec: 4, originalDurationSec: 4, ...over,
+  });
+  const comp = async (s: Awaited<ReturnType<typeof setup>>) => (await s.films.get(s.filmId)).composition as unknown as { precomps: Record<string, { layers: Array<{ id: string }> }> };
+
+  it.skipIf(!has)('a rendering job keeps polling without a new submission and places the clip', async () => {
+    const s = await setup({ clip: await testClip() });
+    await s.runner.resume(s.ctx as ToolCtx, rec(s, {}));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(s.clippy.calls.some((c) => c.tool === 'animate_image')).toBe(false);
+    expect(s.events.some((e) => e.type === 'generate.done')).toBe(true);
+    expect((await comp(s)).precomps.s1!.layers.map((l) => l.id)).toContain('s1:clip');
+  });
+
+  it.skipIf(!has)('a placing job places once; resuming again leaves the film alone and ends done', async () => {
+    const s = await setup({});
+    const clip = await s.assets.put(await testClip(), 'video/mp4', { role: 'clip', sceneId: 's1' });
+    await s.runner.resume(s.ctx as ToolCtx, rec(s, { status: 'placing', assetId: clip.id }));
+    const placed = await s.films.get(s.filmId);
+    expect((await comp(s)).precomps.s1!.layers.filter((l) => l.id === 's1:clip')).toHaveLength(1);
+
+    await s.runner.resume(s.ctx as ToolCtx, rec(s, { status: 'checking', assetId: clip.id }));
+    expect((await s.films.get(s.filmId)).version).toBe(placed.version);
+    expect((await s.jobs.get(s.filmId, 's1'))?.status).toBe('done');
+  });
+});
+
 describe('runner part 2', () => {
   it.skipIf(!has)('places the clip under the headline and checks the product', async () => {
     const s = await setup({ clip: await testClip(), frac: 0.9 });
