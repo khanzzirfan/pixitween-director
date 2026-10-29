@@ -11,6 +11,8 @@ export type AppDeps = ToolCtxDeps & {
   makeToolCtx(filmId: string): ToolCtx;
   /** Film admission (D-16). Optional and mutable: handlers read it at request time and never cache it. */
   admission?: FilmAdmission;
+  /** Where films and crew files live. Defaults to DATA_DIR; tests that use a temp dir set it. */
+  dataDir?: string;
 };
 
 /** Stamp `filmId` and `at` onto an event the caller left unstamped and forward it to the bus; failures are logged, never thrown. */

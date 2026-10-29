@@ -5,7 +5,7 @@ import type { ToolDef } from '@shared/tools';
 import { loadEnv } from '../env';
 import { createMetaClients } from '../meta';
 import { MetaApiError } from '../meta/http';
-import { createRouter, shouldFallback, type RouterDeps } from './router';
+import { createRouter, shouldFallback, shouldFallbackFromWonder, type RouterDeps } from './router';
 
 const tool = (name: string): ToolDef => ({ name, description: name, params: z.object({}), run: async () => ({ ok: true }) });
 const backend = (id: LlmBackend['id'], behaviour: () => unknown = () => ({ toolCalls: [], content: id, ms: 1 })) => {
@@ -13,7 +13,7 @@ const backend = (id: LlmBackend['id'], behaviour: () => unknown = () => ({ toolC
   return { id, chatWithTools: chat as unknown as LlmBackend['chatWithTools'], chat };
 };
 
-function setup(o: { local?: boolean; reachable?: boolean; spark?: ReturnType<typeof backend>; sparkReview?: () => Promise<unknown> } = {}) {
+function setup(o: { local?: boolean; reachable?: boolean; spark?: ReturnType<typeof backend>; sparkReview?: () => Promise<unknown>; wonder?: ReturnType<typeof backend>; showrunnerModel?: string } = {}) {
   const spark = o.spark ?? backend('spark');
   const glimmer = backend('glimmer');
   const glimmerReview = vi.fn(async () => ({ from: 'glimmer' }));
@@ -21,6 +21,8 @@ function setup(o: { local?: boolean; reachable?: boolean; spark?: ReturnType<typ
   const deps: RouterDeps = {
     makeSpark: () => spark,
     makeGlimmer: () => glimmer,
+    makeWonder: () => o.wonder ?? backend('wonder'),
+    showrunnerModel: () => o.showrunnerModel ?? 'muse-wonder-1.0',
     getStatus: async () => ({ reachable: o.reachable ?? true }),
     getLocal: () => o.local ?? false,
     sparkReviewer: () => sparkReview as never,
@@ -150,4 +152,49 @@ it('sends only chat edits to Spark Open when EDIT_BACKEND=spark-open, and needs 
     Object.assign(process.env, saved);
     vi.resetModules();
   }
+});
+
+describe('showrunner task', () => {
+  it('is Wonder by default and Spark when SHOWRUNNER_MODEL is a Spark model', () => {
+    expect(setup().router.pickBackend('showrunner').id).toBe('wonder');
+    expect(setup({ showrunnerModel: 'muse-spark-1.3-contributor' }).router.pickBackend('showrunner').id).toBe('spark');
+  });
+
+  it('a Wonder 503 gives that call to Spark and reports the fallback', async () => {
+    const wonder = backend('wonder', () => {
+      throw new MetaApiError(503, 'down');
+    });
+    const { router, spark } = setup({ wonder });
+    const onFallback = vi.fn();
+    const r = await router.pickBackend('showrunner', { onFallback }).chatWithTools([], []);
+    expect(r.content).toBe('spark');
+    expect(spark.chat).toHaveBeenCalledOnce();
+    expect(onFallback).toHaveBeenCalledWith(expect.objectContaining({ from: 'wonder', to: 'spark', reason: expect.stringContaining('503') }));
+  });
+
+  it('a Wonder 400 is our own mistake and is rethrown, not retried on Spark', async () => {
+    const wonder = backend('wonder', () => {
+      throw new MetaApiError(400, 'bad');
+    });
+    const { router, spark } = setup({ wonder });
+    await expect(router.pickBackend('showrunner').chatWithTools([], [])).rejects.toThrow(/400/);
+    expect(spark.chat).not.toHaveBeenCalled();
+  });
+
+  it('an abort by the caller is not a reason to fall back', async () => {
+    const wonder = backend('wonder', () => {
+      throw Object.assign(new Error('aborted'), { name: 'AbortError' });
+    });
+    const { router, spark } = setup({ wonder });
+    const ac = new AbortController();
+    ac.abort();
+    await expect(router.pickBackend('showrunner').chatWithTools([], [], { signal: ac.signal })).rejects.toThrow('aborted');
+    expect(spark.chat).not.toHaveBeenCalled();
+  });
+
+  it('shouldFallbackFromWonder: 429, 5xx, timeouts yes; 400 and 402 no', () => {
+    expect([429, 500, 503].every((s) => shouldFallbackFromWonder(new MetaApiError(s, 'x')))).toBe(true);
+    expect([400, 402, 404].some((s) => shouldFallbackFromWonder(new MetaApiError(s, 'x')))).toBe(false);
+    expect(shouldFallbackFromWonder(Object.assign(new Error('t'), { name: 'TimeoutError' }))).toBe(true);
+  });
 });

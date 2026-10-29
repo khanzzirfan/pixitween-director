@@ -115,3 +115,72 @@ it('a queue that fills between canAccept and submit fails the film and answers 4
   expect(created[0]!.status).toBe('failed');
   expect(emitted).toContainEqual(expect.objectContaining({ type: 'error', where: 'admission' }));
 });
+
+// ---- crew films (S12b) ----
+const crewFilm = async (status: 'building' | 'ready' | 'planning' = 'building') => {
+  const base = await makeTestDeps();
+  const { filmId: _unused, ...rest } = base;
+  void _unused;
+  const film = await base.films.create({ aspect: '16:9', brief: { text: 'x', productAssetId: 'ast_' + '0'.repeat(32) }, assets: [], crew: true });
+  await base.films.update(film.id, { status });
+  const modelCalls: string[] = [];
+  const backend = { id: 'wonder' as const, async chatWithTools(m: unknown) { modelCalls.push(JSON.stringify(m)); return { toolCalls: [], ms: 1 }; } };
+  const heardAt: number[] = [];
+  const deps = {
+    ...rest,
+    filmId: base.filmId,
+    makeToolCtx: (id: string) => {
+      const ctx = makeToolCtx(base, id);
+      return { ...ctx, emit: (e: Parameters<typeof ctx.emit>[0]) => (e.type === 'showrunner.heard' && heardAt.push(modelCalls.length), ctx.emit(e)) };
+    },
+  };
+  const { bindCrew } = await import('../crew/run-crew');
+  bindCrew(deps as never, { backend, idleEndMs: 80 });
+  return { deps, filmId: film.id, modelCalls, base, heardAt };
+};
+
+it('POST /chat on a crew film that is building returns 202 with an inboxId and emits showrunner.heard before any model call', async () => {
+  const { deps, filmId, modelCalls, heardAt } = await crewFilm('building');
+  const app = createApp(deps as never);
+  const res = await app.request(`/api/films/${filmId}/chat`, json({ message: 'add a sunset scene' }));
+  expect(res.status).toBe(202);
+  const body = (await res.json()) as { accepted: boolean; inboxId: string };
+  expect(body.accepted).toBe(true);
+  expect(body.inboxId).toMatch(/^i_/);
+  await new Promise((r) => setTimeout(r, 120));
+  expect(heardAt).toEqual([0]); // emitted when no model call had been made
+  expect(modelCalls).toHaveLength(1);
+  expect(modelCalls[0]).toContain('add a sunset scene');
+});
+
+it('POST /chat on a non-crew building film still returns 409 film_busy', async () => {
+  const base = await makeTestDeps();
+  const film = await base.films.create({ aspect: '16:9', brief: { text: 'x', productAssetId: 'ast_' + '0'.repeat(32) }, assets: [] });
+  await base.films.commit(film.id, newFilmComposition({ aspect: '16:9', title: 't', palette: ['#111111'] }), 'director'); // a film with a composition, so the busy check is reached
+  await base.films.update(film.id, { status: 'building' });
+  const res = await createApp({ ...base, makeToolCtx: (id: string) => makeToolCtx(base, id) }).request(`/api/films/${film.id}/chat`, json({ message: 'hello' }));
+  expect(res.status).toBe(409);
+  expect((await res.json()).error).toBe('film_busy');
+});
+
+it('POST /chat on a crew film that has not started or has failed is film_not_ready', async () => {
+  const { deps, filmId, base } = await crewFilm('building');
+  await base.films.update(filmId, { status: 'failed' });
+  expect((await createApp(deps as never).request(`/api/films/${filmId}/chat`, json({ message: 'hello' }))).status).toBe(409);
+});
+
+it('POST /undo on a crew film with a running job returns 409 crew_busy, and works when the crew is quiet', async () => {
+  const { deps, filmId } = await crewFilm('ready');
+  const { ensureCrewSession } = await import('../crew/run-crew');
+  const app = createApp(deps as never);
+  const session = await ensureCrewSession(filmId);
+  const job = session.crew.board.add({ kind: 'build-scene', origin: 'auto', sceneId: 's1' });
+  session.crew.board.update(job.id, { status: 'running' });
+  const res = await app.request(`/api/films/${filmId}/undo`, { method: 'POST' });
+  expect(res.status).toBe(409);
+  expect((await res.json()).error).toBe('crew_busy');
+  session.crew.board.update(job.id, { status: 'cancelled' });
+  const quiet = await app.request(`/api/films/${filmId}/undo`, { method: 'POST' });
+  expect((await quiet.json()).error).not.toBe('crew_busy'); // this film has no versions, so the answer is nothing_to_undo
+  session.stop();
+});

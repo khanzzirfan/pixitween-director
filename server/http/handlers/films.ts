@@ -2,6 +2,7 @@ import type { Hono } from 'hono';
 import { getAdmission } from '../../admission';
 import { bindDirector, runDirector } from '../../agent/director';
 import { BriefTooLongError, EmptyBriefError, transcribeBrief } from '../../listener';
+import { bindCrew, runCrew } from '../../crew/run-crew';
 import { loadEnv } from '../../env';
 import type { AppDeps } from '../deps';
 import { InputError, parseCreateFilm } from './films-input';
@@ -34,16 +35,19 @@ export function registerFilmsRoutes(app: Hono, deps: AppDeps): void {
         throw e;
       }
     }
+    const crewOn = loadEnv().CREW_ENABLED; // the showrunner and the crew make the film; off, the single director does
     const film = await deps.films.create({
       aspect: input.aspect,
       brief: { text, ...(input.audio ? { transcript: text } : {}), productAssetId: product.id },
       ...(input.title ? { title: input.title } : {}),
+      ...(crewOn ? { crew: true } : {}),
       assets: [product],
     });
     const ctx = deps.makeToolCtx(film.id);
     if (input.audio) ctx.emit({ type: 'listener.transcript', text });
     bindDirector(deps);
-    const queue = admission.submit(film.id, () => runDirector(film.id));
+    if (crewOn) bindCrew(deps);
+    const queue = admission.submit(film.id, () => (crewOn ? runCrew(film.id) : runDirector(film.id)));
     if (queue.state === 'rejected') {
       await deps.films.update(film.id, { status: 'failed' });
       ctx.emit({ type: 'error', where: 'admission', message: 'film queue is full' });

@@ -11,6 +11,8 @@ export default defineConfig({
         test: {
           name: 'server',
           environment: 'node',
+          // existing film tests run the single director; the crew tests turn the crew on themselves
+          setupFiles: ['./server/test-setup.ts'],
           include: ['server/**/*.test.ts', 'shared/**/*.test.ts', 'scripts/**/*.test.ts', 'deploy/**/*.test.ts'],
         },
       },

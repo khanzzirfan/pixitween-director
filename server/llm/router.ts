@@ -6,13 +6,14 @@ import type { Env } from '../env';
 import { loadEnv } from '../env';
 import { createMetaClients } from '../meta';
 import { MetaApiError } from '../meta/http';
-import { makeGlimmerBackend } from './glimmer-backend';
+import { makeGlimmerBackend, type GlimmerTask } from './glimmer-backend';
 import { glimmerReviewImages } from './glimmer/review';
 import { getGlimmerStatus, getLocalMode } from './local-mode';
 import { createSparkBackend } from './spark-backend';
 import { createSparkOpenBackend } from './spark-open-backend';
+import { createWonderBackend } from './wonder-backend';
 
-export type LlmTask = 'storyboard' | 'build' | 'edit' | 'review';
+export type LlmTask = 'storyboard' | 'build' | 'edit' | 'review' | 'showrunner';
 export type FallbackInfo = { from: string; to: string; reason: string };
 export type ReviewImages = (images: Buffer[], prompt: string, schema?: object) => Promise<unknown>;
 export type Reviewer = { id: 'spark' | 'glimmer'; reviewImages: ReviewImages };
@@ -28,13 +29,24 @@ export function shouldFallback(err: unknown): boolean {
   return name === 'AbortError' || name === 'TimeoutError';
 }
 
+/** Wonder is a preview model: a server error, a timeout or a 429 that survived the retries sends that one call to Spark. */
+export function shouldFallbackFromWonder(err: unknown): boolean {
+  if (err instanceof MetaApiError) return err.status === 429 || err.status >= 500;
+  if (err instanceof TypeError && /fetch failed/i.test(err.message)) return true;
+  const name = (err as { name?: string } | null)?.name;
+  return name === 'AbortError' || name === 'TimeoutError';
+}
+
 const reasonOf = (err: unknown): string => (err instanceof MetaApiError ? `Meta API ${err.status}` : err instanceof Error ? err.message : String(err));
 
 export interface RouterDeps {
   makeSpark(): LlmBackend;
-  makeGlimmer(task: LlmTask): LlmBackend;
+  makeGlimmer(task: GlimmerTask): LlmBackend;
   /** Spark Open (Baseten), when EDIT_BACKEND asks for it. Only chat edits use it. */
   makeSparkOpen?(): LlmBackend | undefined;
+  /** The showrunner's lead model. Without it, or when the configured model is a Spark model, the showrunner is Spark. */
+  makeWonder?(): LlmBackend;
+  showrunnerModel?(): string;
   getStatus(): Promise<{ reachable: boolean }>;
   getLocal(): boolean;
   sparkReviewer(): ReviewImages;
@@ -46,7 +58,7 @@ type PickOpts = { local?: boolean; onFallback?: (info: FallbackInfo) => void };
 export function createRouter(deps: RouterDeps) {
   const defaultWarn = (i: FallbackInfo) => console.warn(`LLM fallback ${i.from} -> ${i.to}: ${i.reason}`);
 
-  const wantsGlimmer = (task: LlmTask, local: boolean | undefined): boolean => {
+  const wantsGlimmer = (task: GlimmerTask, local: boolean | undefined): boolean => {
     if (local === false) return false;
     if (task === 'edit' || task === 'review') return local === true || (local === undefined && deps.getLocal());
     return local === true;
@@ -57,7 +69,7 @@ export function createRouter(deps: RouterDeps) {
     chatWithTools: (messages, tools: ToolDef[], o) => inner.chatWithTools(messages, tools.filter((t) => !LOCAL_EDIT_DENYLIST.includes(t.name)), o),
   });
 
-  const withFallback = (spark: LlmBackend, task: LlmTask, onFallback: (i: FallbackInfo) => void): LlmBackend => ({
+  const withFallback = (spark: LlmBackend, task: GlimmerTask, onFallback: (i: FallbackInfo) => void): LlmBackend => ({
     id: spark.id,
     async chatWithTools(messages, tools, o) {
       try {
@@ -71,7 +83,25 @@ export function createRouter(deps: RouterDeps) {
     },
   });
 
+  const withWonderFallback = (wonder: LlmBackend, onFallback: (i: FallbackInfo) => void): LlmBackend => ({
+    id: wonder.id,
+    async chatWithTools(messages, tools, o) {
+      try {
+        return await wonder.chatWithTools(messages, tools, o);
+      } catch (err) {
+        if (!shouldFallbackFromWonder(err) || o?.signal?.aborted) throw err;
+        onFallback({ from: 'wonder', to: 'spark', reason: reasonOf(err) });
+        return deps.makeSpark().chatWithTools(messages, tools, o);
+      }
+    },
+  });
+
   function pickBackend(task: LlmTask, opts: PickOpts = {}): LlmBackend {
+    if (task === 'showrunner') {
+      const model = deps.showrunnerModel?.() ?? 'muse-wonder-1.0';
+      if (!deps.makeWonder || model.startsWith('muse-spark')) return deps.makeSpark();
+      return withWonderFallback(deps.makeWonder(), opts.onFallback ?? defaultWarn);
+    }
     if (task === 'edit' && opts.local !== true) {
       const open = deps.makeSparkOpen?.();
       if (open) return open;
@@ -110,7 +140,8 @@ export function createRouter(deps: RouterDeps) {
 let clients: MetaClients | undefined;
 let spark: LlmBackend | undefined;
 let sparkOpen: LlmBackend | undefined;
-const glimmers = new Map<LlmTask, LlmBackend>();
+let wonder: { model: string; backend: LlmBackend } | undefined;
+const glimmers = new Map<GlimmerTask, LlmBackend>();
 const meta = () => (clients ??= createMetaClients(loadEnv()));
 
 const glimmerConn = (env: Pick<Env, 'GLIMMER_BASE_URL' | 'GLIMMER_MODEL'>) => ({ baseUrl: env.GLIMMER_BASE_URL, model: env.GLIMMER_MODEL });
@@ -128,6 +159,12 @@ const real = createRouter({
   },
   // EDIT_BACKEND=spark-open sends chat edits to Muse Spark Open on Baseten; storyboard, build and review stay on Spark
   makeSparkOpen: () => (loadEnv().EDIT_BACKEND === 'spark-open' ? (sparkOpen ??= createSparkOpenBackend(loadEnv())) : undefined),
+  makeWonder: () => {
+    const model = loadEnv().SHOWRUNNER_MODEL;
+    if (wonder?.model !== model) wonder = { model, backend: createWonderBackend({ meta: meta().spark, model }) };
+    return wonder.backend;
+  },
+  showrunnerModel: () => loadEnv().SHOWRUNNER_MODEL,
   getStatus: () => getGlimmerStatus(),
   getLocal: () => getLocalMode(),
   sparkReviewer: () => (images, prompt, schema) => meta().spark.reviewImages(images, prompt, schema),

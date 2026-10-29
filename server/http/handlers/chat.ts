@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import type { Hono } from 'hono';
 import { isFilmId } from '@shared/composition';
+import { createId } from '../../crew/ids';
+import { bindCrew, ensureCrewSession, getCrewSession } from '../../crew/run-crew';
+import { TERMINAL } from '../../crew/board';
 import type { AppDeps } from '../deps';
 import { FilmBusyError, FilmNotReadyError, assertEditable, bindEditDeps, runEdit } from '../../agent/edit-loop';
 
@@ -12,6 +15,7 @@ const bodySchema = z.object({
 });
 export function registerChatRoutes(app: Hono, deps: AppDeps): void {
   bindEditDeps(deps);
+  bindCrew(deps);
   app.post('/api/films/:id/chat', async (c) => {
     const id = c.req.param('id');
     if (!isFilmId(id)) return c.json({ error: 'not_found' }, 404);
@@ -22,6 +26,16 @@ export function registerChatRoutes(app: Hono, deps: AppDeps): void {
       film = await deps.films.get(id);
     } catch {
       return c.json({ error: 'not_found' }, 404);
+    }
+    if (film.crew) {
+      // a crew film is directed through the showrunner's inbox at any time, building or not (design 3.2)
+      if (film.status === 'new' || film.status === 'failed') return c.json({ error: 'film_not_ready' }, 409);
+      const session = await ensureCrewSession(id);
+      const inboxId = createId('i');
+      // heard first: it shows at once, before the inbox can wake the showrunner for a model call
+      deps.makeToolCtx(id).emit({ type: 'showrunner.heard', inboxId, from: 'user', text: parsed.data.message });
+      session.push({ id: inboxId, from: 'user', text: parsed.data.message, ...(parsed.data.selection ? { selection: parsed.data.selection } : {}) });
+      return c.json({ accepted: true, inboxId }, 202);
     }
     try {
       assertEditable(film, await deps.films.versions(id));
@@ -45,7 +59,10 @@ export function registerChatRoutes(app: Hono, deps: AppDeps): void {
       } catch {
         return c.json({ error: 'not_found' }, 404);
       }
-      if (film.status === 'building' || film.status === 'planning') return c.json({ error: 'film_busy' }, 409);
+      if (film.crew) {
+        const busy = getCrewSession(id)?.crew.board.list().some((j) => !TERMINAL.includes(j.status));
+        if (busy) return c.json({ error: 'crew_busy' }, 409);
+      } else if (film.status === 'building' || film.status === 'planning') return c.json({ error: 'film_busy' }, 409);
       const versions = await deps.films.versions(id);
       if (action === 'undo' && film.version <= 1) return c.json({ error: 'nothing_to_undo' }, 409);
       if (action === 'redo' && film.version === versions.at(-1)?.version) return c.json({ error: 'nothing_to_redo' }, 409);

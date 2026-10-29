@@ -109,7 +109,7 @@ export interface MetaClients {
 }
 
 export interface LlmBackend {
-  id: 'spark' | 'glimmer' | 'spark-open';
+  id: 'spark' | 'glimmer' | 'spark-open' | 'wonder';
   chatWithTools(
     messages: ChatMessage[],
     tools: ToolDef[],

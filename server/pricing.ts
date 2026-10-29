@@ -2,6 +2,8 @@
 const SPARK_PER_M: Record<string, { in: number; out: number }> = {
   'muse-spark-1.3-contributor': { in: 0.1, out: 0.2 },
   'muse-spark-1.3': { in: 1.25, out: 4.25 },
+  // measured in the S12a MG-1 probe: about $0.059 for a planning turn
+  'muse-wonder-1.0': { in: 4, out: 20 },
 };
 
 export function priceSpark(model: string, inTokens: number, outTokens: number): number {

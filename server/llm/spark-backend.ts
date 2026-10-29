@@ -19,7 +19,7 @@ function withHint(messages: ChatMessage[]): ChatMessage[] {
 
 export function createSparkBackend(
   spark: MetaClients['spark'],
-  o: { id?: LlmBackend['id']; maxTokens?: number } = {},
+  o: { id?: LlmBackend['id']; maxTokens?: number; model?: string } = {},
 ): LlmBackend {
   return {
     id: o.id ?? 'spark',
@@ -29,6 +29,7 @@ export function createSparkBackend(
           messages: opts?.parallelHint ? withHint(messages) : [...messages],
           tools: tools.map(toolSpec),
           tool_choice: 'auto',
+          ...(o.model ? { model: o.model } : {}),
           ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
         },
         opts?.signal ? { signal: opts.signal } : undefined,

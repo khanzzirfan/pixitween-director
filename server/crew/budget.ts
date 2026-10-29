@@ -34,6 +34,7 @@ export interface BudgetDeps {
 
 export interface Budget extends JobGate {
   check(): void;
+  capUsd: number;
   spent(): number;
   estimate(job: Pick<Job, 'kind'>): number;
   level(): BudgetLevel;
@@ -46,6 +47,7 @@ export function createBudget(deps: BudgetDeps): Budget {
   const estimate = (job: Pick<Job, 'kind'>) => JOB_ESTIMATE_USD[job.kind];
 
   return {
+    capUsd: deps.capUsd,
     spent,
     estimate,
     level: () => levelFor(spent()),

@@ -1,0 +1,661 @@
+[
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:00.000Z",
+  "type": "film.status",
+  "status": "planning"
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:01.000Z",
+  "type": "crew.agent",
+  "lane": "showrunner",
+  "worker": "showrunner",
+  "state": "thinking",
+  "model": "muse-wonder-1.0"
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:21.000Z",
+  "type": "style.bible",
+  "bible": {
+   "palette": [
+    "#1f2937",
+    "#f59e0b"
+   ],
+   "light": "low warm morning sun from the left",
+   "camera": "slow dolly-ins",
+   "type": {
+    "font": "Inter",
+    "weight": 800,
+    "case": "upper"
+   },
+   "productLine": "a matte slate can with a small orange mountain",
+   "mood": "calm, early"
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:21.000Z",
+  "type": "storyboard.revised",
+  "rev": 1,
+  "source": "showrunner",
+  "ops": [
+   {
+    "op": "add",
+    "scene": {
+     "durationSec": 4,
+     "intent": "intent for s1",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    }
+   },
+   {
+    "op": "add",
+    "scene": {
+     "durationSec": 4,
+     "intent": "intent for s2",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    }
+   },
+   {
+    "op": "add",
+    "scene": {
+     "durationSec": 4,
+     "intent": "intent for s3",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    }
+   },
+   {
+    "op": "add",
+    "scene": {
+     "durationSec": 4,
+     "intent": "intent for s4",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    }
+   }
+  ],
+  "storyboard": {
+   "title": "Cold brew morning",
+   "aspect": "16:9",
+   "durationSec": 16,
+   "palette": [
+    "#1f2937",
+    "#f59e0b"
+   ],
+   "scenes": [
+    {
+     "id": "s1",
+     "durationSec": 4,
+     "intent": "intent for s1",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    },
+    {
+     "id": "s2",
+     "durationSec": 4,
+     "intent": "intent for s2",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    },
+    {
+     "id": "s3",
+     "durationSec": 4,
+     "intent": "intent for s3",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    },
+    {
+     "id": "s4",
+     "durationSec": 4,
+     "intent": "intent for s4",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    }
+   ]
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:21.000Z",
+  "type": "agent.turn",
+  "backend": "wonder",
+  "ms": 19800,
+  "calls": 6,
+  "reply": "Four scenes."
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:21.000Z",
+  "type": "showrunner.say",
+  "kind": "note",
+  "text": "Four scenes: the can, the pour, the detail, the close."
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:22.000Z",
+  "type": "film.status",
+  "status": "building"
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:22.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j1",
+   "kind": "build-scene",
+   "sceneId": "s1",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s1",
+   "reason": "test",
+   "origin": "showrunner",
+   "status": "queued",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:22.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j2",
+   "kind": "build-scene",
+   "sceneId": "s2",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s2",
+   "reason": "test",
+   "origin": "showrunner",
+   "status": "queued",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:22.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j3",
+   "kind": "build-scene",
+   "sceneId": "s3",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s3",
+   "reason": "test",
+   "origin": "showrunner",
+   "status": "queued",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:22.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j4",
+   "kind": "build-scene",
+   "sceneId": "s4",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s4",
+   "reason": "test",
+   "origin": "showrunner",
+   "status": "queued",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:23.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j1",
+   "kind": "build-scene",
+   "sceneId": "s1",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s1",
+   "reason": "test",
+   "origin": "showrunner",
+   "status": "running",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0,
+   "worker": "w1",
+   "startedAt": "2026-10-30T14:00:23.000Z"
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:23.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j2",
+   "kind": "build-scene",
+   "sceneId": "s2",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s2",
+   "reason": "test",
+   "origin": "showrunner",
+   "status": "running",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0,
+   "worker": "w2",
+   "startedAt": "2026-10-30T14:00:23.000Z"
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:23.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j3",
+   "kind": "build-scene",
+   "sceneId": "s3",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s3",
+   "reason": "test",
+   "origin": "showrunner",
+   "status": "running",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0,
+   "worker": "w3",
+   "startedAt": "2026-10-30T14:00:23.000Z"
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:23.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j4",
+   "kind": "build-scene",
+   "sceneId": "s4",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s4",
+   "reason": "test",
+   "origin": "showrunner",
+   "status": "running",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0,
+   "worker": "w4",
+   "startedAt": "2026-10-30T14:00:23.000Z"
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:27.000Z",
+  "type": "tool.call",
+  "name": "addLayer",
+  "args": {
+   "sceneId": "s1"
+  },
+  "ok": true,
+  "version": 3
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:28.000Z",
+  "type": "tool.call",
+  "name": "addLayer",
+  "args": {
+   "sceneId": "s2"
+  },
+  "ok": false,
+  "error": "unknown asset"
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:29.000Z",
+  "type": "tool.call",
+  "name": "addLayer",
+  "args": {
+   "sceneId": "s2"
+  },
+  "ok": true,
+  "version": 4
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:30.000Z",
+  "type": "cost",
+  "usd": 0.031,
+  "model": "muse-spark-1.3-contributor",
+  "units": "7 turns"
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:30.000Z",
+  "type": "showrunner.heard",
+  "inboxId": "i1",
+  "from": "user",
+  "text": "add a sunset scene after the second one, and warmer light everywhere"
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:31.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j1",
+   "kind": "build-scene",
+   "sceneId": "s1",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s1",
+   "reason": "test",
+   "origin": "showrunner",
+   "status": "done",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.03,
+   "worker": "w1",
+   "startedAt": "2026-10-30T14:00:23.000Z",
+   "endedAt": "2026-10-30T14:00:31.000Z",
+   "ms": 8000,
+   "summary": "7 tool calls, 7 ok"
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:40.000Z",
+  "type": "agent.turn",
+  "backend": "wonder",
+  "ms": 18200,
+  "calls": 4,
+  "reply": "Added s5."
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:40.000Z",
+  "type": "showrunner.say",
+  "kind": "reply",
+  "text": "Adding a sunset scene after scene 2 and warming every scene."
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:40.000Z",
+  "type": "storyboard.revised",
+  "rev": 2,
+  "source": "showrunner",
+  "ops": [
+   {
+    "op": "add",
+    "scene": {
+     "durationSec": 4,
+     "intent": "sunset",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    },
+    "after": "s2"
+   }
+  ],
+  "storyboard": {
+   "title": "Cold brew morning",
+   "aspect": "16:9",
+   "durationSec": 20,
+   "palette": [
+    "#1f2937",
+    "#f59e0b"
+   ],
+   "scenes": [
+    {
+     "id": "s1",
+     "durationSec": 4,
+     "intent": "intent for s1",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    },
+    {
+     "id": "s2",
+     "durationSec": 4,
+     "intent": "intent for s2",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    },
+    {
+     "id": "s5",
+     "durationSec": 4,
+     "intent": "intent for s5",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    },
+    {
+     "id": "s3",
+     "durationSec": 4,
+     "intent": "intent for s3",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    },
+    {
+     "id": "s4",
+     "durationSec": 4,
+     "intent": "intent for s4",
+     "shotType": "hero",
+     "camera": "static",
+     "layersWanted": [
+      "bg",
+      "product",
+      "headline"
+     ],
+     "mode": "motion",
+     "modeReason": "a still is enough"
+    }
+   ]
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:41.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j2",
+   "kind": "build-scene",
+   "sceneId": "s2",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s2",
+   "reason": "test",
+   "origin": "showrunner",
+   "status": "superseded",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0,
+   "worker": "w2",
+   "supersededBy": "j6",
+   "startedAt": "2026-10-30T14:00:23.000Z",
+   "endedAt": "2026-10-30T14:00:41.000Z",
+   "ms": 18000
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:41.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j6",
+   "kind": "restyle-scene",
+   "sceneId": "s2",
+   "filmId": "film_0123456789ab",
+   "brief": "restyle-scene s2",
+   "reason": "test",
+   "origin": "user",
+   "status": "running",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0,
+   "worker": "w2",
+   "startedAt": "2026-10-30T14:00:41.000Z"
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:41.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j7",
+   "kind": "build-scene",
+   "sceneId": "s5",
+   "filmId": "film_0123456789ab",
+   "brief": "build-scene s5",
+   "reason": "test",
+   "origin": "auto",
+   "status": "running",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.0,
+   "worker": "w5",
+   "startedAt": "2026-10-30T14:00:41.000Z"
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:44.000Z",
+  "type": "review.finding",
+  "sceneId": "s1",
+  "kind": "text-over-product",
+  "atSec": 3.2,
+  "evidence": "the headline crosses the can label",
+  "deterministic": false
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:45.000Z",
+  "type": "cost",
+  "usd": 0.059,
+  "model": "muse-wonder-1.0",
+  "units": "2 turns"
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:00:50.000Z",
+  "type": "budget",
+  "spentUsd": 0.41,
+  "capUsd": 1.5,
+  "level": "ok"
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:01:00.000Z",
+  "type": "job.update",
+  "job": {
+   "id": "j6",
+   "kind": "restyle-scene",
+   "sceneId": "s2",
+   "filmId": "film_0123456789ab",
+   "brief": "restyle-scene s2",
+   "reason": "test",
+   "origin": "user",
+   "status": "done",
+   "createdAt": "2026-10-30T14:00:05.000Z",
+   "costUsd": 0.02,
+   "worker": "w2",
+   "startedAt": "2026-10-30T14:00:41.000Z",
+   "endedAt": "2026-10-30T14:01:00.000Z",
+   "ms": 19000
+  }
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:01:01.000Z",
+  "type": "take.ready",
+  "jobId": "j9",
+  "takeOf": "j8",
+  "sceneId": "s3",
+  "label": "B",
+  "takeFilmId": "film_ba9876543210",
+  "score": 7.5
+ },
+ {
+  "filmId": "film_0123456789ab",
+  "at": "2026-10-30T14:01:10.000Z",
+  "type": "film.status",
+  "status": "ready"
+ }
+]

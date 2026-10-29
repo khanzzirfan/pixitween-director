@@ -29,6 +29,7 @@ export async function buildDeps(env: Env): Promise<AppDeps> {
     bus,
     admission: createDirectAdmission({ maxInFlight: env.FILMS_IN_FLIGHT_MAX }),
     makeToolCtx: (filmId) => makeToolCtx({ films, assets, meta, ledger, bus }, filmId),
+    dataDir: env.DATA_DIR,
   };
 }
 

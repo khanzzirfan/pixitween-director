@@ -13,6 +13,7 @@ export async function makeTestDeps(): Promise<AppDeps & { filmId: string; dir: s
     ledger: t.ledger,
     bus: t.bus,
     makeToolCtx: () => t.ctx,
+    dataDir: t.dir,
   };
   return { ...deps, filmId: t.filmId, dir: t.dir, events: t.events };
 }
