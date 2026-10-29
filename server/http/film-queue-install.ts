@@ -28,7 +28,8 @@ export function createInstallFilmQueue(opts: { loadDirector?: () => Promise<Dire
     let director: DirectorModule | undefined;
     try {
       director = await loadDirector();
-    } catch {
+    } catch (e) {
+      log(`[queue] director failed to load: ${e instanceof Error ? e.message : String(e)}`);
       director = undefined;
     }
     const runDirector = director?.runDirector;

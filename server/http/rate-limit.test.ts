@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest';
-import { createRateLimiter } from './rate-limit';
+import { afterEach, expect, it, vi } from 'vitest';
+import { createRateLimiter, startSweeper } from './rate-limit';
 
 const HOUR = 3_600_000;
 const make = (max: number) => {
@@ -57,4 +57,54 @@ it('peek never spends budget', () => {
   expect(l.check('a')).toMatchObject({ allowed: true, remaining: 0 });
   at(1);
   expect(l.peek('a').allowed).toBe(false);
+});
+
+it('refund gives the slot back after an allowed check', () => {
+  const { l } = make(1);
+  expect(l.check('a').allowed).toBe(true);
+  l.refund('a');
+  expect(l.check('a').allowed).toBe(true);
+});
+
+it('refund on an unknown key or a key with no live hits does nothing', () => {
+  const { l, at } = make(1);
+  expect(() => l.refund('nobody')).not.toThrow();
+  l.check('a');
+  at(HOUR * 2);
+  expect(() => l.refund('a')).not.toThrow();
+  expect(l.size()).toBe(0);
+});
+
+it('refund removes only the most recent hit', () => {
+  const { l } = make(3);
+  l.check('a');
+  l.check('a');
+  l.check('a');
+  l.refund('a');
+  expect(l.check('a')).toMatchObject({ allowed: true, remaining: 0 });
+  expect(l.check('a').allowed).toBe(false);
+});
+
+it('refund deletes the key when its last hit goes', () => {
+  const { l } = make(2);
+  l.check('a');
+  expect(l.size()).toBe(1);
+  l.refund('a');
+  expect(l.size()).toBe(0);
+});
+
+afterEach(() => vi.useRealTimers());
+
+it('startSweeper drops idle keys without any check call, and its stop function ends the timer', () => {
+  vi.useFakeTimers();
+  const l = createRateLimiter({ windowMs: 1000, max: 1 }); // Date.now is faked too
+  const stop = startSweeper(l, 500);
+  l.check('a');
+  expect(l.size()).toBe(1);
+  vi.advanceTimersByTime(1600);
+  expect(l.size()).toBe(0);
+  stop();
+  l.check('b');
+  vi.advanceTimersByTime(5000);
+  expect(l.size()).toBe(1); // no sweep after stop
 });

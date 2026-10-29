@@ -84,3 +84,34 @@ it('undo and redo walk the version history and refuse at the ends', async () => 
   const redone = await app.request(`/api/films/${deps.filmId}/redo`, { method: 'POST' });
   expect((await redone.json()).version).toBe(top);
 });
+
+it('a queue that fills between canAccept and submit fails the film and answers 429, not a stuck new film', async () => {
+  const base = await makeTestDeps();
+  const emitted: Array<{ type: string; where?: string }> = [];
+  const deps = {
+    ...base,
+    makeToolCtx: (id: string) => {
+      const ctx = makeToolCtx(base, id);
+      return { ...ctx, emit: (e: Parameters<typeof ctx.emit>[0]) => (emitted.push(e as { type: string; where?: string }), ctx.emit(e)) };
+    },
+    admission: {
+      canAccept: () => ({ ok: true as const }),
+      submit: () => ({ state: 'rejected' as const, retryAfterSec: 17 }),
+      position: () => ({ state: 'unknown' as const }),
+      stats: () => ({ inFlight: 0, queued: 0, maxInFlight: 1, maxQueued: 0, startsInWindow: 0, startsPerWindow: 1, windowSec: 60 }),
+    },
+  };
+  const before = new Set((await deps.films.list()).map((f) => f.id));
+  const app = createApp(deps);
+  const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#ccc' } }).png().toBuffer();
+  const form = new FormData();
+  form.set('product', new File([png], 'p.png', { type: 'image/png' }));
+  form.set('brief', 'a ceramic mug at sunrise');
+  const res = await app.request('/api/films', { method: 'POST', body: form });
+  expect(res.status).toBe(429);
+  expect(res.headers.get('retry-after')).toBe('17');
+  const created = (await deps.films.list()).filter((f) => !before.has(f.id));
+  expect(created).toHaveLength(1);
+  expect(created[0]!.status).toBe('failed');
+  expect(emitted).toContainEqual(expect.objectContaining({ type: 'error', where: 'admission' }));
+});

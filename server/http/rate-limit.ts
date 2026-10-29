@@ -31,6 +31,12 @@ export function createRateLimiter(opts: { windowMs: number; max: number; now?: (
       return r;
     },
     peek: (key: string): RateCheck => answer(live(key)),
+    /** Gives back the slot the last allowed check took, for a request that did not use it. */
+    refund(key: string): void {
+      const kept = live(key);
+      if (kept.length) hits.set(key, kept.slice(0, -1));
+      if (!hits.get(key)?.length) hits.delete(key);
+    },
     size: () => hits.size,
     sweep(): void {
       for (const key of [...hits.keys()]) live(key);
@@ -39,3 +45,10 @@ export function createRateLimiter(opts: { windowMs: number; max: number; now?: (
 }
 
 export type RateLimiter = ReturnType<typeof createRateLimiter>;
+
+/** Drops idle keys on a timer that never keeps the process alive, so the map cannot grow with every visitor ever seen. */
+export function startSweeper(limiter: RateLimiter, everyMs = 60_000): () => void {
+  const h = setInterval(() => limiter.sweep(), everyMs);
+  h.unref?.();
+  return () => clearInterval(h);
+}

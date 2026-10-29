@@ -7,7 +7,7 @@ function app() {
   const a = new Hono();
   for (const m of middlewares) a.use('*', m);
   a.get('/api/films', (c) => c.json([]));
-  a.post('/api/films', (c) => c.text('created'));
+  a.post('/api/films', async (c) => ((await c.req.text()) === 'bad' ? c.json({ error: 'product_required' }, 400) : c.text('created')));
   a.post('/api/films/:id/scenes/:sceneId/approve', (c) => c.text('approved'));
   return a;
 }
@@ -39,4 +39,15 @@ it('caps approvals after the passcode', async () => {
 it('rejects a big upload before the handler', async () => {
   const res = await createFilm(app(), auth, new Uint8Array(26 * 1024 * 1024));
   expect(res.status).toBe(413);
+});
+
+it('a create refused by the handler (bad body) does not use a film slot, and a good one does', async () => {
+  vi.resetModules(); // the limiter lives in the module, and the tests above have used this file's quota
+  const fresh = await import('./middleware');
+  const a = new Hono();
+  for (const m of fresh.middlewares) a.use('*', m);
+  a.post('/api/films', async (c) => ((await c.req.text()) === 'bad' ? c.json({ error: 'product_required' }, 400) : c.text('created')));
+  for (let i = 0; i < 5; i++) expect((await createFilm(a, auth, 'bad')).status).toBe(400);
+  for (let i = 0; i < 3; i++) expect((await createFilm(a)).status).toBe(200);
+  expect((await createFilm(a)).status).toBe(429);
 });

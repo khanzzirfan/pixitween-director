@@ -60,3 +60,56 @@ it('only logs when the director is missing', async () => {
 it('is registered at boot', () => {
   expect(bootHooks).toContain(installFilmQueue);
 });
+
+const withLog = (loadDirector: Parameters<typeof createInstallFilmQueue>[0] extends infer O ? (O extends { loadDirector?: infer L } ? L : never) : never, films?: FilmState[]) => {
+  const lines: string[] = [];
+  const deps = { films: { list: async () => films ?? [] } } as unknown as AppDeps;
+  const hook = createInstallFilmQueue({ log: (l) => lines.push(l), loadDirector });
+  return { lines, deps, hook, app: new Hono() };
+};
+
+it('a director that fails to load is logged by name and the hook does not throw', async () => {
+  const { lines, deps, hook, app } = withLog(async () => {
+    throw new Error('boom');
+  });
+  await expect(hook({ app, deps })).resolves.toBeUndefined();
+  expect(lines).toContain('[queue] director failed to load: boom');
+  expect(lines).toContain('[queue] director not available; skipping requeue');
+});
+
+it('a director module with no runDirector only says it is not available', async () => {
+  const { lines, deps, hook, app } = withLog(async () => ({}));
+  await hook({ app, deps });
+  expect(lines).toContain('[queue] director not available; skipping requeue');
+  expect(lines.some((l) => l.includes('failed to load'))).toBe(false);
+});
+
+it('submits three new films oldest first', async () => {
+  vi.stubEnv('FILMS_IN_FLIGHT_MAX', '5');
+  vi.stubEnv('FILMS_STARTS_PER_WINDOW', '5');
+  const ran: string[] = [];
+  const { deps, hook, app } = withLog(
+    async () => ({ runDirector: (id: string) => (ran.push(id), new Promise<void>(() => undefined)) }),
+    [film('c', 'new', '2026-10-29T00:03:00Z'), film('a', 'new', '2026-10-29T00:01:00Z'), film('b', 'new', '2026-10-29T00:02:00Z')],
+  );
+  await hook({ app, deps });
+  await new Promise((r) => setTimeout(r, 0));
+  expect(ran).toEqual(['a', 'b', 'c']);
+});
+
+it('a film already running through the queue is not started twice by the boot requeue', async () => {
+  vi.stubEnv('FILMS_IN_FLIGHT_MAX', '5');
+  vi.stubEnv('FILMS_STARTS_PER_WINDOW', '5');
+  let runs = 0;
+  // the film is still `new` in the store while its first run is in flight
+  const { deps, hook, app } = withLog(
+    async () => ({ runDirector: () => (runs++, new Promise<void>(() => undefined)) }),
+    [film('f1', 'new', '2026-10-29T00:01:00Z')],
+  );
+  await hook({ app, deps });
+  await new Promise((r) => setTimeout(r, 0));
+  expect(runs).toBe(1);
+  expect(deps.admission!.submit('f1', async () => { runs++; })).toMatchObject({ state: 'running' });
+  await new Promise((r) => setTimeout(r, 0));
+  expect(runs).toBe(1);
+});
