@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import type { AppDeps } from './http/deps';
+import { installFilmQueue } from './http/film-queue-install';
 import { resumeGenerations } from './tools/generate';
 
 export type BootHook = (ctx: { app: Hono; deps: AppDeps }) => void | Promise<void>;
@@ -11,4 +12,5 @@ export const bootHooks: BootHook[] = [
     // not awaited: a clip can take 15 minutes and the server must start listening meanwhile
     void resumeGenerations(deps.makeToolCtx);
   },
+  installFilmQueue,
 ];

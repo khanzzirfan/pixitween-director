@@ -1,3 +1,4 @@
+import { QueueBanner } from './QueueBanner';
 import type { PanelProps } from './types';
 
 export const STUB_OWNER = 'S3b' as const;
@@ -29,6 +30,7 @@ export default function Storyboard({ film, events }: PanelProps) {
         </div>
         <span className={`status-pill status-${status}`}>{labels[status]}</span>
       </div>
+      {film && <QueueBanner filmId={film.id} status={status} />}
       {transcript?.type === 'listener.transcript' && <p className="transcript-note">We heard: “{transcript.text}”</p>}
       {storyboard ? (
         <div>
