@@ -10,7 +10,6 @@ import { newFilmComposition, registerAsset } from '../authoring/api';
 import type { Comp } from '../authoring/types';
 import { setSceneMode } from '../generate/mode';
 import { runRules } from '../review/rules';
-import { tools as generateTools } from '../tools/generate';
 import type { Board } from './board';
 import { TERMINAL } from './board';
 import type { Budget } from './budget';
@@ -223,7 +222,9 @@ export function createBoardTools(crew: CrewCtx): ToolDef[] {
       } catch (e) {
         return fail(message(e));
       }
-      return (crew.propose ?? ((sceneId) => generateTools[0]!.run(ctx, { sceneId })))(a.sceneId);
+      // loaded here: the generate tools pull in the Clippy services, which nothing else in the crew needs
+      const propose = crew.propose ?? (async (sceneId: string) => (await import('../tools/generate')).tools[0]!.run(ctx, { sceneId }));
+      return propose(a.sceneId);
     },
   });
 

@@ -6,9 +6,11 @@ import { loadEnv } from '../env';
 import { pickBackend } from '../llm/router';
 import { resizeFit } from '../media/image';
 import type { AppDeps } from '../http/deps';
+import { isFakeDirector } from '../agent/fake-director';
 import { createBoard, TERMINAL } from './board';
 import { createBudget } from './budget';
 import { createJobChains } from './chains';
+import { createFakeCrew } from './fake-showrunner';
 import { createId } from './ids';
 import { createInbox, type Inbox } from './inbox';
 import { createCrewPersist } from './persist';
@@ -34,6 +36,8 @@ export interface CrewOptions {
   model?: string;
   /** Overrides CREW_IDLE_END_MS. */
   idleEndMs?: number;
+  /** Pause per fake job and turn when DIRECTOR_FAKE=1. */
+  fakeDelayMs?: number;
 }
 
 export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
@@ -57,7 +61,11 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
       return full;
     };
 
+    const fake = isFakeDirector() ? createFakeCrew({ delayMs: o.fakeDelayMs }) : undefined;
+    // assigned once below, but the callbacks created first read them
+    // eslint-disable-next-line prefer-const
     let crew!: CrewCtx;
+    // eslint-disable-next-line prefer-const
     let board!: ReturnType<typeof createBoard>;
     const chains = createJobChains({
       board: () => board,
@@ -90,7 +98,7 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     const scheduler = createScheduler({
       board,
       maxWorkers: env.CREW_MAX_WORKERS,
-      runWorker: (job, signal) => runRegisteredWorker(job, signal, crew),
+      runWorker: (job, signal) => (fake?.workers[job.kind] ?? ((j, sg, c) => runRegisteredWorker(j, sg, c)))(job, signal, crew),
       budget,
       films: deps.films,
       persist,
@@ -99,7 +107,7 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     crew = { filmId, films: deps.films, board, scheduler, budget, inbox, emit: toolCtx.emit, source: 'showrunner', takesMax: env.CREW_TAKES_MAX, removedIds: new Set(), toolCtx, turn: newTurn() };
 
     const model = o.model ?? env.SHOWRUNNER_MODEL;
-    const backend = o.backend ?? pickBackend('showrunner', { onFallback: (i) => toolCtx.emit({ type: 'error', where: 'showrunner', message: `${i.from} unavailable (${i.reason}); this turn used ${i.to}` }) });
+    const backend = o.backend ?? fake?.backend ?? pickBackend('showrunner', { onFallback: (i) => toolCtx.emit({ type: 'error', where: 'showrunner', message: `${i.from} unavailable (${i.reason}); this turn used ${i.to}` }) });
     let productImageUrl: string | undefined;
     try {
       productImageUrl = `data:image/jpeg;base64,${(await resizeFit(await deps.assets.read(film.brief.productAssetId), 768, 'jpeg')).toString('base64')}`;
@@ -185,4 +193,13 @@ export async function ensureCrewSession(filmId: string): Promise<CrewSession> {
 export async function runCrew(filmId: string): Promise<void> {
   if (!bound) throw new Error('crew not bound');
   return bound.runCrew(filmId);
+}
+
+/** Sends a user message to a crew film's showrunner. `showrunner.heard` goes out first, so the UI shows it before any model call. */
+export async function directShowrunner(deps: AppDeps, filmId: string, text: string, selection?: InboxItem['selection']): Promise<string> {
+  const session = await ensureCrewSession(filmId);
+  const inboxId = createId('i');
+  deps.makeToolCtx(filmId).emit({ type: 'showrunner.heard', inboxId, from: 'user', text });
+  session.push({ id: inboxId, from: 'user', text, ...(selection ? { selection } : {}) });
+  return inboxId;
 }

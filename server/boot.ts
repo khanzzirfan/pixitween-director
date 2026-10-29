@@ -1,4 +1,5 @@
 import type { Hono } from 'hono';
+import { registerCrew } from './crew/boot';
 import type { AppDeps } from './http/deps';
 import { installFilmQueue } from './http/film-queue-install';
 import { resumeGenerations } from './tools/generate';
@@ -13,4 +14,5 @@ export const bootHooks: BootHook[] = [
     void resumeGenerations(deps.makeToolCtx);
   },
   installFilmQueue,
+  registerCrew,
 ];

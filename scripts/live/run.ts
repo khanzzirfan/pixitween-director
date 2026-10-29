@@ -6,8 +6,9 @@ import { loadEnv } from '../../server/env';
 
 export interface LiveScript {
   describe(): string;
-  estimateUsd(): number;
-  run(ctx: { env: Env; log(line: string): void }): Promise<void>;
+  /** `args` are the flags after the script name (for example `--ab`), for scripts whose cost depends on them. */
+  estimateUsd(args?: string[]): number;
+  run(ctx: { env: Env; log(line: string): void; args?: string[] }): Promise<void>;
 }
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -33,12 +34,13 @@ export async function runLive(argv: string[], o: { dir?: string; log?: (l: strin
 
   const script = (await import(pathToFileURL(file).href)) as LiveScript;
   log(script.describe());
-  log(`estimated cost: $${script.estimateUsd()}`);
+  const args = argv.filter((a) => a !== name && a !== '--yes');
+  log(`estimated cost: $${script.estimateUsd(args)}`);
   if (!yes) {
     log('Dry run. Pass --yes to run.');
     return 0;
   }
-  await script.run({ env: loadEnv(), log });
+  await script.run({ env: loadEnv(), log, args });
   return 0;
 }
 

@@ -5,7 +5,7 @@ import type { ChatMessage, LlmBackend, ToolCall } from '@shared/ports';
 import type { ToolDef } from '@shared/tools';
 import { assistantMessageFrom, toolResultMessage } from '../llm/messages';
 import { priceSpark } from '../pricing';
-import { createRegistry } from '../tools/registry';
+import type { Registry } from '../tools/registry';
 import { compact, renderTurn, storySoFar, type Finding } from './history';
 import { SHOWRUNNER_SYSTEM } from './prompts';
 import { createBoardTools, newTurn, type CrewCtx } from './showrunner-tools';
@@ -32,7 +32,7 @@ export interface ShowrunnerDeps {
 const REPAIR = 'Every tool call in your last turn failed. Read the errors, fix the arguments and call the tools again.';
 
 /** Dispatches an 'auto' job for every scene that needs a builder and got none from the showrunner this turn (design 5.4). */
-export async function autoDispatch(crew: CrewCtx): Promise<string[]> {
+export async function autoDispatch(crew: CrewCtx, origin: 'auto' | 'user' = 'auto'): Promise<string[]> {
   const film = await crew.films.get(crew.filmId);
   const made: string[] = [];
   for (const id of crew.turn.needsBuilder) {
@@ -40,7 +40,7 @@ export async function autoDispatch(crew: CrewCtx): Promise<string[]> {
     const scene = film.storyboard?.scenes.find((s) => s.id === id);
     if (!scene) continue;
     const built = crew.board.list().some((j) => j.sceneId === id && j.status === 'done' && j.kind !== 'critique' && j.kind !== 'continuity');
-    const job = await crew.scheduler.dispatch({ kind: built ? 'rebuild-scene' : 'build-scene', sceneId: id, origin: 'auto', brief: scene.intent, reason: built ? 'the scene changed' : 'new scene' });
+    const job = await crew.scheduler.dispatch({ kind: built ? 'rebuild-scene' : 'build-scene', sceneId: id, origin, brief: scene.intent, reason: built ? 'the scene changed' : 'new scene' });
     made.push(job.id);
   }
   return made;
@@ -49,7 +49,9 @@ export async function autoDispatch(crew: CrewCtx): Promise<string[]> {
 export function createShowrunner(deps: ShowrunnerDeps) {
   const { crew, backend } = deps;
   const tools = deps.tools ?? createBoardTools(crew);
-  const registry = createRegistry([tools]);
+  // loaded on first use: the registry pulls in every tool module, which a route registration does not need
+  let registry: Registry | undefined;
+  const getRegistry = async (): Promise<Registry> => (registry ??= (await import('../tools/registry')).createRegistry([tools]));
   const history: ChatMessage[] = [{ role: 'system', content: SHOWRUNNER_SYSTEM }];
   const maxTurns = deps.maxTurns ?? 40;
   let turns = 0;
@@ -85,13 +87,13 @@ export function createShowrunner(deps: ShowrunnerDeps) {
     const results = [];
     for (const call of calls) {
       if (signal.aborted) break;
-      results.push(await registry.run(crew.toolCtx, call.name, call.args));
+      results.push(await (await getRegistry()).run(crew.toolCtx, call.name, call.args));
     }
     history.push(assistantMessageFrom({ content: response.content, toolCalls: calls.slice(0, results.length) }));
     results.forEach((r, i) => history.push(toolResultMessage(calls[i]!, r)));
     if (!calls.length && response.content?.trim()) {
       // no tool call: whatever the model said is a note to the user
-      await registry.run(crew.toolCtx, 'say', { text: response.content.trim().slice(0, 240) });
+      await (await getRegistry()).run(crew.toolCtx, 'say', { text: response.content.trim().slice(0, 240) });
     }
     if (results.some((r, i) => r.ok && calls[i]!.name === 'finish')) finished = true;
     return { allFailed: results.length > 0 && results.every((r) => !r.ok) };

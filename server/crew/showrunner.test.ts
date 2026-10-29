@@ -7,7 +7,7 @@ import { createBoard } from './board';
 import { createScheduler } from './scheduler';
 import { createShowrunner, autoDispatch } from './showrunner';
 import { newTurn, reviseStoryboard } from './showrunner-tools';
-import { makeTestCrew } from './test-helpers';
+import { makeTestCrew, waitFor } from './test-helpers';
 
 const scene: Omit<Scene, 'id'> = { durationSec: 4, intent: 'a scene', shotType: 'hero', camera: 'static', layersWanted: ['bg', 'product'], mode: 'motion', modeReason: 'a still is enough' };
 const adds = (n: number) => Array.from({ length: n }, () => ({ op: 'add' as const, scene }));
@@ -84,8 +84,7 @@ describe('the loop', () => {
     const bad: Entry = [{ name: 'cancel', args: { jobId: 'j9' } }];
     const s = await start([bad, [{ name: 'say', args: { text: 'fixed' } }], [{ name: 'say', args: { text: 'later' } }]], { idleEndMs: 200 });
     s.inbox.push(item('user', 'first'));
-    await settle();
-    expect(s.backend.turns()).toBe(2);
+    await waitFor(() => s.backend.turns() === 2);
     s.inbox.push(item('user', 'second'));
     await s.done;
     expect(s.backend.turns()).toBe(3);
@@ -94,9 +93,9 @@ describe('the loop', () => {
   it('only the first turn carries the product photo', async () => {
     const s = await start([[{ name: 'say', args: { text: 'one' } }], [{ name: 'say', args: { text: 'two' } }], [{ name: 'say', args: { text: 'three' } }]], { image: true, idleEndMs: 200 });
     s.inbox.push(item('system', 'New film'));
-    await settle();
+    await waitFor(() => s.backend.turns() === 1);
     s.inbox.push(item('user', 'again'));
-    await settle();
+    await waitFor(() => s.backend.turns() === 2);
     s.inbox.push(item('user', 'and again'));
     await s.done;
     const hasImage = s.backend.sent.map((m) => JSON.stringify(m).includes('image_url'));
@@ -150,7 +149,7 @@ describe('the loop', () => {
     const sr = createShowrunner({ crew: t.crew, backend: scripted([[{ name: 'finish', args: { summary: 'done' } }], [{ name: 'say', args: { text: 'on it' } }]]), model: 'muse-wonder-1.0', idleEndMs: 150 });
     const run = sr.run(new AbortController().signal);
     t.inbox.push(item('system', 'go'));
-    await settle();
+    await waitFor(() => sr.isFinished());
     expect(sr.isFinished()).toBe(true);
     expect((await t.film.films.get(t.film.filmId)).status).toBe('ready');
     t.inbox.push(item('user', 'one more thing'));
@@ -168,7 +167,7 @@ describe('auto-dispatch', () => {
     const sr = createShowrunner({ crew: t.crew, backend, model: 'muse-wonder-1.0', idleEndMs: 40 });
     const run = sr.run(new AbortController().signal);
     t.inbox.push(item('user', 'add a scene'));
-    await settle();
+    await waitFor(() => t.board.list().length === 1);
     expect(t.board.list().map((j) => [j.kind, j.sceneId, j.origin])).toEqual([['build-scene', 's5', 'auto']]);
     await t.scheduler.cancel('j1');
     await run;
@@ -181,7 +180,8 @@ describe('auto-dispatch', () => {
     const sr = createShowrunner({ crew: t.crew, backend, model: 'muse-wonder-1.0', idleEndMs: 40 });
     const run = sr.run(new AbortController().signal);
     t.inbox.push(item('user', 'add a scene'));
-    await settle();
+    await waitFor(() => t.board.list().length >= 1);
+    await settle(); // a second, wrongly auto-made, job would show by now
     expect(t.board.list().filter((j) => j.sceneId === 's5')).toHaveLength(1);
     expect(t.board.list()[0]!.origin).toBe('showrunner');
     await t.scheduler.cancel('j1');
@@ -205,7 +205,10 @@ describe('job chains', () => {
   it('a build on s2 ending done queues one continuity and one critique, and tells the inbox once', async () => {
     const pushed: InboxItem[] = [];
     const inbox = { push: (i: InboxItem) => pushed.push(i), drain: async () => [], size: () => 0, close: () => undefined };
+    // the chain handler is created first and reads them later
+    // eslint-disable-next-line prefer-const
     let board!: ReturnType<typeof createBoard>;
+    // eslint-disable-next-line prefer-const
     let scheduler!: ReturnType<typeof createScheduler>;
     const onUpdate = createJobChains({ board: () => board, scheduler: () => scheduler, inbox });
     board = createBoard({ filmId: 'film_aaaaaaaaaaaa', emit: (e) => onUpdate(e.job), persist: () => undefined });
@@ -225,7 +228,10 @@ describe('job chains', () => {
   it('a failed job is reported, and queues no checks', async () => {
     const pushed: InboxItem[] = [];
     const inbox = { push: (i: InboxItem) => pushed.push(i), drain: async () => [], size: () => 0, close: () => undefined };
+    // the chain handler is created first and reads them later
+    // eslint-disable-next-line prefer-const
     let board!: ReturnType<typeof createBoard>;
+    // eslint-disable-next-line prefer-const
     let scheduler!: ReturnType<typeof createScheduler>;
     const onUpdate = createJobChains({ board: () => board, scheduler: () => scheduler, inbox });
     board = createBoard({ filmId: 'film_aaaaaaaaaaaa', emit: (e) => onUpdate(e.job), persist: () => undefined });
@@ -240,7 +246,10 @@ describe('job chains', () => {
   it('a late patch on a finished job does not chain again', async () => {
     const pushed: InboxItem[] = [];
     const inbox = { push: (i: InboxItem) => pushed.push(i), drain: async () => [], size: () => 0, close: () => undefined };
+    // the chain handler is created first and reads them later
+    // eslint-disable-next-line prefer-const
     let board!: ReturnType<typeof createBoard>;
+    // eslint-disable-next-line prefer-const
     let scheduler!: ReturnType<typeof createScheduler>;
     const onUpdate = createJobChains({ board: () => board, scheduler: () => scheduler, inbox });
     board = createBoard({ filmId: 'film_aaaaaaaaaaaa', emit: (e) => onUpdate(e.job), persist: () => undefined });

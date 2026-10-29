@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import type { Hono } from 'hono';
 import { isFilmId } from '@shared/composition';
-import { createId } from '../../crew/ids';
-import { bindCrew, ensureCrewSession, getCrewSession } from '../../crew/run-crew';
+import { bindCrew, directShowrunner, getCrewSession } from '../../crew/run-crew';
 import { TERMINAL } from '../../crew/board';
 import type { AppDeps } from '../deps';
 import { FilmBusyError, FilmNotReadyError, assertEditable, bindEditDeps, runEdit } from '../../agent/edit-loop';
@@ -30,11 +29,7 @@ export function registerChatRoutes(app: Hono, deps: AppDeps): void {
     if (film.crew) {
       // a crew film is directed through the showrunner's inbox at any time, building or not (design 3.2)
       if (film.status === 'new' || film.status === 'failed') return c.json({ error: 'film_not_ready' }, 409);
-      const session = await ensureCrewSession(id);
-      const inboxId = createId('i');
-      // heard first: it shows at once, before the inbox can wake the showrunner for a model call
-      deps.makeToolCtx(id).emit({ type: 'showrunner.heard', inboxId, from: 'user', text: parsed.data.message });
-      session.push({ id: inboxId, from: 'user', text: parsed.data.message, ...(parsed.data.selection ? { selection: parsed.data.selection } : {}) });
+      const inboxId = await directShowrunner(deps, id, parsed.data.message, parsed.data.selection);
       return c.json({ accepted: true, inboxId }, 202);
     }
     try {

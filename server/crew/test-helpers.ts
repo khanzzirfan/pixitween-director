@@ -49,3 +49,12 @@ export async function makeTestCrew(o: { runWorker?: (job: Job, signal: AbortSign
   };
   return { crew, film, board: t.board, scheduler, inbox, budget, events: film.events };
 }
+
+/** Polls until `ok()` is true; a test waits for what it needs instead of guessing a delay. */
+export async function waitFor(ok: () => boolean | Promise<boolean>, ms = 3000): Promise<void> {
+  const t0 = Date.now();
+  while (!(await ok())) {
+    if (Date.now() - t0 > ms) throw new Error('waitFor: condition not reached');
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
