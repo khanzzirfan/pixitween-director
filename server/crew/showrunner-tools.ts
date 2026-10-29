@@ -125,6 +125,11 @@ export async function reviseStoryboard(crew: CrewCtx, ops: StoryboardOp[]): Prom
 
 const sceneIdsOf = async (crew: CrewCtx): Promise<string[]> => (await crew.films.get(crew.filmId)).storyboard?.scenes.map((s) => s.id) ?? [];
 
+/** Showrunner-ordered fixes per scene. After this many, the showrunner leaves the finding and says why. */
+export const MAX_FIXES_PER_SCENE = 2;
+/** Findings finish does not wait for: the crew cannot always satisfy them and they do not break the film. */
+const NON_BLOCKING = ['outside-safe-area'];
+
 const NEEDS_SCENE: JobKind[] = [...WRITING_KINDS, 'take', 'critique'];
 
 export function createBoardTools(crew: CrewCtx): ToolDef[] {
@@ -170,6 +175,10 @@ export function createBoardTools(crew: CrewCtx): ToolDef[] {
     async run(_ctx, a) {
       if (NEEDS_SCENE.includes(a.kind) && !a.sceneId) return fail(`${a.kind} needs a sceneId`);
       if (a.sceneId && !(await sceneIdsOf(crew)).includes(a.sceneId)) return fail(`unknown scene ${a.sceneId}`);
+      if (a.kind === 'fix' && a.sceneId) {
+        const fixes = crew.board.list().filter((j) => j.kind === 'fix' && j.sceneId === a.sceneId && j.origin === 'showrunner').length;
+        if (fixes >= MAX_FIXES_PER_SCENE) return fail(`scene ${a.sceneId} already had ${fixes} fixes; leave the remaining findings and say why in one line, or use edit for something new`);
+      }
       for (const dep of a.dependsOn ?? []) if (!crew.board.get(dep)) return fail(`unknown job ${dep} in dependsOn`);
       const base = { origin: 'showrunner' as const, brief: a.brief, reason: a.reason, ...(a.sceneId ? { sceneId: a.sceneId } : {}), ...(a.dependsOn ? { dependsOn: a.dependsOn } : {}) };
       const ids: string[] = [];
@@ -263,7 +272,7 @@ export function createBoardTools(crew: CrewCtx): ToolDef[] {
       const film = await crew.films.get(crew.filmId);
       if (film.composition) {
         const { findings } = await runRules(film.composition as Comp, ctx.assets, { ...(film.storyboard ? { storyboard: film.storyboard } : {}) });
-        const errors = [...findings.filter((f) => f.severity === 'error').map((f) => ({ kind: f.kind, sceneId: f.sceneId })), ...((await crew.extraChecks?.(film.composition as Comp)) ?? [])];
+        const errors = [...findings.filter((f) => f.severity === 'error' && !NON_BLOCKING.includes(f.kind)).map((f) => ({ kind: f.kind, sceneId: f.sceneId })), ...((await crew.extraChecks?.(film.composition as Comp)) ?? [])];
         if (errors.length) return fail(`continuity errors: ${errors.map((e) => `${e.kind} (${e.sceneId})`).join(', ')}`);
       }
       await crew.films.update(crew.filmId, { status: 'ready' });

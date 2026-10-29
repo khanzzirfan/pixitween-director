@@ -105,8 +105,12 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       } catch (e) {
         if (!entry.cancelled && live(board.get(job.id)!)) {
           const message = e instanceof Error ? e.message : String(e);
-          log(`[crew] ${job.id} failed: ${message}`);
-          board.update(job.id, { status: 'failed', error: message.slice(0, 300) });
+          // a scene dropped from the storyboard while its job waited is not a failure
+          if (/^unknown scene /.test(message)) board.update(job.id, { status: 'cancelled', error: message });
+          else {
+            log(`[crew] ${job.id} failed: ${message}`);
+            board.update(job.id, { status: 'failed', error: message.slice(0, 300) });
+          }
         }
       } finally {
         active.delete(job.id);

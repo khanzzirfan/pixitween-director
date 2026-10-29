@@ -24,6 +24,7 @@ export interface BuilderOptions {
 }
 
 const abortError = () => Object.assign(new Error('The job was stopped'), { name: 'AbortError' });
+const SAFE_AREA = 'SAFE AREA: keep all text and the product inside a 5 % inset from every canvas edge, including while it animates.';
 const EDIT_KINDS = ['edit', 'fix'];
 
 function defaultBackend(job: Job): LlmBackend {
@@ -93,7 +94,7 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
       canvas: { ...dims, aspect: film.aspect },
       palette,
       product: { assetId: film.brief.productAssetId, width: product?.width ?? dims.width, height: product?.height ?? dims.height },
-      extraSystem: [film.styleBible ? renderBibleBlock(film.styleBible) : '', renderJobBlock(job)].filter(Boolean).join('\n'),
+      extraSystem: [film.styleBible ? renderBibleBlock(film.styleBible) : '', SAFE_AREA, renderJobBlock(job)].filter(Boolean).join('\n'),
       toolFilter: building ? (t: ToolDef) => !EDIT_ONLY_TOOLS.includes(t.name) : () => true,
       signal,
       run: scopedRunTool(sceneId),

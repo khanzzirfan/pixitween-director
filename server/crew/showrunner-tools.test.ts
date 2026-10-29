@@ -111,6 +111,17 @@ describe('dispatch, cancel, pickTake, proposeGenerate', () => {
     expect(await t.run('dispatch', { kind: 'build-scene', sceneId: 's9', brief: 'b', reason: 'r' })).toEqual({ ok: false, error: 'unknown scene s9' });
   });
 
+  it('refuses a third showrunner fix on one scene, but not a fix on another', async () => {
+    const t = await setup();
+    await t.run('reviseStoryboard', { ops: add(2) });
+    const fix = (sceneId: string) => t.run('dispatch', { kind: 'fix', sceneId, brief: 'b', reason: 'r' });
+    expect((await fix('s1')).ok).toBe(true);
+    expect((await fix('s1')).ok).toBe(true);
+    const third = await fix('s1');
+    expect(!third.ok && third.error).toContain('already had 2 fixes');
+    expect((await fix('s2')).ok).toBe(true);
+  });
+
   it('a writing kind with no scene is refused', async () => {
     const t = await setup();
     expect((await t.run('dispatch', { kind: 'restyle-scene', brief: 'b', reason: 'r' })).ok).toBe(false);
@@ -213,7 +224,7 @@ describe('say, ask, finish', () => {
     expect((await t.film.films.get(t.film.filmId)).status).not.toBe('ready');
   });
 
-  it('finish is refused on a real S5a rules error (a headline pushed outside the safe area)', async () => {
+  it('finish does not wait for a safe-area finding (the crew leaves it and says why)', async () => {
     const t = await setup();
     await t.run('reviseStoryboard', { ops: add(2) });
     await t.film.films.mutate(t.film.filmId, (f) => {
@@ -222,8 +233,8 @@ describe('say, ask, finish', () => {
       return { next: c, data: null };
     }, 'director');
     const r = await t.run('finish', { summary: 'done' });
-    expect(r.ok).toBe(false);
-    expect(!r.ok && r.error).toMatch(/continuity errors: .*\(s1\)/);
+    expect(r.ok).toBe(true);
+    expect((await t.film.films.get(t.film.filmId)).status).toBe('ready');
   });
 
   it('finish with nothing open and no errors makes the film ready', async () => {
