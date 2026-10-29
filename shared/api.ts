@@ -36,9 +36,17 @@ export interface SceneModeResponse {
 export interface ApproveRequest {
   token: string;
 }
+/** GET /api/local-mode, and the answer to a successful PUT: the flag plus what Ollama says about the model. */
 export interface LocalModeResponse {
   local: boolean;
   reachable: boolean;
+  modelPresent: boolean;
+  /** null when Ollama could not say */
+  loaded: boolean | null;
+  model: string;
+  host: string;
+  checkedAt: string;
+  error?: string;
 }
 export interface HealthResponse {
   ok: true;

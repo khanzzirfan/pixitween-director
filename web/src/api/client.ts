@@ -4,6 +4,7 @@ import type {
   ChatResponse,
   CreateFilmResponse,
   ListFilmsResponse,
+  LocalModeResponse,
   UndoRedoResponse,
   VersionsResponse,
 } from '@shared/api';
@@ -54,6 +55,8 @@ async function request<T>(method: string, path: string, body?: BodyInit | null, 
 }
 
 export const api = {
+  getLocalMode: () => request<LocalModeResponse>('GET', '/api/local-mode'),
+  putLocalMode: (local: boolean) => request<LocalModeResponse>('PUT', '/api/local-mode', JSON.stringify({ local }), true),
   listFilms: () => request<ListFilmsResponse>('GET', '/api/films'),
   getFilm: (id: string) => request<FilmState>('GET', `/api/films/${id}`),
   getVersions: (id: string) => request<VersionsResponse>('GET', `/api/films/${id}/versions`),

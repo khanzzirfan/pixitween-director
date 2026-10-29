@@ -37,7 +37,7 @@ export default function Chat({
             <span className="eyebrow">DIRECTOR'S DESK</span>
             <h2>Edit your film</h2>
           </div>
-          <BackendBadge />
+          <BackendBadge events={events} />
         </header>
         <p>Open or create a film to start editing.</p>
       </section>
@@ -56,7 +56,7 @@ export default function Chat({
           <span className="eyebrow">DIRECTOR'S DESK</span>
           <h2>Edit your film</h2>
         </div>
-        <BackendBadge />
+        <BackendBadge events={events} />
       </header>
       <details>
         <summary>Layers</summary>
