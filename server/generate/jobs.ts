@@ -1,4 +1,5 @@
 // Owned by S7b. Persists in-flight generation state so a restart can resume it.
+import { randomBytes } from 'node:crypto';
 import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadEnv } from '../env';
@@ -14,6 +15,8 @@ export interface JobRecord {
   submittedAt: string;
   updatedAt: string;
   originalDurationSec?: number;
+  /** The clip length asked for; the resume path needs it to place the clip. */
+  clipSec?: number;
   assetId?: string;
   productVisibleFrac?: number;
   creditsCharged?: number;
@@ -37,7 +40,7 @@ export function createJobStore(o: { filmsDir?: string } = {}): JobStore {
     async save(record) {
       const file = fileFor(record.filmId, record.sceneId);
       await mkdir(join(filmsDir(), record.filmId, 'generate'), { recursive: true });
-      const tmp = `${file}.${process.pid}.tmp`;
+      const tmp = `${file}.${randomBytes(4).toString('hex')}.tmp`;
       await writeFile(tmp, JSON.stringify(record, null, 2));
       await rename(tmp, file);
     },
