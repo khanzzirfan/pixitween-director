@@ -1,59 +1,49 @@
 # Next steps (owner)
 
-Status on Wed 28 Oct 2026. The specs are in `docs/hackathon/` and the Ralph PRDs are in `ralph/`. The full plan lives in
-the private monorepo at `specs/hackathon/meta/`.
+Status on Thu 29 Oct 2026. The plan now centres on **the Muse crew**: a Muse Wonder showrunner leading parallel
+Muse Spark workers while you keep directing it (step S12). Specs: `docs/hackathon/09-crew-swarm.md` and
+`docs/hackathon/steps/step-12-crew-swarm/` (local only). Ralph PRDs: `ralph/prd-s12a…e`.
 
 ## Done
-- [x] Meta billing: card added, $150 free credits active.
-- [x] Engine `reacthub-pixitweenjs@0.3.0-alpha.3` published; `ralph/ENGINE_SPEC` points at it.
-- [x] Repo created (Apache-2.0) and scaffolded by `bootstrap-repo.sh`. Nothing is committed yet.
+- [x] Meta billing, $150 credits; engine `reacthub-pixitweenjs@0.3.0-alpha.3` published; repo public.
+- [x] Waves 1–4 built on `integration`: skeleton, authoring core, director, art + SAM layers, review rules and frame
+      review, chat edit, Clippy client and generate mode, export + gallery, deploy config, Local mode, Spark Open.
+- [x] Root causes of both engine bugs found (`reacthub-pixitweenjs/docs/director-uplift/01-texture-teardown-fixes.md`).
+- [x] S12 crew specs, contracts (D-17 to D-23) and five Ralph PRDs (61 stories) written; `build_prds.py --check` OK.
+- [x] S13 3D product shots: engine side shipped (`0.3.0-alpha.5`), contracts (D-24 to D-27) and two Ralph PRDs (25 stories).
 
-## 1. Check the engine is installable (2 min)
-```bash
-npm view reacthub-pixitweenjs dist-tags        # expect latest: '0.3.0-alpha.3'
-```
-If it still says `0.2.109-alpha.7` after ~15 min, the publish didn't land: rerun `npm publish` in the engine checkout.
-If you'd rather keep `latest` on the old stable, do this (optional; the repo pins the exact version, so this has no effect on the build):
-```bash
-npm dist-tag add reacthub-pixitweenjs@0.3.0-alpha.3 alpha
-npm dist-tag add reacthub-pixitweenjs@0.2.109-alpha.7 latest
-```
-If it's still not visible and you want to start anyway: `echo 'file:../reacthub-pixitweenjs' > ralph/ENGINE_SPEC`.
+## Today (Thu 29) — the critical path
+1. [~] **Engine fix.** Published as `0.3.0-alpha.5` on 29 Oct (texture teardown fixes plus `model3d`). Still to do here: `npm i`, check a
+       two-scene film plays across the boundary (`/clip-check.html?noclip=1`), then mark both `ENGINE-NEEDS.md` rows closed.
+2. [ ] **Finish S08b.** Write the tests in `tests/index.md`, then commit the uncommitted `server/http/*` review fixes.
+3. [ ] **Merge `integration` → `main`.** S12 worktrees branch from `main`.
+4. [ ] **Start S12a** in a worktree (`ralph/s12a-crew-core`). Its US-001 is the Wonder probe script.
+5. [ ] **MG-1 Wonder probe:** `npm run live -- s12-wonder` (read the estimate, ≈ $0.30), then `--yes`.
+       Pass = access 200, valid tool calls in ≥ 4 of 5 runs, parallel dispatch in ≥ 3 of 5. Record latency and cost per turn.
+       Then set `SHOWRUNNER_MODEL` (`muse-wonder-1.0`, or `muse-spark-1.3-contributor` if it fails).
 
-## 2. First commit (5 min)
-```bash
-brew install gitleaks && gitleaks detect --no-git --source .
-python3 ralph/build_prds.py --check            # expect: OK (check only)
-git add -A && git commit -m "chore: scaffold from hackathon specs" && git push
-```
+## Fri 30
+- [ ] Merge S12a. Start **wave 7** in four worktrees: `s12b-showrunner`, `s12c-crew-workers`, `s12d-crew-ui`, `s13a-product-3d-core`.
+- [ ] **Engine 3D:** the engine side is shipped in `0.3.0-alpha.5`; install it, bump `ralph/ENGINE_SPEC`, and run the S13 browser checks.
+- [ ] Run the outstanding live gates of the built steps and record them: `s03-director`, `s04-art`, `s05-review`, `s06-chat`.
+- [ ] Clippy Pro token → `CLIPPY_TOKEN`, `CLIPPY_MCP_URL` (needed for `s07-generate` on Sun).
 
-## 3. Ralph wave 1: S2 skeleton (38 stories, today)
-```bash
-git worktree add ../pixitween-s02 -b ralph/s02-skeleton main
-cd ../pixitween-s02
-mkdir -p docs && ln -s ~/Documents/code/trolio/pixitween-director/docs/{hackathon,learn-improve,engine} docs/   # specs are gitignored
-ralph-tui run --prd ./ralph/prd-s02-skeleton.json --iterations 0
-```
-Check `.ralph-tui/config.toml` first (`agent = "claude"`, `autoCommit = false`).
-When the run finishes, review the diff, run `npm run live -- s02-smoke --yes` (needs `.env`), then merge to `main` and
-remove the worktree.
+## Sat 31 — M1
+- [ ] Merge wave 7. **MG-2:** `npm run live -- s12-crew --yes` (≈ $1). M1 = a live crew film with 4 builders at once,
+      one mid-build change by chat, one critic fix.
 
-## 4. While Ralph runs
-- [ ] `.env` from `.env.example`: set `META_API_KEY` (create it under **API keys**). Verify without printing it:
-      `curl -s -o /dev/null -w "%{http_code}\n" https://api.meta.ai/v1/models -H "Authorization: Bearer $META_API_KEY"` → `200`.
-- [ ] Meta **Spend limits**: set a monthly notification (e.g. A$50) at the bottom of the Billing page.
-- [ ] Note that the A$7.49 outstanding balance is from before the credits. It bills on 1 Nov or at A$30.
-- [ ] Clippy Pro account + token → `CLIPPY_TOKEN`, `CLIPPY_MCP_URL` (needed by Mon 2 Nov for S7).
-- [ ] Discord intro in #intros.
+## Sun 1
+- [ ] `s12e-crew-replay` and `s13b-product-3d-director`. `s07-generate` (one clip, 25 credits), `s09-local`.
+- [ ] Set `PRODUCT_3D=true`. **S13 MG-1:** `npm run live -- s13-3d --yes` (≈ $0.40); keep 3D in the demo only if realism is 4/5 or better.
+- [ ] **MG-3:** `npm run live -- s12-crew --ab --yes` (≈ $3) → paste the table into the PR and the orchestration review.
 
-## 5. Following waves (one worktree per PRD, merge before starting the next wave)
-| When | Wave | PRDs |
-|------|------|------|
-| Thu 29 | 2 | `s03a-authoring-core`, `s07a-clippy-client`, `s08a-export-gallery` |
-| Fri 30 | 3 | `s03b-director-agent`, `s04-art-layers`, `s05a-review-rules`, `s06-chat-edit` |
-| Sat 31 | 4 | `s05b-review-visual`, `s07b-generate-integration`, `s08b-deploy`, `s09-local-mode`, `s11-mcp-server` |
-| Sun 1 | 5 | `s10-docs-submission` |
+## Mon 2 — M2
+- [ ] Deploy (`deploy/README.md`) with `CREW_ENABLED=true`, `FILMS_STARTS_PER_WINDOW=2`, `CREW_FILM_BUDGET_USD=1.5`; smoke it logged out.
+- [ ] **MG-4:** the demo script in the browser twice in a row. Feature the best run in the gallery (its replay is what judges see first).
+- [ ] `s10-docs-submission` runs after the crew is in, so the README leads with the crew and quotes `scripts/crew-report.ts` numbers.
 
-Milestones: **M1** Sat 31 (brief → film in the browser + one self-review fix), **M2** Mon 2 (live URL),
-**M3** Tue 3 23:59 ET (freeze), **M4** Wed 4 (submit by 12:00 ET; hard deadline 21:00 ET).
-We're one day behind `02-timeline.md`. If it slips more, cut in this order: S11, S8a export, S9 Local mode.
+## Tue 3 — M3 freeze 23:59 ET · Wed 4 — M4 submit by 12:00 ET (hard 21:00 ET)
+- [ ] Record the demo, `npx tsx scripts/preflight-submission.ts --strict`, submit, post the 30 s crew clip on X.
+
+Cut order if time runs short: S11 MCP server → takes → 3D extruded cut-outs (then 3D itself if MG-1 < 4) → Local mode → voice → export → Wonder (fall back to a Spark showrunner).
+Never cut: the engine fix, the crew core, chat while building, builders + critic, crew board + live storyboard, Image + SAM layers, one generate clip, the featured replay.

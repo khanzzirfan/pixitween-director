@@ -22,3 +22,7 @@ docs/hackathon
 opencode.json
 docs/learn-improve
 docs/engine
+
+# Local tool state
+.claude/
+.commandcode/
