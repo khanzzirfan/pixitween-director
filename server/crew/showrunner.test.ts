@@ -261,4 +261,23 @@ describe('job chains', () => {
     expect(board.list().map((j) => j.kind)).toEqual(['restyle-scene', 'continuity', 'critique']);
     expect(pushed).toHaveLength(1);
   });
+
+  it('stops queueing automatic critiques for a scene after three rounds', async () => {
+    const inbox = { push: () => undefined, drain: async () => [], size: () => 0, close: () => undefined };
+    // eslint-disable-next-line prefer-const
+    let board!: ReturnType<typeof createBoard>;
+    // eslint-disable-next-line prefer-const
+    let scheduler!: ReturnType<typeof createScheduler>;
+    const onUpdate = createJobChains({ board: () => board, scheduler: () => scheduler, inbox });
+    board = createBoard({ filmId: 'film_aaaaaaaaaaaa', emit: (e) => onUpdate(e.job), persist: () => undefined });
+    scheduler = createScheduler({ board, maxWorkers: 4, runWorker: async () => undefined });
+    for (let i = 0; i < 5; i++) {
+      await scheduler.dispatch({ kind: 'fix', sceneId: 's1', origin: 'showrunner', brief: 'b', reason: 'r' });
+      await scheduler.idle();
+      await settle();
+      await scheduler.idle();
+    }
+    expect(board.list().filter((j) => j.kind === 'critique')).toHaveLength(3);
+    expect(board.list().filter((j) => j.kind === 'continuity')).toHaveLength(5);
+  });
 });

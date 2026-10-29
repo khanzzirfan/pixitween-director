@@ -10,6 +10,9 @@ import { isFakeDirector } from '../agent/fake-director';
 import { createBoard, TERMINAL } from './board';
 import { createBudget } from './budget';
 import { createJobChains } from './chains';
+import { createTakes } from './takes';
+import type { WorkerFn } from './workers';
+import type { JobKind } from '@shared/crew';
 import { createFakeCrew } from './fake-showrunner';
 import { createId } from './ids';
 import { createInbox, type Inbox } from './inbox';
@@ -38,6 +41,8 @@ export interface CrewOptions {
   idleEndMs?: number;
   /** Pause per fake job and turn when DIRECTOR_FAKE=1. */
   fakeDelayMs?: number;
+  /** The workers to run instead of the real ones. A kind missing from it fails its jobs. */
+  workers?: Partial<Record<JobKind, WorkerFn>>;
 }
 
 export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
@@ -61,6 +66,9 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
       return full;
     };
 
+    const takes = createTakes();
+    // loaded here: the workers pull in every tool module, which registering the routes does not need
+    const workers = o.workers ?? (await import('./workers/registry')).createWorkerRegistry({ takes });
     const fake = isFakeDirector() ? createFakeCrew({ delayMs: o.fakeDelayMs }) : undefined;
     // assigned once below, but the callbacks created first read them
     // eslint-disable-next-line prefer-const
@@ -98,13 +106,13 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     const scheduler = createScheduler({
       board,
       maxWorkers: env.CREW_MAX_WORKERS,
-      runWorker: (job, signal) => (fake?.workers[job.kind] ?? ((j, sg, c) => runRegisteredWorker(j, sg, c)))(job, signal, crew),
+      runWorker: (job, signal) => runRegisteredWorker(job, signal, crew, fake?.workers[job.kind] ?? workers[job.kind]),
       budget,
       films: deps.films,
       persist,
       log: (line) => console.log(line),
     });
-    crew = { filmId, films: deps.films, board, scheduler, budget, inbox, emit: toolCtx.emit, source: 'showrunner', takesMax: env.CREW_TAKES_MAX, removedIds: new Set(), toolCtx, turn: newTurn(), snapshots: { load: (id) => persist.loadSnapshot(id) } };
+    crew = { filmId, films: deps.films, board, scheduler, budget, inbox, emit: toolCtx.emit, source: 'showrunner', takesMax: env.CREW_TAKES_MAX, removedIds: new Set(), toolCtx, makeToolCtx: deps.makeToolCtx, turn: newTurn(), snapshots: { load: (id) => persist.loadSnapshot(id) }, takes: { pick: (args) => takes.pick(crew, args) } };
 
     const model = o.model ?? env.SHOWRUNNER_MODEL;
     const backend = o.backend ?? fake?.backend ?? pickBackend('showrunner', { onFallback: (i) => toolCtx.emit({ type: 'error', where: 'showrunner', message: `${i.from} unavailable (${i.reason}); this turn used ${i.to}` }) });

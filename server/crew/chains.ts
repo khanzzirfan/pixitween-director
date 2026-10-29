@@ -5,6 +5,9 @@ import type { Board } from './board';
 import type { Inbox } from './inbox';
 import type { Scheduler } from './scheduler';
 
+/** A scene is critiqued automatically this many times per session. A finding that survives that many rounds is the showrunner's to judge. */
+export const MAX_AUTO_CRITIQUES = 3;
+
 export interface ChainDeps {
   board(): Board;
   scheduler(): Scheduler;
@@ -22,6 +25,7 @@ const describe = (job: Job): string => {
 /** Returns the function to call with every job.update. It acts once per job per status. */
 export function createJobChains(deps: ChainDeps): (job: Job) => void {
   const seen = new Set<string>();
+  const critiques = new Map<string, number>();
   let n = 0;
   const id = deps.newId ?? (() => `inbox-${++n}`);
 
@@ -42,8 +46,11 @@ export function createJobChains(deps: ChainDeps): (job: Job) => void {
     void Promise.resolve()
       .then(async () => {
         await deps.scheduler().dispatch({ kind: 'continuity', sceneId, origin: 'auto', brief: `check continuity after ${job.id}`, reason: `after ${job.kind} on ${sceneId}`, filmId: job.filmId });
-        if (!deps.board().list().some((j) => j.kind === 'critique' && j.sceneId === sceneId && j.status === 'queued'))
+        const rounds = critiques.get(sceneId) ?? 0;
+        if (rounds < MAX_AUTO_CRITIQUES && !deps.board().list().some((j) => j.kind === 'critique' && j.sceneId === sceneId && j.status === 'queued')) {
+          critiques.set(sceneId, rounds + 1);
           await deps.scheduler().dispatch({ kind: 'critique', sceneId, origin: 'auto', brief: `review the frames of ${sceneId}`, reason: `after ${job.kind} on ${sceneId}`, filmId: job.filmId });
+        }
       })
       .catch((e: unknown) => deps.onError?.(e));
   };

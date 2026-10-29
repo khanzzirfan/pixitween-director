@@ -10,6 +10,7 @@ import { createInbox } from './inbox';
 import { createScheduler } from './scheduler';
 import { newTurn, type CrewCtx } from './showrunner-tools';
 import { makeTestFilm } from '../test-utils/film';
+import { makeToolCtx } from '../http/deps';
 import { createCrewPersist, type CrewPersist } from './persist';
 
 export interface TestBoard {
@@ -46,6 +47,7 @@ export async function makeTestCrew(o: { runWorker?: (job: Job, signal: AbortSign
   const crew: CrewCtx = {
     filmId: film.filmId, films: film.films, board: t.board, scheduler, budget, inbox,
     emit: film.ctx.emit, source: 'showrunner', takesMax: 3, removedIds: new Set(), toolCtx: film.ctx, turn: newTurn(),
+    makeToolCtx: (id) => makeToolCtx({ films: film.films, assets: film.assets, meta: film.meta, ledger: film.ledger, bus: film.bus }, id),
   };
   return { crew, film, board: t.board, scheduler, inbox, budget, events: film.events };
 }

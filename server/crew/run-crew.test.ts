@@ -40,7 +40,7 @@ describe('runCrew', () => {
       { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's1', brief: 'b', reason: 'r' } },
       { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's2', brief: 'b', reason: 'r' } },
     ]]);
-    const crew = createCrew(deps, { backend, idleEndMs: 60 });
+    const crew = createCrew(deps, { backend, idleEndMs: 60, workers: {} });
     await crew.runCrew(deps.filmId);
     await settle();
     const film = await deps.films.get(deps.filmId);
@@ -75,7 +75,7 @@ describe('runCrew', () => {
       { name: 'reviseStoryboard', args: { ops: [{ op: 'add', scene }, { op: 'add', scene }] } },
       { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's1', brief: 'b', reason: 'r' } },
     ]]);
-    await createCrew(deps, { backend, idleEndMs: 60 }).runCrew(deps.filmId);
+    await createCrew(deps, { backend, idleEndMs: 60, workers: {} }).runCrew(deps.filmId);
     await settle();
     const job = [...deps.events].reverse().find((e) => e.type === 'job.update' && e.job.id === 'j1');
     expect(job).toMatchObject({ job: { status: 'failed', error: 'no worker for build-scene' } });
@@ -110,7 +110,7 @@ describe('runCrew', () => {
       { name: 'reviseStoryboard', args: { ops: [{ op: 'add', scene }, { op: 'add', scene }] } },
       { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's1', brief: 'b', reason: 'r' } },
     ]]);
-    await createCrew(deps, { backend, idleEndMs: 60 }).runCrew(deps.filmId);
+    await createCrew(deps, { backend, idleEndMs: 60, workers: {} }).runCrew(deps.filmId);
     await settle();
     const resumed = createCrew(deps, { backend: scripted([]), idleEndMs: 30 });
     const s = await resumed.start(deps.filmId, { resume: true });

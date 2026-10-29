@@ -1,5 +1,6 @@
 // Owned by S12c. Cross-scene consistency, checked by code (design.md 5.12): the S5a rules plus three drift checks,
 // so the film looks like one film. Drift is a warning for the showrunner, never a reason to refuse finish.
+import type { Buffer } from 'node:buffer';
 import type { Job, StyleBible } from '@shared/crew';
 import type { Storyboard } from '@shared/storyboard';
 import type { Comp, Obj } from '../authoring/types';
@@ -102,7 +103,7 @@ function typeDrift(comp: Comp, bible: StyleBible): ContinuityFinding[] {
 /** The S5a rules for every scene, plus the three cross-scene checks. Without a bible only the scale check runs. */
 export async function runContinuity(
   comp: Comp,
-  assets: { read(id: string): Promise<import('node:buffer').Buffer> } | null,
+  assets: { read(id: string): Promise<Buffer> } | null,
   bible?: StyleBible,
   storyboard?: Storyboard,
 ): Promise<ContinuityFinding[]> {

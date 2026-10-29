@@ -6,7 +6,8 @@ import { registerSseRoute } from './sse';
 const notFound = { error: 'not_found' } as const;
 
 export function registerReadRoutes(app: Hono, deps: AppDeps): void {
-  app.get('/api/films', async (c) => c.json(await deps.films.list()));
+  // a take's child film is part of its parent, not a film of its own
+  app.get('/api/films', async (c) => c.json((await deps.films.list()).filter((f) => !f.parentId)));
 
   app.get('/api/films/:id', async (c) => {
     const id = c.req.param('id');

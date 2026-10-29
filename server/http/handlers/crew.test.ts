@@ -34,7 +34,7 @@ async function setup() {
   const modelCalls: string[] = [];
   const backend: LlmBackend = { id: 'wonder', async chatWithTools(m) { modelCalls.push(JSON.stringify(m)); return { toolCalls: [], ms: 1 }; } };
   const deps = { ...base, makeToolCtx: (id: string) => makeToolCtx(base, id) };
-  bindCrew(deps, { backend, idleEndMs: 60_000 });
+  bindCrew(deps, { backend, idleEndMs: 60_000, workers: {} }); // only the workers a test registers
   const app = createApp(deps);
   registerCrewRoutes(app, deps);
   const session = await ensureCrewSession(film.id);

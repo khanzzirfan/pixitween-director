@@ -39,7 +39,8 @@ export function staticBox(
 
 const FLAT_ROLES = ['bg', 'subject', 'product'];
 
-export async function flattenScene(ctx: Pick<ToolCtx, 'assets'>, comp: Comp, sceneId: string, size: { width: number; height: number }): Promise<Buffer> {
+/** `frame` is a frame of the scene; the layers are placed where they are at that moment (default: the first frame). */
+export async function flattenScene(ctx: Pick<ToolCtx, 'assets'>, comp: Comp, sceneId: string, size: { width: number; height: number }, frame = 0): Promise<Buffer> {
   const precomp = (comp.precomps as Record<string, { layers: Array<Record<string, any>> }> | undefined)?.[sceneId];
   const roles = (comp.meta as { director?: { layers?: Record<string, { role: string }> } } | undefined)?.director?.layers ?? {};
   const draw: Array<{ png: Buffer; left: number; top: number }> = [];
@@ -49,7 +50,7 @@ export async function flattenScene(ctx: Pick<ToolCtx, 'assets'>, comp: Comp, sce
     if (roles[layer.id] && !FLAT_ROLES.includes(roles[layer.id]!.role)) continue;
     const bytes = await ctx.assets.read(layer.assetId);
     const natural = await imageSize(bytes);
-    const box = staticBox(layer as never, natural, size);
+    const box = staticBox(layer as never, natural, size, frame);
     const w = Math.max(1, Math.round(box.width));
     const h = Math.max(1, Math.round(box.height));
     let left = Math.round(box.left);

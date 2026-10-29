@@ -45,6 +45,8 @@ export interface CrewCtx {
   removedIds: Set<string>;
   /** The tool context of the film, for the rules and the S7 propose flow. */
   toolCtx: ToolCtx;
+  /** A tool context for another film (a take's child film). */
+  makeToolCtx?(filmId: string): ToolCtx;
   turn: TurnState;
   /** Reads the scene snapshot a job saved before it started (S12a persist). */
   snapshots?: { load(jobId: string): Promise<SceneSnapshot | undefined> };

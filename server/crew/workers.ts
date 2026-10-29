@@ -15,8 +15,9 @@ export function clearWorkers(): void {
   registry.clear();
 }
 
-export async function runRegisteredWorker(job: Job, signal: AbortSignal, crew: CrewCtx): Promise<WorkerResult | void> {
-  const fn = registry.get(job.kind);
+/** A worker registered with registerWorker comes first (tests and plug-ins); then `fallback`, the session's default for the kind. */
+export async function runRegisteredWorker(job: Job, signal: AbortSignal, crew: CrewCtx, fallback?: WorkerFn): Promise<WorkerResult | void> {
+  const fn = registry.get(job.kind) ?? fallback;
   if (!fn) throw new Error(`no worker for ${job.kind}`);
   return fn(job, signal, crew);
 }

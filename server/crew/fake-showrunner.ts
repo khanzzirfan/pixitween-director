@@ -53,6 +53,7 @@ export function createFakeShowrunner(o: { delayMs?: number } = {}): LlmBackend {
   let finishedFor = '';
   const restyled = new Set<string>();
   const handled = new Set<string>();
+  const fixed = new Set<string>();
   let n = 0;
 
   return {
@@ -103,7 +104,7 @@ export function createFakeShowrunner(o: { delayMs?: number } = {}): LlmBackend {
         if (handled.has(m[1]!)) continue;
         handled.add(m[1]!);
         const sceneId = /\b(s\d+)\b/.exec(m[2]!)?.[1];
-        if (sceneId) calls.push({ name: 'dispatch', args: { kind: 'fix', sceneId, brief: 'Move the headline clear of the product.', reason: 'the critic saw the headline over the can' } });
+        if (sceneId && !fixed.has(sceneId) && fixed.add(sceneId)) calls.push({ name: 'dispatch', args: { kind: 'fix', sceneId, brief: 'Move the headline clear of the product.', reason: 'the critic saw the headline over the can' } });
       }
 
       const dispatching = calls.some((c) => c.name === 'dispatch');
