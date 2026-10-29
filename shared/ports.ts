@@ -114,7 +114,7 @@ export interface LlmBackend {
     messages: ChatMessage[],
     tools: ToolDef[],
     opts?: { parallelHint?: boolean },
-  ): Promise<{ toolCalls: Array<{ id: string; name: string; args: unknown }>; content?: string; ms: number; usage?: unknown }>;
+  ): Promise<{ toolCalls: Array<{ id: string; name: string; args: unknown }>; content?: string; ms: number; usage?: unknown; /** true when the backend answered without a request (the local closing-turn skip) */ skipped?: true }>;
 }
 
 export interface Ledger {

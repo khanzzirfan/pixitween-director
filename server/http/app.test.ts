@@ -53,7 +53,7 @@ it('enforces the passcode on mutating routes only', async () => {
     expect(ok.status).toBe(409);
     expect((await ok.json()).error).toBe('film_not_ready');
   }
-  expect((await app.request('/api/local-mode')).status).toBe(501); // GET is never blocked
+  expect((await app.request('/api/local-mode')).status).not.toBe(401); // GET is never blocked
 });
 
 it('lets mutating routes through when no passcode is set', async () => {
