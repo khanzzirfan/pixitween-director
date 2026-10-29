@@ -41,7 +41,14 @@ other as shown: a PRD must not start until the ones it `requires` are
 | 4 | `prd-s08b-deploy.json` | S8 | `ralph/s08b-deploy` | s03b, s08a |
 | 4 | `prd-s09-local-mode.json` | [S9](../steps/step-09-open-weight-lane/design.md) | `ralph/s09-local-mode` | s02, s06 |
 | 4 | `prd-s11-mcp-server.json` | [S11](../steps/step-11-stretch/design.md) | `ralph/s11-mcp-server` | s03b, s06 |
-| 5 | `prd-s10-docs-submission.json` | [S10](../steps/step-10-demo-and-submission/design.md) | `ralph/s10-docs` | everything built so far |
+| 6 | `prd-s12a-crew-core.json` | [S12](../steps/step-12-crew-swarm/design.md) | `ralph/s12a-crew-core` | the wave 1–4 PRDs, merged; engine fix published |
+| 7 | `prd-s12b-showrunner.json` | S12 | `ralph/s12b-showrunner` | s12a |
+| 7 | `prd-s12c-crew-workers.json` | S12 | `ralph/s12c-crew-workers` | s12a |
+| 7 | `prd-s12d-crew-ui.json` | S12 | `ralph/s12d-crew-ui` | s12a |
+| 7 | `prd-s13a-product-3d-core.json` | [S13](../steps/step-13-product-3d/design.md) | `ralph/s13a-product-3d-core` | the wave 1–4 PRDs, merged |
+| 8 | `prd-s12e-crew-replay.json` | S12 | `ralph/s12e-crew-replay` | s12b, s12c, s12d |
+| 8 | `prd-s13b-product-3d-director.json` | S13 | `ralph/s13b-product-3d-director` | s13a, s12b, s12d; engine `0.3.0-alpha.5` or newer for browser checks |
+| 9 | `prd-s10-docs-submission.json` | [S10](../steps/step-10-demo-and-submission/design.md) | `ralph/s10-docs` | everything through wave 8 |
 
 Steps whose second half needs other steps' output (S3, S5, S7, S8) are split
 into an **a** and a **b** PRD, so every PRD can start the moment its `requires`
@@ -122,6 +129,10 @@ npm run live -- s04-art --yes      # does it
 | S7 one real clip (Clippy credits) | `s07-generate` | 25 Clippy credits + < $0.05 | owner, per clip |
 | S9 local Glimmer run (Ollama) | `s09-local` | $0 | owner |
 | S11 MCP server: one film + one edit through an MCP client | `s11-mcp` | ≈ $0.25 | owner |
+| S12 MG-1 Wonder as a tool-calling showrunner (5 turns) | `s12-wonder` | ≈ $0.30 (ceiling $1) | owner, **first** |
+| S12 MG-2 one crew film with a mid-build message | `s12-crew` | ≈ $1 | owner |
+| S12 MG-3 sequential vs crew (Spark lead) vs crew (Wonder lead) | `s12-crew --ab` | ≈ $3 | owner |
+| S13 MG-1 one film with a 3D hero scene; realism score | `s13-3d` | ≈ $0.40 | owner |
 | S8 deploy | (platform commands in `deploy/README.md`) | hosting | owner |
 
 Record each live result in the PR description. Never paste keys or signed URLs.

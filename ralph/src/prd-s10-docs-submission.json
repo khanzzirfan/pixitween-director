@@ -6,7 +6,8 @@
     "specs": [
       "docs/hackathon/steps/step-10-demo-and-submission/requirements.md",
       "docs/hackathon/steps/step-10-demo-and-submission/design.md",
-      "docs/hackathon/steps/step-10-demo-and-submission/contract-issues.md"
+      "docs/hackathon/steps/step-10-demo-and-submission/contract-issues.md",
+      "docs/hackathon/09-crew-swarm.md"
     ],
     "readFirst": [
       "docs/engine/README.md (engine behaviour: composition JSON, Player slot props, layer kinds, effects, validation; read before writing code that touches the engine)",
@@ -28,7 +29,12 @@
       "prd-s07b-generate-integration",
       "prd-s08a-export-gallery",
       "prd-s08b-deploy",
-      "prd-s09-local-mode"
+      "prd-s09-local-mode",
+      "prd-s12b-showrunner",
+      "prd-s12c-crew-workers",
+      "prd-s12d-crew-ui",
+      "prd-s12e-crew-replay",
+      "prd-s13b-product-3d-director"
     ],
     "owns": [
       "docs/new-vs-existing.md",
@@ -56,7 +62,9 @@
       "scripts/preflight/* are pure functions except context.ts. The only subprocesses allowed are read-only `git ls-files` and `git log` inside context.ts. No network.",
       "Preflight and test output never print matched secret text, only the file, line and pattern name.",
       "The X post contains no @handle: official Meta and Cerebral Valley handles are not confirmed.",
-      "Sample ledgers and events under fixtures/s10 are synthetic test data and say so in their content; never present them as measurements."
+      "Sample ledgers and events under fixtures/s10 are synthetic test data and say so in their content; never present them as measurements.",
+      "The crew (S12, docs/hackathon/09-crew-swarm.md) is the headline: the README pitch, the demo script and the submission answers lead with 'a film crew of Muse agents you direct in real time', name Muse Wonder as the showrunner only if MG-1 chose it (otherwise 'Spark showrunner'), link docs/crew.md, and quote crew numbers only from scripts/crew-report.ts output. The demo script follows 09-crew-swarm.md section 4.",
+      "3D product shots (S13) are described only if S13 MG-1 scored realism 4 or above: the three-way Motion / 3D / Generate decision, the label coming from the user's photo, docs/3d.md, and one line that the engine's model3d layer was rebuilt during the hackathon from our earlier editor experiment."
     ],
     "manualGates": [
       "MG-1: owner runs `npx tsx scripts/cost-per-film.ts data/films/<id>/events.jsonl` on a real finished film and pastes the table into the README (marker `cost-table`).",

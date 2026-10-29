@@ -1,0 +1,181 @@
+{
+  "name": "PixiTween Director S12e: crew replay, crew report and the demo film",
+  "branchName": "ralph/s12e-crew-replay",
+  "description": "Turn any finished crew film into a show: a replay of its event log in the studio view with the player following the versions, a 'Watch it being made' button in the gallery, a crew report that prints the measured numbers, the committed demo film fixture and docs/crew.md for the README.",
+  "metadata": {
+    "specs": [
+      "docs/hackathon/09-crew-swarm.md",
+      "docs/hackathon/steps/step-12-crew-swarm/design.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/steps/step-12-crew-swarm/design.md (sections 8 and 9)",
+      "web/src/crew/crewReducer.ts and web/src/crew/CrewStudio.tsx",
+      "docs/hackathon/08-agent-orchestration-review.md section 7 (the metric table)"
+    ],
+    "requires": [
+      "prd-s12b-showrunner",
+      "prd-s12c-crew-workers",
+      "prd-s12d-crew-ui"
+    ],
+    "owns": [
+      "web/src/crew/replay/useEventLog.ts",
+      "web/src/crew/replay/replayClock.ts",
+      "web/src/crew/replay/useReplay.ts",
+      "web/src/crew/replay/ReplayBar.tsx",
+      "scripts/crew-report.ts",
+      "docs/crew.md",
+      "fixtures/s12e/*"
+    ],
+    "sharedEdits": [
+      "web/src/panels/Gallery.tsx",
+      "web/src/crew/CrewStudio.tsx"
+    ],
+    "extraGuardrails": [
+      "Replay never calls a mutating route and never starts a model call: it reads /log, /versions and /assets only.",
+      "docs/crew.md must not link to gitignored paths (docs/hackathon/, docs/learn-improve/) and must quote only numbers that come from a recorded run, marking any missing number as 'to be measured'."
+    ],
+    "manualGates": [
+      "MG-5: owner picks the best MG-4 run, sets it as the gallery's featured film, and checks that its replay plays logged out on the deployed URL."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Fetch a film's event log",
+      "description": "As a replay, I want the whole event log of a film in one request so that it can be played back in order.",
+      "steps": [
+        "Read server/http/handlers/crew.ts (GET /api/films/:id/log) and web/src/api/client.ts.",
+        "Create web/src/crew/replay/useEventLog.ts: useEventLog(filmId) fetches /api/films/:id/log once and returns { events, loading, error }, with no passcode header.",
+        "Add web/src/crew/replay/useEventLog.test.tsx with a mocked fetch."
+      ],
+      "acceptance": [
+        "useEventLog('f1') requests /api/films/f1/log exactly once and returns the events in the order received",
+        "A 404 response sets error 'not_found' and events []"
+      ],
+      "labels": [
+        "frontend"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Replay clock with speeds and gap compression",
+      "description": "As a judge, I want the replay to keep the real rhythm but skip dead time so that a 2-minute build is watchable in under a minute.",
+      "steps": [
+        "Read design.md section 8 and the event `at` timestamps in fixtures/s12d/crew-midbuild.json.",
+        "Create web/src/crew/replay/replayClock.ts exporting schedule(events, { speed: 1 | 2 | 4, maxGapMs = 1000 }) returning [{ event, atMs }] where each gap between events is divided by speed and then capped at maxGapMs.",
+        "Add web/src/crew/replay/replayClock.test.ts."
+      ],
+      "acceptance": [
+        "Events at 0 s, 1 s and 21 s with speed 2 give atMs 0, 500 and 1500",
+        "The schedule keeps event order even when two events share a timestamp"
+      ],
+      "labels": [
+        "frontend"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "useReplay drives crew state and the player by version",
+      "description": "As a judge, I want the studio to look exactly as it did during the run so that the replay shows the real crew at work.",
+      "steps": [
+        "Read web/src/crew/crewReducer.ts, web/src/crew/CrewStudio.tsx and GET /api/films/:id/versions.",
+        "Create web/src/crew/replay/useReplay.ts: given the events and the versions list, play the schedule with timers, folding events into crewReducer, and whenever a tool.call event carries a version, set the player composition to that version's composition. Expose play, pause, speed, progress and seek(fraction) (seek folds events up to that point).",
+        "Add web/src/crew/replay/useReplay.test.tsx with fake timers."
+      ],
+      "acceptance": [
+        "After playing the whole fixture, the crew state equals folding all events at once (deep equal) and the composition is the last version's",
+        "seek(0.5) yields the state of folding the first half of the scheduled events"
+      ],
+      "labels": [
+        "frontend"
+      ],
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "ReplayBar in the studio and 'Watch it being made' in the gallery",
+      "description": "As a judge, I want a button on each crew film in the gallery that replays how it was made so that I see the crew with no passcode and no cost.",
+      "steps": [
+        "Read web/src/panels/Gallery.tsx and web/src/crew/CrewStudio.tsx.",
+        "Create web/src/crew/replay/ReplayBar.tsx (play/pause, 1x/2x/4x, progress scrubber, a 'Replay' badge) and edit web/src/crew/CrewStudio.tsx to accept a replay prop that feeds it from useReplay and hides every control that would post (chat, push-to-talk, card edits, cancel, pick).",
+        "Edit web/src/panels/Gallery.tsx: crew films get a 'Watch it being made' button that opens ?film=<id>&replay=1.",
+        "Add web/src/crew/replay/ReplayBar.test.tsx and extend the Gallery test."
+      ],
+      "acceptance": [
+        "With ?replay=1, CrewStudio renders no chat input, no push-to-talk and no Cancel or Pick buttons",
+        "A crew film in the gallery shows the 'Watch it being made' button; a non-crew film does not",
+        "Browser check: the replay of the fixture film plays to the end at 4x with the crew board lanes changing"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Crew report from an event log",
+      "description": "As a owner, I want the crew's numbers printed from a real run so that the README and the video quote facts.",
+      "steps": [
+        "Read docs/hackathon/08-agent-orchestration-review.md section 7 and scripts/cost-per-film.ts if it exists.",
+        "Create scripts/crew-report.ts: npx tsx scripts/crew-report.ts <data/films/<id>/events.jsonl> [--json] prints wall time to first playable scene, wall time to ready, showrunner turns and model, jobs by kind and status, peak parallel workers, superseded jobs, first-try tool-call validity, critic findings and fixes, cost by model and total, Clippy credits.",
+        "Add scripts/crew-report.test.ts over fixtures/s12e/crew-run.events.jsonl (a fake-mode run recorded by the test itself with the S12b fake showrunner)."
+      ],
+      "acceptance": [
+        "The report over the fixture prints 'Peak parallel workers: 4' for the fake run with 4 overlapping builds",
+        "--json output parses and has numeric fields wallToReadySec and costUsd"
+      ],
+      "labels": [
+        "backend",
+        "scripts"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-006",
+      "title": "Demo film fixture for offline replay",
+      "description": "As a owner, I want a committed fake-mode crew film so that the replay and the gallery can be checked without any spend.",
+      "steps": [
+        "Read server/crew/fake-showrunner.ts and server/store/film-store.ts (the data layout).",
+        "Create fixtures/s12e/demo-film/ holding a fake-mode crew film's film.json, versions/*.json, events.jsonl and its small fake assets, produced by a script step in scripts/crew-report.test.ts setup or a dedicated test helper, with no data: URLs over 200 characters.",
+        "Document in fixtures/s12e/README.md how to load it into DATA_DIR for a local replay."
+      ],
+      "acceptance": [
+        "fixtures/s12e/demo-film/events.jsonl contains at least one storyboard.revised event with source 'user' and one take.ready event",
+        "Loading the fixture into a temp DATA_DIR makes GET /api/films list it with crew true"
+      ],
+      "labels": [
+        "backend",
+        "testing"
+      ],
+      "dependsOn": [
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "docs/crew.md: how the crew works, for the README",
+      "description": "As a judge, I want a short public explanation of the crew so that the technical depth is easy to verify.",
+      "steps": [
+        "Read docs/hackathon/09-crew-swarm.md, design.md sections 3 and 5, and docs/architecture/README.md.",
+        "Write docs/crew.md: the crew table (lane, model, job), a mermaid diagram of inbox, showrunner, board and workers, the scheduling rules (4 workers, one writer per scene, user first, supersede with rollback), the blind critic, takes, the budget, how to replay a film, and a 'Measured' section with the crew-report numbers or 'to be measured'. Link call sites in server/crew/.",
+        "Add a docs check to scripts/crew-report.test.ts that docs/crew.md contains no 'docs/hackathon' or 'learn-improve' link."
+      ],
+      "acceptance": [
+        "docs/crew.md contains the headings 'The crew', 'How jobs run', 'Blind critic', 'Takes', 'Replay' and 'Measured'",
+        "docs/crew.md contains no link to docs/hackathon/ or docs/learn-improve/"
+      ],
+      "labels": [
+        "docs"
+      ],
+      "dependsOn": []
+    }
+  ]
+}

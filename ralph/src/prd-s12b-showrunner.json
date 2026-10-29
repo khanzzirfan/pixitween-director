@@ -1,0 +1,362 @@
+{
+  "name": "PixiTween Director S12b: the showrunner (Muse Wonder lead agent, board tools, inbox loop, crew routes)",
+  "branchName": "ralph/s12b-showrunner",
+  "description": "The Muse Wonder showrunner: its backend and router task, prompts, board and history rendering, the nine board tools, the event-driven loop with auto-dispatch and auto-chains, runCrew as the new film entry point, chat and voice into the inbox, the crew HTTP routes, a scripted fake showrunner for offline runs, the restart hook and the live crew script. Workers (S12c) and UI (S12d) are separate PRDs.",
+  "metadata": {
+    "specs": [
+      "docs/hackathon/09-crew-swarm.md",
+      "docs/hackathon/steps/step-12-crew-swarm/requirements.md",
+      "docs/hackathon/steps/step-12-crew-swarm/design.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (sections 4, 5, 6 and 7)",
+      "docs/hackathon/steps/step-12-crew-swarm/design.md (sections 3, 5.4 to 5.7, 6 and 7)",
+      "server/agent/director.ts and server/agent/fake-director.ts (the sequential director this replaces when CREW_ENABLED)"
+    ],
+    "requires": [
+      "prd-s12a-crew-core"
+    ],
+    "owns": [
+      "server/llm/wonder-backend.ts",
+      "server/crew/prompts.ts",
+      "server/crew/history.ts",
+      "server/crew/showrunner-tools.ts",
+      "server/crew/showrunner.ts",
+      "server/crew/run-crew.ts",
+      "server/crew/fake-showrunner.ts",
+      "server/crew/boot.ts",
+      "server/http/handlers/crew.ts",
+      "scripts/live/s12-crew.ts",
+      "fixtures/s12b/*"
+    ],
+    "sharedEdits": [
+      "server/llm/router.ts",
+      "server/boot.ts",
+      "server/http/handlers/films.ts",
+      "server/http/handlers/chat.ts",
+      "server/pricing.ts"
+    ],
+    "extraGuardrails": [
+      "The showrunner never calls a timeline tool from server/tools/registry.ts. It only calls the board tools in server/crew/showrunner-tools.ts.",
+      "With CREW_ENABLED=false every existing director, chat and films test must pass unchanged.",
+      "Shared edits are small and stated: router.ts gains the 'showrunner' task; boot.ts appends one hook; films.ts switches runDirector to runCrew behind CREW_ENABLED; chat.ts routes crew films to the inbox; pricing.ts adds the muse-wonder-1.0 price."
+    ],
+    "manualGates": [
+      "MG-2: owner runs `npm run live -- s12-crew` (estimate about $1, ceiling $2), then `--yes`: one crew film on the Coffee Co. brief with the scripted mid-build message 'add a sunset scene after the second one, and warmer light everywhere'. Record wall time, jobs, showrunner turns, cost and whether the new scene is in the final film.",
+      "MG-3: owner runs `npm run live -- s12-crew --ab --yes` (estimate about $3): the same brief through the sequential director, the crew with a Spark showrunner and the crew with a Wonder showrunner. Paste the printed table into the PR and docs/hackathon/08-agent-orchestration-review.md section 7."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Wonder backend, price and the router's showrunner task",
+      "description": "As a showrunner loop, I want pickBackend('showrunner') to return Muse Wonder with a Spark fallback so that the lead model is one env key away.",
+      "steps": [
+        "Read server/llm/router.ts, server/llm/spark-backend.ts, server/pricing.ts and design.md section 7 (Wonder error row).",
+        "Create server/llm/wonder-backend.ts exporting createWonderBackend({ meta, model }) that returns an LlmBackend with id 'wonder' using the Spark client's /chat/completions path with model SHOWRUNNER_MODEL.",
+        "Edit server/pricing.ts: add muse-wonder-1.0 at $4 per 1M input and $20 per 1M output tokens.",
+        "Edit server/llm/router.ts: add the task 'showrunner'. pickBackend('showrunner') returns the Wonder backend wrapped so a 5xx, timeout or 429-after-retry falls back to Spark for that call and calls onFallback({ from: 'wonder', to: 'spark', reason }). SHOWRUNNER_MODEL starting with 'muse-spark' returns Spark directly.",
+        "Add server/llm/wonder-backend.test.ts and extend server/llm/router.test.ts with fake clients."
+      ],
+      "acceptance": [
+        "pickBackend('showrunner').id is 'wonder' with the default env and 'spark' with SHOWRUNNER_MODEL=muse-spark-1.3-contributor",
+        "A fake Wonder that throws MetaApiError 503 makes the call return the fake Spark answer and onFallback receives from 'wonder'",
+        "priceSpark-style pricing for muse-wonder-1.0 of 8000 in and 1500 out tokens is 0.062 USD"
+      ],
+      "labels": [
+        "backend",
+        "llm"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Showrunner system prompt and board tool schemas",
+      "description": "As a showrunner, I want a fixed, tested prompt and tool list so that its behaviour is reviewable.",
+      "steps": [
+        "Read design.md sections 6.1 and 6.3.",
+        "Create server/crew/prompts.ts exporting SHOWRUNNER_SYSTEM (the exact text of design 6.1) and renderBibleBlock(bible) and renderJobBlock(job) for the builder prompt addition of design 6.4.",
+        "Create server/crew/prompts.test.ts: the system prompt contains 'You may call several tools in one turn' and 'Never use real brand names'; renderBibleBlock of the example bible matches a snapshot."
+      ],
+      "acceptance": [
+        "SHOWRUNNER_SYSTEM includes the sentence 'Call finish only when every scene is built, nothing is running and continuity reports no errors.'",
+        "renderJobBlock({ id: 'j7', kind: 'restyle-scene', sceneId: 's1', brief: 'x' }) includes 'You own scene s1 only.'"
+      ],
+      "labels": [
+        "backend",
+        "prompts"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "Board and inbox rendering with history compaction",
+      "description": "As a showrunner, I want a compact view of the board and the new inbox items each turn so that turns stay under about 8k input tokens.",
+      "steps": [
+        "Read design.md sections 5.7 and 6.2, shared/crew.ts and server/authoring/api.ts (summariseComposition).",
+        "Create server/crew/history.ts exporting renderTurn({ storyboard, rev, jobs, findings, budget, inbox }) producing the BOARD table and NEW IN YOUR INBOX list of design 6.2, and compact(messages, keepTurns = 8, storySoFar) which replaces older turns with one 'STORY SO FAR' message.",
+        "Export storySoFar(events) that builds one paragraph from storyboard.revised, showrunner.heard (user) and take.ready events, at most 1200 characters.",
+        "Create server/crew/history.test.ts with a fixture event list in fixtures/s12b/events-midbuild.json."
+      ],
+      "acceptance": [
+        "renderTurn of 4 scenes and 3 inbox items contains one table row per scene and the line starting '[user ' for the user item",
+        "compact() of 12 turns keeps the system message, a STORY SO FAR message and the last 8 turns",
+        "The planning turn's image part is removed from every compacted history after turn 1"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-004",
+      "title": "Board tools: setStyleBible and reviseStoryboard",
+      "description": "As a showrunner, I want to set the style bible and revise the storyboard so that the crew has a plan.",
+      "steps": [
+        "Read design.md sections 5.4 and 6.3, server/crew/storyboard-ops.ts and server/crew/sync.ts.",
+        "Create server/crew/showrunner-tools.ts with the CrewCtx type ({ filmId, films, board, scheduler, budget, emit, inbox, source }) and the tools setStyleBible (stores film.styleBible, emits style.bible) and reviseStoryboard (applyOps, then films.mutate with syncComposition, then films.update storyboard and storyboardRev + 1, emits storyboard.revised, returns { rev, needsBuilder, needsMode }).",
+        "Create server/crew/showrunner-tools.test.ts with makeTestFilm."
+      ],
+      "acceptance": [
+        "reviseStoryboard with 4 add ops on an empty film returns rev 1 and needsBuilder ['s1','s2','s3','s4'] and the composition has 4 scene precomps",
+        "reviseStoryboard that would make 7 scenes returns { ok: false } with an error naming the 6-scene limit, and storyboardRev is unchanged",
+        "setStyleBible with a palette entry 'red' returns ok false"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ],
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Board tools: dispatch, cancel, pickTake, proposeGenerate",
+      "description": "As a showrunner, I want to hand jobs to the crew and change my mind so that the film follows the user's direction.",
+      "steps": [
+        "Read design.md sections 5.1, 5.2 and 5.10, server/crew/scheduler.ts and server/generate/mode.ts (the S7 propose path).",
+        "Edit server/crew/showrunner-tools.ts: dispatch (validates kind, sceneId exists unless the kind needs none, takes 2..CREW_TAKES_MAX for kind take; calls scheduler.dispatch; returns jobIds), cancel (scheduler.cancel), pickTake (delegates to an injected takes.pick so S12c fills it), proposeGenerate (calls the S7 mode switch to 'generate' for the scene).",
+        "Extend server/crew/showrunner-tools.test.ts."
+      ],
+      "acceptance": [
+        "dispatch({ kind: 'build-scene', sceneId: 's9', … }) on a film without s9 returns ok false with error 'unknown scene s9'",
+        "dispatch({ kind: 'take', sceneId: 's1', takes: 4 }) returns ok false naming CREW_TAKES_MAX",
+        "cancel of a running fake job ends it 'cancelled' and returns ok true"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ],
+      "dependsOn": [
+        "US-004"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Board tools: say, ask, finish with the pass gate",
+      "description": "As a user, I want the showrunner to talk to me and to declare the film done only when it truly is.",
+      "steps": [
+        "Read design.md sections 5.12 and 6.3 and server/review/rules.ts (runRules).",
+        "Edit server/crew/showrunner-tools.ts: say emits showrunner.say kind 'note' (or 'reply' when the turn contained a user item); ask emits kind 'ask' with options; finish refuses while any job is queued, running or awaiting-frames, or runRules reports an error-severity finding, and otherwise sets status 'ready' and emits film.status.",
+        "Extend server/crew/showrunner-tools.test.ts."
+      ],
+      "acceptance": [
+        "finish with one running job returns ok false with error 'jobs still running: j3'",
+        "finish with no jobs and a rules error 'text-off-frame' returns ok false naming that rule",
+        "say({ text }) in a turn that included a user item emits showrunner.say with kind 'reply'"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ],
+      "dependsOn": [
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "The event-driven showrunner loop",
+      "description": "As a crew, I want the showrunner to wake on its inbox, take one turn and act through its tools so that it directs without blocking anyone.",
+      "steps": [
+        "Read design.md sections 3.1 and 5.6, server/crew/inbox.ts and server/agent/build-scene.ts (how a tool-calling turn is run and costed).",
+        "Create server/crew/showrunner.ts exporting createShowrunner({ ctx, backend, tools, now }) with run(signal): loop { items = await inbox.drain(); emit crew.agent thinking; one chatWithTools turn with parallelHint; run each call; record ledger cost as model SHOWRUNNER_MODEL; emit agent.turn with backend id; if every call failed, one repair turn; emit crew.agent idle } until finished and idle for CREW_IDLE_END_MS, or signal aborted.",
+        "Send the product photo as an image part only in the first turn.",
+        "Create server/crew/showrunner.test.ts with makeFakeBackend scripts."
+      ],
+      "acceptance": [
+        "A scripted planning turn calling setStyleBible, reviseStoryboard (4 adds) and dispatch x4 leaves 4 jobs on the board after one turn",
+        "A turn whose two calls both fail triggers exactly one repair turn, and a second all-failed turn triggers none",
+        "Only the first chatWithTools call's messages contain an image_url part",
+        "Each turn emits crew.agent 'thinking' then 'idle', and one agent.turn"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ],
+      "dependsOn": [
+        "US-001",
+        "US-003",
+        "US-006"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Auto-dispatch and auto-chains",
+      "description": "As a user, I want the film to keep moving even when the model forgets a step so that a card edit or a finished build always leads somewhere.",
+      "steps": [
+        "Read design.md sections 5.4 (auto-dispatch rule) and 5.5 (auto-chains).",
+        "Edit server/crew/showrunner.ts: after each turn, every scene in needsBuilder with no writing job dispatched for it in that turn gets an 'auto' build-scene (new scene) or rebuild-scene job with brief = the scene's intent.",
+        "Edit server/crew/run-crew.ts (or create it if US-009 has not run) wiring a board listener: a writing job that ends 'done' queues continuity, then one critique for that scene unless one is queued; job outcomes are pushed to the inbox as { from: 'job' } items with the job summary.",
+        "Extend server/crew/showrunner.test.ts."
+      ],
+      "acceptance": [
+        "A turn that adds s5 but dispatches nothing leaves one 'auto' build-scene job for s5",
+        "A turn that adds s5 and dispatches its build itself leaves exactly one build job for s5",
+        "A fake build on s2 ending 'done' queues one continuity and one critique job for s2 and pushes one inbox item"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ],
+      "dependsOn": [
+        "US-007"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "runCrew entry point and the films handler switch",
+      "description": "As a new film, I want to be made by the crew when CREW_ENABLED so that the crew is the default path.",
+      "steps": [
+        "Read server/http/handlers/films.ts, server/agent/director.ts (status handling, product photo) and design.md section 3.1.",
+        "Create or complete server/crew/run-crew.ts exporting bindCrew(deps) and runCrew(filmId): build board, scheduler (maxWorkers CREW_MAX_WORKERS, runWorker from an injectable worker registry that S12c fills; default registry marks jobs failed 'no worker'), budget, inbox and showrunner; push the system 'New film' item with the brief; set status planning; resolve when the showrunner loop ends. runCrew never rejects (errors become status failed + an error event).",
+        "Edit server/http/handlers/films.ts: when CREW_ENABLED, create the film with crew: true and submit runCrew instead of runDirector. Nothing else changes.",
+        "Add server/crew/run-crew.test.ts and extend the films route test for both settings."
+      ],
+      "acceptance": [
+        "POST /api/films with CREW_ENABLED=true stores crew: true and the admission run function calls runCrew",
+        "With CREW_ENABLED=false the existing films handler tests pass unchanged and runDirector is used",
+        "runCrew with a showrunner backend that throws ends with status 'failed' and an error event where 'showrunner', and the promise resolves"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Chat to a crew film goes to the inbox, never 409",
+      "description": "As a user, I want to talk to the showrunner while the film builds so that I direct it live.",
+      "steps": [
+        "Read server/http/handlers/chat.ts, server/agent/edit-loop.ts (assertEditable) and design.md section 3.2.",
+        "Edit server/http/handlers/chat.ts: if film.crew, push { from: 'user', text: message, selection } to the film's inbox (via an exported getCrewSession(filmId) from run-crew.ts; if no session is running, start one with resume = true), emit showrunner.heard, return 202 { accepted: true, inboxId }. Undo and redo on a crew film with a queued or running job return 409 { error: 'crew_busy' }. Non-crew films keep today's behaviour.",
+        "Extend server/http/routes-films-chat.test.ts."
+      ],
+      "acceptance": [
+        "POST /chat on a crew film whose status is 'building' returns 202 with an inboxId and emits showrunner.heard before any model call",
+        "POST /chat on a non-crew building film still returns 409 film_busy",
+        "POST /undo on a crew film with a running job returns 409 crew_busy"
+      ],
+      "labels": [
+        "backend",
+        "http"
+      ],
+      "dependsOn": [
+        "US-009"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Crew routes and the boot hook",
+      "description": "As a UI, I want routes for the board, the event log, card edits, cancel, pick, revert and voice so that the user can direct by hand too.",
+      "steps": [
+        "Read docs/hackathon/06-contracts.md section 7 (the crew routes table), server/boot.ts and server/http/handlers/generate.ts (handler style).",
+        "Create server/http/handlers/crew.ts exporting registerCrewRoutes(app, deps): GET /api/films/:id/crew (board, bible, storyboardRev), GET /api/films/:id/log (the event log as a JSON array, no passcode), POST /api/films/:id/storyboard { ops } (user source, applies at once, inbox note), POST /api/films/:id/jobs/:jobId/cancel, POST /api/films/:id/takes/:jobId/pick { takeFilmId }, POST /api/films/:id/scenes/:sceneId/revert, POST /api/films/:id/voice (multipart audio within MAX_UPLOAD_MB, transcribed through deps.meta.transcribe with the product noun as keyword, then treated as a chat message).",
+        "Create server/crew/boot.ts exporting registerCrew(ctx) and append it to bootHooks in server/boot.ts (one line).",
+        "Add server/http/handlers/crew.test.ts."
+      ],
+      "acceptance": [
+        "GET /api/films/:id/log returns the film's events in seq order and needs no passcode",
+        "POST /storyboard with a camera update on s2 returns 200 with the new rev and makes no model call",
+        "POST /scenes/s1/revert with no earlier done job on s1 returns 409 nothing_to_revert",
+        "POST /voice with a 1 KB text/plain body returns 415"
+      ],
+      "labels": [
+        "backend",
+        "http"
+      ],
+      "dependsOn": [
+        "US-010"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Scripted fake showrunner for offline runs and e2e",
+      "description": "As a tester, I want a crew film to run end to end with no network so that the Playwright flow and the demo rehearsal are repeatable.",
+      "steps": [
+        "Read server/agent/fake-director.ts (isFakeDirector, delays) and server/crew/showrunner.ts.",
+        "Create server/crew/fake-showrunner.ts: when isFakeDirector(), runCrew uses a scripted backend: the planning turn (bible, 4 scenes, 4 dispatches), a reply turn to any user message containing 'scene' that adds one scene after s2 and dispatches restyles for done scenes, a turn that answers critic findings with one fix, then finish. Workers use the existing fake director parts with a per-job delay so 4 builders are visibly busy together.",
+        "Add server/crew/fake-showrunner.test.ts running a whole fake crew film with makeTestFilm."
+      ],
+      "acceptance": [
+        "A fake crew film ends 'ready' with 4 scenes and at least 4 build jobs whose running intervals overlap",
+        "Sending 'add a sunset scene after scene 2' mid-build ends with 5 scenes and s5 third in the storyboard",
+        "The fake run records zero Meta HTTP requests"
+      ],
+      "labels": [
+        "backend",
+        "crew",
+        "testing"
+      ],
+      "dependsOn": [
+        "US-011"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Restart hook for interrupted crew films",
+      "description": "As a owner, I want a server restart to leave crew films honest so that no job shows 'running' forever.",
+      "steps": [
+        "Read server/http/film-queue-install.ts (the requeue boot hook) and server/crew/persist.ts.",
+        "Edit server/crew/boot.ts: on boot, for each crew film with a board.json, mark running and awaiting-frames jobs failed with error 'restart', queued jobs cancelled, emit an error event where 'crew.restart', and leave the film's status as 'ready' if it has a composition, else 'failed'.",
+        "Extend server/crew/boot.test.ts."
+      ],
+      "acceptance": [
+        "A board.json with one running and one queued job becomes one 'failed' (error 'restart') and one 'cancelled' after the hook",
+        "A crew film with a composition ends status 'ready' after the hook; one without ends 'failed'"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ],
+      "dependsOn": [
+        "US-011"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Live crew script with the A/B mode",
+      "description": "As a owner, I want one command that makes a real crew film, and one that compares the three arrangements so that the README quotes measured numbers.",
+      "steps": [
+        "Read scripts/live/s03-director.ts and docs/hackathon/08-agent-orchestration-review.md section 7 (the metric table).",
+        "Create scripts/live/s12-crew.ts: describe(), estimateUsd() returning 1 (3 with --ab), run(args): start a crew film on fixtures/seed's product photo with the Coffee Co. brief, send the mid-build chat message 6 s after the first job starts, wait for ready, then print wall time, showrunner turns, jobs by kind, superseded jobs, first-try tool validity, findings and cost from the event log. With --ab also run CREW_ENABLED=false and SHOWRUNNER_MODEL=muse-spark-1.3-contributor and print the 08 section 7 table.",
+        "Add scripts/live/s12-crew.test.ts for the table printer using fixtures/s12b/events-midbuild.json."
+      ],
+      "acceptance": [
+        "estimateUsd(['--ab']) returns 3 and estimateUsd([]) returns 1",
+        "The table printer over the fixture log prints a 'Wall time' row and a 'Cost per film' row with values taken from the log"
+      ],
+      "labels": [
+        "backend",
+        "live-script"
+      ],
+      "dependsOn": [
+        "US-012"
+      ]
+    }
+  ]
+}
