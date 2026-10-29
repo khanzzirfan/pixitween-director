@@ -13,12 +13,16 @@ export interface ReviewDeps {
   postFrames(filmId: string, form: FormData): Promise<FramesResponse>;
 }
 
-/** Builds the multipart form the frames endpoint takes: one file per frame, with its scene and time. */
+export const BLANK_FRAMES_MESSAGE =
+  'The player drew only blank pictures, so no frames were sent for review. Reload the film and run the review again.';
+
+/** Builds the multipart form the frames endpoint takes: one file per frame, with its scene and time. Blank frames are left out. */
 export function buildReviewForm(capture: ReviewCapture, phase: 'before' | 'after'): FormData {
   const form = new FormData();
+  const frames = capture.frames.filter((f) => !f.blank);
   form.set('phase', phase);
-  for (const [i, f] of capture.frames.entries()) form.append('frames', f.blob, `frame-${i + 1}.png`);
-  form.set('meta', JSON.stringify(capture.frames.map((f) => ({ sceneId: f.sceneId, atSec: f.atSec }))));
+  for (const [i, f] of frames.entries()) form.append('frames', f.blob, `frame-${i + 1}.png`);
+  form.set('meta', JSON.stringify(frames.map((f) => ({ sceneId: f.sceneId, atSec: f.atSec }))));
   if (phase === 'before' && Object.keys(capture.textBoxes).length) form.set('textBoxes', JSON.stringify(capture.textBoxes));
   return form;
 }
@@ -60,6 +64,8 @@ export function useAutoReview(o: { filmId?: string; events: FilmEvent[]; deps: R
     setState('running');
     try {
       const capture = await depsRef.current.capture();
+      // nothing worth judging: do not post, and do not bill a vision model for a flat picture
+      if (capture.frames.length && capture.frames.every((f) => f.blank)) throw new Error(BLANK_FRAMES_MESSAGE);
       const res = await depsRef.current.postFrames(filmId, buildReviewForm(capture, phase));
       if (phase === 'before') {
         if (!geometryRef.current && res.geometry) {

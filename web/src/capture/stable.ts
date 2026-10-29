@@ -27,11 +27,24 @@ export async function waitForStable(
   }
 }
 
+/**
+ * True when every pixel of a signature (comma-separated RGBA values) is the same colour: a flat picture, which is
+ * what the player shows when it failed to draw the layers. An empty signature is not flat; it is unknown.
+ */
+export function isFlatSignature(signature: string): boolean {
+  const v = signature.split(',').map(Number);
+  if (v.length < 8 || v.length % 4 !== 0 || v.some(Number.isNaN)) return false;
+  for (let i = 4; i < v.length; i++) if (v[i] !== v[i % 4]) return false;
+  return true;
+}
+
 export interface CapturedFrame<P> {
   sceneId: string;
   atSec: number;
   rootSec: number;
   unstable: boolean;
+  /** The picture is one flat colour, so there is nothing to review in it. */
+  blank: boolean;
   image: P;
 }
 
@@ -42,6 +55,8 @@ export interface CaptureDriver<P> {
   nextFrames(n: number): Promise<void>;
   /** A cheap fingerprint of the current picture, used only for the stability check. */
   signature(): Promise<string>;
+  /** Whether the current picture is one flat colour. Drivers that cannot tell leave this out. */
+  isBlank?(): Promise<boolean>;
   /** The full-size picture for the frame. */
   extractFull(item: { sceneId: string; atSec: number; rootSec: number }): Promise<P>;
 }
@@ -62,8 +77,9 @@ export async function captureFrames<P>(
     await driver.seek(item.rootSec);
     await driver.nextFrames(3);
     const stability = await waitForStable(() => driver.signature(), o);
+    const blank = (await driver.isBlank?.()) ?? false;
     const image = await driver.extractFull(item);
-    out.push({ ...item, unstable: !stability.stable, image });
+    out.push({ ...item, unstable: !stability.stable, blank, image });
     o.onProgress?.(i + 1, plan.length);
   }
   return out;

@@ -28,6 +28,7 @@ export function installCaptureHook(getPlayer: () => PlayerHandle | null, getStor
         sceneId: f.sceneId,
         atSec: f.atSec,
         unstable: f.unstable,
+        blank: f.blank,
         width: bitmap.width,
         mean: Math.round((sum / (data.length / 4)) * 10) / 10,
       });

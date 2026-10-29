@@ -2,7 +2,7 @@ import type { PlayerHandle } from '../player/Player';
 import type { Storyboard } from '@shared/storyboard';
 import { ASPECT_SIZES } from '@shared/composition';
 import { CAPTURE_FPS, planFrames } from './plan';
-import { captureFrames, type CaptureDriver, type CapturedFrame } from './stable';
+import { captureFrames, isFlatSignature, type CaptureDriver, type CapturedFrame } from './stable';
 import { measureTextBoxes, type PixiStageLike } from './measure';
 
 export interface MeasuredText {
@@ -10,7 +10,7 @@ export interface MeasuredText {
   box: { left: number; top: number; right: number; bottom: number };
 }
 export interface ReviewCapture {
-  frames: Array<{ sceneId: string; atSec: number; blob: Blob; unstable: boolean }>;
+  frames: Array<{ sceneId: string; atSec: number; blob: Blob; unstable: boolean; blank: boolean }>;
   textBoxes: Record<string, MeasuredText>;
 }
 
@@ -41,6 +41,10 @@ function playerDriver(player: PlayerHandle): CaptureDriver<Blob> {
     async signature() {
       const canvas = player.getCanvas();
       return canvas ? canvasSignature(canvas) : 'no-canvas';
+    },
+    async isBlank() {
+      const canvas = player.getCanvas();
+      return canvas ? isFlatSignature(await canvasSignature(canvas)) : false;
     },
     async extractFull() {
       const canvas = player.getCanvas();
@@ -94,7 +98,7 @@ export async function captureReview(
     }
   }
   return {
-    frames: results.map((r) => ({ sceneId: r.sceneId, atSec: r.atSec, blob: r.image, unstable: r.unstable })),
+    frames: results.map((r) => ({ sceneId: r.sceneId, atSec: r.atSec, blob: r.image, unstable: r.unstable, blank: r.blank })),
     textBoxes,
   };
 }

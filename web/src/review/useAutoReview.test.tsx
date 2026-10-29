@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { FilmEvent } from '@shared/events';
 import type { ReviewCapture } from '../capture/driver';
-import { buildReviewForm, useAutoReview, type ReviewDeps } from './useAutoReview';
+import { BLANK_FRAMES_MESSAGE, buildReviewForm, useAutoReview, type ReviewDeps } from './useAutoReview';
 
 const FILM = 'film_000000000001';
 const at = new Date(0).toISOString();
@@ -13,6 +13,7 @@ const capture = (n: number): ReviewCapture => ({
     atSec: 0.8 + i,
     blob: new Blob(['x'], { type: 'image/png' }),
     unstable: false,
+    blank: false,
   })),
   textBoxes: {},
 });
@@ -81,6 +82,31 @@ describe('useAutoReview', () => {
     const { result, postFrames } = setup([status('reviewing'), status('ready')]);
     expect(result.current.state).toBe('idle');
     expect(postFrames).not.toHaveBeenCalled();
+  });
+});
+
+describe('blank frames', () => {
+  const blankCapture = (blanks: boolean[]): ReviewCapture => ({
+    frames: blanks.map((blank, i) => ({ sceneId: 's1', atSec: i + 1, blob: new Blob(['x'], { type: 'image/png' }), unstable: false, blank })),
+    textBoxes: {},
+  });
+
+  it('leaves blank frames out of the form and keeps meta aligned with the files', () => {
+    const form = buildReviewForm(blankCapture([true, false, false]), 'before');
+    expect(form.getAll('frames')).toHaveLength(2);
+    expect(JSON.parse(String(form.get('meta')))).toEqual([
+      { sceneId: 's1', atSec: 2 },
+      { sceneId: 's1', atSec: 3 },
+    ]);
+  });
+
+  it('does not post when every frame is blank, and says why', async () => {
+    const postFrames = vi.fn(async () => ({ geometry: null }));
+    const deps: ReviewDeps = { capture: async () => blankCapture([true, true]), postFrames };
+    const { result } = renderHook(() => useAutoReview({ filmId: FILM, events: [status('ready')], deps }));
+    await waitFor(() => expect(result.current.state).toBe('error'));
+    expect(postFrames).not.toHaveBeenCalled();
+    expect(result.current.error).toBe(BLANK_FRAMES_MESSAGE);
   });
 });
 

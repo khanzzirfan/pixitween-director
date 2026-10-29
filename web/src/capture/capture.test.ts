@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { planFrames } from './plan';
 import { fitTransform, toCompSpace } from './fit';
-import { captureFrames, waitForStable } from './stable';
+import { captureFrames, isFlatSignature, waitForStable } from './stable';
 import { measureTextBoxes, findTextNode, type PixiNodeLike } from './measure';
 
 describe('planFrames', () => {
@@ -52,7 +52,26 @@ describe('waitForStable', () => {
   });
 });
 
+describe('isFlatSignature', () => {
+  const px = (r: number, g: number, b: number, n: number) => Array.from({ length: n }, () => `${r},${g},${b},255`).join(',');
+  it('is true for one colour everywhere and false once any pixel differs', () => {
+    expect(isFlatSignature(px(245, 230, 211, 576))).toBe(true);
+    expect(isFlatSignature(`${px(245, 230, 211, 575)},10,10,10,255`)).toBe(false);
+  });
+  it('treats an empty or malformed signature as unknown, not flat', () => {
+    for (const s of ['', 'no-canvas', 'no-2d', '1,2,3,4']) expect(isFlatSignature(s)).toBe(false);
+  });
+});
+
 describe('captureFrames', () => {
+  it('flags a frame the driver reports as blank, and defaults to not blank when it cannot tell', async () => {
+    const base = { async seek() {}, async nextFrames() {}, async signature() { return 's'; }, async extractFull() { return 'img'; } };
+    const item = [{ sceneId: 's1', atSec: 1, rootSec: 1 }];
+    const sleep = async () => undefined;
+    expect((await captureFrames(item, { ...base, async isBlank() { return true; } }, { sleep }))[0]!.blank).toBe(true);
+    expect((await captureFrames(item, base, { sleep }))[0]!.blank).toBe(false);
+  });
+
   it('seeks in plan order, waits three frames each time, reports progress and reads each frame once', async () => {
     const plan = [
       { sceneId: 's1', atSec: 0.8, rootSec: 0.8 },
