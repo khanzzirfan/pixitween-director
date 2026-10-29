@@ -104,7 +104,7 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
       persist,
       log: (line) => console.log(line),
     });
-    crew = { filmId, films: deps.films, board, scheduler, budget, inbox, emit: toolCtx.emit, source: 'showrunner', takesMax: env.CREW_TAKES_MAX, removedIds: new Set(), toolCtx, turn: newTurn() };
+    crew = { filmId, films: deps.films, board, scheduler, budget, inbox, emit: toolCtx.emit, source: 'showrunner', takesMax: env.CREW_TAKES_MAX, removedIds: new Set(), toolCtx, turn: newTurn(), snapshots: { load: (id) => persist.loadSnapshot(id) } };
 
     const model = o.model ?? env.SHOWRUNNER_MODEL;
     const backend = o.backend ?? fake?.backend ?? pickBackend('showrunner', { onFallback: (i) => toolCtx.emit({ type: 'error', where: 'showrunner', message: `${i.from} unavailable (${i.reason}); this turn used ${i.to}` }) });

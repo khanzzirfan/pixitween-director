@@ -11,6 +11,7 @@ import { findFix } from '../../review/fix-log';
 import { runReview } from '../../review/loop';
 import { listScenes } from '../../review/geometry';
 import type { VisualFrame } from '../../review/visual';
+import { resolveCapture, waitingCapture } from '../../crew/workers/critic';
 
 export const STUB_OWNER = 'S5b' as const;
 
@@ -92,6 +93,22 @@ export function registerReviewRoutes(app: Hono, deps: AppDeps, o: { run?: Review
       const meta = parseJsonField(body.meta, 'meta');
       const textBoxes = parseTextBoxes(parseJsonField(body.textBoxes, 'textBoxes'));
       const valid = validateFrames(files, meta, { sceneIds: sceneIdsOf(film) });
+
+      // frames a crew critique asked for go to that job, and nothing else is started (design 5.9)
+      const requestId = typeof body.requestId === 'string' ? body.requestId : undefined;
+      if (requestId && phase === 'before') {
+        const want = waitingCapture(requestId);
+        if (!want || want.filmId !== id) return c.json({ error: 'unknown_request', message: 'No critique is waiting for these frames.' }, 409);
+        if (valid.some((f) => f.meta.sceneId !== want.sceneId)) throw new FrameInputError(400, 'wrong_scene', `The frames must all be of scene '${want.sceneId}'.`);
+        const stored = await storeFrames(deps.assets, id, valid, { phase: 'before', batch: new Date().toISOString() });
+        resolveCapture(requestId, {
+          frames: stored.map((f) => ({ id: f.id, atSec: f.atSec, image: f.image })),
+          ...(textBoxes ? { textBoxes } : {}),
+        });
+        return c.json({ review: 'crew', frames: stored.length }, 202);
+      }
+      // a crew film has one reviewer, the critic, so a scene is never reviewed and billed twice
+      if (film.crew && phase === 'before') return c.json({ error: 'crew_reviews', message: 'This film is reviewed by its crew.' }, 409);
 
       if (phase === 'after') {
         const ctx = makeToolCtx(deps, id);

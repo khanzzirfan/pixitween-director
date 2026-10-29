@@ -14,6 +14,7 @@ import type { Board } from './board';
 import { TERMINAL } from './board';
 import type { Budget } from './budget';
 import type { Inbox } from './inbox';
+import type { SceneSnapshot } from './scene-snapshot';
 import type { Scheduler } from './scheduler';
 import { applyOps, StoryboardOpError } from './storyboard-ops';
 import { syncComposition } from './sync';
@@ -45,6 +46,8 @@ export interface CrewCtx {
   /** The tool context of the film, for the rules and the S7 propose flow. */
   toolCtx: ToolCtx;
   turn: TurnState;
+  /** Reads the scene snapshot a job saved before it started (S12a persist). */
+  snapshots?: { load(jobId: string): Promise<SceneSnapshot | undefined> };
   /** Filled by the takes module (S12c). */
   takes?: { pick(args: { takeFilmId: string; reason: string }): Promise<ToolResult> };
   /** The S7 propose step. Defaults to the real proposeGenerate tool. */

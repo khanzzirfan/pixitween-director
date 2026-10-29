@@ -158,7 +158,7 @@ export function createFakeWorkers(o: { delayMs?: number } = {}): Partial<Record<
           c = addLayer(c, { sceneId, role: 'bg', kind: 'shape', fill: '#b45309' });
         } else if (meta.layers[`${sceneId}:headline`] && sc.text) {
           c = removeLayer(c, `${sceneId}:headline`);
-          c = addLayer(c, { sceneId, role: 'headline', kind: 'text', text: sc.text, box: { x: 0.12, y: 0.78, w: 0.76, h: 0.14 } });
+          c = addLayer(c, { sceneId, role: 'headline', kind: 'text', text: sc.text, box: { x: Math.round(c.width * 0.12), y: Math.round(c.height * 0.78), w: Math.round(c.width * 0.76), h: Math.round(c.height * 0.14) } });
         }
         return { next: c, data: null };
       },

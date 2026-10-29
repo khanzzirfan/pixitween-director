@@ -110,15 +110,34 @@ export function describeTool(tool: { name: string; params: z.ZodTypeAny }): stri
   return `- ${tool.name} { ${fields.join(', ')} }`;
 }
 
+/** The two sentences that make a review blind: it may judge only what it can see (design 6.5). */
+export const BLIND_RULES = 'Judge only what is visible. Report each problem with the frame index and what you see. Do not guess what the film is meant to show.';
+
 export function buildVisualPrompt(o: {
   sceneId: string;
   frameTimes: number[];
   findings: string[];
   layerSummary: string[];
   tools: Array<{ name: string; params: z.ZodTypeAny }>;
+  /** A crew critic's review: frames, measured text boxes and rule facts only. No layer summary, no fix tools, nothing about intent. */
+  blind?: boolean;
+  /** One line per measured text box, for a blind review. */
+  measured?: string[];
 }): string {
   const images = o.frameTimes.map((t, i) => `Image ${i + 1} = ${t} s`).join(', ');
   const found = o.findings.length ? o.findings.map((f) => `- ${f}`).join('\n') : 'none';
+  if (o.blind)
+    return [
+      'You are reviewing frames from a short product film. Judge only what is visible in the images.',
+      `The images are frames from one scene: ${images}.`,
+      `Automatic checks already found: ${o.findings.length ? '' : 'none'}`,
+      ...(o.findings.length ? [found] : []),
+      ...(o.measured?.length ? ['Measured text boxes (pixels in the frame):', ...o.measured.map((m) => `- ${m}`)] : []),
+      'Report only clear visual faults: text that is hard to read, text covering the product, a cut-off subject, or a broken frame.',
+      BLIND_RULES,
+      `Reply with only a JSON object: {"sceneId": "${o.sceneId}", "pass": boolean, "issues": [{"image": number, "atSec": number, "kind": string, "where": string, "evidence": string}], "fixes": []}.`,
+      'Every issue must name the image number and the second it appears at. Evidence is one sentence describing what you see.',
+    ].join('\n');
   const allowed = o.tools.filter((t) => (ALLOWED_FIX_TOOLS as readonly string[]).includes(t.name));
   return [
     `You are reviewing scene "${o.sceneId}" of a short product film. Judge only what is visible in the images.`,
@@ -272,6 +291,9 @@ export async function visualReview(o: {
   local?: boolean;
   /** Calls allowed for this scene: 2 means one retry after a malformed answer. */
   maxAttempts?: number;
+  /** A blind review (crew critic): see buildVisualPrompt. */
+  blind?: boolean;
+  measured?: string[];
   reviewer?: Reviewer;
   pickReviewer?: (o: { local: boolean }) => Reviewer;
 }): Promise<{ verdict: VisualVerdict; refused: RefusedFix[]; dropped: DroppedIssue[] }> {
@@ -292,6 +314,7 @@ export async function visualReview(o: {
     findings: o.findings,
     layerSummary: o.layerSummary,
     tools: o.tools,
+    ...(o.blind ? { blind: true, measured: o.measured } : {}),
   });
   let prompt = basePrompt;
   for (let attempt = 0; attempt < (o.maxAttempts ?? 2); attempt++) {
