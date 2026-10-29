@@ -1,0 +1,151 @@
+/* Light and dark theme tokens. The system setting decides; data-theme="light" or "dark" on <html> overrides it. */
+:root {
+  --bg: #f6f3ee;
+  --fg: #17151b;
+  --muted: #5f5a68;
+  --card: #fffdf9;
+  --border: #e0d8cd;
+  --accent: #6a3fd0;
+  --danger: #b42318;
+  --radius: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  color-scheme: light dark;
+}
+
+/* The names the existing panels use, following the tokens above. */
+:root {
+  --text: var(--fg);
+  --surface: var(--card);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f0d14;
+    --fg: #f2eef8;
+    --muted: #a8a2b3;
+    --card: #1a1722;
+    --border: #322d3d;
+    --accent: #b49cff;
+    --danger: #ff8a80;
+    --radius: 16px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 16px;
+    --space-4: 24px;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f0d14;
+  --fg: #f2eef8;
+  --muted: #a8a2b3;
+  --card: #1a1722;
+  --border: #322d3d;
+  --accent: #b49cff;
+  --danger: #ff8a80;
+  --radius: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* styles.css hard-codes a few light colours; these follow the theme instead */
+.app-header {
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+}
+.slot {
+  background: var(--card);
+}
+
+/* Controls, pills and chat bubbles: colours derived from the tokens, so light and dark both follow them. */
+.slot input:not([type='radio']):not([type='file']),
+.slot textarea,
+.slot select {
+  background: var(--card);
+  color: var(--fg);
+  border-color: var(--border);
+}
+.slot input[type='file'] {
+  background: color-mix(in srgb, var(--accent) 8%, var(--card));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  color: var(--fg);
+}
+.slot button,
+.slot a[download] {
+  background: var(--card);
+  color: var(--fg);
+  border-color: var(--border);
+}
+.slot button[type='submit'],
+.slot button.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.slot article,
+.product-preview,
+.review-placeholder {
+  background: var(--card);
+  border-color: var(--border);
+}
+.step-pill,
+.status-pill,
+.mode-pill,
+.scene-duration,
+.scene-number,
+.story-scene .scene-number,
+.status-planning,
+.status-building,
+.status-reviewing {
+  background: color-mix(in srgb, var(--accent) 16%, var(--card));
+  color: var(--fg);
+}
+.status-ready,
+.mode-motion,
+.app-header [data-testid='film-status'] {
+  background: color-mix(in srgb, #2fa37a 24%, var(--card));
+  color: var(--fg);
+}
+.status-failed,
+.mode-generate {
+  background: color-mix(in srgb, var(--danger) 20%, var(--card));
+  color: var(--fg);
+}
+.transcript-note {
+  background: color-mix(in srgb, var(--accent) 8%, var(--card));
+}
+.chat-user {
+  background: color-mix(in srgb, var(--accent) 18%, var(--card)) !important;
+}
+.chat-applied {
+  background: color-mix(in srgb, #2fa37a 16%, var(--card)) !important;
+}
+.chat-error {
+  background: color-mix(in srgb, var(--danger) 16%, var(--card)) !important;
+}
+.scene-card [role='radiogroup'] {
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+}
+.scene-card [role='radio'][aria-checked='true'] {
+  background: var(--accent);
+  color: var(--bg);
+}
+.export-progress {
+  background: color-mix(in srgb, var(--accent) 14%, var(--card));
+}
