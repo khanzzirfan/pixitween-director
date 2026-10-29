@@ -1,0 +1,191 @@
+{
+  "version": "1.8.0",
+  "id": "film",
+  "name": "Live generate check",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "durationInFrames": 150,
+  "bgColor": "#111827",
+  "assets": {
+    "ast_11111111111111111111111111111111": {
+      "type": "image",
+      "src": "/api/assets/ast_11111111111111111111111111111111",
+      "width": 960,
+      "height": 640
+    },
+    "ast_22222222222222222222222222222222": {
+      "type": "image",
+      "src": "/api/assets/ast_22222222222222222222222222222222",
+      "width": 384,
+      "height": 672
+    }
+  },
+  "layers": [
+    {
+      "kind": "precomp",
+      "id": "s1",
+      "name": "s1",
+      "inPoint": 0,
+      "outPoint": 150,
+      "compId": "s1",
+      "width": 1920,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    }
+  ],
+  "precomps": {
+    "s1": {
+      "version": "1.8.0",
+      "id": "s1",
+      "name": "s1",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 150,
+      "assets": {
+        "ast_11111111111111111111111111111111": {
+          "type": "image",
+          "src": "/api/assets/ast_11111111111111111111111111111111",
+          "width": 960,
+          "height": 640
+        },
+        "ast_22222222222222222222222222222222": {
+          "type": "image",
+          "src": "/api/assets/ast_22222222222222222222222222222222",
+          "width": 384,
+          "height": 672
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "s1:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 150,
+          "assetId": "ast_11111111111111111111111111111111",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              480,
+              320
+            ],
+            "scale": [
+              2,
+              2
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "image",
+          "id": "s1:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 150,
+          "assetId": "ast_22222222222222222222222222222222",
+          "transform": {
+            "position": [
+              960,
+              561.6
+            ],
+            "anchor": [
+              192,
+              336
+            ],
+            "scale": [
+              0.9964,
+              0.9964
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "text",
+          "id": "s1:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 150,
+          "source": "Slow mornings",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 76,
+            "fill": "#ffffff",
+            "weight": 700,
+            "align": "center",
+            "boxWidth": 1536
+          },
+          "transform": {
+            "position": [
+              960,
+              172.8
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        }
+      ]
+    }
+  },
+  "meta": {
+    "director": {
+      "scenes": {
+        "s1": {
+          "precompId": "s1",
+          "startFrame": 0,
+          "durationFrames": 150,
+          "mode": "generate",
+          "intent": "Steam rises from the mug as the camera slowly pushes in"
+        }
+      },
+      "layers": {
+        "s1:bg": {
+          "sceneId": "s1",
+          "role": "bg",
+          "assetId": "ast_11111111111111111111111111111111",
+          "z": 10
+        },
+        "s1:product": {
+          "sceneId": "s1",
+          "role": "product",
+          "assetId": "ast_22222222222222222222222222222222",
+          "z": 1
+        },
+        "s1:headline": {
+          "sceneId": "s1",
+          "role": "headline",
+          "z": 0
+        }
+      }
+    }
+  }
+}
