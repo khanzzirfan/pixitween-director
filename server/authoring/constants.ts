@@ -1,6 +1,6 @@
 import type { LayerRole, Ease } from './types';
 
-export const AEP_VERSION = '1.8.0';
+export const AEP_VERSION = '1.9.0';
 export const MAX_SCENES = 12;
 export const MAX_FILM_SECONDS = 60;
 

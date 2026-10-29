@@ -4,7 +4,7 @@ import { getProductNoun, readDirector, sceneIds, sceneMeta, setProductNoun, writ
 import { deepFreeze, threeSceneFilm } from './test-helpers';
 import type { Comp } from './types';
 
-const bare = { version: '1.8.0', id: 'film', width: 1, height: 1, fps: 30, durationInFrames: 1, assets: {}, layers: [] } as unknown as Comp;
+const bare = { version: '1.9.0', id: 'film', width: 1, height: 1, fps: 30, durationInFrames: 1, assets: {}, layers: [] } as unknown as Comp;
 
 it('reads empty maps when meta is absent', () => expect(readDirector(bare)).toEqual({ scenes: {}, layers: {} }));
 

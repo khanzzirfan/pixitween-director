@@ -28,7 +28,7 @@ vi.mock('reacthub-pixitweenjs', async () => {
   };
 });
 
-const comp = { version: '1.8.0', id: 'c', width: 1920, height: 1080, fps: 30, durationInFrames: 150, layers: [], assets: {} } as AepCompositionJson;
+const comp = { version: '1.9.0', id: 'c', width: 1920, height: 1080, fps: 30, durationInFrames: 150, layers: [], assets: {} } as AepCompositionJson;
 
 beforeEach(() => {
   Object.values(h.ctx).forEach((f) => typeof f === 'function' && (f as ReturnType<typeof vi.fn>).mockClear());

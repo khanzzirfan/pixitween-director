@@ -1,5 +1,5 @@
 {
-  "version": "1.8.0",
+  "version": "1.9.0",
   "id": "film",
   "name": "Live generate check",
   "width": 1920,
@@ -51,7 +51,7 @@
   ],
   "precomps": {
     "s1": {
-      "version": "1.8.0",
+      "version": "1.9.0",
       "id": "s1",
       "name": "s1",
       "width": 1920,

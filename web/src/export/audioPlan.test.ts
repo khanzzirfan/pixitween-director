@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import type { AepCompositionJson } from 'reacthub-pixitweenjs';
 import { collectAudioPlan } from './audioPlan';
 
-const comp = (o: Record<string, unknown>) => ({ version: '1.8.0', id: 'c', width: 1, height: 1, fps: 30, durationInFrames: 900, assets: {}, layers: [], ...o }) as unknown as AepCompositionJson;
+const comp = (o: Record<string, unknown>) => ({ version: '1.9.0', id: 'c', width: 1, height: 1, fps: 30, durationInFrames: 900, assets: {}, layers: [], ...o }) as unknown as AepCompositionJson;
 const audio = (id: string, o: Record<string, unknown> = {}) => ({ kind: 'audio', id, assetId: 'a1', inPoint: 0, outPoint: 30, transform: {}, ...o });
 const assets = { a1: { type: 'audio', src: '/api/assets/a1' } };
 

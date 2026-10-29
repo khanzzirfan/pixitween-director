@@ -6,7 +6,7 @@ import type { Comp, Obj } from './types';
 
 it('creates a valid empty 9:16 film', () => {
   const c = newFilmComposition({ aspect: '9:16' });
-  expect(c).toMatchObject({ version: '1.8.0', width: 1080, height: 1920, fps: 30, durationInFrames: 1 });
+  expect(c).toMatchObject({ version: '1.9.0', width: 1080, height: 1920, fps: 30, durationInFrames: 1 });
   expect(lightValidate(c).ok).toBe(true);
 });
 

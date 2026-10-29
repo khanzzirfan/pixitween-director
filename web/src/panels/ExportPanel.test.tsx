@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 const film = (o: Record<string, unknown> = {}) =>
-  ({ id: 'film_aaaaaaaaaaaa', title: 'Morning Ritual', composition: { version: '1.8.0', id: 'c', width: 10, height: 10, fps: 30, durationInFrames: 120, assets: {}, layers: [], ...o } }) as unknown as FilmState;
+  ({ id: 'film_aaaaaaaaaaaa', title: 'Morning Ritual', composition: { version: '1.9.0', id: 'c', width: 10, height: 10, fps: 30, durationInFrames: 120, assets: {}, layers: [], ...o } }) as unknown as FilmState;
 const canvas = (preserved: boolean | null = null) => ({ getContext: () => (preserved === null ? null : { getContextAttributes: () => ({ preserveDrawingBuffer: preserved }) }) }) as unknown as HTMLCanvasElement;
 const player = (c = canvas()) => ({ getCanvas: () => c, play: vi.fn(), pause: vi.fn(), seek: vi.fn(), getTime: vi.fn(() => 0) });
 const fixedNow = () => new Date('2026-11-02T12:00:00Z');

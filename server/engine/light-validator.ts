@@ -50,7 +50,7 @@ function validateComp(c: unknown, path: string, issues: CompositionIssue[]): voi
   const at = (k: string) => (path ? `${path}.${k}` : k);
 
   const version = c.version;
-  if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) issues.push({ path: at('version'), message: "version must be a semver string like '1.8.0'" });
+  if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) issues.push({ path: at('version'), message: "version must be a semver string like '1.9.0'" });
   else if (version.split('.')[0] !== '1') issues.push({ path: at('version'), message: 'unsupported schema version: major must be 1' });
   if (typeof c.id !== 'string' || !c.id) issues.push({ path: at('id'), message: 'id must be a non-empty string' });
   for (const k of ['width', 'height', 'fps', 'durationInFrames']) {

@@ -40,7 +40,7 @@ afterEach(() => {
   window.history.replaceState({}, '', '/');
 });
 
-const film = { id: 'film_3fa9c2d41b7e', title: 'Mug', status: 'ready', composition: { version: '1.8.0', id: 'c', width: 10, height: 10, fps: 30, durationInFrames: 60, assets: {}, layers: [] } };
+const film = { id: 'film_3fa9c2d41b7e', title: 'Mug', status: 'ready', composition: { version: '1.9.0', id: 'c', width: 10, height: 10, fps: 30, durationInFrames: 60, assets: {}, layers: [] } };
 
 it('shows Nothing to export with no film', () => {
   render(<App />);

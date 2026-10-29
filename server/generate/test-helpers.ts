@@ -18,10 +18,10 @@ export function buildComp(scenes: Array<{ id: string; mode?: 'motion' | 'generat
       if (l.assetId) assets[l.assetId] = { type: 'image', src: `/api/assets/${l.assetId}` };
       return { kind: l.kind ?? (l.assetId ? 'image' : 'shape'), id: l.id, inPoint: 0, outPoint: frames, ...(l.assetId ? { assetId: l.assetId } : { path: { kind: 'rect', size: [10, 10] }, fill: '#000000' }), ...(l.hidden ? { hidden: true } : {}), transform: tr(l) };
     });
-    precomps[s.id] = { version: '1.8.0', id: s.id, width: 1920, height: 1080, fps: 30, durationInFrames: frames, assets: Object.fromEntries(layers.filter((l) => l.assetId).map((l) => [l.assetId, assets[l.assetId!]])), layers };
+    precomps[s.id] = { version: '1.9.0', id: s.id, width: 1920, height: 1080, fps: 30, durationInFrames: frames, assets: Object.fromEntries(layers.filter((l) => l.assetId).map((l) => [l.assetId, assets[l.assetId!]])), layers };
     root.push({ kind: 'precomp', id: s.id, inPoint: start, outPoint: start + frames, compId: s.id, width: 1920, height: 1080, transform: tr({ id: s.id, role: 'x', position: [0, 0] }) });
     metaScenes[s.id] = { precompId: s.id, startFrame: start, durationFrames: frames, mode: s.mode ?? 'motion', ...(s.intent ? { intent: s.intent } : {}) };
     start += frames;
   }
-  return { version: '1.8.0', id: 'film', width: 1920, height: 1080, fps: 30, durationInFrames: Math.max(1, start), assets, layers: root, precomps, meta: { director: { scenes: metaScenes, layers: metaLayers } } } as unknown as AepCompositionJson;
+  return { version: '1.9.0', id: 'film', width: 1920, height: 1080, fps: 30, durationInFrames: Math.max(1, start), assets, layers: root, precomps, meta: { director: { scenes: metaScenes, layers: metaLayers } } } as unknown as AepCompositionJson;
 }

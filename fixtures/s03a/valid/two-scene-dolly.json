@@ -1,5 +1,5 @@
 {
-  "version": "1.8.0",
+  "version": "1.9.0",
   "id": "film",
   "name": "Two scene dolly",
   "width": 1920,
@@ -71,7 +71,7 @@
   ],
   "precomps": {
     "s1": {
-      "version": "1.8.0",
+      "version": "1.9.0",
       "id": "s1",
       "name": "s1",
       "width": 1920,
@@ -246,7 +246,7 @@
       ]
     },
     "s2": {
-      "version": "1.8.0",
+      "version": "1.9.0",
       "id": "s2",
       "name": "s2",
       "width": 1920,
