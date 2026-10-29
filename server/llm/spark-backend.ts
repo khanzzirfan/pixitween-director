@@ -24,12 +24,15 @@ export function createSparkBackend(
   return {
     id: o.id ?? 'spark',
     async chatWithTools(messages, tools, opts) {
-      const r = await spark.chat({
-        messages: opts?.parallelHint ? withHint(messages) : [...messages],
-        tools: tools.map(toolSpec),
-        tool_choice: 'auto',
-        ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
-      });
+      const r = await spark.chat(
+        {
+          messages: opts?.parallelHint ? withHint(messages) : [...messages],
+          tools: tools.map(toolSpec),
+          tool_choice: 'auto',
+          ...(o.maxTokens ? { max_tokens: o.maxTokens } : {}),
+        },
+        opts?.signal ? { signal: opts.signal } : undefined,
+      );
       return { toolCalls: r.toolCalls, ...(r.content !== undefined ? { content: r.content } : {}), ms: r.ms, ...(r.usage ? { usage: r.usage } : {}) };
     },
   };

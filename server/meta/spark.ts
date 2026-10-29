@@ -17,11 +17,11 @@ interface RawChat {
 }
 
 export function createSparkClient(http: MetaHttp, opts: { model: string }): MetaClients['spark'] {
-  const post = (body: Record<string, unknown>) => http.json<RawChat>('/chat/completions', body);
+  const post = (body: Record<string, unknown>, signal?: AbortSignal) => http.json<RawChat>('/chat/completions', body, signal ? { signal } : undefined);
 
   return {
-    async chat(req: ChatRequest): Promise<ChatResponse> {
-      const r = await post({ ...req, model: req.model ?? opts.model });
+    async chat(req: ChatRequest, callOpts?: { signal?: AbortSignal }): Promise<ChatResponse> {
+      const r = await post({ ...req, model: req.model ?? opts.model }, callOpts?.signal);
       const msg = r.body.choices[0]?.message;
       if (!msg) throw new SparkProtocolError('chat response had no choices');
       const toolCalls = (msg.tool_calls ?? []).map((c) => {

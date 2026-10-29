@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { ChatMessage, ChatRequest, MetaClients } from '@shared/ports';
 import type { ToolDef } from '@shared/tools';
@@ -58,4 +58,13 @@ it('builds the OpenAI-shaped assistant and tool messages', () => {
   expect(a.tool_calls![0]!.function.arguments).toBe('{"id":"s1"}');
   expect(assistantMessageFrom({ toolCalls: [] })).toEqual({ role: 'assistant', content: null });
   expect(toolResultMessage(call, { ok: true })).toEqual({ role: 'tool', tool_call_id: 'c1', content: '{"ok":true}' });
+});
+
+it('passes the abort signal to chat() as an option, never in the request', async () => {
+  const chat = vi.fn(async () => ({ toolCalls: [], ms: 1, model: 'm' }));
+  const ac = new AbortController();
+  await createSparkBackend({ chat } as unknown as MetaClients['spark']).chatWithTools([{ role: 'user', content: 'hi' }], [], { signal: ac.signal });
+  const [req, opts] = chat.mock.calls[0] as unknown as [Record<string, unknown>, { signal?: AbortSignal }];
+  expect(opts.signal).toBe(ac.signal);
+  expect(JSON.stringify(req)).not.toContain('signal');
 });

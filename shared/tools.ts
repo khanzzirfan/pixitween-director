@@ -17,6 +17,10 @@ export interface ToolCtx {
   ledger: Ledger;
   /** The `source` tools record on commit (default 'director'; S5b 'review', S6 'chat', S7b 'generate'). */
   source?: FilmVersion['source'];
+  /** Set by the crew scheduler: a cancelled job stops before its next model turn or tool call. */
+  signal?: AbortSignal;
+  /** Set for a crew worker: the one scene its tools may touch. */
+  scope?: { sceneId: string };
 }
 
 export type ToolResult = { ok: true; version?: number; data?: unknown } | { ok: false; error: string; zodIssues?: unknown };

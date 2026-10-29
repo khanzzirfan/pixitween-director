@@ -73,7 +73,7 @@ export interface FilmStore {
     source: FilmVersion['source'],
     note?: string,
   ): Promise<{ ok: true; version: number; data: T } | { ok: false; issues: unknown }>;
-  update(id: FilmId, patch: Partial<Pick<FilmState, 'status' | 'storyboard' | 'title'>>): Promise<void>;
+  update(id: FilmId, patch: Partial<Pick<FilmState, 'status' | 'storyboard' | 'title' | 'styleBible' | 'storyboardRev'>>): Promise<void>;
   undo(id: FilmId): Promise<number>;
   redo(id: FilmId): Promise<number>;
   versions(id: FilmId): Promise<FilmVersion[]>;
@@ -91,7 +91,7 @@ export interface AssetStore {
 // ---- Meta clients ----
 export interface MetaClients {
   spark: {
-    chat(req: ChatRequest): Promise<ChatResponse>;
+    chat(req: ChatRequest, opts?: { signal?: AbortSignal }): Promise<ChatResponse>;
     reviewImages(images: Buffer[], prompt: string, schema?: object): Promise<unknown>;
     video(mp4: Buffer, prompt: string): Promise<string>;
   };
@@ -113,7 +113,7 @@ export interface LlmBackend {
   chatWithTools(
     messages: ChatMessage[],
     tools: ToolDef[],
-    opts?: { parallelHint?: boolean },
+    opts?: { parallelHint?: boolean; signal?: AbortSignal },
   ): Promise<{ toolCalls: Array<{ id: string; name: string; args: unknown }>; content?: string; ms: number; usage?: unknown; /** true when the backend answered without a request (the local closing-turn skip) */ skipped?: true }>;
 }
 

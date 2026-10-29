@@ -35,10 +35,15 @@ export interface MetaHttpOptions {
   mode?: { replay?: { dir: string }; record?: { dir: string } };
 }
 
+/** Aborting rejects with an error named 'AbortError' and is never retried. */
+export interface MetaCallOptions {
+  signal?: AbortSignal;
+}
+
 export interface MetaHttp {
-  json<T = unknown>(path: string, body: unknown): Promise<{ status: number; ms: number; body: T }>;
-  form(path: string, form: FormData, headers?: Record<string, string>): Promise<{ status: number; ms: number; text: string }>;
-  sse(path: string, body: unknown): Promise<{ status: number; ms: number; text: string }>;
+  json<T = unknown>(path: string, body: unknown, opts?: MetaCallOptions): Promise<{ status: number; ms: number; body: T }>;
+  form(path: string, form: FormData, headers?: Record<string, string>, opts?: MetaCallOptions): Promise<{ status: number; ms: number; text: string }>;
+  sse(path: string, body: unknown, opts?: MetaCallOptions): Promise<{ status: number; ms: number; text: string }>;
 }
 
 interface Req {
@@ -48,6 +53,7 @@ interface Req {
   form?: FormData;
   accept?: string;
   headers?: Record<string, string>;
+  signal?: AbortSignal;
 }
 interface Res {
   status: number;
@@ -57,6 +63,14 @@ interface Res {
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+function abortError(signal: AbortSignal): Error {
+  const reason: unknown = signal.reason;
+  if (reason instanceof Error && reason.name === 'AbortError') return reason;
+  const e = new Error('The request was aborted');
+  e.name = 'AbortError';
+  return e;
+}
 
 export function createMetaHttp(opts: MetaHttpOptions): MetaHttp {
   if (opts.mode?.replay && opts.mode.record) throw new ConfigError('replay and record modes are mutually exclusive');
@@ -89,6 +103,7 @@ export function createMetaHttp(opts: MetaHttpOptions): MetaHttp {
   };
 
   async function attempt(req: Req, key: string): Promise<Res & { retryAfter?: string }> {
+    if (req.signal?.aborted) throw abortError(req.signal);
     await acquire();
     const t0 = Date.now();
     try {
@@ -106,7 +121,7 @@ export function createMetaHttp(opts: MetaHttpOptions): MetaHttp {
         body = JSON.stringify(req.json);
       }
       if (req.accept) headers.Accept = req.accept;
-      const res = await fetch(opts.baseUrl.replace(/\/$/, '') + req.path, { method: req.method, headers, body, dispatcher: agent });
+      const res = await fetch(opts.baseUrl.replace(/\/$/, '') + req.path, { method: req.method, headers, body, dispatcher: agent, ...(req.signal ? { signal: req.signal } : {}) });
       const text = await res.text();
       return { status: res.status, ms: Date.now() - t0, text, contentType: res.headers.get('content-type') ?? '', retryAfter: res.headers.get('retry-after') ?? undefined };
     } finally {
@@ -130,6 +145,7 @@ export function createMetaHttp(opts: MetaHttpOptions): MetaHttp {
     let retried402 = false;
     let retries429 = 0;
     for (;;) {
+      if (req.signal?.aborted) throw abortError(req.signal);
       const res = await attempt(req, apiKey);
       log(`meta ${req.path} ${res.status} ${res.ms}ms`);
       if (res.status >= 200 && res.status < 300) {
@@ -158,16 +174,16 @@ export function createMetaHttp(opts: MetaHttpOptions): MetaHttp {
   }
 
   return {
-    async json<T>(path: string, body: unknown) {
-      const r = await request({ method: 'POST', path, json: body });
+    async json<T>(path: string, body: unknown, o?: MetaCallOptions) {
+      const r = await request({ method: 'POST', path, json: body, ...(o?.signal ? { signal: o.signal } : {}) });
       return { status: r.status, ms: r.ms, body: JSON.parse(r.text) as T };
     },
-    async form(path, form, headers) {
-      const r = await request({ method: 'POST', path, form, headers });
+    async form(path, form, headers, o) {
+      const r = await request({ method: 'POST', path, form, headers, ...(o?.signal ? { signal: o.signal } : {}) });
       return { status: r.status, ms: r.ms, text: r.text };
     },
-    async sse(path, body) {
-      const r = await request({ method: 'POST', path, json: body, accept: 'text/event-stream' });
+    async sse(path, body, o) {
+      const r = await request({ method: 'POST', path, json: body, accept: 'text/event-stream', ...(o?.signal ? { signal: o.signal } : {}) });
       return { status: r.status, ms: r.ms, text: r.text };
     },
   };
