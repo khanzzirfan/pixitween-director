@@ -16,7 +16,8 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "live": "tsx scripts/live/run.ts",
-    "check:bundle": "tsx scripts/check-bundle.ts"
+    "check:bundle": "tsx scripts/check-bundle.ts",
+    "start": "tsx server/main.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

@@ -1,0 +1,44 @@
+# Rename the app (it must be unique on Fly), then change PUBLIC_BASE_URL below to match.
+app = "pixitween-director"
+primary_region = "iad"
+
+[build]
+  dockerfile = "deploy/Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+  # The Fly volume is mounted at /data and the stores write there, so films survive a restart.
+  DATA_DIR = "/data"
+  # Fly sits directly in front of the server, so its client-address header can be trusted for rate limits.
+  TRUST_FLY_CLIENT_IP = "true"
+  # Change with the app name.
+  PUBLIC_BASE_URL = "https://pixitween-director.fly.dev"
+  # Optional crew tuning (see deploy/README.md): FILMS_IN_FLIGHT_MAX = "2", FILMS_QUEUE_MAX = "4",
+  # FILMS_STARTS_PER_WINDOW = "3", FILMS_WINDOW_SEC = "300".
+
+# Secrets are set with `fly secrets set` and are never listed in this file.
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Machines stay on during judging (5 to 16 Nov 2026), so nobody waits for a cold start.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/api/health"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "1gb"
+
+[mounts]
+  source = "director_data"
+  destination = "/data"
+  initial_size = "1gb"

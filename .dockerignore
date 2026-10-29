@@ -1,0 +1,12 @@
+node_modules
+.git
+.env
+.env.*
+data
+debug
+.ralph-tui
+docs
+web/dist
+dist
+*.log
+.DS_Store

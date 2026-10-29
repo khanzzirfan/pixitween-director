@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": { "types": ["node"] },
-  "include": ["server", "shared", "scripts", "vitest.config.ts"]
+  "include": ["server", "shared", "scripts", "deploy", "vitest.config.ts"]
 }
