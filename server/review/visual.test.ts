@@ -1,6 +1,6 @@
 import type { Buffer } from 'node:buffer';
 import sharp from 'sharp';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { makeFakeMeta } from '../meta/fakes';
 import { makeTestFilm } from '../test-utils/film';
@@ -157,11 +157,15 @@ describe('filterFixes', () => {
   });
 });
 
+/** A frame with a mark on it: a picture of one flat colour counts as blank and is never sent for review. */
 async function frame(color: string, w = 64) {
+  const mark = await sharp({ create: { width: 16, height: 16, channels: 3, background: '#ffffff' } }).png().toBuffer();
   return sharp({ create: { width: w, height: 64, channels: 3, background: color } })
-    .jpeg()
+    .composite([{ input: mark, left: 4, top: 4 }])
+    .png()
     .toBuffer();
 }
+const flatFrame = (color = '#808080') => sharp({ create: { width: 64, height: 64, channels: 3, background: color } }).png().toBuffer();
 function spyLedger(t: Awaited<ReturnType<typeof makeTestFilm>>) {
   const costs: number[] = [];
   const ctx = { ...t.ctx, ledger: { ...t.ledger, add: (_f: string, _m: string, _u: string, usd: number) => void costs.push(usd) } };
@@ -179,6 +183,29 @@ const reviewInput = async (ctx: Awaited<ReturnType<typeof makeTestFilm>>['ctx'],
 });
 
 describe('visualReview', () => {
+  it('does not call the reviewer or charge for frames that are one flat colour', async () => {
+    const t = await makeTestFilm();
+    const reviewer = vi.fn(async () => ({ sceneId: 's1', pass: true, issues: [], fixes: [] }));
+    const { ctx, costs } = spyLedger(t);
+    const blank = { frames: [{ image: await flatFrame(), atSec: 0.8 }, { image: await flatFrame('#ffffff'), atSec: 2 }], reviewer };
+    await expect(visualReview(await reviewInput(ctx, blank))).rejects.toMatchObject({ code: 'blank-frames', message: 'frame was blank, check the player' });
+    expect(reviewer).not.toHaveBeenCalled();
+    expect(costs).toEqual([]);
+  });
+  it('reviews only the frames that have something on them', async () => {
+    const t = await makeTestFilm();
+    const seen: Array<{ n: number; prompt: string }> = [];
+    const reviewer = async (images: Buffer[], prompt: string) => {
+      seen.push({ n: images.length, prompt });
+      return { sceneId: 's1', pass: true, issues: [], fixes: [] };
+    };
+    const frames = [{ image: await flatFrame(), atSec: 0.8 }, { image: await frame('#808080'), atSec: 2 }];
+    await visualReview(await reviewInput(t.ctx, { frames, reviewer }));
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.n).toBe(1);
+    expect(seen[0]!.prompt).toContain('2 s');
+    expect(seen[0]!.prompt).not.toContain('0.8 s');
+  });
   it('makes one call, returns a grounded verdict and records the cost', async () => {
     const t = await makeTestFilm();
     const calls: Array<{ n: number; schema: object }> = [];

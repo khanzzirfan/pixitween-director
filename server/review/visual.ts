@@ -2,7 +2,7 @@ import type { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import type { MetaClients } from '@shared/ports';
 import type { ToolCtx } from '@shared/tools';
-import { resizeFit } from '../media/image';
+import { isFlatImage, resizeFit } from '../media/image';
 import { pickReviewer } from '../llm/router';
 
 export const STUB_OWNER = 'S5b' as const;
@@ -30,7 +30,7 @@ export const ALLOWED_FIX_TOOLS = [
 
 export class ReviewError extends Error {
   constructor(
-    readonly code: 'no-frames' | 'spark-failed' | 'spark-invalid' | 'local-vision-unavailable',
+    readonly code: 'no-frames' | 'blank-frames' | 'spark-failed' | 'spark-invalid' | 'local-vision-unavailable',
     message: string,
   ) {
     super(message);
@@ -276,12 +276,16 @@ export async function visualReview(o: {
   pickReviewer?: (o: { local: boolean }) => Reviewer;
 }): Promise<{ verdict: VisualVerdict; refused: RefusedFix[]; dropped: DroppedIssue[] }> {
   if (!o.frames.length) throw new ReviewError('no-frames', 'no frames to review');
+  // a flat picture means the player drew nothing; a vision model cannot judge it and the call would still be billed
+  const flat = await Promise.all(o.frames.map((f) => isFlatImage(f.image).catch(() => false)));
+  const frames = o.frames.filter((_, i) => !flat[i]);
+  if (!frames.length) throw new ReviewError('blank-frames', 'frame was blank, check the player');
   // an explicit true or false wins; left unset, the global Local mode decides (router.pickReviewer, 06 D-5)
   const picked = o.reviewer || o.pickReviewer ? undefined : pickReviewer({ local: o.local, spark: (images, prompt, schema) => o.ctx.meta.spark.reviewImages(images, prompt, schema) });
   const reviewer = o.reviewer ?? o.pickReviewer?.({ local: !!o.local }) ?? (picked!.reviewImages as Reviewer);
   const local = !!o.local || picked?.id === 'glimmer';
-  const frameTimes = o.frames.map((f) => f.atSec);
-  const images = await Promise.all(o.frames.map((f) => resizeFit(f.image, REVIEW_MAX_SIDE, 'jpeg')));
+  const frameTimes = frames.map((f) => f.atSec);
+  const images = await Promise.all(frames.map((f) => resizeFit(f.image, REVIEW_MAX_SIDE, 'jpeg')));
   const basePrompt = buildVisualPrompt({
     sceneId: o.sceneId,
     frameTimes,

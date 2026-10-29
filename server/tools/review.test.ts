@@ -9,7 +9,8 @@ import { reviewRules } from './review';
 import type { AepCompositionJson } from 'reacthub-pixitweenjs';
 
 const png = (c = '#808080') =>
-  sharp({ create: { width: 64, height: 64, channels: 3, background: c } })
+  // a mark on the picture: a frame of one flat colour counts as blank and is skipped by the review
+  sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="${c}"/><rect x="4" y="4" width="12" height="12" fill="#ffffff"/></svg>`))
     .png()
     .toBuffer();
 

@@ -42,3 +42,9 @@ export async function resizeFit(buf: Buffer, maxSide: number, format: 'png' | 'j
   const img = sharp(buf).resize({ width: maxSide, height: maxSide, fit: 'inside', withoutEnlargement: true });
   return (format === 'png' ? img.png() : img.jpeg()).toBuffer();
 }
+
+/** True when every pixel of the picture is the same colour (every channel has zero spread): a flat frame, nothing to judge. */
+export async function isFlatImage(buf: Buffer): Promise<boolean> {
+  const { channels } = await sharp(buf).stats();
+  return channels.every((c) => c.stdev === 0);
+}
