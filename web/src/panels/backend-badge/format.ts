@@ -1,14 +1,14 @@
 import type { FilmEvent } from '@shared/events';
 
 export interface BadgeInfo {
-  backend: 'spark' | 'glimmer' | 'spark-open';
+  backend: 'spark' | 'glimmer' | 'spark-open' | 'wonder';
   seconds: number;
   local: boolean;
   fallbackFrom?: { status?: number };
   text: string;
 }
 
-const NAMES = { glimmer: 'Muse Glimmer (local)', spark: 'Muse Spark', 'spark-open': 'Muse Spark Open' } as const;
+const NAMES = { glimmer: 'Muse Glimmer (local)', spark: 'Muse Spark', 'spark-open': 'Muse Spark Open', wonder: 'Muse Wonder' } as const;
 
 /** Which model made the last edit, how long it took, and whether the Meta API had to be skipped to get there. */
 export function formatBadge(events: FilmEvent[]): BadgeInfo | null {

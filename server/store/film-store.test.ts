@@ -34,6 +34,18 @@ it('creates a film', async () => {
   expect(id).toMatch(/^film_[a-f0-9]{12}$/);
 });
 
+it('round-trips the crew fields and loads a film written before them', async () => {
+  const child = await store.create({ ...brief, parentId: 'film_aaaaaaaaaaaa', crew: false });
+  expect((await store.get(child.id)).parentId).toBe('film_aaaaaaaaaaaa');
+  await store.update(id, { storyboardRev: 3 });
+  expect((await store.get(id)).storyboardRev).toBe(3);
+  const bible = { palette: ['#111111', '#222222'], light: 'l', camera: 'c', type: { font: 'Inter', weight: 700, case: 'upper' as const }, productLine: 'p', mood: 'm' };
+  await store.update(id, { styleBible: bible });
+  expect((await store.get(id)).styleBible).toEqual(bible);
+  const old = await store.create(brief);
+  expect((await store.get(old.id)).crew).toBeUndefined();
+});
+
 it('commits versions, rejects invalid ones, and lists them', async () => {
   expect(await store.commit(id, shape, 'director')).toEqual({ ok: true, version: 1 });
   expect(await store.commit(id, text, 'chat', 'note')).toEqual({ ok: true, version: 2 });

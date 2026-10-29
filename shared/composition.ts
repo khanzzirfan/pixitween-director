@@ -1,4 +1,5 @@
 import type { AepCompositionJson } from 'reacthub-pixitweenjs';
+import type { StyleBible } from './crew';
 import type { Storyboard } from './storyboard';
 
 export type FilmId = string;
@@ -41,6 +42,10 @@ export interface FilmState {
   costUsd: number; // derived from the Ledger
   clippyCredits: number; // derived from the Ledger
   createdAt: string; // ISO; the gallery sorts newest first
+  crew?: boolean; // run by the showrunner and the job board (S12)
+  parentId?: FilmId; // set on a take's child film
+  styleBible?: StyleBible;
+  storyboardRev?: number;
 }
 
 export const FILM_FPS = 30;

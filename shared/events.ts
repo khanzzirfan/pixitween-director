@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FILM_ID_RE, type FilmId } from './composition';
+import { inboxItemSchema, jobSchema, laneSchema, storyboardOpSchema, styleBibleSchema } from './crew';
 import { storyboardSchema } from './storyboard';
 
 const base = { filmId: z.string().regex(FILM_ID_RE), at: z.string() };
@@ -26,7 +27,7 @@ export const filmEventSchema = z.discriminatedUnion('type', [
   z.object({
     ...base,
     type: t('agent.turn'),
-    backend: z.enum(['spark', 'glimmer', 'spark-open']),
+    backend: z.enum(['spark', 'glimmer', 'spark-open', 'wonder']),
     ms: z.number(),
     calls: z.number(),
     reply: z.string().optional(),
@@ -63,6 +64,42 @@ export const filmEventSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: t('generate.progress'), sceneId: z.string(), status: z.string() }),
   z.object({ ...base, type: t('generate.done'), sceneId: z.string(), asset: assetRefSchema, productVisibleFrac: z.number().optional() }),
   z.object({ ...base, type: t('cost'), usd: z.number(), model: z.string(), units: z.string(), credits: z.number().optional() }),
+  z.object({
+    ...base,
+    type: t('crew.agent'),
+    lane: laneSchema,
+    worker: z.string(),
+    state: z.enum(['idle', 'thinking', 'working', 'waiting']),
+    jobId: z.string().optional(),
+    model: z.string().optional(),
+    note: z.string().optional(),
+  }),
+  z.object({ ...base, type: t('job.update'), job: jobSchema }),
+  z.object({ ...base, type: t('showrunner.heard'), inboxId: z.string(), from: inboxItemSchema.shape.from, text: z.string() }),
+  z.object({ ...base, type: t('showrunner.say'), kind: z.enum(['note', 'reply', 'ask']), text: z.string(), options: z.array(z.string()).optional() }),
+  z.object({
+    ...base,
+    type: t('storyboard.revised'),
+    rev: z.number().int(),
+    source: z.enum(['showrunner', 'user']),
+    ops: z.array(storyboardOpSchema),
+    storyboard: storyboardSchema,
+  }),
+  z.object({ ...base, type: t('style.bible'), bible: styleBibleSchema }),
+  z.object({
+    ...base,
+    type: t('take.ready'),
+    jobId: z.string(),
+    takeOf: z.string(),
+    sceneId: z.string(),
+    label: z.enum(['A', 'B', 'C']),
+    takeFilmId: z.string(),
+    thumbAssetId: z.string().optional(),
+    score: z.number().optional(),
+    note: z.string().optional(),
+  }),
+  z.object({ ...base, type: t('capture.request'), requestId: z.string(), sceneId: z.string(), timesSec: z.array(z.number()) }),
+  z.object({ ...base, type: t('budget'), spentUsd: z.number(), capUsd: z.number(), level: z.enum(['ok', 'warn', 'stop']) }),
   z.object({ ...base, type: t('error'), where: z.string(), status: z.number().optional(), message: z.string() }),
 ]);
 

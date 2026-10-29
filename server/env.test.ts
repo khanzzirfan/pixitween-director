@@ -48,3 +48,27 @@ it('rejects replay and record together', () => throwsNaming({ DIRECTOR_REPLAY: '
 it('treats empty values as unset, so a copied .env.example loads', () => {
   expect(loadEnv({ PORT: '', DATA_DIR: '', EDIT_BACKEND: '', META_API_KEY: '' })).toMatchObject({ PORT: 8787, DATA_DIR: './data', EDIT_BACKEND: 'spark', metaApiKey: undefined });
 });
+
+it('has crew defaults', () => {
+  expect(loadEnv({})).toMatchObject({
+    CREW_ENABLED: true,
+    SHOWRUNNER_MODEL: 'muse-wonder-1.0',
+    CREW_MAX_WORKERS: 4,
+    CREW_FILM_BUDGET_USD: 1.5,
+    CREW_TAKES_MAX: 3,
+    CREW_INBOX_DEBOUNCE_MS: 1500,
+    CREW_CAPTURE_TIMEOUT_MS: 90000,
+    CREW_IDLE_END_MS: 600000,
+  });
+});
+it('parses CREW_ENABLED=false and 0 to false, and an empty value to the default', () => {
+  expect(loadEnv({ CREW_ENABLED: 'false' }).CREW_ENABLED).toBe(false);
+  expect(loadEnv({ CREW_ENABLED: '0' }).CREW_ENABLED).toBe(false);
+  expect(loadEnv({ CREW_ENABLED: '' }).CREW_ENABLED).toBe(true);
+});
+it('names the crew variable that is out of range', () => {
+  throwsNaming({ CREW_MAX_WORKERS: '9' }, 'CREW_MAX_WORKERS');
+  throwsNaming({ CREW_TAKES_MAX: '1' }, 'CREW_TAKES_MAX');
+  throwsNaming({ CREW_FILM_BUDGET_USD: '50' }, 'CREW_FILM_BUDGET_USD');
+  throwsNaming({ CREW_INBOX_DEBOUNCE_MS: '20000' }, 'CREW_INBOX_DEBOUNCE_MS');
+});

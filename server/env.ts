@@ -5,6 +5,11 @@ const bool = z
   .union([z.boolean(), z.string()])
   .optional()
   .transform((v) => v === true || v === '1' || v === 'true');
+/** A boolean that is on unless the value says otherwise. */
+const boolOn = z
+  .union([z.boolean(), z.string()])
+  .optional()
+  .transform((v) => !(v === false || v === '0' || v === 'false'));
 const int = (def: number, min?: number, max?: number) => {
   let n = z.coerce.number().int();
   if (min !== undefined) n = n.min(min);
@@ -44,6 +49,14 @@ const schema = z.object({
   FILMS_QUEUE_MAX: int(4, 0, 20),
   FILMS_STARTS_PER_WINDOW: int(3, 1, 50),
   FILMS_WINDOW_SEC: int(300, 30, 3600),
+  CREW_ENABLED: boolOn,
+  SHOWRUNNER_MODEL: z.string().default('muse-wonder-1.0'),
+  CREW_MAX_WORKERS: int(4, 1, 8),
+  CREW_FILM_BUDGET_USD: z.coerce.number().min(0.1).max(20).default(1.5),
+  CREW_TAKES_MAX: int(3, 2, 3),
+  CREW_INBOX_DEBOUNCE_MS: int(1500, 0, 10000),
+  CREW_CAPTURE_TIMEOUT_MS: int(90000, 5000, 600000),
+  CREW_IDLE_END_MS: int(600000, 60000, 3600000),
 });
 
 export const ENV_KEYS = Object.keys(schema.shape);
