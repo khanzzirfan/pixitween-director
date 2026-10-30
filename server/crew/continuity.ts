@@ -8,6 +8,7 @@ import { layerBoxAt, listScenes } from '../review/geometry';
 import { runRules } from '../review/rules';
 import type { Finding } from '../review/types';
 import { boxH } from '../review/types';
+import { BIBLE_FONT_STACKS } from '../authoring/constants';
 import { createId } from './ids';
 import type { WorkerResult } from './scheduler';
 import type { CrewCtx } from './showrunner-tools';
@@ -89,10 +90,11 @@ function typeDrift(comp: Comp, bible: StyleBible): ContinuityFinding[] {
       if (l.kind !== 'text' || roleOf(comp, l.id) !== 'headline') continue;
       const font = l.style?.font;
       const weight = l.style?.weight;
-      if (font !== bible.type.font || weight !== bible.type.weight)
+      const expected = BIBLE_FONT_STACKS[bible.type.font];
+      if (font !== expected || weight !== bible.type.weight)
         out.push({
           id: `C3:${l.id}:type-drift`, rule: 'C3', kind: 'type-drift', severity: 'warn', sceneId: s.sceneId, layerId: l.id,
-          evidence: `${l.id} is set in ${String(font)} ${String(weight)} but the style bible says ${bible.type.font} ${bible.type.weight}`,
+          evidence: `${l.id} is set in ${String(font)} ${String(weight)} but the style bible says ${expected} ${bible.type.weight}`,
           metrics: { font: String(font), weight: String(weight) },
         });
     }

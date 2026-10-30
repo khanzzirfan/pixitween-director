@@ -39,7 +39,7 @@ it('round-trips the crew fields and loads a film written before them', async () 
   expect((await store.get(child.id)).parentId).toBe('film_aaaaaaaaaaaa');
   await store.update(id, { storyboardRev: 3 });
   expect((await store.get(id)).storyboardRev).toBe(3);
-  const bible = { palette: ['#111111', '#222222'], light: 'l', camera: 'c', type: { font: 'Inter', weight: 700, case: 'upper' as const }, productLine: 'p', mood: 'm' };
+  const bible = { palette: ['#111111', '#222222'], light: 'l', camera: 'c', type: { font: 'sans' as const, weight: 700, case: 'upper' as const }, productLine: 'p', mood: 'm' };
   await store.update(id, { styleBible: bible });
   expect((await store.get(id)).styleBible).toEqual(bible);
   const old = await store.create(brief);

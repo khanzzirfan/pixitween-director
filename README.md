@@ -90,6 +90,7 @@ With no keys, `DIRECTOR_FAKE=1 npm run dev` runs the whole crew offline with scr
 | `npm run typecheck`, `npm run lint`, `npm test` | the offline gates: types, lint, unit tests |
 | `npm run e2e`, `npm run e2e:crew` | the browser flows: the single director, and the crew with four builders at once |
 | `npm run dev:server`, `npm run dev:web` | the API alone (port 8787), or the web app alone (port 5173) |
+| `npm run dev:nowatch`, `npm run dev:server:nowatch` | the same without file watching, so editing `server/**` cannot restart the server and kill a live film |
 | `npm run build`, `npm run check:bundle`, `npm run start` | build the web app, check it holds no keys, run the server as the container does |
 | `npm run live -- <name> [--yes]` | live checks that spend money: a dry run unless `--yes` is passed |
 | `npx tsx scripts/preflight-submission.ts` | what still blocks the submission |

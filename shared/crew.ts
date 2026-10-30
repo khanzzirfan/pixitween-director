@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { sceneSchema } from './storyboard';
 
+
 export const LANES = ['showrunner', 'builder', 'critic', 'continuity', 'producer', 'listener', 'local'] as const;
 export const laneSchema = z.enum(LANES);
 export type Lane = z.infer<typeof laneSchema>;
@@ -47,11 +48,15 @@ export type Job = z.infer<typeof jobSchema>;
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
+/** The style bible names one of these stacks; the actual CSS stacks live in server/authoring/constants.ts. */
+export const BIBLE_FONT_IDS = ['sans', 'serif', 'rounded', 'condensed', 'mono'] as const;
+export type BibleFontId = (typeof BIBLE_FONT_IDS)[number];
+
 export const styleBibleSchema = z.object({
   palette: z.array(hex).min(2).max(6),
   light: z.string().max(120),
   camera: z.string().max(120),
-  type: z.object({ font: z.string().min(1).max(60), weight: z.number().int().min(100).max(900), case: z.enum(['upper', 'title', 'sentence']) }),
+  type: z.object({ font: z.enum(BIBLE_FONT_IDS), weight: z.number().int().min(100).max(900), case: z.enum(['upper', 'title', 'sentence']) }),
   productLine: z.string().max(160),
   mood: z.string().max(80),
 });

@@ -21,6 +21,10 @@ export interface TurnView {
   findings: Finding[];
   budget: { spentUsd: number; capUsd: number };
   inbox: InboxItem[];
+  /** The director's messages, newest first; never compacted (S12f). */
+  requests?: string[];
+  /** CREW_MAX_FIXES_PER_SCENE */
+  maxFixes?: number;
 }
 
 const WRITING_SHORT: Record<string, string> = {
@@ -50,14 +54,15 @@ function lastJob(sceneJobs: Job[]): string {
 export function renderTurn(v: TurnView): string {
   const running = v.jobs.filter((j) => j.status === 'running' || j.status === 'awaiting-frames').length;
   const queued = v.jobs.filter((j) => j.status === 'queued').length;
-  const lines = [`BOARD  rev ${v.rev} · $${v.budget.spentUsd.toFixed(2)} of $${v.budget.capUsd.toFixed(2)} · ${running} running · ${queued} queued`, 'scene | dur | mode   | status      | last job           | open findings'];
+  const lines = ["DIRECTOR'S REQUESTS (newest first; they outrank the original brief)", ...(v.requests?.length ? v.requests : ['(none yet)']), '', `BOARD  rev ${v.rev} · $${v.budget.spentUsd.toFixed(2)} of $${v.budget.capUsd.toFixed(2)} · ${running} running · ${queued} queued`, 'scene | dur | mode   | status      | last job           | fixes | open findings'];
   for (const s of v.storyboard.scenes) {
     const sceneJobs = v.jobs.filter((j) => j.sceneId === s.id);
     const found = v.findings
       .filter((f) => f.sceneId === s.id)
       .map((f) => `${f.source ?? 'critic'}${f.atSec !== undefined ? ` ${f.atSec}s` : ''} ${f.kind} "${f.text}"`)
       .join('; ');
-    lines.push(`${s.id} | ${s.durationSec}s | ${s.mode === 'generate' ? 'gen' : s.mode}${' '.repeat(Math.max(0, 6 - (s.mode === 'generate' ? 3 : s.mode.length)))} | ${sceneStatus(sceneJobs, s.mode).padEnd(11)} | ${lastJob(sceneJobs).padEnd(18)} | ${found || '-'}`);
+    const fixes = sceneJobs.filter((j) => j.kind === 'fix' && j.status !== 'cancelled').length;
+    lines.push(`${s.id} | ${s.durationSec}s | ${s.mode === 'generate' ? 'gen' : s.mode}${' '.repeat(Math.max(0, 6 - (s.mode === 'generate' ? 3 : s.mode.length)))} | ${sceneStatus(sceneJobs, s.mode).padEnd(11)} | ${lastJob(sceneJobs).padEnd(18)} | ${`${fixes}/${v.maxFixes ?? 3}`.padEnd(5)} | ${found || '-'}`);
   }
   lines.push('', 'NEW IN YOUR INBOX');
   if (!v.inbox.length) lines.push('(nothing new)');
@@ -66,6 +71,15 @@ export function renderTurn(v: TurnView): string {
     else lines.push(`[${i.from}${i.jobId ? ` ${i.jobId}` : ''}] ${i.text}`);
   }
   return lines.join('\n');
+}
+
+/** The director's requests as the never-compacted block the showrunner sees above the board. */
+export function directorRequests(events: readonly FilmEvent[]): string[] {
+  return events
+    .filter((e): e is Extract<FilmEvent, { type: 'showrunner.heard' }> => e.type === 'showrunner.heard' && e.from === 'user')
+    .slice(-10)
+    .reverse()
+    .map((e) => `[${clock(e.at)}] ${e.text.slice(0, 160)}`);
 }
 
 const STORY_MAX = 1200;

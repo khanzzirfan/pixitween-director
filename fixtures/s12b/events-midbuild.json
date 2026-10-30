@@ -26,7 +26,7 @@
    "light": "low warm morning sun from the left",
    "camera": "slow dolly-ins",
    "type": {
-    "font": "Inter",
+    "font": "sans",
     "weight": 800,
     "case": "upper"
    },

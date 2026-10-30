@@ -18,6 +18,7 @@ const noise = (seed: number) => {
 
 async function setup() {
   const t = await makeTestCrew();
+  t.film.bus.subscribe(t.film.filmId, () => {});
   let c = addScene(newFilmComposition({ aspect: '16:9', title: 'T', palette: ['#111111'] }), { id: 's1', durationSec: 5, mode: 'motion', intent: INTENT });
   c = addLayer(c, { sceneId: 's1', role: 'headline', kind: 'text', text: 'Hello' });
   await t.film.films.commit(t.film.filmId, c, 'director');

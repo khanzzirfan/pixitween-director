@@ -71,7 +71,7 @@ describe('the local lane', () => {
   it('the idle event still goes out when the job fails', async () => {
     const t = await setup();
     const bad = t.board.add({ kind: 'fix', origin: 'showrunner', sceneId: 's9', brief: 'b', reason: 'r' });
-    await expect(runBuilderJob(bad, new AbortController().signal, t.crew)).rejects.toThrow(/unknown scene/);
+    await expect(runBuilderJob(bad, new AbortController().signal, t.crew)).rejects.toThrow(/scene s9 is not in the storyboard/);
     await settle();
     expect(agentEvents(t)).toEqual([]); // it failed before it started working, so there is nothing to close
   });

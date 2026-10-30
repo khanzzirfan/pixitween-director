@@ -32,7 +32,7 @@ const BIBLE = {
   palette: ['#1f2937', '#f59e0b', '#fde68a'],
   light: 'low warm morning sun from the left',
   camera: 'slow dolly-ins, no fast cuts',
-  type: { font: 'Inter', weight: 800, case: 'upper' },
+  type: { font: 'sans', weight: 800, case: 'upper' },
   productLine: 'a matte slate can with a small orange mountain',
   mood: 'calm, early',
 };

@@ -23,7 +23,7 @@ The repository history starts on 28 Oct 2026, the second day of the event; `git 
 
 | Dependency | Version | What it is | How we use it |
 |------------|---------|-----------|---------------|
-| `reacthub-pixitweenjs` | 0.3.0-alpha.5 | our own PixiJS and GSAP timeline engine, published on npm before the hackathon, under its own source-available licence | the player: it renders the composition JSON the agents write. Never copied or edited here; gaps are in `ENGINE-NEEDS.md` |
+| `reacthub-pixitweenjs` | 0.3.2 | our own PixiJS and GSAP timeline engine, published on npm before the hackathon, under its own source-available licence | the player: it renders the composition JSON the agents write. Never copied or edited here; gaps are in `ENGINE-NEEDS.md` |
 | Clippy video-generation service | remote service | a pre-existing video generator | only for approved *generate* scenes |
 | Meta models | through the Meta Model API | Muse Wonder, Muse Spark, Muse Image, SAM 3.1, Muse Voice Transcribe, Muse Glimmer | see the README |
 | `@meta-sam/parser` | 0.1.0 | Meta's parser for SAM output, under the SAM License | reading SAM results |

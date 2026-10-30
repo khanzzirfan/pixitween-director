@@ -35,7 +35,8 @@ export function registerFilmsRoutes(app: Hono, deps: AppDeps): void {
         throw e;
       }
     }
-    const crewOn = loadEnv().CREW_ENABLED; // the showrunner and the crew make the film; off, the single director does
+    const env = loadEnv();
+    const crewOn = env.CREW_ENABLED; // the showrunner and the crew make the film; off, the single director does
     const film = await deps.films.create({
       aspect: input.aspect,
       brief: { text, ...(input.audio ? { transcript: text } : {}), productAssetId: product.id },

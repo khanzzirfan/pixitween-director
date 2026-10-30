@@ -3,6 +3,7 @@ import type { Storyboard } from '@shared/storyboard';
 import type { Finding, RuleDeps, SkipNote, Box } from './types';
 import { boxArea, boxH, boxW, intersect, round2 } from './types';
 import { layerBoxAt, listScenes, sampleSceneFrames, isProductVisible } from './geometry';
+import { restFrames } from '../crew/text-lane';
 import { parseColor, relLuminance, ratioFromLuminance } from './contrast';
 
 export async function runRulesCore(
@@ -74,7 +75,18 @@ export async function runRulesCore(
         });
       }
       let overflow: { f: number; values: number[]; box: Box } | undefined;
-      for (const f of samples) {
+      let restSamples = restFrames(text, samples).filter((f) => {
+        const b = box(text.id, f);
+        return b.visible && b.opacity >= 0.3;
+      });
+      if (!restSamples.length) {
+        const last = [...samples].reverse().find((f) => {
+          const b = box(text.id, f);
+          return b.visible && b.opacity >= 0.3;
+        });
+        if (last !== undefined) restSamples = [last];
+      }
+      for (const f of restSamples) {
         const b = box(text.id, f);
         if (!b.visible || b.opacity < 0.3) continue;
         const vals = [
@@ -103,7 +115,7 @@ export async function runRulesCore(
           layerId: text.id,
           atSec: round2(overflow.f / scene.fps),
           metrics: { overflowLeft: round2(l!), overflowRight: round2(r!), overflowTop: round2(t!), overflowBottom: round2(b!) },
-          evidence: `text '${text.id}' extends ${sides.join(' and ')} safe edge at ${(overflow.f / scene.fps).toFixed(2)} s (safe ${Math.round(inset * scene.width)},${Math.round(inset * scene.height)} → ${Math.round((1 - inset) * scene.width)},${Math.round((1 - inset) * scene.height)})`,
+          evidence: `text '${text.id}' extends ${sides.join(' and ')} safe edge at rest (${(overflow.f / scene.fps).toFixed(2)} s; safe ${Math.round(inset * scene.width)},${Math.round(inset * scene.height)} → ${Math.round((1 - inset) * scene.width)},${Math.round((1 - inset) * scene.height)})`,
         });
       }
       const stroke = (text.style as any)?.stroke;

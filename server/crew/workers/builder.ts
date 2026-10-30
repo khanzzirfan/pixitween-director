@@ -1,6 +1,6 @@
 // Owned by S12c. The scene builder: one worker for every job kind that writes a scene (design.md 5.8).
 // build, rebuild, restyle, edit and fix run S3b's buildScene on the job's scene only; revert restores a snapshot with no model.
-import { WRITING_KINDS, type Job } from '@shared/crew';
+import { WRITING_KINDS, type Job, type StyleBible } from '@shared/crew';
 import { ASPECT_SIZES } from '@shared/composition';
 import type { LlmBackend } from '@shared/ports';
 import type { ToolCtx, ToolDef } from '@shared/tools';
@@ -12,11 +12,19 @@ import type { Comp } from '../../authoring/types';
 import { loadEnv } from '../../env';
 import { getLocalMode } from '../../llm/local-mode';
 import { pickBackend } from '../../llm/router';
-import { renderBibleBlock, renderJobBlock } from '../prompts';
+import { BUILDER_DIRECTION, renderBibleBlock, renderJobBlock, renderOutlineBlock } from '../prompts';
+import { applyTextLane, fitTextToSafeArea } from '../text-lane';
 import { restoreScene } from '../scene-snapshot';
 import type { WorkerResult } from '../scheduler';
 import type { CrewCtx } from '../showrunner-tools';
 import { scopedRunTool } from './scope';
+
+export class SceneGoneError extends Error {
+  constructor(sceneId: string) {
+    super(`scene ${sceneId} is not in the storyboard`);
+    this.name = 'SceneGoneError';
+  }
+}
 
 export interface BuilderOptions {
   /** Which model answers this job. Defaults to the router; tests supply a scripted one. */
@@ -47,6 +55,22 @@ async function clearScene(crew: CrewCtx, job: Job, sceneId: string): Promise<voi
   if (!r.ok) throw new Error('the scene could not be cleared for a rebuild');
 }
 
+/** The deterministic lane: bible type, then the rest position inside the safe area. A no-op writes no version. */
+async function runTextLane(crew: CrewCtx, job: Job, sceneId: string, bible: StyleBible | undefined): Promise<void> {
+  const film = await crew.films.get(job.filmId);
+  const c = film.composition as Comp | undefined;
+  if (!c || !film.storyboard?.scenes.some((s) => s.id === sceneId)) return;
+  const styled = bible ? applyTextLane(c, sceneId, bible) : c;
+  const fitted = fitTextToSafeArea(styled, sceneId);
+  if (styled === c && !fitted.moved.length) return;
+  const written = await crew.films.mutate(job.filmId, (f) => {
+    const base = f.composition as Comp;
+    const lane = fitTextToSafeArea(bible ? applyTextLane(base, sceneId, bible) : base, sceneId);
+    return { next: lane.comp, data: null };
+  }, 'director', `text lane ${sceneId}`);
+  if (!written.ok) throw new Error('the text lane was refused by the film');
+}
+
 async function revert(crew: CrewCtx, job: Job, sceneId: string): Promise<WorkerResult> {
   const previous = crew.board
     .list()
@@ -67,7 +91,7 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
 
   const film = await crew.films.get(job.filmId);
   const scene = film.storyboard?.scenes.find((s) => s.id === sceneId);
-  if (!scene) throw new Error(`unknown scene ${sceneId}`);
+  if (!scene) throw new SceneGoneError(sceneId);
   const product = film.assets.find((a) => a.id === film.brief.productAssetId);
   const dims = ASPECT_SIZES[film.aspect];
   const palette = film.styleBible?.palette ?? film.storyboard!.palette;
@@ -94,7 +118,7 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
       canvas: { ...dims, aspect: film.aspect },
       palette,
       product: { assetId: film.brief.productAssetId, width: product?.width ?? dims.width, height: product?.height ?? dims.height },
-      extraSystem: [film.styleBible ? renderBibleBlock(film.styleBible) : '', SAFE_AREA, renderJobBlock(job)].filter(Boolean).join('\n'),
+      extraSystem: [film.styleBible ? renderBibleBlock(film.styleBible) : '', film.storyboard ? renderOutlineBlock(film.storyboard, sceneId) : '', SAFE_AREA, BUILDER_DIRECTION, renderJobBlock(job)].filter(Boolean).join('\n'),
       toolFilter: building ? (t: ToolDef) => !EDIT_ONLY_TOOLS.includes(t.name) : () => true,
       signal,
       run: scopedRunTool(sceneId),
@@ -102,6 +126,7 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
     if (r.aborted || signal.aborted) throw abortError();
     if (building) await ensureSceneBasics({ ctx, scene, product: { assetId: film.brief.productAssetId }, palette });
     if (!r.calls || r.stalled) throw new Error(r.failures.at(-1) ? `builder stalled: ${r.failures.at(-1)}`.slice(0, 280) : 'builder made no progress');
+    await runTextLane(crew, job, sceneId, film.styleBible);
     const after = await crew.films.get(job.filmId);
     return { summary: `${r.calls} tool calls, ${r.ok} ok`, version: after.version, costUsd: Math.max(0, crew.toolCtx.ledger.total(job.filmId) - spentBefore), model };
   } finally {

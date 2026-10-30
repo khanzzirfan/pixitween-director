@@ -4,34 +4,39 @@ import { appendEvent, readEvents } from './log';
 
 export interface EventBus {
   emit(filmId: string, event: FilmEvent): Promise<number>;
-  subscribe(filmId: string, fn: (env: EventEnvelope) => void): () => void;
+  /** `internal` subscribers (the crew's own history, metrics) do not count as a browser watching the film. */
+  subscribe(filmId: string, fn: (env: EventEnvelope) => void, opts?: { internal?: boolean }): () => void;
+  /** Public subscribers only: the browser tabs streaming this film. */
+  subscriberCount(filmId: string): number;
   replay(filmId: string, afterSeq?: number): Promise<EventEnvelope[]>;
 }
 
 export function createEventBus(dir: string): EventBus {
-  const subs = new Map<string, Set<(env: EventEnvelope) => void>>();
+  const subs = new Map<string, Set<{ fn: (env: EventEnvelope) => void; internal: boolean }>>();
   return {
     async emit(filmId, event) {
       const parsed = filmEventSchema.parse(event);
       const seq = await appendEvent(dir, filmId, parsed);
-      for (const fn of [...(subs.get(filmId) ?? [])]) {
+      for (const sub of [...(subs.get(filmId) ?? [])]) {
         try {
-          fn({ seq, event: parsed });
+          sub.fn({ seq, event: parsed });
         } catch (e) {
           console.error('event subscriber threw', e);
         }
       }
       return seq;
     },
-    subscribe(filmId, fn) {
+    subscribe(filmId, fn, opts) {
       let set = subs.get(filmId);
       if (!set) subs.set(filmId, (set = new Set()));
-      set.add(fn);
+      const entry = { fn, internal: opts?.internal ?? false };
+      set.add(entry);
       return () => {
-        set.delete(fn);
+        set.delete(entry);
         if (set.size === 0) subs.delete(filmId);
       };
     },
+    subscriberCount: (filmId) => [...(subs.get(filmId) ?? [])].filter((s) => !s.internal).length,
     replay: (filmId, afterSeq = 0) => readEvents(dir, filmId, afterSeq),
   };
 }

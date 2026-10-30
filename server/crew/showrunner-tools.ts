@@ -13,6 +13,7 @@ import { setSceneMode } from '../generate/mode';
 import { runRules } from '../review/rules';
 import type { Board } from './board';
 import { TERMINAL } from './board';
+import { loadEnv } from '../env';
 import type { Budget } from './budget';
 import type { Inbox } from './inbox';
 import type { SceneSnapshot } from './scene-snapshot';
@@ -42,6 +43,8 @@ export interface CrewCtx {
   source: 'showrunner' | 'user';
   /** CREW_TAKES_MAX */
   takesMax: number;
+  /** CREW_MAX_FIXES_PER_SCENE */
+  maxFixes?: number;
   /** Scene ids removed so far, so a new scene never takes a removed scene's id. */
   removedIds: Set<string>;
   /** The tool context of the film, for the rules and the S7 propose flow. */
@@ -55,6 +58,8 @@ export interface CrewCtx {
   takes?: { pick(args: { takeFilmId: string; reason: string }): Promise<ToolResult> };
   /** The S7 propose step. Defaults to the real proposeGenerate tool. */
   propose?(sceneId: string): Promise<ToolResult>;
+  /** Public browser subscribers for this film; the critic skips capture when it is 0. */
+  subscriberCount?(filmId: string): number;
   /** Extra continuity checks beyond the S5a rules (S12c). */
   extraChecks?(comp: Comp): Promise<Array<{ kind: string; sceneId: string }>>;
 }
@@ -92,7 +97,25 @@ export interface Revision {
 export async function reviseStoryboard(crew: CrewCtx, ops: StoryboardOp[], extra: { productShape?: ProductShape } = {}): Promise<Revision> {
   const film = await crew.films.get(crew.filmId);
   const before = film.storyboard ?? blankStoryboard(film);
-  const preview = applyOps(before, ops, [...crew.removedIds]); // throws StoryboardOpError before anything is touched
+  const userTurn = crew.turn.hadUser || crew.source === 'user';
+  // a scene the director asked for may only be removed in a user turn
+  if (!userTurn) {
+    for (const op of ops) {
+      if (op.op === 'remove' && before.scenes.find((s) => s.id === op.sceneId)?.requestedBy === 'user')
+        throw new StoryboardOpError(`${op.sceneId} was asked for by the director; ask before removing it`);
+    }
+  }
+  // mark what this user turn adds or updates; a later showrunner-only turn cannot throw it away
+  const marked: StoryboardOp[] = userTurn
+    ? ops.map((op) =>
+        op.op === 'add'
+          ? { ...op, scene: { ...op.scene, requestedBy: 'user' as const } }
+          : op.op === 'update'
+            ? { ...op, patch: { ...op.patch, requestedBy: 'user' as const } }
+            : op,
+      )
+    : ops;
+  const preview = applyOps(before, marked, [...crew.removedIds]); // throws StoryboardOpError before anything is touched
 
   // jobs on a scene that is going away stop first, while the scene still exists to roll back to
   for (const id of preview.removed) {
@@ -103,7 +126,7 @@ export async function reviseStoryboard(crew: CrewCtx, ops: StoryboardOp[], extra
     crew.filmId,
     (f) => {
       const base = f.storyboard ?? blankStoryboard(f);
-      const r = applyOps(base, ops, [...crew.removedIds]);
+      const r = applyOps(base, marked, [...crew.removedIds]);
       if (extra.productShape) r.storyboard = { ...r.storyboard, productShape: extra.productShape };
       const s = { ...syncComposition((f.composition as Comp | undefined) ?? blankComposition(f, base), base, r.storyboard, r) };
       if (extra.productShape) {
@@ -120,7 +143,7 @@ export async function reviseStoryboard(crew: CrewCtx, ops: StoryboardOp[], extra
   const { r, needsBuilder, needsMode, rev } = written.data;
   for (const id of r.removed) crew.removedIds.add(id);
   await crew.films.update(crew.filmId, { storyboard: r.storyboard, title: r.storyboard.title, storyboardRev: rev });
-  crew.emit({ type: 'storyboard.revised', rev, source: crew.source, ops, storyboard: r.storyboard });
+  crew.emit({ type: 'storyboard.revised', rev, source: crew.source, ops: marked, storyboard: r.storyboard });
   if (film.status === 'planning') {
     // the first revision turns planning into building
     await crew.films.update(crew.filmId, { status: 'building' });
@@ -133,11 +156,48 @@ export async function reviseStoryboard(crew: CrewCtx, ops: StoryboardOp[], extra
 const sceneIdsOf = async (crew: CrewCtx): Promise<string[]> => (await crew.films.get(crew.filmId)).storyboard?.scenes.map((s) => s.id) ?? [];
 
 /** Showrunner-ordered fixes per scene. After this many, the showrunner leaves the finding and says why. */
-export const MAX_FIXES_PER_SCENE = 2;
-/** Findings finish does not wait for: the crew cannot always satisfy them and they do not break the film. */
-const NON_BLOCKING = ['outside-safe-area'];
+export const MAX_FIXES_PER_SCENE = 3;
+const maxFixes = (crew: CrewCtx): number => crew.maxFixes ?? loadEnv().CREW_MAX_FIXES_PER_SCENE;
 
 const NEEDS_SCENE: JobKind[] = [...WRITING_KINDS, 'take', 'critique'];
+
+export interface FinishGate {
+  pass: boolean;
+  block: string[];
+  accepted: string[];
+}
+
+/** What finish would do right now, without changing the film. Used by the tool, the done nudge and auto-finish. */
+export async function finishGate(crew: CrewCtx, ctx: ToolCtx): Promise<FinishGate> {
+  const open = crew.board.list().filter((j) => !TERMINAL.includes(j.status));
+  if (open.length) return { pass: false, block: [`jobs still running: ${open.map((j) => j.id).join(', ')}`], accepted: [] };
+  const film = await crew.films.get(crew.filmId);
+  if (!film.composition || !film.storyboard?.scenes.length) return { pass: false, block: ['nothing is built yet: plan and build scenes before finish'], accepted: [] };
+  const { findings } = await runRules(film.composition as Comp, ctx.assets, { ...(film.storyboard ? { storyboard: film.storyboard } : {}) });
+  const errors = [
+    ...findings.filter((f) => f.severity === 'error').map((f) => ({ kind: f.kind, sceneId: f.sceneId })),
+    ...((await crew.extraChecks?.(film.composition as Comp)) ?? []),
+  ];
+  const block: string[] = [];
+  const accepted: string[] = [];
+  for (const e of errors) {
+    const fixes = crew.board.list().filter((j) => j.kind === 'fix' && j.sceneId === e.sceneId && j.status !== 'cancelled').length;
+    if (fixes >= maxFixes(crew)) accepted.push(`${e.sceneId} ${e.kind} (${fixes} fixes tried)`);
+    else block.push(`${e.kind} (${e.sceneId})`);
+  }
+  return { pass: block.length === 0, block, accepted };
+}
+
+/** Makes the film ready when the gate passes; the accepted findings are listed in the note. */
+export async function finishFilm(crew: CrewCtx, ctx: ToolCtx, summary: string): Promise<ToolResult> {
+  const gate = await finishGate(crew, ctx);
+  if (!gate.pass) return fail(gate.block.join(', '));
+  await crew.films.update(crew.filmId, { status: 'ready' });
+  crew.emit({ type: 'film.status', status: 'ready' });
+  const text = gate.accepted.length ? `${summary} accepted: ${gate.accepted.join(', ')}` : summary;
+  crew.emit({ type: 'showrunner.say', kind: 'note', text });
+  return { ok: true };
+}
 
 export function createBoardTools(crew: CrewCtx): ToolDef[] {
   const defs: ToolDef[] = [];
@@ -145,7 +205,7 @@ export function createBoardTools(crew: CrewCtx): ToolDef[] {
 
   def({
     name: 'setStyleBible',
-    description: 'Set the film style bible once, before the first build. It keeps every scene consistent.',
+    description: 'Set the film style bible once, before the first build. It keeps every scene consistent. type.font must be one of sans, serif, rounded, condensed or mono.',
     params: styleBibleSchema,
     async run(_ctx, bible) {
       await crew.films.update(crew.filmId, { styleBible: bible });
@@ -184,18 +244,22 @@ export function createBoardTools(crew: CrewCtx): ToolDef[] {
       if (NEEDS_SCENE.includes(a.kind) && !a.sceneId) return fail(`${a.kind} needs a sceneId`);
       if (a.sceneId && !(await sceneIdsOf(crew)).includes(a.sceneId)) return fail(`unknown scene ${a.sceneId}`);
       if (a.kind === 'fix' && a.sceneId) {
-        const fixes = crew.board.list().filter((j) => j.kind === 'fix' && j.sceneId === a.sceneId && j.origin === 'showrunner').length;
-        if (fixes >= MAX_FIXES_PER_SCENE) return fail(`scene ${a.sceneId} already had ${fixes} fixes; leave the remaining findings and say why in one line, or use edit for something new`);
+        const fixes = crew.board.list().filter((j) => j.kind === 'fix' && j.sceneId === a.sceneId && j.status !== 'cancelled').length;
+        if (fixes >= maxFixes(crew)) return fail(`fix cap reached for ${a.sceneId}: leave its findings and say why in one line`);
       }
       for (const dep of a.dependsOn ?? []) if (!crew.board.get(dep)) return fail(`unknown job ${dep} in dependsOn`);
       const base = { origin: 'showrunner' as const, brief: a.brief, reason: a.reason, ...(a.sceneId ? { sceneId: a.sceneId } : {}), ...(a.dependsOn ? { dependsOn: a.dependsOn } : {}) };
       const ids: string[] = [];
-      if (a.kind === 'take') {
-        const n = a.takes ?? crew.takesMax;
-        if (n < 2 || n > crew.takesMax) return fail(`takes must be 2 to ${crew.takesMax} (CREW_TAKES_MAX)`);
-        for (const label of (['A', 'B', 'C'] as const).slice(0, n)) ids.push((await crew.scheduler.dispatch({ ...base, kind: 'take', takeLabel: label })).id);
-      } else {
-        ids.push((await crew.scheduler.dispatch({ ...base, kind: a.kind })).id);
+      try {
+        if (a.kind === 'take') {
+          const n = a.takes ?? crew.takesMax;
+          if (n < 2 || n > crew.takesMax) return fail(`takes must be 2 to ${crew.takesMax} (CREW_TAKES_MAX)`);
+          for (const label of (['A', 'B', 'C'] as const).slice(0, n)) ids.push((await crew.scheduler.dispatch({ ...base, kind: 'take', takeLabel: label })).id);
+        } else {
+          ids.push((await crew.scheduler.dispatch({ ...base, kind: a.kind })).id);
+        }
+      } catch (e) {
+        return fail(message(e));
       }
       if (a.sceneId && WRITING_KINDS.includes(a.kind)) crew.turn.dispatched.add(a.sceneId);
       return { ok: true, data: { jobIds: ids } };
@@ -275,18 +339,7 @@ export function createBoardTools(crew: CrewCtx): ToolDef[] {
     description: 'Declare the film done. Refused while any job is open or continuity reports an error.',
     params: z.object({ summary: z.string().min(1).max(300) }),
     async run(ctx, a) {
-      const open = crew.board.list().filter((j) => !TERMINAL.includes(j.status));
-      if (open.length) return fail(`jobs still running: ${open.map((j) => j.id).join(', ')}`);
-      const film = await crew.films.get(crew.filmId);
-      if (film.composition) {
-        const { findings } = await runRules(film.composition as Comp, ctx.assets, { ...(film.storyboard ? { storyboard: film.storyboard } : {}) });
-        const errors = [...findings.filter((f) => f.severity === 'error' && !NON_BLOCKING.includes(f.kind)).map((f) => ({ kind: f.kind, sceneId: f.sceneId })), ...((await crew.extraChecks?.(film.composition as Comp)) ?? [])];
-        if (errors.length) return fail(`continuity errors: ${errors.map((e) => `${e.kind} (${e.sceneId})`).join(', ')}`);
-      }
-      await crew.films.update(crew.filmId, { status: 'ready' });
-      crew.emit({ type: 'film.status', status: 'ready' });
-      crew.emit({ type: 'showrunner.say', kind: 'note', text: a.summary });
-      return { ok: true };
+      return finishFilm(crew, ctx, a.summary);
     },
   });
 

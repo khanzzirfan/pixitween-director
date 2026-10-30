@@ -29,7 +29,7 @@ export async function makeTestFilm(o: { aspect?: Aspect; composition?: AepCompos
   const filmId: FilmId = film.id;
 
   const events: FilmEvent[] = [];
-  bus.subscribe(filmId, (env) => events.push(env.event));
+  bus.subscribe(filmId, (env) => events.push(env.event), { internal: true });
   const ctx: ToolCtx = makeToolCtx({ films, assets, meta, ledger, bus }, filmId);
   if (o.composition) await films.commit(filmId, o.composition, 'user');
   return { filmId, films, assets, ctx, events, meta, ledger, bus, dir };

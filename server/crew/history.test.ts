@@ -30,11 +30,11 @@ describe('renderTurn', () => {
   const rows = text.split('\n');
 
   it('has the header with rev, spend and counts', () => {
-    expect(rows[0]).toBe('BOARD  rev 3 · $0.41 of $1.50 · 1 running · 1 queued');
+    expect(rows.find((r) => r.startsWith('BOARD'))).toBe('BOARD  rev 3 · $0.41 of $1.50 · 1 running · 1 queued');
   });
   it('has one table row per scene, with each status', () => {
     expect(rows.filter((r) => /^s\d \|/.test(r))).toHaveLength(4);
-    expect(text).toMatch(/^s1 \| 4s \| motion \| done +\| build ✓ 17s +\| critic 3\.2s text-over-product "headline crosses the label"/m);
+    expect(text).toMatch(/^s1 \| 4s \| motion \| done +\| build ✓ 17s +\| 0\/3 +\| critic 3\.2s text-over-product "headline crosses the label"/m);
     expect(text).toMatch(/^s2 .*building +\| build ⟳/m);
     expect(text).toMatch(/^s3 \| 4s \| gen +\| proposed/m);
     expect(text).toMatch(/^s4 .*queued/m);
