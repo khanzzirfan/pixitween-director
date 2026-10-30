@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { LlmBackend, ToolCall } from '@shared/ports';
 import type { Scene } from '@shared/storyboard';
@@ -101,6 +103,43 @@ describe('runCrew', () => {
     session.push({ from: 'user', text: 'make it warmer' });
     await session.done;
     expect(seen.some((s) => s.includes('make it warmer'))).toBe(true);
+  });
+
+  it('runs the same plan on the LangGraph engine and saves its checkpoint', async () => {
+    const deps = await makeTestDeps();
+    registerWorker('build-scene', async (job) => ({ summary: `built ${job.sceneId}` }));
+    const backend = scripted([[
+      { name: 'reviseStoryboard', args: { ops: [{ op: 'add', scene }, { op: 'add', scene }] } },
+      { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's1', brief: 'b', reason: 'r' } },
+      { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's2', brief: 'b', reason: 'r' } },
+    ]]);
+    await createCrew(deps, { backend, idleEndMs: 60, workers: {}, engine: 'langgraph' }).runCrew(deps.filmId);
+    await settle();
+    const film = await deps.films.get(deps.filmId);
+    expect(film.status).toBe('ready');
+    expect(deps.events.filter((e) => e.type === 'film.status').map((e) => (e as { status: string }).status)).toEqual(['planning', 'building', 'ready']);
+    expect(existsSync(join(deps.dir, 'films', deps.filmId, 'crew', 'checkpoints', 'showrunner.json'))).toBe(true);
+  });
+
+  it('resumes the LangGraph showrunner with its history after a session ends', async () => {
+    const deps = await makeTestDeps();
+    registerWorker('build-scene', async (job) => ({ summary: `built ${job.sceneId}` }));
+    const first = scripted([[
+      { name: 'reviseStoryboard', args: { ops: [{ op: 'add', scene }, { op: 'add', scene }] } },
+      { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's1', brief: 'b', reason: 'r' } },
+      { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's2', brief: 'b', reason: 'r' } },
+    ]]);
+    await createCrew(deps, { backend: first, idleEndMs: 60, workers: {}, engine: 'langgraph' }).runCrew(deps.filmId);
+    await settle();
+
+    const seen: string[] = [];
+    const second: LlmBackend = { id: 'wonder', async chatWithTools(m) { seen.push(JSON.stringify(m)); return { toolCalls: [], content: 'still here', ms: 1 }; } };
+    const session = await createCrew(deps, { backend: second, idleEndMs: 40, engine: 'langgraph' }).start(deps.filmId, { resume: true });
+    session.push({ from: 'user', text: 'one more thing' });
+    await session.done;
+    await settle();
+    expect(seen[0]).toContain('New film. Brief: test brief');
+    expect(deps.events.some((e) => e.type === 'showrunner.say' && e.text === 'still here')).toBe(true);
   });
 
   it('saves the board under data/films/<id>/crew/board.json and can resume it', async () => {

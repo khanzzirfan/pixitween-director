@@ -1,5 +1,7 @@
 // Owned by S12b. The showrunner's loop (design.md 3.1 and 5.6): wake on the inbox, take one turn, act through the board tools.
+// The turn machinery is shared by the native loop and the LangGraph engine (server/crew/engine/showrunner-graph.ts).
 import { loadEnv } from '../env';
+import type { InboxItem } from '@shared/crew';
 import type { FilmEvent } from '@shared/events';
 import type { ChatMessage, LlmBackend, ToolCall } from '@shared/ports';
 import type { ToolDef } from '@shared/tools';
@@ -29,8 +31,8 @@ export interface ShowrunnerDeps {
   maxTurns?: number;
 }
 
-const REPAIR = 'Every tool call in your last turn failed. Read the errors, fix the arguments and call the tools again.';
-const REPAIR_STALLED = 'Some tool calls in your last turn failed and no job is running, so nothing will wake you. Read the errors, fix the arguments and call those tools again.';
+export const REPAIR = 'Every tool call in your last turn failed. Read the errors, fix the arguments and call the tools again.';
+export const REPAIR_STALLED = 'Some tool calls in your last turn failed and no job is running, so nothing will wake you. Read the errors, fix the arguments and call those tools again.';
 
 /** Dispatches an 'auto' job for every scene that needs a builder and got none from the showrunner this turn (design 5.4). */
 export async function autoDispatch(crew: CrewCtx, origin: 'auto' | 'user' = 'auto'): Promise<string[]> {
@@ -47,21 +49,49 @@ export async function autoDispatch(crew: CrewCtx, origin: 'auto' | 'user' = 'aut
   return made;
 }
 
-export function createShowrunner(deps: ShowrunnerDeps) {
+export interface ShowrunnerSnapshot {
+  messages?: ChatMessage[];
+  turns?: number;
+  finished?: boolean;
+  sentImage?: boolean;
+}
+
+export interface TurnResult {
+  allFailed: boolean;
+  anyFailed: boolean;
+}
+
+export interface ShowrunnerAgent {
+  history(): ChatMessage[];
+  turns(): number;
+  sentImage(): boolean;
+  isFinished(): boolean;
+  setFinished(value: boolean): void;
+  agent(state: 'thinking' | 'idle'): void;
+  resetTurn(hadUser: boolean): void;
+  restoreTurn(hadUser: boolean, needsBuilder: readonly string[], dispatched: readonly string[]): void;
+  view(items: InboxItem[]): Promise<string>;
+  /** Adds the product photo to the first turn only. */
+  compose(text: string): ChatMessage['content'];
+  turn(content: ChatMessage['content'], signal: AbortSignal): Promise<TurnResult>;
+  /** Waits for the next batch, or for the end of the session. Undefined means stop. */
+  next(signal: AbortSignal): Promise<InboxItem[] | undefined>;
+}
+
+export function createShowrunnerAgent(deps: ShowrunnerDeps, snapshot: ShowrunnerSnapshot = {}): ShowrunnerAgent {
   const { crew, backend } = deps;
   const tools = deps.tools ?? createBoardTools(crew);
   // loaded on first use: the registry pulls in every tool module, which a route registration does not need
   let registry: Registry | undefined;
   const getRegistry = async (): Promise<Registry> => (registry ??= (await import('../tools/registry')).createRegistry([tools]));
-  const history: ChatMessage[] = [{ role: 'system', content: showrunnerSystem() }];
-  const maxTurns = deps.maxTurns ?? 40;
-  let turns = 0;
-  let sentImage = false;
-  let finished = false;
+  const history: ChatMessage[] = snapshot.messages?.length ? [...snapshot.messages] : [{ role: 'system', content: showrunnerSystem() }];
+  let turns = snapshot.turns ?? 0;
+  let sentImage = snapshot.sentImage ?? false;
+  let finished = snapshot.finished ?? false;
 
   const agent = (state: 'thinking' | 'idle') => crew.emit({ type: 'crew.agent', lane: 'showrunner', worker: 'showrunner', state, model: deps.model });
 
-  async function view(items: Parameters<typeof renderTurn>[0]['inbox']): Promise<string> {
+  async function view(items: InboxItem[]): Promise<string> {
     const film = await crew.films.get(crew.filmId);
     return renderTurn({
       storyboard: film.storyboard ?? { title: film.title ?? 'Untitled', aspect: film.aspect, durationSec: 0, palette: ['#1f2937'], scenes: [] },
@@ -74,8 +104,8 @@ export function createShowrunner(deps: ShowrunnerDeps) {
   }
 
   /** One model turn: send, run each call, record cost. Returns whether every call failed, and whether any did. */
-  async function turn(userContent: ChatMessage['content'], signal: AbortSignal): Promise<{ allFailed: boolean; anyFailed: boolean }> {
-    history.push({ role: 'user', content: userContent });
+  async function turn(content: ChatMessage['content'], signal: AbortSignal): Promise<TurnResult> {
+    history.push({ role: 'user', content });
     turns++;
     const sent = compact(history, 8, storySoFar(deps.events?.() ?? []));
     const response = await backend.chatWithTools(sent, tools, { parallelHint: true, signal });
@@ -100,8 +130,7 @@ export function createShowrunner(deps: ShowrunnerDeps) {
     return { allFailed: results.length > 0 && results.every((r) => !r.ok), anyFailed: results.some((r) => !r.ok) };
   }
 
-  /** Waits for the next batch, or for the end of the session. Undefined means stop. */
-  async function next(signal: AbortSignal): Promise<ReturnType<typeof crew.inbox.drain> | undefined> {
+  async function next(signal: AbortSignal): Promise<InboxItem[] | undefined> {
     const idleMs = deps.idleEndMs ?? loadEnv().CREW_IDLE_END_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let onAbort: (() => void) | undefined;
@@ -121,13 +150,40 @@ export function createShowrunner(deps: ShowrunnerDeps) {
   }
 
   return {
-    isFinished: () => finished,
+    history: () => history,
     turns: () => turns,
+    sentImage: () => sentImage,
+    isFinished: () => finished,
+    setFinished: (value) => void (finished = value),
+    agent,
+    resetTurn: (hadUser) => void (crew.turn = newTurn(hadUser)),
+    restoreTurn: (hadUser, needsBuilder, dispatched) => {
+      crew.turn = { hadUser, needsBuilder: new Set(needsBuilder), dispatched: new Set(dispatched) };
+    },
+    view,
+    compose(text) {
+      const first = !sentImage;
+      sentImage = true;
+      return first && deps.productImageUrl ? [{ type: 'text', text }, { type: 'image_url', image_url: { url: deps.productImageUrl } }] : text;
+    },
+    turn,
+    next,
+  };
+}
+
+export function createShowrunner(deps: ShowrunnerDeps) {
+  const maxTurns = deps.maxTurns ?? 40;
+  const agent = createShowrunnerAgent(deps);
+  const { crew } = deps;
+
+  return {
+    isFinished: agent.isFinished,
+    turns: agent.turns,
 
     /** Runs until the session is idle for CREW_IDLE_END_MS, the signal aborts, or maxTurns is reached. */
     async run(signal: AbortSignal): Promise<void> {
-      while (!signal.aborted && turns < maxTurns) {
-        const batch = await next(signal);
+      while (!signal.aborted && agent.turns() < maxTurns) {
+        const batch = await agent.next(signal);
         if (!batch) {
           // idle, or aborted: a job still working may yet report, so only an idle crew ends the session
           if (signal.aborted || crew.board.list().every((j) => TERMINAL.includes(j.status))) return;
@@ -135,33 +191,30 @@ export function createShowrunner(deps: ShowrunnerDeps) {
         }
         if (!batch.length) return; // the inbox was closed
         const hadUser = batch.some((i) => i.from === 'user');
-        crew.turn = newTurn(hadUser);
-        if (finished && hadUser) {
-          finished = false;
+        agent.resetTurn(hadUser);
+        if (agent.isFinished() && hadUser) {
+          agent.setFinished(false);
           await crew.films.update(crew.filmId, { status: 'building' });
           crew.emit({ type: 'film.status', status: 'building' });
         }
-        agent('thinking');
+        agent.agent('thinking');
         try {
-          const text = await view(batch);
-          const first = !sentImage;
-          sentImage = true;
-          const content: ChatMessage['content'] = first && deps.productImageUrl ? [{ type: 'text', text }, { type: 'image_url', image_url: { url: deps.productImageUrl } }] : text;
-          let r = await turn(content, signal);
+          const text = await agent.view(batch);
+          const content = agent.compose(text);
+          let r = await agent.turn(content, signal);
           // one repair turn, at once, when everything failed, or when some calls failed and no job is left to wake the inbox;
           // a second failed turn waits for the inbox
           const stalled = r.anyFailed && crew.board.list().every((j) => TERMINAL.includes(j.status));
-          if ((r.allFailed || stalled) && !signal.aborted) r = await turn(r.allFailed ? REPAIR : REPAIR_STALLED, signal);
+          if ((r.allFailed || stalled) && !signal.aborted) r = await agent.turn(r.allFailed ? REPAIR : REPAIR_STALLED, signal);
           await autoDispatch(crew);
           if (crew.budget.level() === 'stop') {
             crew.emit({ type: 'error', where: 'showrunner', message: 'the film budget is spent; the crew stops here' });
             return;
           }
         } finally {
-          agent('idle');
+          agent.agent('idle');
         }
       }
     },
   };
 }
-

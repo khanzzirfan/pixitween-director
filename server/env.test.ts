@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { ConfigError } from './errors';
-import { loadEnv } from './env';
+import { hostedTracingVars, loadEnv } from './env';
 
 const throwsNaming = (src: Record<string, string>, name: string) => {
   try {
@@ -52,6 +52,7 @@ it('treats empty values as unset, so a copied .env.example loads', () => {
 it('has crew defaults', () => {
   expect(loadEnv({})).toMatchObject({
     CREW_ENABLED: true,
+    CREW_ENGINE: 'native',
     SHOWRUNNER_MODEL: 'muse-wonder-1.0',
     CREW_MAX_WORKERS: 4,
     CREW_FILM_BUDGET_USD: 1.5,
@@ -60,6 +61,17 @@ it('has crew defaults', () => {
     CREW_CAPTURE_TIMEOUT_MS: 90000,
     CREW_IDLE_END_MS: 600000,
   });
+});
+it('has CREW_ENGINE native by default and rejects unknown engines', () => {
+  expect(loadEnv({}).CREW_ENGINE).toBe('native');
+  expect(loadEnv({ CREW_ENGINE: 'langgraph' }).CREW_ENGINE).toBe('langgraph');
+  expect(loadEnv({ CREW_ENGINE: '' }).CREW_ENGINE).toBe('native');
+  throwsNaming({ CREW_ENGINE: 'nope' }, 'CREW_ENGINE');
+});
+it('names hosted tracing variables so startup can warn without sending anything', () => {
+  expect(hostedTracingVars({})).toEqual([]);
+  expect(hostedTracingVars({ LANGCHAIN_TRACING_V2: 'true', OTHER: 'x' })).toEqual(['LANGCHAIN_TRACING_V2']);
+  expect(hostedTracingVars({ LANGSMITH_API_KEY: 'k', LANGSMITH_ENDPOINT: '' })).toEqual(['LANGSMITH_API_KEY']);
 });
 it('parses CREW_ENABLED=false and 0 to false, and an empty value to the default', () => {
   expect(loadEnv({ CREW_ENABLED: 'false' }).CREW_ENABLED).toBe(false);

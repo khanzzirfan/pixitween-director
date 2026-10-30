@@ -1,5 +1,5 @@
 // Owned by S12b. The crew's entry point (design.md 3.1): one session per film wires the board, scheduler, budget, inbox and showrunner together.
-import type { InboxItem } from '@shared/crew';
+import type { CrewEngine, InboxItem } from '@shared/crew';
 import type { FilmEvent } from '@shared/events';
 import type { LlmBackend } from '@shared/ports';
 import { loadEnv } from '../env';
@@ -43,6 +43,8 @@ export interface CrewOptions {
   fakeDelayMs?: number;
   /** The workers to run instead of the real ones. A kind missing from it fails its jobs. */
   workers?: Partial<Record<JobKind, WorkerFn>>;
+  /** Overrides the film's CREW_ENGINE (tests and the offline run). */
+  engine?: CrewEngine;
 }
 
 export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
@@ -122,7 +124,19 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     } catch {
       // the photo is optional context; the brief still says what the product is
     }
-    const showrunner = createShowrunner({ crew, backend, model, productImageUrl, events: () => events, idleEndMs: o.idleEndMs ?? env.CREW_IDLE_END_MS });
+    const engine: CrewEngine = o.engine ?? film.crewEngine ?? env.CREW_ENGINE;
+    const common = { crew, backend, model, productImageUrl, events: () => events, idleEndMs: o.idleEndMs ?? env.CREW_IDLE_END_MS };
+    const showrunner =
+      engine === 'langgraph'
+        ? await (async () => {
+            const [{ createShowrunnerGraph }, { createCrewCheckpointer }] = await Promise.all([
+              import('./engine/showrunner-graph'),
+              import('./engine/checkpointer'),
+            ]);
+            const checkpointer = createCrewCheckpointer(deps.dataDir ?? env.DATA_DIR, filmId);
+            return createShowrunnerGraph({ ...common, checkpointer, threadId: filmId });
+          })()
+        : createShowrunner(common);
 
     const ac = new AbortController();
     const status = async (value: 'planning' | 'building' | 'ready' | 'failed') => {
