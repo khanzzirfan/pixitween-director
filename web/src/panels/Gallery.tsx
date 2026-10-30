@@ -53,7 +53,7 @@ export default function Gallery({ fetchFilms = api.listFilms, onOpen = defaultOp
               <span className="meta">
                 <span className="title">{it.title}</span>
                 <br />
-                <span>{formatDuration(it.durationSec)}</span>
+                <span>{formatDuration(it.durationSec)}{it.createdLabel ? ` · ${it.createdLabel}` : ''}</span>
                 <br />
                 <span className="badge">{it.hasGenerated ? 'Includes generated clip' : 'Motion only'}</span>
               </span>

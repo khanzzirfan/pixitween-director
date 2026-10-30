@@ -9,6 +9,7 @@ export interface BadgeInfo {
 }
 
 const NAMES = { glimmer: 'Muse Glimmer (local)', spark: 'Muse Spark', 'spark-open': 'Muse Spark Open', wonder: 'Muse Wonder' } as const;
+const nameOf = (b: string) => (NAMES as Record<string, string | undefined>)[b] ?? 'the director';
 
 /** Which model made the last edit, how long it took, and whether the Meta API had to be skipped to get there. */
 export function formatBadge(events: FilmEvent[]): BadgeInfo | null {
@@ -31,8 +32,8 @@ export function formatBadge(events: FilmEvent[]): BadgeInfo | null {
       seconds,
       local: turn.backend === 'glimmer',
       fallbackFrom: { status },
-      text: `Meta API unavailable${status !== undefined ? ` (${status})` : ''}: used ${NAMES[turn.backend]} · ${seconds} s`,
+      text: `Meta API unavailable${status !== undefined ? ` (${status})` : ''}: used ${nameOf(turn.backend)} · ${seconds} s`,
     };
   }
-  return { backend: turn.backend, seconds, local: turn.backend === 'glimmer', text: `edited by ${NAMES[turn.backend]} · ${seconds} s` };
+  return { backend: turn.backend, seconds, local: turn.backend === 'glimmer', text: `edited by ${nameOf(turn.backend)} · ${seconds} s` };
 }

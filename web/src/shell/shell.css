@@ -218,3 +218,36 @@
 .sh [data-testid^='gen-'] .mode-hint { display: none; }
 .sh [data-testid^='gen-'] > div:not([role]), .sh [data-testid^='gen-'] > p, .sh [data-testid^='gen-'] > button { flex-basis: 100%; }
 .sh [data-testid^='gen-'] > div:first-of-type { flex: 1; }
+
+.sh-bare { padding: 0; border: 0; background: transparent; color: inherit; text-align: left; border-radius: 8px; }
+.sh-bare:hover { background: var(--sh-raise); }
+
+/* Review: compact scene blocks, the panel head already says "Review" */
+.sh .review-scene { margin: 6px 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 11px; }
+.sh .review-scene h3 { margin: 0 0 4px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.sh .review-scene ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.sh .review-scene li p { margin: 2px 0 0; font-size: 12px; }
+.sh .review-pair { display: flex; gap: 6px; }
+.sh .review-pair img { max-width: 48%; border-radius: 8px; }
+.sh .review-badge { padding: 1px 7px; border-radius: 99px; font-size: 10.5px; font-weight: 700; background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.sh [data-pane='review'] .panel-heading h2 { font-size: 13px; }
+.sh [data-pane='review'] .panel-heading button { padding: 5px 10px; font-size: 12px; }
+
+/* new-film form: photo and name share a row */
+.sh .classic-form { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 10px; }
+.sh .classic-form > * { grid-column: 1 / -1; min-width: 0; }
+.sh .classic-form > label:nth-of-type(1), .sh .classic-form > label:nth-of-type(2) { grid-column: auto; }
+.sh .classic-form .product-preview { max-height: 120px; }
+.sh .classic-form fieldset { padding: 6px 10px; }
+.sh .classic-form fieldset label { font-weight: 600; }
+
+/* Gallery in the left panel */
+.sh .gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sh .gallery-card .meta { padding: 8px 10px; font-size: 12px; }
+.sh .gallery-card .badge { font-size: 11px; }
+
+/* the panel head names the panel, so these panels drop their own repeated title */
+.sh [data-pane='review'] .panel-heading h2, .sh [data-pane='gallery'] h2, .sh [data-pane='generate'] .panel-heading h2, .sh [data-pane='export'] .panel-heading h2 { display: none; }
+.sh [data-pane='review'] .panel-heading { justify-content: flex-end; }
+/* the crew badge style is global; the gallery's "Includes generated clip" is plain text */
+.sh .gallery-card .badge { background: none; color: var(--muted); padding: 0; border-radius: 0; font-weight: 500; }

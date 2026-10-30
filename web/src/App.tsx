@@ -68,6 +68,7 @@ function Director({ filmId }: { filmId: string | null }) {
       strip={<Filmstrip scenes={scenes} selected={selected} onSelect={jump} />}
       side={<Slot name="chat"><Chat {...panelProps} player={playerRef.current} comp={film?.composition} /></Slot>}
       sideTitle="Director's desk"
+      onTogglePlay={() => document.querySelector<HTMLButtonElement>('[data-testid="slot-player"] .player-controls button')?.click()}
       headerRight={film && costs > 0 ? <span className="sh-cost" title="Spent on this film">${costs.toFixed(2)}</span> : undefined}
     />
   );

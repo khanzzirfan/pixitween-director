@@ -45,6 +45,7 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [] 
   };
 
   const scenes = storyboard?.scenes ?? [];
+  const togglePlay = () => document.querySelector<HTMLButtonElement>('[data-testid="slot-player"] .player-controls button')?.click();
   const jobs = Object.values(crew.jobs);
   const busy = Object.values(crew.lanes).filter((l) => l.state !== 'idle').length;
   const jump = (sceneId: string) => {
@@ -101,6 +102,8 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [] 
       }
       sideTitle="Talk to the showrunner"
       headerRight={<BudgetMeter budget={crew.budget} credits={crew.credits} />}
+      headerRightTab="crew"
+      onTogglePlay={togglePlay}
     />
   );
 }

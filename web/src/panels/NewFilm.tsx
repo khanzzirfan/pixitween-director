@@ -97,7 +97,7 @@ function ClassicNewFilm(_props: PanelProps) {
     }
   }
   return (
-    <form onSubmit={submit}>
+    <form className="classic-form" onSubmit={submit}>
       <div className="panel-heading">
         <div>
           <span className="eyebrow">START WITH AN IDEA</span>

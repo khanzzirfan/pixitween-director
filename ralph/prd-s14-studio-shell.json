@@ -263,8 +263,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "done by hand: compact review blocks, \"edited by\" never prints undefined (unknown backend shows \"the director\")",
       "dependsOn": [
         "US-004"
       ],
@@ -293,8 +293,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "done by hand: photo and name share a row, thumbnail capped at 120 px, intake no longer in a phone frame",
       "dependsOn": [
         "US-004"
       ],
@@ -322,8 +322,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "done by hand: created date on cards, storyboard title as fallback, two-column grid; global .badge clash fixed in shell.css",
       "dependsOn": [
         "US-004"
       ],
@@ -353,8 +353,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "done by hand: badges, number keys, brackets, ? sheet, header cost opens Crew tab, Space clicks the player button",
       "dependsOn": [
         "US-005",
         "US-006"
@@ -384,8 +384,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "done by hand: e2e/studio-shell.spec.ts (desktop no scroll, resize persists, rail collapse; phone no sideways scroll)",
       "dependsOn": [
         "US-005",
         "US-006",

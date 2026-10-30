@@ -31,3 +31,9 @@ describe('formatBadge', () => {
     expect(formatBadge([])).toBeNull();
   });
 });
+
+it('never prints "undefined" for an unknown backend', async () => {
+  const { formatBadge } = await import('./format');
+  const b = formatBadge([{ type: 'agent.turn', backend: 'brand-new', ms: 2000 } as never]);
+  expect(b?.text).toBe('edited by the director · 2 s');
+});

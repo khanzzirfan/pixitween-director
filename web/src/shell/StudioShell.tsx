@@ -32,6 +32,8 @@ export interface StudioShellProps {
   side: ReactNode;
   sideTitle: string;
   headerRight?: ReactNode;
+  /** when set, a click on headerRight opens this tab */
+  headerRightTab?: string;
   testId?: string;
   /** Space plays or pauses when the focus is not in a text field */
   onTogglePlay?(): void;
@@ -189,7 +191,9 @@ export function StudioShell(p: StudioShellProps) {
           ))}
         </ol>
         <div className="sh-spacer" />
-        {p.headerRight}
+        {p.headerRight && (p.headerRightTab ? (
+          <button type="button" className="sh-bare" title={`Open ${p.headerRightTab}`} onClick={() => select(p.headerRightTab!)}>{p.headerRight}</button>
+        ) : p.headerRight)}
         {p.status && (
           <span className={`sh-chip st-${p.status}`} data-testid="film-status">
             {p.status}

@@ -8,6 +8,8 @@ export interface GalleryItem {
   thumbUrl: string;
   sceneCount: number;
   hasGenerated: boolean;
+  /** short local date, empty when the film has no valid createdAt */
+  createdLabel: string;
 }
 
 const time = (iso: string | undefined): number => {
@@ -26,12 +28,13 @@ export function toGalleryItems(films: FilmState[]): GalleryItem[] {
       const product = f.assets.find((a) => a.id === f.brief.productAssetId);
       return {
         id: f.id,
-        title: f.title || 'Untitled film',
+        title: f.title || f.storyboard?.title || 'Untitled film',
         aspect: f.aspect,
         durationSec: Math.round((c.durationInFrames / c.fps) * 10) / 10,
         thumbUrl: product?.url ?? `/api/assets/${f.brief.productAssetId}`,
         sceneCount: f.storyboard?.scenes.length ?? 0,
         hasGenerated: f.storyboard?.scenes.some((s) => s.mode === 'generate') ?? false,
+        createdLabel: Number.isFinite(time(f.createdAt)) ? new Date(f.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '',
       };
     });
 }
