@@ -63,7 +63,7 @@ describe('runBuilderJob: build', () => {
 
   it('puts the style bible and the job brief in the prompt', async () => {
     const t = await setup();
-    await t.film.films.update(t.film.filmId, { styleBible: { palette: ['#1f2937', '#f59e0b'], light: 'warm sun', camera: 'slow', type: { font: 'Inter', weight: 800, case: 'upper' }, productLine: 'a can', mood: 'calm' } });
+    await t.film.films.update(t.film.filmId, { styleBible: { palette: ['#1f2937', '#f59e0b'], light: 'warm sun', camera: 'slow', type: { font: 'sans', weight: 800, case: 'upper' }, productLine: 'a can', mood: 'calm' } });
     let system = '';
     const spy: LlmBackend = { id: 'spark', async chatWithTools(m) { system = String(m[0]!.content); return { toolCalls: [], ms: 1 }; } };
     await runBuilderJob(t.job('build-scene', { brief: 'Warmer light please' }), ac(), t.crew, { backendFor: () => spy }).catch(() => undefined);
@@ -96,7 +96,7 @@ describe('runBuilderJob: build', () => {
 
   it('an unknown scene and a job with no scene are errors', async () => {
     const t = await setup();
-    await expect(runBuilderJob(t.job('build-scene', { sceneId: 's9' }), ac(), t.crew, { backendFor: () => scripted([]) })).rejects.toThrow(/unknown scene s9/);
+    await expect(runBuilderJob(t.job('build-scene', { sceneId: 's9' }), ac(), t.crew, { backendFor: () => scripted([]) })).rejects.toThrow(/scene s9 is not in the storyboard/);
     await expect(runBuilderJob(t.job('build-scene', { sceneId: undefined }), ac(), t.crew, { backendFor: () => scripted([]) })).rejects.toThrow(/needs a scene/);
   });
 

@@ -3,7 +3,7 @@ import type { InboxItem } from '@shared/crew';
 import type { ChatMessage, LlmBackend, ToolCall } from '@shared/ports';
 import type { Scene } from '@shared/storyboard';
 import { createJobChains } from './chains';
-import { createBoard } from './board';
+import { createBoard, TERMINAL } from './board';
 import { createScheduler } from './scheduler';
 import { createShowrunner, autoDispatch } from './showrunner';
 import { newTurn, reviseStoryboard } from './showrunner-tools';
@@ -11,7 +11,18 @@ import { makeTestCrew, waitFor } from './test-helpers';
 
 const scene: Omit<Scene, 'id'> = { durationSec: 4, intent: 'a scene', shotType: 'hero', camera: 'static', layersWanted: ['bg', 'product'], mode: 'motion', modeReason: 'a still is enough' };
 const adds = (n: number) => Array.from({ length: n }, () => ({ op: 'add' as const, scene }));
-const bible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'Inter', weight: 700, case: 'upper' as const }, productLine: 'a can', mood: 'calm' };
+const bible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'sans', weight: 700, case: 'upper' as const }, productLine: 'a can', mood: 'calm' };
+/** Sets an env var for one test and returns the function that puts the old value back. */
+const setEnv = (key: string, value: string) => {
+  const prev = process.env[key];
+  process.env[key] = value;
+  return () => (prev === undefined ? delete process.env[key] : (process.env[key] = prev));
+};
+/** The test crew has no job-end chain, so this is the system note a finished build would send. */
+const afterBuilds = async (t: Awaited<ReturnType<typeof makeTestCrew>>) => {
+  await waitFor(() => t.board.list().length === 2 && t.board.list().every((j) => TERMINAL.includes(j.status)));
+  t.inbox.push(item('system', 'both builds are done'));
+};
 const settle = () => new Promise<void>((r) => setTimeout(r, 20));
 let n = 0;
 const item = (from: InboxItem['from'], text: string): InboxItem => ({ id: `i${++n}`, at: new Date().toISOString(), from, text });
@@ -44,7 +55,7 @@ const planning: Entry = [
 async function start(entries: Entry[], o: { image?: boolean; idleEndMs?: number; instant?: boolean } = {}) {
   const t = await makeTestCrew(o.instant ? {} : { runWorker: (_job, signal) => new Promise((_res, rej) => signal.addEventListener('abort', () => rej(new Error('stopped')))) });
   const backend = scripted(entries);
-  const showrunner = createShowrunner({ crew: t.crew, backend, model: 'muse-wonder-1.0', idleEndMs: o.idleEndMs ?? 60, ...(o.image ? { productImageUrl: 'data:image/jpeg;base64,AAAA' } : {}) });
+  const showrunner = createShowrunner({ crew: t.crew, backend, model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: o.idleEndMs ?? 60, ...(o.image ? { productImageUrl: 'data:image/jpeg;base64,AAAA' } : {}) });
   const ac = new AbortController();
   const done = showrunner.run(ac.signal);
   return { ...t, backend, showrunner, done, ac };
@@ -140,7 +151,7 @@ describe('the loop', () => {
   it('a reply with no tool calls becomes a note to the user', async () => {
     const t = await makeTestCrew();
     const talker: LlmBackend = { id: 'wonder', async chatWithTools() { return { toolCalls: [], content: 'I am thinking about it.', ms: 1 }; } };
-    const sr = createShowrunner({ crew: t.crew, backend: talker, model: 'muse-wonder-1.0', idleEndMs: 40 });
+    const sr = createShowrunner({ crew: t.crew, backend: talker, model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 40 });
     t.inbox.push(item('system', 'hi'));
     await sr.run(new AbortController().signal);
     await settle();
@@ -158,7 +169,7 @@ describe('the loop', () => {
     const t = await makeTestCrew({ runWorker: (_j, signal) => new Promise((_r, rej) => signal.addEventListener('abort', () => rej(new Error('stopped')))) });
     await reviseStoryboard(t.crew, adds(2));
     await t.scheduler.dispatch({ kind: 'build-scene', sceneId: 's1', origin: 'auto', brief: 'b', reason: 'r' });
-    const sr = createShowrunner({ crew: t.crew, backend: scripted([]), model: 'muse-wonder-1.0', idleEndMs: 30 });
+    const sr = createShowrunner({ crew: t.crew, backend: scripted([]), model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 30 });
     const ac = new AbortController();
     let ended = false;
     const run = sr.run(ac.signal).then(() => (ended = true));
@@ -171,7 +182,7 @@ describe('the loop', () => {
   it('a showrunner turn after finish by the user puts the film back to building', async () => {
     const t = await makeTestCrew();
     await reviseStoryboard(t.crew, adds(2));
-    const sr = createShowrunner({ crew: t.crew, backend: scripted([[{ name: 'finish', args: { summary: 'done' } }], [{ name: 'say', args: { text: 'on it' } }]]), model: 'muse-wonder-1.0', idleEndMs: 150 });
+    const sr = createShowrunner({ crew: t.crew, backend: scripted([[{ name: 'finish', args: { summary: 'done' } }], [{ name: 'say', args: { text: 'on it' } }]]), model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 150 });
     const run = sr.run(new AbortController().signal);
     t.inbox.push(item('system', 'go'));
     await waitFor(() => sr.isFinished());
@@ -189,7 +200,7 @@ describe('auto-dispatch', () => {
     const t = await makeTestCrew({ runWorker: (_j, signal) => new Promise((_r, rej) => signal.addEventListener('abort', () => rej(new Error('stopped')))) });
     await reviseStoryboard(t.crew, adds(4));
     const backend = scripted([[{ name: 'reviseStoryboard', args: { ops: adds(1) } }]]);
-    const sr = createShowrunner({ crew: t.crew, backend, model: 'muse-wonder-1.0', idleEndMs: 40 });
+    const sr = createShowrunner({ crew: t.crew, backend, model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 40 });
     const run = sr.run(new AbortController().signal);
     t.inbox.push(item('user', 'add a scene'));
     await waitFor(() => t.board.list().length === 1);
@@ -202,7 +213,7 @@ describe('auto-dispatch', () => {
     const t = await makeTestCrew({ runWorker: (_j, signal) => new Promise((_r, rej) => signal.addEventListener('abort', () => rej(new Error('stopped')))) });
     await reviseStoryboard(t.crew, adds(4));
     const backend = scripted([[{ name: 'reviseStoryboard', args: { ops: adds(1) } }, { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's5', brief: 'b', reason: 'r' } }]]);
-    const sr = createShowrunner({ crew: t.crew, backend, model: 'muse-wonder-1.0', idleEndMs: 40 });
+    const sr = createShowrunner({ crew: t.crew, backend, model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 40 });
     const run = sr.run(new AbortController().signal);
     t.inbox.push(item('user', 'add a scene'));
     await waitFor(() => t.board.list().length >= 1);
@@ -305,5 +316,21 @@ describe('job chains', () => {
     }
     expect(board.list().filter((j) => j.kind === 'critique')).toHaveLength(3);
     expect(board.list().filter((j) => j.kind === 'continuity')).toHaveLength(5);
+  });
+
+  it('auto-finishes the native loop after two idle turns when CREW_AUTO_FINISH is on', async () => {
+    const restore = setEnv('CREW_AUTO_FINISH', '1');
+    try {
+      const t = await makeTestCrew();
+      const sr = createShowrunner({ crew: t.crew, backend: scripted([[{ name: 'reviseStoryboard', args: { ops: adds(2) } }]]), model: 'muse-wonder-1.0', idleEndMs: 40 });
+      const run = sr.run(new AbortController().signal);
+      t.inbox.push(item('user', 'go'));
+      await afterBuilds(t);
+      await run;
+      await settle();
+      expect((await t.film.films.get(t.film.filmId)).status).toBe('ready');
+    } finally {
+      restore();
+    }
   });
 });

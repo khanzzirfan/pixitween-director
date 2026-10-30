@@ -11,7 +11,7 @@ import { makeTestCrew } from './test-helpers';
 const settle = () => new Promise<void>((r) => setTimeout(r, 15)); // the bus appends events asynchronously
 const scene: Omit<Scene, 'id'> = { durationSec: 4, intent: 'a scene', shotType: 'hero', camera: 'static', layersWanted: ['bg', 'product'], mode: 'motion', modeReason: 'a still is enough' };
 const add = (n = 1): StoryboardOp[] => Array.from({ length: n }, () => ({ op: 'add' as const, scene }));
-const bible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'Inter', weight: 700, case: 'upper' as const }, productLine: 'a can', mood: 'calm' };
+const bible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'sans', weight: 700, case: 'upper' as const }, productLine: 'a can', mood: 'calm' };
 
 async function setup(o: Parameters<typeof makeTestCrew>[0] = {}) {
   const t = await makeTestCrew(o);
@@ -125,14 +125,13 @@ describe('dispatch, cancel, pickTake, proposeGenerate', () => {
     expect(await t.run('dispatch', { kind: 'build-scene', sceneId: 's9', brief: 'b', reason: 'r' })).toEqual({ ok: false, error: 'unknown scene s9' });
   });
 
-  it('refuses a third showrunner fix on one scene, but not a fix on another', async () => {
+  it('allows three showrunner fixes on one scene, then refuses the fourth, but not a fix on another', async () => {
     const t = await setup();
     await t.run('reviseStoryboard', { ops: add(2) });
     const fix = (sceneId: string) => t.run('dispatch', { kind: 'fix', sceneId, brief: 'b', reason: 'r' });
-    expect((await fix('s1')).ok).toBe(true);
-    expect((await fix('s1')).ok).toBe(true);
-    const third = await fix('s1');
-    expect(!third.ok && third.error).toContain('already had 2 fixes');
+    for (let i = 0; i < 3; i++) expect((await fix('s1')).ok).toBe(true);
+    const fourth = await fix('s1');
+    expect(!fourth.ok && fourth.error).toContain('fix cap reached for s1');
     expect((await fix('s2')).ok).toBe(true);
   });
 
@@ -238,7 +237,7 @@ describe('say, ask, finish', () => {
     expect((await t.film.films.get(t.film.filmId)).status).not.toBe('ready');
   });
 
-  it('finish does not wait for a safe-area finding (the crew leaves it and says why)', async () => {
+  it('finish waits for a safe-area finding until the fix cap is spent, then accepts it', async () => {
     const t = await setup();
     await t.run('reviseStoryboard', { ops: add(2) });
     await t.film.films.mutate(t.film.filmId, (f) => {
@@ -246,9 +245,19 @@ describe('say, ask, finish', () => {
       c = setTransform(c, 's1:headline', { x: 1900, y: 1070 });
       return { next: c, data: null };
     }, 'director');
+    const blocked = await t.run('finish', { summary: 'done' });
+    expect(!blocked.ok && blocked.error).toContain('outside-safe-area (s1)');
+    expect((await t.film.films.get(t.film.filmId)).status).not.toBe('ready');
+    for (let i = 0; i < 3; i++) {
+      const j = t.board.add({ kind: 'fix', origin: 'showrunner', sceneId: 's1', brief: 'b', reason: 'r' });
+      t.board.update(j.id, { status: 'running' });
+      t.board.update(j.id, { status: 'done' });
+    }
     const r = await t.run('finish', { summary: 'done' });
     expect(r.ok).toBe(true);
     expect((await t.film.films.get(t.film.filmId)).status).toBe('ready');
+    await settle();
+    expect(t.events.find((e) => e.type === 'showrunner.say')).toMatchObject({ text: 'done accepted: s1 outside-safe-area (3 fixes tried)' });
   });
 
   it('finish with nothing open and no errors makes the film ready', async () => {

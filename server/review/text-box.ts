@@ -33,7 +33,10 @@ export function estimateTextSize(layer: Obj): { w: number; h: number } {
   if (Array.isArray(size)) size = size[0]?.v ?? 56;
   const k = advanceFactor(style.weight),
     text = String(typeof layer.source === 'string' ? layer.source : (layer.source?.[0]?.v ?? ''));
-  if (isSplitText(layer) && style.boxWidth) return wrapWords(text, style.boxWidth, size, k);
+  if (style.boxWidth) {
+    const boxes = text.split('\n').map((line) => wrapWords(line, style.boxWidth, size, k));
+    return { w: Math.max(...boxes.map((b) => b.w)), h: boxes.reduce((n, b) => n + b.h, 0) };
+  }
   const lines = text.split('\n');
   return { w: Math.max(0, ...lines.map((line) => line.length * size * k)), h: lines.length * size * 1.2 };
 }

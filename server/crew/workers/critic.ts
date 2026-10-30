@@ -78,7 +78,9 @@ export async function runCriticJob(job: Job, signal: AbortSignal, crew: CrewCtx,
     const requestId = createId('cap');
     const timesSec = captureTimes(scene.durationFrames / comp.fps);
     const timeoutMs = o.timeoutMs ?? loadEnv().CREW_CAPTURE_TIMEOUT_MS;
-    const captured = await new Promise<CapturedFrames | undefined>((resolve, reject) => {
+    const hasBrowser = (crew.subscriberCount?.(job.filmId) ?? 1) > 0;
+    let captured: CapturedFrames | undefined;
+    if (hasBrowser) captured = await new Promise<CapturedFrames | undefined>((resolve, reject) => {
       const done = (c: CapturedFrames | undefined) => {
         clearTimeout(timer);
         signal.removeEventListener('abort', onAbort);

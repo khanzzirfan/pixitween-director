@@ -8,9 +8,10 @@ import type { ToolDef } from '@shared/tools';
 import { assistantMessageFrom, toolResultMessage } from '../llm/messages';
 import { priceSpark } from '../pricing';
 import type { Registry } from '../tools/registry';
-import { compact, renderTurn, storySoFar, type Finding } from './history';
+import { compact, directorRequests, renderTurn, storySoFar, type Finding } from './history';
 import { showrunnerSystem } from './prompts';
-import { createBoardTools, newTurn, type CrewCtx } from './showrunner-tools';
+import { createBoardTools, finishFilm, finishGate, newTurn, type CrewCtx } from './showrunner-tools';
+import { createId } from './ids';
 import { TERMINAL } from './board';
 
 export interface ShowrunnerDeps {
@@ -29,10 +30,76 @@ export interface ShowrunnerDeps {
   idleEndMs?: number;
   /** A guard against a runaway loop. */
   maxTurns?: number;
+  /** The S12f done nudge and auto-finish. Default true; tests can turn it off. */
+  wrapUp?: boolean;
 }
 
 export const REPAIR = 'Every tool call in your last turn failed. Read the errors, fix the arguments and call the tools again.';
 export const REPAIR_STALLED = 'Some tool calls in your last turn failed and no job is running, so nothing will wake you. Read the errors, fix the arguments and call those tools again.';
+export const DONE_NUDGE = 'Everything is built and checked. Call finish with a one-line summary now, unless a director\'s request is not done yet.';
+export const WRAPPING = 'Wrapping up: everything is built.';
+
+export interface IdleProgress {
+  nudged: boolean;
+  idleTurns: number;
+}
+
+export type IdleAction = 'none' | 'nudge' | 'finish';
+
+/**
+ * Decides what an idle board needs: nothing, the one done nudge, or auto-finish after two idle turns (S12f 3.7).
+ * Reads the board and the gate, changes nothing. The graph routes on the action; the native loop calls idleFinishStep.
+ */
+export async function idleDecision(
+  crew: CrewCtx,
+  progress: IdleProgress,
+  o: { autoFinish: boolean; hadUser: boolean; finished: boolean },
+): Promise<IdleProgress & { finished: boolean; action: IdleAction }> {
+  if (o.finished) return { ...progress, finished: true, action: 'none' };
+  const open = crew.board.list().some((j) => !TERMINAL.includes(j.status));
+  const turn = o.hadUser ? { nudged: false, idleTurns: 0 } : progress;
+  if (open) return { nudged: false, idleTurns: 0, finished: false, action: 'none' };
+  const gate = await finishGate(crew, crew.toolCtx);
+  if (!gate.pass) return { nudged: false, idleTurns: 0, finished: false, action: 'none' };
+  // The gate passes a film with no composition, so an idle crew that never planned would be nudged, then marked ready.
+  // Nothing is built, so there is nothing to wrap up: leave it to the session end, which fails an empty film.
+  const film = await crew.films.get(crew.filmId);
+  if (!film.composition || !film.storyboard?.scenes.length) return { nudged: false, idleTurns: 0, finished: false, action: 'none' };
+  if (!turn.nudged) return { nudged: true, idleTurns: 0, finished: false, action: 'nudge' };
+  // Each director turn after the nudge that ends without finishing counts as an idle turn. With auto-finish on, the
+  // director is prompted again after each one, so the second makes the film finish itself. Without a new batch, nothing
+  // would wake the loop again (the board is terminal), so the counter could never reach two.
+  const idleTurns = turn.idleTurns + 1;
+  if (!o.autoFinish) return { nudged: true, idleTurns, finished: false, action: 'none' };
+  if (idleTurns < 2) return { nudged: true, idleTurns, finished: false, action: 'nudge' };
+  return { nudged: true, idleTurns, finished: false, action: 'finish' };
+}
+
+/** The done nudge: one system item in the inbox. */
+export function pushDoneNudge(crew: CrewCtx): void {
+  crew.inbox.push({ id: createId('i'), at: new Date().toISOString(), from: 'system', text: DONE_NUDGE });
+}
+
+/** Auto-finish. Returns false when the gate refuses, so the caller keeps the session going. */
+export async function autoFinish(crew: CrewCtx): Promise<boolean> {
+  const film = await crew.films.get(crew.filmId);
+  const r = await finishFilm(crew, crew.toolCtx, `${film.storyboard?.scenes.length ?? 0} scenes built and checked`);
+  if (!r.ok) return false;
+  crew.emit({ type: 'showrunner.say', kind: 'note', text: WRAPPING });
+  return true;
+}
+
+/** Native loop's idle step: decide, then apply. The graph does the same two steps on separate nodes. */
+export async function idleFinishStep(
+  crew: CrewCtx,
+  progress: IdleProgress,
+  o: { autoFinish: boolean; hadUser: boolean; finished: boolean },
+): Promise<IdleProgress & { finished: boolean }> {
+  const d = await idleDecision(crew, progress, o);
+  if (d.action === 'nudge') pushDoneNudge(crew);
+  if (d.action === 'finish' && !(await autoFinish(crew))) return { nudged: true, idleTurns: 0, finished: false };
+  return { nudged: d.nudged, idleTurns: d.idleTurns, finished: d.action === 'finish' || d.finished };
+}
 
 /** Dispatches an 'auto' job for every scene that needs a builder and got none from the showrunner this turn (design 5.4). */
 export async function autoDispatch(crew: CrewCtx, origin: 'auto' | 'user' = 'auto'): Promise<string[]> {
@@ -100,6 +167,8 @@ export function createShowrunnerAgent(deps: ShowrunnerDeps, snapshot: Showrunner
       findings: deps.findings?.() ?? [],
       budget: { spentUsd: crew.budget.spent(), capUsd: crew.budget.capUsd },
       inbox: items,
+      requests: directorRequests(deps.events?.() ?? []),
+      maxFixes: crew.maxFixes ?? loadEnv().CREW_MAX_FIXES_PER_SCENE,
     });
   }
 
@@ -175,6 +244,7 @@ export function createShowrunner(deps: ShowrunnerDeps) {
   const maxTurns = deps.maxTurns ?? 40;
   const agent = createShowrunnerAgent(deps);
   const { crew } = deps;
+  const progress: IdleProgress = { nudged: false, idleTurns: 0 };
 
   return {
     isFinished: agent.isFinished,
@@ -210,6 +280,15 @@ export function createShowrunner(deps: ShowrunnerDeps) {
           if (crew.budget.level() === 'stop') {
             crew.emit({ type: 'error', where: 'showrunner', message: 'the film budget is spent; the crew stops here' });
             return;
+          }
+          if (deps.wrapUp !== false) {
+            const idle = await idleFinishStep(crew, progress, { autoFinish: loadEnv().CREW_AUTO_FINISH, hadUser, finished: agent.isFinished() });
+            progress.nudged = idle.nudged;
+            progress.idleTurns = idle.idleTurns;
+            if (idle.finished && !agent.isFinished()) {
+              agent.setFinished(true);
+              return;
+            }
           }
         } finally {
           agent.agent('idle');

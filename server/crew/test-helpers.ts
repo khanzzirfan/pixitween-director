@@ -46,7 +46,7 @@ export async function makeTestCrew(o: { runWorker?: (job: Job, signal: AbortSign
   const inbox = createInbox({ debounceMs: o.debounceMs ?? 0 });
   const crew: CrewCtx = {
     filmId: film.filmId, films: film.films, board: t.board, scheduler, budget, inbox,
-    emit: film.ctx.emit, source: 'showrunner', takesMax: 3, removedIds: new Set(), toolCtx: film.ctx, turn: newTurn(),
+    emit: film.ctx.emit, source: 'showrunner', takesMax: 3, maxFixes: 3, removedIds: new Set(), toolCtx: film.ctx, subscriberCount: (id) => film.bus.subscriberCount(id), turn: newTurn(),
     makeToolCtx: (id) => makeToolCtx({ films: film.films, assets: film.assets, meta: film.meta, ledger: film.ledger, bus: film.bus }, id),
   };
   return { crew, film, board: t.board, scheduler, inbox, budget, events: film.events };

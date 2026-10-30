@@ -1,5 +1,7 @@
 // Owned by S12b. The showrunner's system prompt (design.md 6.1) and the block a builder gets appended (6.4).
 import type { Job, StyleBible } from '@shared/crew';
+import type { Storyboard } from '@shared/storyboard';
+import { BIBLE_FONT_STACKS } from '../authoring/constants';
 import { loadEnv } from '../env';
 
 const SHOWRUNNER_BASE = `You are the showrunner of a small film crew making a short animated product film (10 to 30 seconds).
@@ -15,7 +17,7 @@ Tools:
 You may call several tools in one turn. Dispatch independent scenes together so the crew works in parallel.
 
 How you work:
-1. The user is the director. Their newest message outranks your plan. Act on it in this turn.
+1. The user is the director. Their messages outrank the original brief and your plan, for the whole session. Never remove a scene the user asked for unless they ask. To change a scene, update it; never remove and re-add it.
 2. When the user asks for something, say one short line that shows you understood, then dispatch the work.
 3. A scene is motion unless it needs physical motion a still cannot fake (pouring, walking, fabric, hands using the product).
    Then call proposeGenerate with the reason. At most 2 generate scenes.
@@ -50,7 +52,7 @@ export function renderBibleBlock(b: StyleBible): string {
   return [
     'STYLE BIBLE (every scene follows it)',
     `palette: ${b.palette.join(' ')} · light: ${b.light} · camera: ${b.camera}`,
-    `type: ${b.type.font} ${b.type.weight}, ${CASE_LABEL[b.type.case]} · product: ${b.productLine} · mood: ${b.mood}`,
+    `type: ${b.type.font} (${BIBLE_FONT_STACKS[b.type.font]}) ${b.type.weight}, ${CASE_LABEL[b.type.case]} · product: ${b.productLine} · mood: ${b.mood}`,
   ].join('\n');
 }
 
@@ -62,4 +64,18 @@ export function renderJobBlock(job: Pick<Job, 'id' | 'kind' | 'sceneId' | 'brief
     job.brief,
     ...(job.sceneId ? [`You own scene ${job.sceneId} only. Calls on other scenes are rejected.`] : []),
   ].join('\n');
+}
+
+/** The film outline a builder sees, so it does not repeat another scene's headline or shot (S12f 3.5). */
+export function renderOutlineBlock(storyboard: Storyboard, sceneId: string): string {
+  const index = storyboard.scenes.findIndex((s) => s.id === sceneId);
+  const own = index >= 0 ? index + 1 : 0;
+  const lines = [`FILM OUTLINE (you build scene ${own || '?'} of ${storyboard.scenes.length}${index >= 0 ? `: ${sceneId}` : ''})`];
+  storyboard.scenes.forEach((s, i) => {
+    const intent = s.intent.length > 60 ? `${s.intent.slice(0, 57)}...` : s.intent;
+    const text = s.text ? `"${s.text}"` : '(no headline yet)';
+    lines.push(i === index ? `${i + 1} ${s.id} · ${s.durationSec} s · ← YOU` : `${i + 1} ${s.id} · ${s.durationSec} s · ${intent} · ${text}`);
+  });
+  lines.push("Do not repeat another scene's headline or shot. The text lane places and styles your text after you finish.");
+  return lines.join('\n');
 }

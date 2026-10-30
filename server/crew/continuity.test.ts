@@ -7,7 +7,7 @@ import { runContinuity, runContinuityJob } from './continuity';
 import { makeTestCrew } from './test-helpers';
 
 const PRODUCT = 'ast_0123456789abcdef0123456789abcdef';
-const bible: StyleBible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'Inter', weight: 800, case: 'upper' }, productLine: 'a can', mood: 'calm' };
+const bible: StyleBible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'sans', weight: 800, case: 'upper' }, productLine: 'a can', mood: 'calm' };
 const scene = (id: string, shotType: Scene['shotType']): Scene => ({ id, durationSec: 4, intent: 'i', shotType, camera: 'static', layersWanted: ['bg', 'product'], mode: 'motion', modeReason: 'r' });
 const board = (scenes: Scene[]): Storyboard => ({ title: 'T', aspect: '16:9', durationSec: scenes.length * 4, palette: ['#1f2937'], scenes });
 
@@ -20,7 +20,7 @@ function film(heights: number[], o: { fill?: string; textFill?: string; font?: s
     const side = Math.round(h * 1080);
     c = addLayer(c, { sceneId: id, role: 'product', kind: 'image', assetId: PRODUCT, box: { x: 700, y: 100, w: side, h: side } });
     if (o.fill) c = addLayer(c, { sceneId: id, role: 'bg', kind: 'shape', fill: o.fill });
-    c = addLayer(c, { sceneId: id, role: 'headline', kind: 'text', text: 'Hello', style: { color: o.textFill ?? '#fde68a', font: o.font ?? 'Inter', weight: o.weight ?? 800 } });
+    c = addLayer(c, { sceneId: id, role: 'headline', kind: 'text', text: 'Hello', style: { color: o.textFill ?? '#fde68a', font: o.font ?? 'Inter, system-ui, sans-serif', weight: o.weight ?? 800 } });
   });
   return c;
 }

@@ -6,7 +6,7 @@ const at = '2026-10-30T00:00:00Z';
 const job = { id: 'j1', kind: 'build-scene', sceneId: 's1', filmId, brief: 'b', reason: 'r', origin: 'auto', status: 'queued', createdAt: at, costUsd: 0 };
 const scene = { id: 's1', durationSec: 4, intent: 'x', shotType: 'hero', camera: 'static', layersWanted: ['bg'], mode: 'motion', modeReason: 'm' };
 const storyboard = { title: 't', aspect: '16:9', durationSec: 8, palette: ['#111111'], scenes: [scene, { ...scene, id: 's2' }] };
-const bible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'Inter', weight: 700, case: 'upper' }, productLine: 'a can', mood: 'calm' };
+const bible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'sans', weight: 700, case: 'upper' }, productLine: 'a can', mood: 'calm' };
 
 const examples: Record<string, object> = {
   'crew.agent': { lane: 'builder', worker: 'builder-1', state: 'working', jobId: 'j1' },

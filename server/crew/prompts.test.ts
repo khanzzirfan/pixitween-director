@@ -6,7 +6,7 @@ const bible: StyleBible = {
   palette: ['#1f2937', '#f59e0b', '#fde68a'],
   light: 'low warm morning sun from the left',
   camera: 'slow dolly-ins, no fast cuts',
-  type: { font: 'Inter', weight: 800, case: 'upper' },
+  type: { font: 'sans', weight: 800, case: 'upper' },
   productLine: 'a matte black cold-brew can with a cream band',
   mood: 'calm, early',
 };
@@ -18,7 +18,7 @@ describe('SHOWRUNNER_SYSTEM', () => {
   });
   it('holds the pass gate sentence and the user-first rule', () => {
     expect(SHOWRUNNER_SYSTEM).toContain('Call finish only when every scene is built, nothing is running and continuity reports no errors.');
-    expect(SHOWRUNNER_SYSTEM).toContain('Their newest message outranks your plan.');
+    expect(SHOWRUNNER_SYSTEM).toContain('Their messages outrank the original brief and your plan, for the whole session. Never remove a scene the user asked for unless they ask.');
   });
   it('names every board tool', () => {
     for (const tool of ['setStyleBible', 'reviseStoryboard', 'dispatch', 'cancel', 'pickTake', 'proposeGenerate', 'say', 'ask', 'finish']) expect(SHOWRUNNER_SYSTEM).toContain(tool);
@@ -30,7 +30,7 @@ describe('builder prompt blocks', () => {
     expect(renderBibleBlock(bible)).toMatchInlineSnapshot(`
       "STYLE BIBLE (every scene follows it)
       palette: #1f2937 #f59e0b #fde68a · light: low warm morning sun from the left · camera: slow dolly-ins, no fast cuts
-      type: Inter 800, UPPER · product: a matte black cold-brew can with a cream band · mood: calm, early"
+      type: sans (Inter, system-ui, sans-serif) 800, UPPER · product: a matte black cold-brew can with a cream band · mood: calm, early"
     `);
   });
   it('names the job, its kind and the one scene it owns', () => {
@@ -43,8 +43,8 @@ describe('builder prompt blocks', () => {
     expect(renderJobBlock({ id: 'j2', kind: 'continuity', brief: 'check' })).not.toContain('You own scene');
   });
   it('renders the other type cases', () => {
-    expect(renderBibleBlock({ ...bible, type: { ...bible.type, case: 'title' } })).toContain('Inter 800, Title');
-    expect(renderBibleBlock({ ...bible, type: { ...bible.type, case: 'sentence' } })).toContain('Inter 800, Sentence');
+    expect(renderBibleBlock({ ...bible, type: { ...bible.type, case: 'title' } })).toContain('sans (Inter, system-ui, sans-serif) 800, Title');
+    expect(renderBibleBlock({ ...bible, type: { ...bible.type, case: 'sentence' } })).toContain('sans (Inter, system-ui, sans-serif) 800, Sentence');
   });
 });
 

@@ -28,7 +28,7 @@
     "light": "warm late sun",
     "camera": "slow and steady",
     "type": {
-     "font": "Inter",
+     "font": "sans",
      "weight": 700,
      "case": "upper"
     },

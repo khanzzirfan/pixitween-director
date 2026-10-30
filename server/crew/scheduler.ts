@@ -106,7 +106,9 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
         if (!entry.cancelled && live(board.get(job.id)!)) {
           const message = e instanceof Error ? e.message : String(e);
           // a scene dropped from the storyboard while its job waited is not a failure
-          if (/^unknown scene /.test(message)) board.update(job.id, { status: 'cancelled', error: message });
+          if ((e as Error).name === 'SceneGoneError' || /^unknown scene /.test(message)) {
+            board.update(job.id, { status: 'cancelled', ...((e as Error).name === 'SceneGoneError' ? { summary: 'scene removed' } : {}), error: message });
+          }
           else {
             log(`[crew] ${job.id} failed: ${message}`);
             board.update(job.id, { status: 'failed', error: message.slice(0, 300) });
@@ -162,6 +164,12 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
   }
 
   async function dispatch(input: NewJob): Promise<Job> {
+    const sceneId = input.sceneId;
+    const filmId = input.filmId;
+    if (sceneId && filmId && deps.films) {
+      const film = await deps.films.get(filmId);
+      if (!film.storyboard?.scenes.some((s) => s.id === sceneId)) throw new Error(`scene ${sceneId} is not in the storyboard`);
+    }
     const job = board.add(input);
     const pending: Array<Promise<void>> = [];
     if (isWriting(job) && job.sceneId) {

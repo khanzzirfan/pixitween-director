@@ -15,6 +15,8 @@ export const sceneSchema = z.object({
   mode: z.enum(['motion', 'generate', '3d']),
   modeReason: z.string().min(1).max(240),
   estCredits: z.number().min(0).optional(),
+  /** Set when the director asked for this scene; the showrunner may not remove it without a user turn. */
+  requestedBy: z.literal('user').optional(),
 });
 
 export const PRODUCT_SHAPES = ['can', 'bottle', 'box', 'jar', 'tube', 'pouch', 'other'] as const;

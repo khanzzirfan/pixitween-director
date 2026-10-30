@@ -67,7 +67,9 @@ const schema = z.object({
   CREW_FILM_BUDGET_USD: z.coerce.number().min(0.1).max(20).default(1.5),
   CREW_TAKES_MAX: int(3, 2, 3),
   CREW_INBOX_DEBOUNCE_MS: int(1500, 0, 10000),
-  CREW_CAPTURE_TIMEOUT_MS: int(90000, 5000, 600000),
+  CREW_CAPTURE_TIMEOUT_MS: int(20000, 5000, 600000),
+  CREW_MAX_FIXES_PER_SCENE: int(3, 1, 10),
+  CREW_AUTO_FINISH: boolOn,
   CREW_IDLE_END_MS: int(600000, 60000, 3600000),
 });
 

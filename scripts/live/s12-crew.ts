@@ -97,7 +97,7 @@ async function collect(deps: Deps, filmId: string, run: () => Promise<void>): Pr
   return events;
 }
 
-async function crewFilm(deps: Deps, log: (l: string) => void, showrunnerModel: string): Promise<FilmEvent[]> {
+export async function crewFilm(deps: Deps, log: (l: string) => void, showrunnerModel: string): Promise<FilmEvent[]> {
   process.env.SHOWRUNNER_MODEL = showrunnerModel;
   const film = await newFilm(deps, true);
   bindCrew(deps, { idleEndMs: FILM_TIMEOUT_MS });

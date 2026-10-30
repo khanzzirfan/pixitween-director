@@ -3,7 +3,7 @@ import { JOB_PRIORITY, WRITING_KINDS, inboxItemSchema, jobSchema, styleBibleSche
 
 const scene = { durationSec: 4, intent: 'hero shot', shotType: 'hero', camera: 'dolly-in', layersWanted: ['bg', 'product'], mode: 'motion', modeReason: 'a still is enough' } as const;
 const job = { id: 'j1', kind: 'build-scene', sceneId: 's1', filmId: 'film_a', brief: 'b', reason: 'r', origin: 'auto', status: 'queued', createdAt: '2026-10-30T00:00:00Z', costUsd: 0 };
-const bible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'Inter', weight: 700, case: 'upper' }, productLine: 'a can', mood: 'calm' };
+const bible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'sans', weight: 700, case: 'upper' }, productLine: 'a can', mood: 'calm' };
 
 describe('styleBibleSchema', () => {
   it('accepts hex colours and rejects a colour name', () => {

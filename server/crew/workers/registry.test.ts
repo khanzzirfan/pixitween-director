@@ -66,7 +66,7 @@ describe('a crew film with the real workers', () => {
       expect(all.find((j) => j.kind === 'critique' && j.sceneId === id)?.status, `critique ${id}`).toBe('done');
     }
     expect(all.find((j) => j.kind === 'critique')?.summary).toBe('no browser connected; rules only');
-    expect(deps.events.filter((e) => e.type === 'capture.request').length).toBeGreaterThanOrEqual(4);
+    expect(deps.events.filter((e) => e.type === 'capture.request')).toHaveLength(0);
     expect(all.filter((j) => j.status === 'failed').map((j) => [j.id, j.kind, j.sceneId, j.error])).toEqual([]);
   });
 });
