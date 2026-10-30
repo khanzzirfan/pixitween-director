@@ -58,7 +58,7 @@ it('has crew defaults', () => {
     CREW_TAKES_MAX: 3,
     CREW_INBOX_DEBOUNCE_MS: 1500,
     CREW_CAPTURE_TIMEOUT_MS: 20000,
-    CREW_IDLE_END_MS: 600000,
+    CREW_IDLE_END_MS: 90000,
   });
 });
 it('names hosted tracing variables so startup can warn without sending anything', () => {

@@ -36,6 +36,9 @@ export interface ShowrunnerDeps {
 
 export const REPAIR = 'Every tool call in your last turn failed. Read the errors, fix the arguments and call the tools again.';
 export const REPAIR_STALLED = 'Some tool calls in your last turn failed and no job is running, so nothing will wake you. Read the errors, fix the arguments and call those tools again.';
+export const REPAIR_PLAN = 'Some of your planning calls failed (the storyboard or a dispatch), so the film is not what you meant. Read the errors, fix the arguments and call those tools again.';
+export const PLAN_NUDGE = 'You have not planned any scenes yet. Call reviseStoryboard with the scenes, then dispatch a builder for each.';
+export const BUILD_NUDGE = 'The storyboard has scenes but nothing is built and no job is running. Dispatch a builder for each scene.';
 export const DONE_NUDGE = 'Everything is built and checked. Call finish with a one-line summary now, unless a director\'s request is not done yet.';
 export const WRAPPING = 'Wrapping up: everything is built.';
 
@@ -44,7 +47,11 @@ export interface IdleProgress {
   idleTurns: number;
 }
 
-export type IdleAction = 'none' | 'nudge' | 'finish';
+/** 'plan': nothing is planned or built and nothing runs, so the director is prompted to plan. 'fail': it was prompted twice already. */
+export type IdleAction = 'none' | 'nudge' | 'finish' | 'plan' | 'fail';
+
+/** Prompts for an idle crew that has not planned or built anything, before the session would sit out CREW_IDLE_END_MS. */
+export const MAX_PLAN_NUDGES = 2;
 
 /**
  * Decides what an idle board needs: nothing, the one done nudge, or auto-finish after two idle turns (S12f 3.7).
@@ -59,12 +66,16 @@ export async function idleDecision(
   const open = crew.board.list().some((j) => !TERMINAL.includes(j.status));
   const turn = o.hadUser ? { nudged: false, idleTurns: 0 } : progress;
   if (open) return { nudged: false, idleTurns: 0, finished: false, action: 'none' };
+  const film = await crew.films.get(crew.filmId);
+  // An idle crew with nothing planned or built has nothing to wrap up, and nothing would wake it. Prompt it to plan, twice,
+  // then fail fast instead of waiting out the idle end.
+  if (!film.composition || !film.storyboard?.scenes.length) {
+    const attempts = turn.idleTurns + 1;
+    if (attempts > MAX_PLAN_NUDGES) return { nudged: false, idleTurns: attempts, finished: false, action: 'fail' };
+    return { nudged: false, idleTurns: attempts, finished: false, action: 'plan' };
+  }
   const gate = await finishGate(crew, crew.toolCtx);
   if (!gate.pass) return { nudged: false, idleTurns: 0, finished: false, action: 'none' };
-  // The gate passes a film with no composition, so an idle crew that never planned would be nudged, then marked ready.
-  // Nothing is built, so there is nothing to wrap up: leave it to the session end, which fails an empty film.
-  const film = await crew.films.get(crew.filmId);
-  if (!film.composition || !film.storyboard?.scenes.length) return { nudged: false, idleTurns: 0, finished: false, action: 'none' };
   if (!turn.nudged) return { nudged: true, idleTurns: 0, finished: false, action: 'nudge' };
   // Each director turn after the nudge that ends without finishing counts as an idle turn. With auto-finish on, the
   // director is prompted again after each one, so the second makes the film finish itself. Without a new batch, nothing
@@ -114,7 +125,11 @@ export interface ShowrunnerSnapshot {
 export interface TurnResult {
   allFailed: boolean;
   anyFailed: boolean;
+  /** A planning call (storyboard, dispatch, proposeGenerate) failed, so the film may not match what the director meant. */
+  planFailed: boolean;
 }
+
+const PLAN_TOOLS = new Set(['reviseStoryboard', 'dispatch', 'proposeGenerate']);
 
 export interface ShowrunnerAgent {
   history(): ChatMessage[];
@@ -184,7 +199,7 @@ export function createShowrunnerAgent(deps: ShowrunnerDeps, snapshot: Showrunner
       await (await getRegistry()).run(crew.toolCtx, 'say', { text: response.content.trim().slice(0, 240) });
     }
     if (results.some((r, i) => r.ok && calls[i]!.name === 'finish')) finished = true;
-    return { allFailed: results.length > 0 && results.every((r) => !r.ok), anyFailed: results.some((r) => !r.ok) };
+    return { allFailed: results.length > 0 && results.every((r) => !r.ok), anyFailed: results.some((r) => !r.ok), planFailed: results.some((r, i) => !r.ok && PLAN_TOOLS.has(calls[i]!.name)) };
   }
 
   async function next(signal: AbortSignal): Promise<InboxItem[] | undefined> {
