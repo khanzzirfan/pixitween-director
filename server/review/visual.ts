@@ -113,6 +113,10 @@ export function describeTool(tool: { name: string; params: z.ZodTypeAny }): stri
 /** The two sentences that make a review blind: it may judge only what it can see (design 6.5). */
 export const BLIND_RULES = 'Judge only what is visible. Report each problem with the frame index and what you see. Do not guess what the film is meant to show.';
 
+/** Visible defaults from docs/direction/quality.md. Reported as kind "style-tell", at most two per scene, so a review stays about faults. */
+export const STYLE_TELLS =
+  'Also report at most two issues of kind "style-tell" for clear generic defaults visible in the frames: a centred title on a plain gradient, glow or particle effects, a flat unlit empty background, a tiny subject in an empty frame, placeholder or repeated-caption text, or a last frame that is not a finished composition. Skip any you are unsure of.';
+
 export function buildVisualPrompt(o: {
   sceneId: string;
   frameTimes: number[];
@@ -135,6 +139,7 @@ export function buildVisualPrompt(o: {
       ...(o.measured?.length ? ['Measured text boxes (pixels in the frame):', ...o.measured.map((m) => `- ${m}`)] : []),
       'Report only clear visual faults: text that is hard to read, text covering the product, a cut-off subject, or a broken frame.',
       BLIND_RULES,
+      STYLE_TELLS,
       `Reply with only a JSON object: {"sceneId": "${o.sceneId}", "pass": boolean, "issues": [{"image": number, "atSec": number, "kind": string, "where": string, "evidence": string}], "fixes": []}.`,
       'Every issue must name the image number and the second it appears at. Evidence is one sentence describing what you see.',
     ].join('\n');

@@ -310,3 +310,11 @@ describe('visualReview', () => {
     expect(() => sparkReviewer(makeFakeMeta(), { local: true })).toThrow(ReviewError);
   });
 });
+
+describe('style tells in the blind review', () => {
+  it('asks the blind critic for at most two style-tell issues, and the sighted review is unchanged', () => {
+    const base = { sceneId: 's1', frameTimes: [1], findings: [], layerSummary: [], tools: TOOLS };
+    expect(buildVisualPrompt({ ...base, blind: true, measured: [] })).toContain('"style-tell"');
+    expect(buildVisualPrompt(base)).not.toContain('style-tell');
+  });
+});
