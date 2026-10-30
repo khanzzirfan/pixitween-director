@@ -132,7 +132,7 @@ export default function GenerateApproval({ film, filmId, comp, events, api = def
         </div>
         <span className="step-pill">UP TO 2 SCENES</span>
       </div>
-      {actions.scenes.length === 0 && <p>No scenes yet.</p>}
+      {actions.scenes.length === 0 ? <p>No scenes yet.</p> : <p className="gen-note">Real video costs about 25 credits a scene and needs your approval. Up to {MAX_GENERATE_SCENES} scenes.</p>}
       {actions.scenes.map((s) => (
         <SceneCard key={s.id} s={s} api={api} generateCount={generateCount} actions={actions} />
       ))}

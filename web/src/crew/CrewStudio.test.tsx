@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { forwardRef } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { App } from '../App';
@@ -25,8 +25,8 @@ function open(f: unknown) {
 it('a crew film gets the studio: crew board and live storyboard, not the classic storyboard panel', async () => {
   open(film(true));
   expect(await screen.findByTestId('crew-studio')).toBeInTheDocument();
-  expect(screen.getByRole('region', { name: 'Crew' })).toBeInTheDocument();
   expect(screen.getByRole('region', { name: 'Storyboard' })).toBeInTheDocument();
+  expect(screen.getByTestId('rail-crew')).toBeInTheDocument();
   expect(screen.queryByTestId('slot-storyboard')).toBeNull();
   expect(screen.queryByTestId('slot-review')).toBeNull();
 });
@@ -38,9 +38,13 @@ it('a classic film renders the classic panels exactly as before', async () => {
   expect(screen.queryByTestId('crew-studio')).toBeNull();
 });
 
-it('puts the player before the conversation, the crew and the plan in the page order (it is first on a phone)', async () => {
+it('puts the plan, crew and conversation in the shell: plan open first, crew one rail click away', async () => {
   open(film(true));
   const studio = await screen.findByTestId('crew-studio');
-  const cols = [...studio.querySelectorAll('.studio-grid > .col')].map((c) => c.className);
-  expect(cols).toEqual(['col col-plan', 'col col-stage', 'col col-crew']); // css `order` puts the stage first below 1100 px
+  expect(studio.querySelector('[data-pane="plan"]')).not.toHaveAttribute('hidden');
+  expect(studio.querySelector('[data-pane="crew"]')).toHaveAttribute('hidden');
+  fireEvent.click(screen.getByTestId('rail-crew'));
+  expect(studio.querySelector('[data-pane="crew"]')).not.toHaveAttribute('hidden');
+  expect(screen.getByRole('region', { name: 'Crew' })).toBeInTheDocument();
+  expect(screen.getByTestId('slot-player')).toBeInTheDocument();
 });

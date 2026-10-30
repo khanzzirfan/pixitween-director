@@ -51,6 +51,7 @@ it('exports the film shown in the Player slot', async () => {
   vi.spyOn(client.api, 'getFilm').mockResolvedValue(film as never);
   window.history.replaceState({}, '', '/?film=film_3fa9c2d41b7e');
   render(<App />);
+  fireEvent.click(await screen.findByTestId('rail-export')); // the export panel sits behind a rail tab
   const button = await screen.findByRole('button', { name: 'Export video' });
   await waitFor(() => expect(button).toBeEnabled());
   fireEvent.click(button);

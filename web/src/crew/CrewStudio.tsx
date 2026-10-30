@@ -1,26 +1,30 @@
-// Owned by S12d. The studio for a crew film: the plan on the left, the player in the middle, the crew and the conversation on the right.
-import { useCallback, type RefObject } from 'react';
+// Owned by S12d, laid out by S14. The studio for a crew film, inside the shell: plan and crew on the left, the player and filmstrip in the middle, the conversation on the right.
+import { useCallback, useState, type RefObject } from 'react';
 import type { FilmState } from '@shared/composition';
 import type { FilmEvent } from '@shared/events';
 import { api } from '../api/client';
 import { captureScene } from '../capture/driver';
 import Player, { type PlayerHandle } from '../player/Player';
+import { Filmstrip, sceneStarts } from '../shell/Filmstrip';
+import { StudioShell, type ShellTab } from '../shell/StudioShell';
+import { STEPS, stepFor } from '../shell/steps';
 import { BudgetMeter } from './BudgetMeter';
 import { ChatThread } from './ChatThread';
 import { CrewBoard } from './CrewBoard';
 import { LiveStoryboard } from './LiveStoryboard';
-import { PhoneView } from './PhoneFrame';
+import { ringFor } from './SceneCard';
 import { TakesPicker } from './TakesPicker';
 import { useCaptureRequests } from './useCaptureRequests';
 import { useCrew, useNow } from './useCrew';
 import './crew.css';
 
-export function CrewStudio({ film, events, playerRef, frozenNow }: { film: FilmState; events: FilmEvent[]; playerRef: RefObject<PlayerHandle | null>; frozenNow?: number }) {
+export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [] }: { film: FilmState; events: FilmEvent[]; playerRef: RefObject<PlayerHandle | null>; frozenNow?: number; extraTabs?: ShellTab[] }) {
   const { crew, actions } = useCrew(film.id, events);
   const liveNow = useNow(1000, frozenNow !== undefined);
   const now = frozenNow ?? liveNow;
   const getPlayer = useCallback(() => playerRef.current, [playerRef]);
   const storyboard = crew.storyboard ?? film.storyboard;
+  const [selected, setSelected] = useState<string>();
   useCaptureRequests({ filmId: film.id, requests: crew.captureRequests, storyboard, getPlayer });
 
   const product = film.assets.find((a) => a.id === film.brief.productAssetId);
@@ -36,50 +40,67 @@ export function CrewStudio({ film, events, playerRef, frozenNow }: { film: FilmS
   }, [playerRef, storyboard]);
 
   const play = () => {
-    document.querySelector('[data-testid="slot-player"]')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
     playerRef.current?.seek(0);
     playerRef.current?.play();
   };
 
-  return (
-    <div className="studio" data-testid="crew-studio">
-      <div className="studio-bar">
-        <h2 className="studio-title">{crew.storyboard?.title ?? film.title ?? 'Your film'}</h2>
-        <span className={`status-chip st-${filmStatus}`} data-testid="film-status-chip">{filmStatus}</span>
-        <div className="studio-spacer" />
-        <BudgetMeter budget={crew.budget} credits={crew.credits} />
-      </div>
-      <div className="studio-grid">
-        <div className="col col-plan">
-          <LiveStoryboard crew={crew} now={now} onOps={(ops) => actions!.postStoryboard(ops)} />
-        </div>
-        <div className="col col-stage">
-          <section className="slot stage" data-testid="slot-player">
-            {/* a finished film is remounted per version: the engine does not rebuild a mounted composition when its source changes, so the picture would stay on the first build */}
-            <Player key={filmStatus === 'ready' ? `v${film.version}` : 'live'} ref={playerRef as RefObject<PlayerHandle>} composition={film.composition ?? null} />
-          </section>
-          <TakesPicker crew={crew} onPick={(jobId, takeFilmId) => actions!.pickTake(jobId, takeFilmId)} />
-        </div>
-        <div className="col col-crew">
+  const scenes = storyboard?.scenes ?? [];
+  const jobs = Object.values(crew.jobs);
+  const busy = Object.values(crew.lanes).filter((l) => l.state !== 'idle').length;
+  const jump = (sceneId: string) => {
+    setSelected(sceneId);
+    const at = sceneStarts(scenes)[scenes.findIndex((s) => s.id === sceneId)];
+    if (at !== undefined) playerRef.current?.seek(at);
+  };
+
+  const tabs: ShellTab[] = [
+    { id: 'plan', label: 'Plan', icon: 'list', badge: scenes.length || undefined, content: <LiveStoryboard crew={crew} now={now} onOps={(ops) => actions!.postStoryboard(ops)} /> },
+    {
+      id: 'crew',
+      label: 'Crew',
+      icon: 'users',
+      badge: busy || undefined,
+      content: (
+        <>
           <CrewBoard crew={crew} now={now} onCancel={(id) => void actions!.cancelJob(id)} />
-          <section className="desk" aria-label="Director's desk">
-            <header className="crew-head"><div><span className="eyebrow">DIRECTOR'S DESK</span><h2>Talk to the showrunner</h2></div></header>
-            <PhoneView>
-              <ChatThread
-                crew={crew}
-                now={now}
-                filmStatus={filmStatus}
-                aspect={film.aspect}
-                productUrl={product?.url}
-                getPoster={poster}
-                onPlay={play}
-                onSend={(message) => api.chat(film.id, { message })}
-                onVoice={(blob) => actions!.postVoice(blob)}
-              />
-            </PhoneView>
-          </section>
-        </div>
-      </div>
-    </div>
+          <TakesPicker crew={crew} onPick={(jobId, takeFilmId) => actions!.pickTake(jobId, takeFilmId)} />
+        </>
+      ),
+    },
+    ...extraTabs,
+  ];
+
+  return (
+    <StudioShell
+      testId="crew-studio"
+      title={crew.storyboard?.title ?? film.title ?? 'Your film'}
+      status={filmStatus}
+      steps={STEPS}
+      step={stepFor(filmStatus)}
+      tabs={tabs}
+      defaultTab="plan"
+      stage={
+        <section className="slot stage" data-testid="slot-player">
+          {/* a finished film is remounted per version: the engine does not rebuild a mounted composition when its source changes, so the picture would stay on the first build */}
+          <Player key={filmStatus === 'ready' ? `v${film.version}` : 'live'} ref={playerRef as RefObject<PlayerHandle>} composition={film.composition ?? null} />
+        </section>
+      }
+      strip={<Filmstrip scenes={scenes} selected={selected} onSelect={jump} ringOf={(id) => ringFor(jobs, id)} />}
+      side={
+        <ChatThread
+          crew={crew}
+          now={now}
+          filmStatus={filmStatus}
+          aspect={film.aspect}
+          productUrl={product?.url}
+          getPoster={poster}
+          onPlay={play}
+          onSend={(message) => api.chat(film.id, { message })}
+          onVoice={(blob) => actions!.postVoice(blob)}
+        />
+      }
+      sideTitle="Talk to the showrunner"
+      headerRight={<BudgetMeter budget={crew.budget} credits={crew.credits} />}
+    />
   );
 }

@@ -1,5 +1,5 @@
 /* Owned by S12d. The crew studio. Built on the theme tokens (--bg, --surface, --border, --accent, --muted, --text), so light and dark both work. */
-.studio, .thread, .phone-view, .crew-map {
+.sh, .studio, .thread, .phone-view, .crew-map {
   --c-working: #16a34a;
   --c-thinking: #d97706;
   --c-waiting: #2563eb;
@@ -9,34 +9,18 @@
   --shadow: 0 10px 30px rgb(30 20 60 / 8%);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .studio, :root:not([data-theme='light']) .thread, :root:not([data-theme='light']) .phone-view, :root:not([data-theme='light']) .crew-map { --c-working: #4ade80; --c-thinking: #fbbf24; --c-waiting: #60a5fa; --c-bad: #f87171; --shadow: 0 10px 30px rgb(0 0 0 / 35%); }
+  :root:not([data-theme='light']) .sh, :root:not([data-theme='light']) .studio, :root:not([data-theme='light']) .thread, :root:not([data-theme='light']) .phone-view, :root:not([data-theme='light']) .crew-map { --c-working: #4ade80; --c-thinking: #fbbf24; --c-waiting: #60a5fa; --c-bad: #f87171; --shadow: 0 10px 30px rgb(0 0 0 / 35%); }
 }
-:root[data-theme='dark'] .studio, :root[data-theme='dark'] .thread, :root[data-theme='dark'] .phone-view, :root[data-theme='dark'] .crew-map { --c-working: #4ade80; --c-thinking: #fbbf24; --c-waiting: #60a5fa; --c-bad: #f87171; --shadow: 0 10px 30px rgb(0 0 0 / 35%); }
+:root[data-theme='dark'] .sh, :root[data-theme='dark'] .studio, :root[data-theme='dark'] .thread, :root[data-theme='dark'] .phone-view, :root[data-theme='dark'] .crew-map { --c-working: #4ade80; --c-thinking: #fbbf24; --c-waiting: #60a5fa; --c-bad: #f87171; --shadow: 0 10px 30px rgb(0 0 0 / 35%); }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .eyebrow { display: block; font-size: 10.5px; font-weight: 750; letter-spacing: .14em; color: var(--accent); }
 
-/* ---------- layout ---------- */
-.studio { max-width: 1680px; margin: 0 auto; padding: clamp(12px, 2vw, 28px); display: grid; gap: 16px; }
-.studio-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.studio-title { margin: 0; font-size: clamp(18px, 2.4vw, 26px); letter-spacing: -.04em; }
-.studio-spacer { flex: 1; }
-.status-chip { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: capitalize; background: color-mix(in srgb, var(--c-waiting) 16%, var(--surface)); color: var(--text); }
-.status-chip.st-building, .status-chip.st-planning { background: color-mix(in srgb, var(--c-thinking) 22%, var(--surface)); }
-.status-chip.st-ready { background: color-mix(in srgb, var(--c-working) 22%, var(--surface)); }
-.status-chip.st-failed { background: color-mix(in srgb, var(--c-bad) 22%, var(--surface)); }
-.studio-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
-.col { display: grid; gap: 16px; min-width: 0; align-content: start; }
-/* phones: player first, then the conversation and the crew, then the plan */
-.col-stage { order: 1; } .col-crew { order: 2; } .col-plan { order: 3; }
-@media (min-width: 1100px) {
-  .studio-grid { grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(340px, 430px); }
-  .col-plan { order: 1; } .col-stage { order: 2; } .col-crew { order: 3; }
-  .col-plan, .col-crew { max-height: calc(100vh - 150px); overflow: auto; position: sticky; top: 72px; scrollbar-width: thin; }
-  .col-stage { position: sticky; top: 72px; }
-}
-.studio section, .desk { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 16px; box-shadow: var(--shadow); min-width: 0; }
-.studio .stage { padding: 12px; }
+/* ---------- layout (the frame itself lives in shell/shell.css) ---------- */
+.status-chip { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; text-transform: capitalize; }
+/* panels inside the shell are flat and padded by the pane */
+.sh-pane > section, .sh-pane > .crew-board { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 10px 14px; min-width: 0; }
+.sh-pane > section + section { border-top: 1px solid var(--border); }
 .crew-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .crew-head h2 { margin: 2px 0 0; font-size: 17px; letter-spacing: -.035em; }
 .crew-extras { padding-top: 0; }

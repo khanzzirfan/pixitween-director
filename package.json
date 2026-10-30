@@ -63,6 +63,7 @@
     "pixi.js": "^8.22.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-resizable-panels": "^3.0.6",
     "reacthub-pixitweenjs": "^0.3.0-alpha.5",
     "sharp": "^0.35.5",
     "three": "^0.184.0",

@@ -22,7 +22,8 @@ test('crew studio: four builders at once, a mid-build message adds a scene, the 
   const studio = page.getByTestId('crew-studio');
   await expect(studio).toBeVisible();
 
-  // four builder lanes are working at the same moment
+  // the crew board sits behind the Crew tab of the rail; four builder lanes are working at the same moment
+  await page.getByTestId('rail-crew').click();
   const working = page.locator('.lane-builder .state-pill.st-working');
   await expect(working).toHaveCount(4, { timeout: 30_000 });
 

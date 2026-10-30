@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useFilm } from './api/useFilm';
 import { FixturePage } from './dev/FixturePage';
 import Chat from './panels/Chat';
@@ -10,6 +10,9 @@ import Review from './panels/Review';
 import Storyboard from './panels/Storyboard';
 import Player, { type PlayerHandle } from './player/Player';
 import { CrewStudio } from './crew/CrewStudio';
+import { Filmstrip, sceneStarts } from './shell/Filmstrip';
+import { StudioShell, type ShellTab } from './shell/StudioShell';
+import { STEPS, stepFor } from './shell/steps';
 
 function Slot({ name, children }: { name: string; children: ReactNode }) {
   return (
@@ -22,63 +25,51 @@ function Slot({ name, children }: { name: string; children: ReactNode }) {
 function Director({ filmId }: { filmId: string | null }) {
   const { film, events } = useFilm(filmId);
   const playerRef = useRef<PlayerHandle>(null);
+  const [selected, setSelected] = useState<string>();
   const panelProps = { film, events };
-  if (film?.crew) {
-    return (
-      <>
-        <header className="app-header">
-          <h1>PixiTween Director</h1>
-          <span className="header-caption">Crew studio</span>
-          <div className="header-spacer" />
-          <span data-testid="film-status">{film.status}</span>
-        </header>
-        <CrewStudio film={film} events={events} playerRef={playerRef} />
-        <main className="grid crew-extras">
-          <Slot name="export">
-            <ExportPanel {...panelProps} getPlayer={() => playerRef.current} />
-          </Slot>
-          <Slot name="gallery">
-            <Gallery {...panelProps} />
-          </Slot>
-        </main>
-      </>
-    );
-  }
+  const getPlayer = useCallback(() => playerRef.current, []);
+
+  const exportTab: ShellTab = { id: 'export', label: 'Export', icon: 'download', content: <Slot name="export"><ExportPanel {...panelProps} getPlayer={getPlayer} /></Slot> };
+  const galleryTab: ShellTab = { id: 'gallery', label: 'Gallery', icon: 'grid', content: <Slot name="gallery"><Gallery {...panelProps} /></Slot> };
+
+  if (film?.crew) return <CrewStudio film={film} events={events} playerRef={playerRef} extraTabs={[exportTab, galleryTab]} />;
+
+  const statusEvent = [...events].reverse().find((e) => e.type === 'film.status');
+  const status = statusEvent?.type === 'film.status' ? statusEvent.status : film?.status;
+  const boardEvent = [...events].reverse().find((e) => e.type === 'director.storyboard');
+  const storyboard = boardEvent?.type === 'director.storyboard' ? boardEvent.storyboard : film?.storyboard;
+  const scenes = storyboard?.scenes ?? [];
+  const costs = events.reduce((n, e) => (e.type === 'cost' ? n + e.usd : n), 0);
+
+  const tabs: ShellTab[] = [
+    { id: 'new', label: 'New', icon: 'plus', content: <Slot name="new-film"><NewFilm {...panelProps} /></Slot> },
+    { id: 'plan', label: 'Plan', icon: 'list', badge: scenes.length || undefined, content: <Slot name="storyboard"><Storyboard {...panelProps} /></Slot> },
+    { id: 'review', label: 'Review', icon: 'eye', content: <Slot name="review"><Review {...panelProps} getPlayer={getPlayer} /></Slot> },
+    { id: 'generate', label: 'Generate', icon: 'bolt', content: <Slot name="generate"><GenerateApproval {...panelProps} /></Slot> },
+    exportTab,
+    galleryTab,
+  ];
+
+  const jump = (sceneId: string) => {
+    setSelected(sceneId);
+    const at = sceneStarts(scenes)[scenes.findIndex((s) => s.id === sceneId)];
+    if (at !== undefined) playerRef.current?.seek(at);
+  };
+
   return (
-    <>
-      <header className="app-header">
-        <h1>PixiTween Director</h1>
-        <span className="header-caption">Creative studio</span>
-        <div className="header-spacer" />
-        {film && <span data-testid="film-status">{film.status}</span>}
-      </header>
-      <main className="grid">
-        <Slot name="new-film">
-          <NewFilm {...panelProps} />
-        </Slot>
-        <Slot name="storyboard">
-          <Storyboard {...panelProps} />
-        </Slot>
-        <Slot name="player">
-          <Player ref={playerRef} composition={film?.composition ?? null} />
-        </Slot>
-        <Slot name="review">
-          <Review {...panelProps} getPlayer={() => playerRef.current} />
-        </Slot>
-        <Slot name="chat">
-          <Chat {...panelProps} player={playerRef.current} comp={film?.composition} />
-        </Slot>
-        <Slot name="generate">
-          <GenerateApproval {...panelProps} />
-        </Slot>
-        <Slot name="export">
-          <ExportPanel {...panelProps} getPlayer={() => playerRef.current} />
-        </Slot>
-        <Slot name="gallery">
-          <Gallery {...panelProps} />
-        </Slot>
-      </main>
-    </>
+    <StudioShell
+      title={film?.title ?? storyboard?.title ?? 'New film'}
+      status={status}
+      steps={STEPS}
+      step={film ? stepFor(status) : 0}
+      tabs={tabs}
+      defaultTab={film ? 'plan' : 'new'}
+      stage={<Slot name="player"><Player ref={playerRef} composition={film?.composition ?? null} /></Slot>}
+      strip={<Filmstrip scenes={scenes} selected={selected} onSelect={jump} />}
+      side={<Slot name="chat"><Chat {...panelProps} player={playerRef.current} comp={film?.composition} /></Slot>}
+      sideTitle="Director's desk"
+      headerRight={film && costs > 0 ? <span className="sh-cost" title="Spent on this film">${costs.toFixed(2)}</span> : undefined}
+    />
   );
 }
 

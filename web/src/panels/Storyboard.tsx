@@ -38,32 +38,37 @@ export default function Storyboard({ film, events }: PanelProps) {
             <article className="story-scene" data-testid="scene-card" key={scene.id}>
               <div className="story-scene-top">
                 <span className="scene-number">{scene.id}</span>
+                <h3>{scene.intent}</h3>
                 <span className="scene-duration">{scene.durationSec}s</span>
               </div>
-              <h3>{scene.intent}</h3>
-              <span className={`mode-pill mode-${scene.mode}`} data-testid="mode-badge">
-                {scene.mode.toUpperCase()}
-              </span>
-              <p>{scene.camera}</p>
-              {scene.text && <p>{scene.text}</p>}
-              <p>{scene.modeReason}</p>
-              {scene.mode === 'generate' && <p>~{scene.estCredits ?? 25} credits</p>}
+              <p className="scene-meta">
+                <span className={`mode-pill mode-${scene.mode}`} data-testid="mode-badge" title={scene.modeReason}>
+                  {scene.mode.toUpperCase()}
+                </span>
+                {[scene.camera, scene.text].filter(Boolean).join(' · ')}
+                {scene.mode === 'generate' && ` · ~${scene.estCredits ?? 25} credits`}
+              </p>
             </article>
           ))}
         </div>
       ) : (
         <p>Waiting for a brief</p>
       )}
-      <div data-testid="tool-ticker">
-        {tools.map((event, i) =>
-          event.type === 'tool.call' ? (
-            <p key={`${event.at}-${i}`}>
-              {event.ok ? '✓' : '✗'} {event.name}
-              {event.error ? `: ${event.error}` : ''}
-            </p>
-          ) : null,
-        )}
-      </div>
+      {tools.length > 0 && (
+        <details className="activity">
+          <summary>Activity ({tools.length})</summary>
+          <div data-testid="tool-ticker">
+            {tools.map((event, i) =>
+              event.type === 'tool.call' ? (
+                <p key={`${event.at}-${i}`}>
+                  {event.ok ? '✓' : '✗'} {event.name}
+                  {event.error ? `: ${event.error}` : ''}
+                </p>
+              ) : null,
+            )}
+          </div>
+        </details>
+      )}
       {(costs.length > 0 || film) && (
         <p>
           Cost ${usd.toFixed(4)}

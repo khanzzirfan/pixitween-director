@@ -33,7 +33,7 @@ export default function ModeToggle({ sceneId, mode, busy, disabledReason, onChan
           );
         })}
       </div>
-      {mode === 'motion' && !disabledReason && <p>Real video costs about 25 credits and needs your approval.</p>}
+      {mode === 'motion' && !disabledReason && <p className="mode-hint">Real video costs about 25 credits and needs your approval.</p>}
       {disabledReason && <p>{disabledReason}</p>}
     </div>
   );

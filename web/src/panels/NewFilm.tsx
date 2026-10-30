@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiRequestError, api } from '../api/client';
 import { ChatIntake } from '../crew/ChatIntake';
-import { PhoneView } from '../crew/PhoneFrame';
 import { getCrewConfig } from '../crew/api';
 import type { PanelProps } from './types';
 import { useRecorder } from './useRecorder';
@@ -39,9 +38,7 @@ export default function NewFilm(props: PanelProps) {
           <h2>Make a new film</h2>
         </div>
       </div>
-      <PhoneView>
-        <ChatIntake />
-      </PhoneView>
+      <ChatIntake />
     </section>
   );
 }
