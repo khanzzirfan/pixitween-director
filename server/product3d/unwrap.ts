@@ -12,8 +12,12 @@ export interface BodyBand {
 
 const OPAQUE = 127;
 const BAND_TOLERANCE = 0.04;
-/** A body shorter than this share of the product's rows is not a cylinder. */
-const MIN_BODY_SHARE = 0.3;
+/**
+ * A body shorter than this share of the product's rows is not a cylinder. Measured on real cut-outs: a can is 92 %, a plain
+ * bottle with a neck about 61 %, and the Habik flacon (ornate cap, neck and shoulders, 45 % of its height) 53 %, which the
+ * bottle primitive wrapped with the cap lost. 0.58 sends the flacon to the outline and keeps the plain bottle.
+ */
+const MIN_BODY_SHARE = 0.58;
 
 const median = (v: number[]): number => {
   const s = [...v].sort((a, b) => a - b);

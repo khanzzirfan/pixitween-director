@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { bottle, stripedCan, triangle, RED, SLATE, WHITE } from './test-images';
+import { bottle, flacon, stripedCan, triangle, RED, SLATE, WHITE } from './test-images';
 import { findBodyBand, LABEL_HEIGHT, LABEL_WIDTH, unwrapCylinder } from './unwrap';
 
 it('finds the body of the test can: rows within 3 px and the radius within 1 px', () => {
@@ -19,6 +19,10 @@ it('leaves the neck and shoulder of the bottle out of the band', () => {
   expect(band.top).toBeGreaterThanOrEqual(truth.neckBottom);
   expect(band.top).toBeGreaterThanOrEqual(truth.bodyTop - 10); // the shoulder rows narrow by more than 4 %
   expect(Math.abs(band.bottom - truth.bodyBottom)).toBeLessThanOrEqual(3);
+});
+
+it('returns null for a flacon whose cap, neck and shoulders are nearly half its height, so the outline keeps the cap', () => {
+  expect(findBodyBand(flacon())).toBeNull();
 });
 
 it('returns null for a triangle, which has no straight body', () => {

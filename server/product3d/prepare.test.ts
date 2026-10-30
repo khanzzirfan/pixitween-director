@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import { expect, it } from 'vitest';
 import { makeTestFilm } from '../test-utils/film';
 import { prepareProduct3D, newPrepareCache } from './prepare';
-import { stripedCan, triangle, type Rgba } from './test-images';
+import { flacon, stripedCan, triangle, type Rgba } from './test-images';
 
 const png = (img: Rgba) => sharp(Buffer.from(img.data.buffer), { raw: { width: img.width, height: img.height, channels: 4 } }).png().toBuffer();
 async function setup(img: Rgba) {
@@ -67,4 +67,11 @@ it('records the time the image work takes on the test can', async () => {
   await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'can' }, newPrepareCache());
   console.log(`prepare (can, 300 x 500 test image): ${Math.round(performance.now() - start)} ms`);
   expect(performance.now() - start).toBeLessThan(5000);
+});
+
+it("outlines a flacon asked as a bottle, so the ornate cap is not replaced by a plain bottle neck", async () => {
+  const t = await setup(flacon());
+  const r = await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'bottle' }, newPrepareCache());
+  expect(r.shape).toBe('other');
+  expect(r.fallback).toBe('extrude');
 });
