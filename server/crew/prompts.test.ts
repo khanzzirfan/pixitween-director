@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { StyleBible } from '@shared/crew';
-import { SHOWRUNNER_SYSTEM, renderBibleBlock, renderJobBlock, showrunnerSystem } from './prompts';
+import { BUILDER_DIRECTION, DIRECTION, SHOWRUNNER_SYSTEM, renderBibleBlock, renderJobBlock, showrunnerSystem } from './prompts';
 
 const bible: StyleBible = {
   palette: ['#1f2937', '#f59e0b', '#fde68a'],
@@ -76,5 +76,18 @@ describe('showrunnerSystem (S13b)', () => {
       if (saved === undefined) delete process.env.PRODUCT_3D;
       else process.env.PRODUCT_3D = saved;
     }
+  });
+});
+
+describe('direction blocks', () => {
+  it('puts the direction in the showrunner prompt without adding a numbered rule', () => {
+    expect(SHOWRUNNER_SYSTEM).toContain(DIRECTION);
+    expect(showrunnerSystem(true)).toContain(DIRECTION);
+    expect(SHOWRUNNER_SYSTEM.split('\n').filter((l) => /^\d+\. /.test(l))).toHaveLength(8);
+  });
+
+  it('gives builders only the four eases the tools know', () => {
+    expect(BUILDER_DIRECTION).toMatch(/easeOut/);
+    expect(BUILDER_DIRECTION).not.toMatch(/cubic-bezier|spring|ζ/);
   });
 });

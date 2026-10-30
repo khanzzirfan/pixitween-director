@@ -12,7 +12,7 @@ import type { Comp } from '../../authoring/types';
 import { loadEnv } from '../../env';
 import { getLocalMode } from '../../llm/local-mode';
 import { pickBackend } from '../../llm/router';
-import { renderBibleBlock, renderJobBlock, renderOutlineBlock } from '../prompts';
+import { BUILDER_DIRECTION, renderBibleBlock, renderJobBlock, renderOutlineBlock } from '../prompts';
 import { applyTextLane, fitTextToSafeArea } from '../text-lane';
 import { restoreScene } from '../scene-snapshot';
 import type { WorkerResult } from '../scheduler';
@@ -118,7 +118,7 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
       canvas: { ...dims, aspect: film.aspect },
       palette,
       product: { assetId: film.brief.productAssetId, width: product?.width ?? dims.width, height: product?.height ?? dims.height },
-      extraSystem: [film.styleBible ? renderBibleBlock(film.styleBible) : '', film.storyboard ? renderOutlineBlock(film.storyboard, sceneId) : '', SAFE_AREA, renderJobBlock(job)].filter(Boolean).join('\n'),
+      extraSystem: [film.styleBible ? renderBibleBlock(film.styleBible) : '', film.storyboard ? renderOutlineBlock(film.storyboard, sceneId) : '', SAFE_AREA, BUILDER_DIRECTION, renderJobBlock(job)].filter(Boolean).join('\n'),
       toolFilter: building ? (t: ToolDef) => !EDIT_ONLY_TOOLS.includes(t.name) : () => true,
       signal,
       run: scopedRunTool(sceneId),
