@@ -1,0 +1,386 @@
+{
+  "name": "PixiTween Director S16b: cartoon crew (cast, set, motion, blocking into stage3d, critic, forge lane)",
+  "branchName": "ralph/s16b-cartoon-crew",
+  "description": "Gives the Muse crew a toy-studio workflow: the showrunner casts characters, dresses the set, requests motion and dispatches one blocking job per shot that writes an engine stage3d layer with a locked camera; the critic checks character, product and intersections on captured frames; the studio shows a forge lane. Catalog fan-out (S15) swaps the product glTF per product on top.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Cartoon contracts: job kinds, storyboard beats and cues, cartoon events",
+      "description": "As a crew member, I want job kinds, shot cues and events for the toy studio so that the board, the replay and the UI show cartoon work like any other job.",
+      "steps": [
+        "Read shared/crew.ts (JOB_KINDS, priorities), shared/storyboard.ts (sceneSchema) and shared/events.ts.",
+        "Edit shared/crew.ts: add 'cast-character', 'make-prop', 'make-set', 'make-motion' and 'block-shot' to JOB_KINDS; block-shot is a writing kind; the forge kinds are not; add lane 'forge' to LANES.",
+        "Edit shared/storyboard.ts: scenes get optional beats (≤ 300 chars), castIds string[], cues [{ atSec, actorId, clip, mark?: [x, z, facingDeg] }] and lightCue?: 'dawn' | 'studio' | 'spotlight' | 'night'.",
+        "Edit shared/events.ts: add forge.job { job } and cast.updated { member } events.",
+        "Add or extend shared tests."
+      ],
+      "acceptanceCriteria": [
+        "A scene with cues [{ atSec: 1.5, actorId: 'c1', clip: 'wave', mark: [0, 0, 0] }] parses",
+        "JOB_KINDS contains 'block-shot' and WRITING_KINDS contains it; WRITING_KINDS does not contain 'cast-character'",
+        "A forge.job event parses through the FilmEvent schema",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "contracts"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Casting worker: concept art → mask → rigged character",
+      "description": "As a showrunner, I want a cast-character job to turn a character description into a rigged toy character so that the film has a mascot that can act.",
+      "steps": [
+        "Read server/art/* (Muse Image generation, prompt lint, SAM 3.1 cut-out) and server/forge/client.ts.",
+        "Create server/cartoon/casting.ts exporting runCastJob(job, signal, crew): generate one concept image with Muse Image using the template 'a cute vinyl toy figure of <description>, full body, A-pose, arms away from body, plain light grey background, soft studio light' (prompt-linted), cut it out with SAM 3.1 (noun 'toy figure'), call forge.character(image, mask), wait, store the rig asset, update FilmState.cast and emit cast.updated and forge.job.",
+        "On a forge failure set the member status 'failed' with the error and push an inbox item to the showrunner.",
+        "Map 'cast-character' in server/crew/workers/registry.ts.",
+        "Add server/cartoon/casting.test.ts with the fake forge and recorded Muse Image/SAM fixtures."
+      ],
+      "acceptanceCriteria": [
+        "A cast job for 'a round orange fox' ends with one cast member status 'rigged' and a rig asset",
+        "The Muse Image prompt contains 'A-pose' and the description, and no brand term passes the lint",
+        "A forge failure leaves the member 'failed' and puts exactly one inbox item",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "crew",
+        "meta"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Set and prop workers: backdrop, props and the product in 3D",
+      "description": "As a set dresser, I want a painted toy-diorama backdrop and 3D props and product so that the shot has a world to stand in.",
+      "steps": [
+        "Read server/art/* (generatePlate), server/forge/client.ts and the stage3d set/props schema in aep-31 requirements.",
+        "Create server/cartoon/set.ts exporting runSetJob: one Muse Image backdrop in the style 'miniature toy diorama of <place>, tilt-shift, soft daylight, no characters' at 16:9, stored as FilmState.set.backdropAssetId.",
+        "Create server/cartoon/props.ts exporting runPropJob: one Muse Image prop image ('a single toy <noun>, plain background'), SAM 3.1 mask, forge.object, mesh asset into FilmState.set.props.",
+        "Export runProductJob: SAM 3.1 mask of the film's product photo → forge.object → FilmState.productMeshAssetId (add the field in shared/composition.ts only if S16a has not).",
+        "Map 'make-set' and 'make-prop' in the registry; the product mesh runs as a 'make-prop' with productOf set.",
+        "Add server/cartoon/set.test.ts and props.test.ts with fakes."
+      ],
+      "acceptanceCriteria": [
+        "A set job stores one backdrop asset and its prompt contains 'diorama' and no character words",
+        "A prop job for 'teapot' adds one prop with a mesh asset",
+        "The product job uses the film's product photo, not a generated image (the fake records the photo asset id)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "crew",
+        "meta"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Motion worker: library clip by name or act-it-out video",
+      "description": "As an animator, I want a make-motion job to supply a named clip so that blockers can cue it on any character.",
+      "steps": [
+        "Read scripts/forge/import-clips.ts (clip-library.json) and server/forge/client.ts motionVideo.",
+        "Create server/cartoon/motion.ts exporting resolveClip(name) from the library (exact, then a small synonym table: hello→wave, celebrate→jump, show→present), and runMotionJob: library hit → FilmState.clips entry with source 'library'; a job with an uploaded video → forge.motionVideo → clip asset with source 'video'.",
+        "Map 'make-motion' in the registry.",
+        "Create server/cartoon/routes.ts with registerCartoonRoutes(app, deps) adding POST /api/films/:id/act (multipart video ≤ 30 s, passcode) that queues a make-motion job named by the form field 'name'; edit server/http/routes.ts to call it.",
+        "Add server/cartoon/motion.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "resolveClip('hello') returns the library clip named 'wave'",
+        "A make-motion job with a video produces one clip with source 'video' via the fake forge",
+        "POST /act with a 40-second video returns 400 naming the 30 s limit",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "crew",
+        "api"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Stage authoring tools: stage3d per scene with locked camera",
+      "description": "As a blocker, I want authoring tools that write a stage3d layer for a scene so that a shot is built from validated, versioned edits.",
+      "steps": [
+        "Read server/tools/authoring.ts (runAuthoring, films.mutate), server/authoring/api.ts and the aep-31 stage3d schema from the engine package.",
+        "Edit server/env.ts and .env.example: CARTOON_MODE boolOff with a one-line comment.",
+        "Create server/cartoon/stage-api.ts (pure): addStage(comp, sceneId, { backdropAssetId, lightPreset, style }) adds one stage3d layer under the scene's 2D title layers with a fixed camera (position [0, 1.4, 6], target [0, 0.9, 0], fov 35); placeActor(comp, sceneId, actorId, assetId, mark); cueClip(comp, sceneId, actorId, clipAssetId, atFrame, opts); moveActor(comp, sceneId, actorId, toMark, atFrame, durationFrames); placeProp(...); placeProduct3D(...); setLightCue(comp, sceneId, cue) mapping dawn/studio/spotlight/night to key/fill/rim keyframes.",
+        "Edit server/tools/authoring.ts to expose these as tools (addStage, placeActor, cueClip, moveActor, placeProp, placeStageProduct, setLightCue), each validated by the engine schema; when CARTOON_MODE is on, setCamera accepts only 'static'.",
+        "Edit server/agent/storyboard.ts so the storyboard camera enum is ['static'] when CARTOON_MODE is on.",
+        "Add server/cartoon/stage-api.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "addStage then placeActor then cueClip produces a composition that the engine's parseAepComposition accepts at schema 1.11.0",
+        "No tool can produce a stage3d camera with keyframes (a test tries and gets a validation error)",
+        "setLightCue('dawn') produces a key light intensity keyframe that rises from 0 at the scene start",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Blocking worker: one Spark builder per shot writes the stage",
+      "description": "As a showrunner, I want one block-shot job per scene so that shots are staged in parallel from the beats and cues.",
+      "steps": [
+        "Read server/crew/workers/builder.ts (scope guard, tool loop) and server/cartoon/stage-api.ts.",
+        "Create server/cartoon/blocking.ts exporting runBlockJob: builds the scene from storyboard beats, castIds and cues using only the stage tools plus setText/restyleText for titles; scope-guarded to its own scene; prompt in server/cartoon/prompts.ts states the rules (locked camera; actors on the 3×3 stage grid x ∈ {-1.5, 0, 1.5}, z ∈ {-1, 0, 1}; product never covered by an actor; every cue must use a clip that exists).",
+        "Map 'block-shot' in the registry.",
+        "Add server/cartoon/blocking.test.ts with a scripted Spark backend."
+      ],
+      "acceptanceCriteria": [
+        "A scripted block job for scene s2 changes only s2's precomp (s1 and s3 JSON unchanged)",
+        "A cue naming a clip that is not in FilmState.clips makes the tool call fail and the job retry with the error, then succeed with an existing clip",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002",
+        "US-003",
+        "US-004",
+        "US-005"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Showrunner tools and prompt for the toy studio",
+      "description": "As a showrunner, I want castCharacter, dressSet, requestMotion and blockShot tools so that I can run the studio in the right order.",
+      "steps": [
+        "Read server/crew/showrunner-tools.ts, server/crew/prompts.ts and server/cartoon/*.",
+        "Create server/cartoon/showrunner-tools.ts: castCharacter({ name, description }), dressSet({ place, props: string[] ≤ 4 }), requestMotion({ name, from: 'library' | 'act' }), blockShot({ sceneId }) and lightCue({ sceneId, cue }); dependencies: blockShot refuses while the scene's cast, props or clips are not ready and says which.",
+        "Edit server/crew/showrunner-tools.ts to append them when CARTOON_MODE is on; edit server/crew/prompts.ts to add the toy-studio section from server/cartoon/prompts.ts (order: cast + set + motion in parallel, then block shots, then review; locked camera; 3 actors max).",
+        "Edit server/crew/fake-showrunner.ts to delegate to a scripted cartoon turn when CARTOON_MODE is on (fixture character, cube prop, wave clip, 3 shots).",
+        "Add server/cartoon/showrunner-tools.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "blockShot for a scene whose cast member is still 'running' returns an error naming that member",
+        "The fake cartoon run with DIRECTOR_FAKE=1 ends with 3 blocked scenes and status 'ready', with 0 Meta or forge network calls",
+        "The showrunner prompt contains 'locked camera' only when CARTOON_MODE is on",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006"
+      ],
+      "labels": [
+        "backend",
+        "crew",
+        "prompts"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Critic checks for cartoon shots",
+      "description": "As a viewer, I want the critic to catch a character out of frame, a hidden product or a limb through a prop so that the film looks finished.",
+      "steps": [
+        "Read server/crew/workers/critic.ts (blind review, findings) and server/review/rules-core.ts.",
+        "Create server/cartoon/checks.ts: rules computed from the stage JSON at the captured times (actor mark outside the camera's visible ground area; product screen box overlapped > 40% by an actor's box; two actors closer than 0.6 units) and a blind vision question list for Spark ('Is any character's body passing through an object? Is the main product clearly visible? Is any character cut off by the frame edge?').",
+        "Feed these findings into the existing critic flow for scenes that contain a stage3d layer; each finding names the scene, second and actor.",
+        "Add server/cartoon/checks.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "An actor marked at x = 4 with the default camera yields one 'actor-off-frame' finding",
+        "An actor box covering 60% of the product box yields one 'product-covered' finding naming the actor",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Studio forge lane, cast cards and act-it-out button",
+      "description": "As a viewer, I want to watch characters, props and clips being made so that the 3D work is visible while the crew builds.",
+      "steps": [
+        "Read web/src/crew/CrewStudio.tsx, web/src/crew/CrewBoard.tsx and web/src/crew/crewReducer.ts.",
+        "Create web/src/cartoon/ForgeLane.tsx: a lane on the crew board for forge jobs (concept image thumbnail → mask → '3D' → 'rigged'), status chips and GPU seconds.",
+        "Create web/src/cartoon/CastCards.tsx: one card per cast member with the concept image and status; clicking a rigged member opens a small turntable preview (one model3d layer in the existing Player, clip 'idle').",
+        "Create web/src/cartoon/ActItOut.tsx: record up to 5 s from the camera with MediaRecorder (or upload a file), name the move, POST /api/films/:id/act; shows the queued job.",
+        "Edit web/src/crew/CrewStudio.tsx to mount these when the film has a cast.",
+        "Add tests for each component."
+      ],
+      "acceptanceCriteria": [
+        "With 2 forge jobs (running, done) the lane shows 2 chips with those statuses",
+        "Clicking a rigged cast card mounts exactly one Player",
+        "ActItOut with a mocked 3 s recording posts a multipart request with fields 'video' and 'name'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-007"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "End-to-end cartoon run and live gate",
+      "description": "As an owner, I want one browser test on the fake crew and one live script so that the cartoon path cannot silently break and I can measure it.",
+      "steps": [
+        "Read e2e/crew.spec.ts and scripts/live/s12-crew.ts.",
+        "Create e2e/cartoon.spec.ts with DIRECTOR_FAKE=1 and CARTOON_MODE=1: start a film with the product fixture, wait for the forge lane to show a rigged character, wait for 3 scenes ready, play to 50% and assert the stage canvas count is 2 or less and the player shows no error.",
+        "Create scripts/live/s16-cartoon.ts: estimate without --yes (Muse calls + forge GPU seconds); with --yes one cartoon film end to end, printing wall time, model cost, GPU cost, critic findings and fixes.",
+        "Add scripts/live/s16-cartoon.test.ts for the estimate and arguments only."
+      ],
+      "acceptanceCriteria": [
+        "npx playwright test e2e/cartoon.spec.ts passes with DIRECTOR_FAKE=1 and CARTOON_MODE=1",
+        "The live script without --yes prints 'Estimate:' and makes no network call",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-008",
+        "US-009"
+      ],
+      "labels": [
+        "e2e",
+        "scripts",
+        "ui"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/cartoon-pipeline-plan.md",
+      "../reacthub-pixitweenjs/specs/features/aep-31-stage3d/requirements.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/cartoon-pipeline-plan.md (sections 2, 3, 5, 6 and 7)",
+      "reacthub-pixitweenjs specs/features/aep-31-stage3d/requirements.md (the stage3d layer the blockers write)",
+      "server/crew/showrunner-tools.ts, server/crew/workers/registry.ts and server/crew/workers/builder.ts",
+      "server/forge/client.ts and server/forge/fake.ts from S16a"
+    ],
+    "requires": [
+      "prd-s16a-forge"
+    ],
+    "owns": [
+      "server/cartoon/*",
+      "web/src/cartoon/*",
+      "scripts/live/s16-cartoon.ts",
+      "e2e/cartoon.spec.ts",
+      "fixtures/s16b/*"
+    ],
+    "sharedEdits": [
+      "shared/crew.ts",
+      "shared/storyboard.ts",
+      "shared/events.ts",
+      "server/crew/workers/registry.ts",
+      "server/crew/showrunner-tools.ts",
+      "server/crew/prompts.ts",
+      "server/crew/fake-showrunner.ts",
+      "server/tools/authoring.ts",
+      "server/agent/storyboard.ts",
+      "web/src/crew/CrewStudio.tsx",
+      "package.json",
+      "package-lock.json",
+      "ralph/ENGINE_SPEC",
+      "server/env.ts",
+      ".env.example",
+      "server/http/routes.ts",
+      "shared/composition.ts"
+    ],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "For engine behaviour (composition JSON, Player, timeline, layer kinds) read docs/engine/README.md before writing code; never edit or copy engine source.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "The camera is locked: blockers never write camera keyframes, and setCamera accepts only 'static' when CARTOON_MODE is on.",
+      "Blocking is deterministic JSON authoring through tools validated against the engine schema; a blocker never writes composition JSON by hand.",
+      "No real brand names, logos or the LEGO name or minifigure shape in prompts, fixtures or concept art.",
+      "Needs engine 0.3.0-alpha.6 (aep-31). Until it is published, link the engine with ENGINE_SPEC=file:../reacthub-pixitweenjs; never copy engine source."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner publishes reacthub-pixitweenjs 0.3.0-alpha.6 (aep-31 validation passed) and bumps the engine here.",
+      "MG-2: owner runs `npm run live -- s16-cartoon` then `--yes` with the product photo fixture: one cartoon film end to end; records wall time, cost (models + GPU), critic findings and fixes.",
+      "MG-3: owner records a 3-second 'wave' on a phone and runs the act-it-out flow once; checks the mascot's wave in the film."
+    ]
+  }
+}

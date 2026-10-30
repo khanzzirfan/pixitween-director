@@ -1,0 +1,301 @@
+{
+  "name": "PixiTween Director S16a: the forge (image → 3D mesh → rigged character → motion clips)",
+  "branchName": "ralph/s16a-forge",
+  "description": "A GPU service (Python on Modal) that turns a masked image into a textured glTF mesh with SAM 3D Objects, rigs humanoid meshes to the Mixamo skeleton with Make-It-Animatable, and turns an acted video into a Mixamo-skeleton clip with Motion2MixamoRig; plus the Director's typed client, a fake forge with fixture GLBs, a clip library importer and a live gate. The crew roles that use it are S16b.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Forge contracts: mesh, rig and clip assets and forge jobs",
+      "description": "As a crew, I want typed records for 3D meshes, rigged characters and motion clips so that every service and UI agrees on one shape.",
+      "steps": [
+        "Read shared/composition.ts (AssetRef roles, FilmState) and docs/hackathon/cartoon-pipeline-plan.md section 7.",
+        "Edit shared/composition.ts: add asset roles 'mesh', 'rig' and 'clip' with mime 'model/gltf-binary'; add optional FilmState fields cast?: CastMember[], set?: SetDressing, clips?: ClipRef[] with the shapes in section 7 of the plan.",
+        "Create server/forge/types.ts exporting zod schemas forgeJobSchema { id, kind: 'object' | 'character' | 'motion-video' | 'motion-text', status: 'queued' | 'running' | 'done' | 'failed', resultUrl?, gpuSeconds?, error? } and request schemas for each kind.",
+        "Add server/forge/types.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "A FilmState with cast [{ id: 'c1', name: 'Pip', conceptAssetId: 'ast_…', status: 'rigged' }] parses",
+        "forgeJobSchema rejects kind 'video' and accepts 'motion-video'",
+        "An AssetRef with role 'clip' and mime 'model/gltf-binary' parses",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "contracts"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Forge service skeleton on Modal with auth and job store",
+      "description": "As a Director server, I want one authenticated HTTP service for all GPU work so that the crew calls a single place for 3D and motion.",
+      "steps": [
+        "Read docs/hackathon/cartoon-pipeline-plan.md section 4 and server/forge/types.ts.",
+        "Create services/forge/app.py: a Modal app with a FastAPI web endpoint exposing POST /object, POST /character, POST /motion/video, POST /motion/text and GET /jobs/{id}; every route requires header Authorization: Bearer <FORGE_TOKEN> and returns 401 otherwise.",
+        "POST routes validate input (image ≤ 8 MB PNG/JPEG, mask PNG same size, video ≤ 30 s MP4), create a job id, spawn the GPU function and return 202 { jobId }. Results go to a Modal Volume and GET /jobs/{id} returns { status, resultUrl (signed, 1 h), gpuSeconds, error }.",
+        "Keep GPU work in services/forge/pipelines/*.py functions imported lazily; services/forge/jobs.py holds the in-volume job store.",
+        "Create services/forge/README.md: setup, weights to request, env vars, deploy command, cost notes, licence notes (SAM licence, Make-It-Animatable licence to confirm, SMPL-X non-commercial default).",
+        "Create services/forge/tests/test_api.py using FastAPI's TestClient with the pipelines stubbed."
+      ],
+      "acceptanceCriteria": [
+        "pytest services/forge/tests/test_api.py passes on a laptop with no GPU and no network",
+        "POST /object without the bearer token returns 401",
+        "POST /object with a mask of a different size than the image returns 400 naming 'mask size'",
+        "GET /jobs/{id} for a stubbed finished job returns status 'done' and a resultUrl",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "service",
+        "python"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Pipeline: image + mask → textured glTF with SAM 3D Objects",
+      "description": "As a set dresser and the product department, I want a masked image turned into a textured 3D mesh so that props and products stand in the 3D stage.",
+      "steps": [
+        "Read services/forge/README.md (MG-1 note on mesh export) and services/forge/app.py.",
+        "Create services/forge/pipelines/sam3d_object.py: run SAM 3D Objects on the image + mask; export a textured mesh as GLB; if only a Gaussian splat is available, convert splat → mesh (density field + marching cubes) and bake vertex colours; decimate to ≤ 20k triangles; centre at origin with the base on y = 0; scale to unit height.",
+        "Write metadata { triangles, bounds, method: 'mesh' | 'splat-to-mesh', seconds } next to the GLB.",
+        "Create services/forge/tests/test_postprocess.py for the pure steps (centre, base-on-ground, unit height, decimation target) on a synthetic trimesh."
+      ],
+      "acceptanceCriteria": [
+        "The postprocess test centres a synthetic mesh so its bounds min y is 0 and its height is 1",
+        "Decimating a 100k-triangle synthetic mesh returns at most 20k triangles",
+        "The pipeline module imports without GPU libraries installed (lazy imports)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "service",
+        "python",
+        "meta"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Pipeline: humanoid mesh → Mixamo-skeleton rig with Make-It-Animatable",
+      "description": "As a casting department, I want a character mesh rigged to the Mixamo skeleton so that any library clip plays on it.",
+      "steps": [
+        "Read services/forge/pipelines/sam3d_object.py and the Make-It-Animatable README (linked in services/forge/README.md).",
+        "Create services/forge/pipelines/rig_character.py: input mesh GLB (from US-003); run Make-It-Animatable; export a skinned GLB whose skeleton uses Mixamo bone names (mixamorig:Hips, …); verify the 22 core bones exist; write metadata { bones, missing, seconds }.",
+        "POST /character chains /object then rig in one job.",
+        "Create services/forge/tests/test_rig_check.py for the pure bone-name check (a list with all 22 core bones passes; one missing is reported by name)."
+      ],
+      "acceptanceCriteria": [
+        "The bone check reports [] for the 22 core Mixamo bones and ['mixamorig:LeftHand'] when that one is missing",
+        "POST /character with stubbed pipelines records two stages (object, rig) in the job status",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "service",
+        "python"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Pipeline: acted video → Mixamo clip with Motion2MixamoRig",
+      "description": "As an owner acting out a move on my phone, I want my motion turned into a clip so that the mascot does exactly what I did.",
+      "steps": [
+        "Read the Motion2MixamoRig README (linked in services/forge/README.md): GVHMR body extraction, SMPL-X model, Mixamo FBX rig input.",
+        "Create services/forge/pipelines/motion_video.py: run the m2mr pipeline with the forge's reference Mixamo rig; extract the animation into an animation-only GLB (no mesh) with Mixamo bone names; trim to the video length; write metadata { frames, fps, seconds }.",
+        "Create services/forge/tests/test_clip_export.py for the pure step that strips meshes and keeps tracks named mixamorig:* only.",
+        "Add POST /clip/convert to services/forge/app.py: an uploaded Mixamo FBX → animation-only GLB with the same strip step, using headless Blender in the Modal image (synchronous, ≤ 60 s)."
+      ],
+      "acceptanceCriteria": [
+        "Stripping a synthetic glTF with 1 mesh and 24 bone tracks keeps 24 tracks and 0 meshes",
+        "Tracks whose names do not start with 'mixamorig:' are dropped and counted in metadata",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "service",
+        "python"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Director forge client, fake forge and fixtures",
+      "description": "As a crew, I want a typed forge client and an offline fake so that every crew job can be tested with no GPU.",
+      "steps": [
+        "Read server/clippy/mcp.ts (timeouts, redaction, retries) and server/clippy/fake.ts.",
+        "Edit server/env.ts and .env.example: FORGE_URL, FORGE_TOKEN (secret), FORGE_TIMEOUT_MS (default 600000), FORGE_POLL_MS (default 3000).",
+        "Create server/forge/client.ts: createForgeClient({ url, token }) with object(image, mask), character(image, mask), motionVideo(video), motionText(prompt) returning a job id, and waitFor(jobId, signal) polling GET /jobs/{id}; downloads the result into the asset store with the right role; redacts the token in errors.",
+        "Create server/forge/fake.ts used when DIRECTOR_FAKE=1 or FORGE_URL is unset: returns fixtures/s16a/toy-character.glb, prop-cube.glb and clip-wave.glb after one 'running' poll.",
+        "Create fixtures/s16a/: a self-made low-poly rigged humanoid with Mixamo bone names (made in Blender by the owner or generated by a script), a prop cube, a wave clip, concept-toy.png and product.png (invented). Record origin in ASSET-CREDITS.md.",
+        "Add server/forge/client.test.ts against a local test server and server/forge/fake.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "character() then waitFor() against the test server stores one asset with role 'rig'",
+        "A 401 from the forge raises ForgeError whose message does not contain the token",
+        "With DIRECTOR_FAKE=1 the fake returns the fixture character after exactly one 'running' poll",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "forge"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Clip library importer (local Mixamo downloads → clip assets)",
+      "description": "As an owner, I want my downloaded Mixamo clips converted into clip assets once so that the animator can cue them by name.",
+      "steps": [
+        "Read server/store/asset-store.ts and services/forge/pipelines/motion_video.py (clip shape).",
+        "Create scripts/forge/import-clips.ts: for each FBX or GLB in a folder, convert FBX through the forge's POST /clip/convert when FORGE_URL is set (skip FBX with a message when it is not), keep only mixamorig:* tracks, and register it in DATA_DIR/clip-library.json as { name (from the file name, kebab-case), clipAssetId, frames, fps }.",
+        "Never copy the source files into the repo; refuse a target folder inside the repo.",
+        "Add scripts/forge/import-clips.test.ts with the fixture clip."
+      ],
+      "acceptanceCriteria": [
+        "Importing a folder with clip-wave.glb registers one entry named 'wave' with frames > 0",
+        "Running with a target folder inside the repository exits with code 2 and a message naming the folder",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006"
+      ],
+      "labels": [
+        "scripts",
+        "forge"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Forge cost and the s16-forge live gate",
+      "description": "As an owner, I want GPU seconds costed in the ledger and one live script so that I know what a character costs before the demo.",
+      "steps": [
+        "Read server/pricing.ts, server/ledger.ts and scripts/live/s15-catalog.ts (if present) or scripts/live/s12-crew.ts.",
+        "Edit server/pricing.ts: FORGE_GPU_USD_PER_SECOND from env (default 0.0011, an A100 on Modal per the owner's plan; the live gate records the real figure) and a cost event per forge job with model 'forge:<kind>'.",
+        "Create scripts/live/s16-forge.ts: without --yes print an estimate for one object, one character and one 5 s motion clip; with --yes run them on fixtures/s16a inputs and print seconds, GPU seconds and cost per call.",
+        "Add scripts/live/s16-forge.test.ts for the estimate and argument handling only."
+      ],
+      "acceptanceCriteria": [
+        "A finished forge job with gpuSeconds 40 records one cost event of 40 × FORGE_GPU_USD_PER_SECOND",
+        "The live script without --yes prints a line starting 'Estimate:' and makes no network call",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006"
+      ],
+      "labels": [
+        "backend",
+        "scripts",
+        "live"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/cartoon-pipeline-plan.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/cartoon-pipeline-plan.md (sections 1, 4 and 10)",
+      "server/clippy/mcp.ts and server/clippy/fake.ts (the client + fake pattern to copy)",
+      "server/art/* (SAM 3.1 masks) and server/store/asset-store.ts",
+      "scripts/live/run.ts (estimate-first live scripts)"
+    ],
+    "requires": [
+      "prd-s12c-crew-workers"
+    ],
+    "owns": [
+      "services/forge/*",
+      "server/forge/*",
+      "scripts/live/s16-forge.ts",
+      "scripts/forge/import-clips.ts",
+      "fixtures/s16a/*"
+    ],
+    "sharedEdits": [
+      "shared/composition.ts",
+      "server/env.ts",
+      ".env.example",
+      "server/pricing.ts",
+      "ASSET-CREDITS.md"
+    ],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "For engine behaviour (composition JSON, Player, timeline, layer kinds) read docs/engine/README.md before writing code; never edit or copy engine source.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "Every character is rigged to the Mixamo humanoid skeleton (bone names mixamorig:*). Clips are animation-only glTFs with the same bone names.",
+      "Never commit Mixamo downloads, SMPL-X, MANO or model weights. Fixtures use a self-made low-poly rigged character and self-made clips; record their origin in ASSET-CREDITS.md.",
+      "Python under services/forge imports GPU libraries lazily inside the Modal functions so its unit tests run on a laptop with no GPU and no network.",
+      "Deploying to Modal and downloading model weights are owner manual gates; a story only writes the code and the instructions."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner requests Hugging Face access for SAM 3D Objects and Make-It-Animatable, confirms in services/forge/README.md whether SAM 3D Objects exports a mesh/GLB in our setup (or only a Gaussian splat), and records the answer.",
+      "MG-2: owner deploys the forge to Modal (`modal deploy services/forge/app.py`), sets FORGE_URL and FORGE_TOKEN, and runs `npm run live -- s16-forge` then `--yes` on fixtures/s16a/concept-toy.png and fixtures/s16a/product.png; records seconds and GPU cost per call.",
+      "MG-3: owner downloads ~20 Mixamo clips with an Adobe account (idle, wave, point, present, jump, walk-in, walk-out, clap, shrug, dance) and runs `npx tsx scripts/forge/import-clips.ts <folder>`; the clips stay out of git."
+    ]
+  }
+}

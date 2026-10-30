@@ -1,0 +1,345 @@
+{
+  "name": "PixiTween Director S15b: catalog crew (showrunner tools, price check, fake crew, live gate)",
+  "branchName": "ralph/s15b-catalog-crew",
+  "description": "Puts the Muse crew in charge of a catalog: the showrunner plans a look per category and dispatches variant jobs, a price check photographs each product's film and compares the price shown with the feed, and flagged products get one fix. Adds the offline fake catalog crew and the s15-catalog live gate. UI and Publish are S15c.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Export requestCapture and let capture requests name another film",
+      "description": "As a price check, I want to ask the browser for frames of a product's child film so that I can see what that product's video shows.",
+      "steps": [
+        "Read server/crew/workers/critic.ts (the waiting map and the Promise in runCriticJob), server/http/handlers/review.ts (how frames resolve a request) and the capture.request event in shared/events.ts.",
+        "Edit shared/events.ts: add optional filmId to capture.request, documented as 'the film to photograph when it is not the film whose stream carries the event'.",
+        "Edit server/crew/workers/critic.ts: move the waiting Promise into an exported requestCapture({ crew, filmId, sceneId, timesSec, signal, timeoutMs, emitFilmId? }): Promise<CapturedFrames | undefined>; it registers the wait with filmId, emits capture.request (with filmId when it differs from the emitting film) and resolves undefined on timeout.",
+        "Make runCriticJob call requestCapture with its current arguments so its behaviour is unchanged.",
+        "Add server/crew/workers/request-capture.test.ts covering resolve, timeout (undefined) and abort (AbortError)."
+      ],
+      "acceptanceCriteria": [
+        "All existing tests in server/crew/workers/critic.test.ts pass unchanged",
+        "requestCapture for child film f2 emitted on master f1 produces a capture.request event with filmId 'f2'",
+        "requestCapture with timeoutMs 10 and no upload resolves undefined and leaves no entry for its requestId (isWaitingCapture returns false)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Price layout rules from measured text boxes",
+      "description": "As a merchant, I want the price never covered by the product or cut off so that every video shows a readable price.",
+      "steps": [
+        "Read server/review/rules-core.ts (measured text boxes, safe area, overlap helpers) and server/catalog/slots.ts.",
+        "Create server/catalog/price-check.ts exporting checkPriceLayout({ slots, textBoxes, productBox, frame: { width, height } }): PriceFinding[] where PriceFinding = { kind: 'price-missing' | 'price-covered' | 'price-off-safe-area'; evidence: string }.",
+        "price-missing when no measured box exists for any 'price' slot; price-covered when the price box overlaps the product box by more than 5% of the price box area; price-off-safe-area when any edge is outside the 5% safe margin.",
+        "Export MAX_FIXES_PER_PRODUCT = 1.",
+        "Add server/catalog/price-check.test.ts with hand-written boxes."
+      ],
+      "acceptanceCriteria": [
+        "A price box fully inside the frame and 0% over the product returns []",
+        "A price box 30% covered by the product box returns one 'price-covered' finding whose evidence contains '30%'",
+        "No price box at all returns one 'price-missing' finding",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "review"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Read the price off a frame and compare with the feed",
+      "description": "As a merchant, I want the crew to read the price the video actually shows so that a wrong price never reaches an ad.",
+      "steps": [
+        "Read server/meta/spark.ts (vision call with an image and structured output), server/review/visual.ts (how a frame is sent) and parsePrice in server/catalog/feed.ts.",
+        "Create server/catalog/price-read.ts exporting readPrice(ctx, frame: Buffer, deps?): Promise<{ text: string | null; costUsd: number }> that asks Spark 'What price, if any, is written in this image? Answer with the exact characters shown, or null.' with a JSON schema { price: string | null }, and records the cost in the ledger.",
+        "Export comparePrice(read: string | null, product): { ok: boolean; note: string } using parsePrice on the read text and comparing with salePrice ?? price to the cent; a currency shown that differs from the product currency is a mismatch.",
+        "Record two redacted Spark fixtures under fixtures/s15b/ (a frame showing '$12.99' and one showing no price) and use them with DIRECTOR_REPLAY=1.",
+        "Add server/catalog/price-read.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "comparePrice('$12.99', { price: 12.99, currency: 'USD' }) returns ok true",
+        "comparePrice('$12.90', { price: 12.99, currency: 'USD' }) returns ok false with a note containing both values",
+        "comparePrice(null, product) returns ok false with note 'no price visible'",
+        "readPrice with the '$12.99' fixture returns text '$12.99' and costUsd > 0",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "review",
+        "meta"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Price-check job: photograph the product film and decide ready or flagged",
+      "description": "As a crew, I want every new or rebound variant checked automatically so that the wall shows a tick or a flag per product.",
+      "steps": [
+        "Read server/catalog/variant.ts and server/catalog/rebind.ts (S15a), server/crew/workers/registry.ts and the new requestCapture.",
+        "Edit shared/crew.ts: add 'price-check' to JOB_KINDS (not a writing kind) with the same priority as critique.",
+        "Create server/catalog/price-check-job.ts exporting runPriceCheckJob(job, signal, crew, deps?): find the scene holding the 'price' slot in the variant film, requestCapture at 0.8 of that scene, run checkPriceLayout on the measured boxes and readPrice on the last frame, then set the variant to 'ready' (no findings and ok) or 'flagged' with priceCheck { ok, read, note } and emit catalog.variant on the master film.",
+        "With no browser connected (requestCapture returns undefined) keep status 'checking' and set priceCheck.note 'waiting for a browser'.",
+        "When flagged, push one inbox item to the showrunner from 'critic' with data { catalogId, productId, findings }.",
+        "Edit server/catalog/variant.ts and server/catalog/rebind.ts to queue one price-check job after a successful commit; edit server/crew/workers/registry.ts to map 'price-check'.",
+        "Add server/catalog/price-check-job.test.ts with fake frames and scripted readPrice."
+      ],
+      "acceptanceCriteria": [
+        "A variant whose frame reads '$12.99' for a $12.99 product and has no layout findings ends 'ready' with priceCheck.ok true",
+        "A frame reading '$12.90' ends 'flagged' and puts exactly one inbox item for the showrunner",
+        "With no capture answer the variant stays 'checking' with note 'waiting for a browser' and no inbox item",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002",
+        "US-003"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Category looks: one Muse Image plate per category",
+      "description": "As a showrunner, I want one background plate per product category so that mugs and candles each get their own look without a plate per product.",
+      "steps": [
+        "Read server/meta/image.ts, server/art/* (plate generation and the prompt lint) and setLook in server/catalog/store.ts.",
+        "Create server/catalog/looks.ts exporting makeLookPlate(ctx, { catalogId, category, platePrompt, styleBible }): Promise<{ plateAssetId: string; costUsd: number }> that lints the prompt with the existing lint, generates one plate at the master's aspect, stores it as an asset (role 'plate', catalogId, category) and saves it with setLook.",
+        "Cache by (catalogId, category): a second call returns the stored asset with costUsd 0.",
+        "Add server/catalog/looks.test.ts with the recorded Muse Image fixture."
+      ],
+      "acceptanceCriteria": [
+        "makeLookPlate for 'mugs' stores one plate asset and the catalog's looks.mugs.plateAssetId equals it",
+        "A second makeLookPlate for 'mugs' makes no image call (fake records 1 call total) and returns costUsd 0",
+        "A prompt naming a real brand is rejected by the lint before any image call",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "art",
+        "meta"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Showrunner tools: planCatalog, dispatchVariants, fixPrice",
+      "description": "As a showrunner, I want board tools for a catalog so that I can plan looks, send products to builders and fix a flagged price.",
+      "steps": [
+        "Read server/crew/showrunner-tools.ts (createBoardTools, dispatch, the budget checks), server/catalog/store.ts and server/catalog/looks.ts.",
+        "Create server/catalog/showrunner-tools.ts exporting createCatalogTools(crew): ToolDef[] with planCatalog({ looks: [{ category, platePrompt (<= 300), note? }] }) that calls makeLookPlate for each category present in the catalog.",
+        "Add dispatchVariants({ category?, productIds? }) that queues one variant job per matching product whose status is 'queued' or 'failed', refuses when the budget level is 'stop', and returns the count queued.",
+        "Add fixPrice({ productId, move: 'other-corner' | 'shrink' | 'raise' }) that edits the price slot layer of that product's film only (via the authoring api inside films.mutate), queues a price-check, and refuses a second fix for the same product (MAX_FIXES_PER_PRODUCT).",
+        "Edit server/crew/showrunner-tools.ts so createBoardTools appends createCatalogTools(crew) when the film has a catalogId.",
+        "Add server/catalog/showrunner-tools.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "dispatchVariants({ category: 'mugs' }) on feed-10 queues exactly the mug products and returns that count",
+        "dispatchVariants with budget level 'stop' queues nothing and returns an error naming the budget",
+        "A second fixPrice for the same product returns an error and queues no job",
+        "createBoardTools for a film without catalogId has no planCatalog tool",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004",
+        "US-005"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Showrunner prompt section and inbox item for a new catalog",
+      "description": "As a showrunner, I want to be told when a catalog arrives and how to run it so that I plan looks first, dispatch in batches and fix flags once.",
+      "steps": [
+        "Read server/crew/prompts.ts (how sections are composed), server/crew/inbox.ts and POST /api/catalogs in server/http/handlers/catalog.ts.",
+        "Create server/catalog/prompts.ts exporting CATALOG_SECTION: plan one look per category with planCatalog, then dispatchVariants per category, answer each price flag with at most one fixPrice, say one short note per category when its products are ready, and finish when every product is ready, flagged after a fix, or failed.",
+        "Edit server/crew/prompts.ts to include CATALOG_SECTION when the film has a catalogId.",
+        "Edit server/http/handlers/catalog.ts so POST /api/catalogs pushes one inbox item from 'system' to the master film's showrunner: 'Catalog <id>: <n> products in <k> categories (<names>). Plan the looks, then build.'",
+        "Add server/catalog/prompts.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "The showrunner system prompt for a film with catalogId contains 'planCatalog' and 'fixPrice'; for a film without one it contains neither",
+        "Importing feed-10.csv pushes exactly one inbox item whose text names all 3 categories",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006"
+      ],
+      "labels": [
+        "backend",
+        "crew",
+        "prompts"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Fake catalog crew for DIRECTOR_FAKE runs",
+      "description": "As a judge or tester without keys, I want the catalog flow to run offline so that the wall fills, one price is fixed and replay works with no spend.",
+      "steps": [
+        "Read server/crew/fake-showrunner.ts (the scripted turns) and server/catalog/showrunner-tools.ts.",
+        "Create server/catalog/fake-catalog.ts exporting fakeCatalogTurn(state, inbox): ToolCall[]: on the catalog inbox item call planCatalog with fixed looks for every category, then dispatchVariants per category; on a price flag call fixPrice once with move 'other-corner'; finish when no variant is queued, building or checking.",
+        "In DIRECTOR_FAKE mode make the price read deterministic: the fake reads the bound price text from the variant composition, except product ids ending in '-7', which read one cent off so one flag always appears.",
+        "Edit server/crew/fake-showrunner.ts to delegate to fakeCatalogTurn when the film has a catalogId.",
+        "Add server/catalog/fake-catalog.test.ts running the whole fake flow on feed-10 with fake frames."
+      ],
+      "acceptanceCriteria": [
+        "The fake flow on feed-10 ends with 9 variants 'ready' and product '…-7' fixed once and then 'ready'",
+        "The fake flow makes 0 calls to Meta clients (the fakes' call counters are 0)",
+        "The master film's event log contains catalog.created, 10 or more catalog.variant events and a showrunner.say per category",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-007"
+      ],
+      "labels": [
+        "backend",
+        "crew",
+        "test"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Live gate s15-catalog",
+      "description": "As an owner, I want one live script that runs a catalog end to end so that I can record wall time and cost per product before the demo.",
+      "steps": [
+        "Read scripts/live/run.ts (the dispatcher, estimate-first and --yes) and scripts/live/s12-crew.ts (waiting on a crew run and reading its log).",
+        "Create scripts/live/s15-catalog.ts: arguments --film <masterFilmId> --feed <csv path, default fixtures/s15a/feed-10.csv>; without --yes print the estimate (products × (SAM cut-out + price read) + categories × plate + showrunner turns, from server/pricing.ts) and exit 0.",
+        "With --yes: import the feed, wait until every variant is ready, flagged or failed (timeout 15 minutes), then print a table: products, ready, flagged, fixed, failed, wall time to all checked, total cost and cost per product from the ledger.",
+        "Add scripts/live/s15-catalog.test.ts covering the estimate output and argument errors only (no network)."
+      ],
+      "acceptanceCriteria": [
+        "Running the script's main with no --yes in a test prints a line starting 'Estimate:' and makes no network call",
+        "Missing --film exits with code 2 and a message naming --film",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-008"
+      ],
+      "labels": [
+        "scripts",
+        "live"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/catalog-crew-plan.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/catalog-crew-plan.md (sections 3 Showrunner and Price check)",
+      "server/crew/workers/critic.ts (capture request, waiting map, runRules + visualReview)",
+      "server/crew/showrunner-tools.ts (createBoardTools and the ToolDef shape) and server/crew/prompts.ts",
+      "server/catalog/* and shared/catalog.ts from S15a"
+    ],
+    "requires": [
+      "prd-s15a-catalog-core"
+    ],
+    "owns": [
+      "server/catalog/price-check.ts",
+      "server/catalog/price-read.ts",
+      "server/catalog/price-check-job.ts",
+      "server/catalog/looks.ts",
+      "server/catalog/showrunner-tools.ts",
+      "server/catalog/prompts.ts",
+      "server/catalog/fake-catalog.ts",
+      "scripts/live/s15-catalog.ts",
+      "fixtures/s15b/*"
+    ],
+    "sharedEdits": [
+      "server/crew/workers/critic.ts",
+      "server/crew/workers/registry.ts",
+      "server/crew/showrunner-tools.ts",
+      "server/crew/prompts.ts",
+      "server/crew/fake-showrunner.ts",
+      "server/catalog/variant.ts",
+      "server/http/handlers/catalog.ts",
+      "shared/events.ts",
+      "shared/crew.ts"
+    ],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "For engine behaviour (composition JSON, Player, timeline, layer kinds) read docs/engine/README.md before writing code; never edit or copy engine source.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "The refactor of server/crew/workers/critic.ts keeps runCriticJob's behaviour byte-for-byte the same for existing tests; only the waiting logic moves into an exported function.",
+      "At most one fix per product (MAX_FIXES_PER_PRODUCT = 1). A product still flagged after its fix stays 'flagged' and the showrunner says so; it never loops.",
+      "The price read model sees one frame and the question only: never the feed price, so it cannot copy the expected answer.",
+      "Muse Image plates per category are capped at one per category per catalog and every call is costed through the ledger."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner runs `npm run live -- s15-catalog` (prints the estimate), then `npm run live -- s15-catalog --yes` for 10 products against a real crew film; records wall time to all variants checked, cost per product and how many were flagged and fixed.",
+      "MG-2: owner repeats MG-1 with feed-30.csv only if MG-1 finished in under 5 minutes."
+    ]
+  }
+}
