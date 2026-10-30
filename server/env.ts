@@ -69,7 +69,7 @@ const schema = z.object({
   CREW_CAPTURE_TIMEOUT_MS: int(20000, 5000, 600000),
   CREW_MAX_FIXES_PER_SCENE: int(3, 1, 10),
   CREW_AUTO_FINISH: boolOn,
-  CREW_IDLE_END_MS: int(600000, 60000, 3600000),
+  CREW_IDLE_END_MS: int(90000, 30000, 3600000),
 });
 
 export const ENV_KEYS = Object.keys(schema.shape);

@@ -117,7 +117,7 @@ describe('runCrew', () => {
     const backend: LlmBackend = { id: 'wonder', async chatWithTools(m) { seen.push(JSON.stringify(m.at(-1))); return { toolCalls: [], ms: 1 }; } };
     const crew = createCrew(deps, { backend, idleEndMs: 200 });
     const session = await crew.start(deps.filmId);
-    await settle();
+    // an empty crew is prompted to plan and then fails, so the note goes in while the session is still open
     session.push({ from: 'user', text: 'make it warmer' });
     await session.done;
     expect(seen.some((s) => s.includes('make it warmer'))).toBe(true);

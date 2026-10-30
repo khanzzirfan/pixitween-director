@@ -6,9 +6,13 @@ import type { InboxItem } from '@shared/crew';
 import type { ChatMessage } from '@shared/ports';
 import { loadEnv } from '../../env';
 import { TERMINAL } from '../board';
+import { createId } from '../ids';
 import {
   REPAIR,
+  REPAIR_PLAN,
   REPAIR_STALLED,
+  PLAN_NUDGE,
+  BUILD_NUDGE,
   autoDispatch,
   createShowrunnerAgent,
   autoFinish,
@@ -30,8 +34,8 @@ const CrewState = Annotation.Root({
   hadUser: Annotation<boolean>(last<boolean>(() => false)),
   needsBuilder: Annotation<string[]>(last<string[]>(() => [])),
   dispatched: Annotation<string[]>(last<string[]>(() => [])),
-  /** 'none' on a normal turn; 'all' or 'stalled' when the next turn is the single repair turn. */
-  repair: Annotation<'none' | 'all' | 'stalled'>(last<'none' | 'all' | 'stalled'>(() => 'none')),
+  /** 'none' on a normal turn; 'all', 'stalled' or 'plan' when the next turn is the single repair turn. */
+  repair: Annotation<'none' | 'all' | 'stalled' | 'plan'>(last<'none' | 'all' | 'stalled' | 'plan'>(() => 'none')),
   nudged: Annotation<boolean>(last<boolean>(() => false)),
   idleTurns: Annotation<number>(last<number>(() => 0)),
   idleAction: Annotation<IdleAction>(last<IdleAction>(() => 'none')),
@@ -112,10 +116,14 @@ export function createShowrunnerGraph(opts: ShowrunnerGraphOptions) {
         ? agent.compose(await agent.view(state.batch))
         : state.repair === 'all'
           ? REPAIR
-          : REPAIR_STALLED;
+          : state.repair === 'plan'
+            ? REPAIR_PLAN
+            : REPAIR_STALLED;
     const r = await agent.turn(content, signal);
     const stalled = r.anyFailed && crew.board.list().every((j) => TERMINAL.includes(j.status));
-    const repair = state.repair === 'none' && !signal.aborted && (r.allFailed || stalled) ? (r.allFailed ? 'all' : 'stalled') : 'none';
+    // a failed storyboard or dispatch is repaired at once, even when other calls went through
+    const repair =
+      state.repair === 'none' && !signal.aborted && (r.allFailed || stalled || r.planFailed) ? (r.allFailed ? 'all' : stalled ? 'stalled' : 'plan') : 'none';
     if (signal.aborted) agentState('idle');
     return {
       messages: agent.history(),
@@ -154,6 +162,19 @@ export function createShowrunnerGraph(opts: ShowrunnerGraphOptions) {
     return {};
   }
 
+  /** Nothing is planned or built and nothing runs: prompt the director through the inbox, as the done nudge does. */
+  async function plan(): Promise<Partial<State>> {
+    const film = await crew.films.get(crew.filmId);
+    crew.inbox.push({ id: createId('i'), at: new Date().toISOString(), from: 'system', text: film.storyboard?.scenes.length ? BUILD_NUDGE : PLAN_NUDGE });
+    return {};
+  }
+
+  /** The director was prompted to plan twice and built nothing. Ending the session lets the film fail now, not after the idle wait. */
+  async function fail(): Promise<Partial<State>> {
+    crew.emit({ type: 'error', where: 'showrunner', message: 'the showrunner did not plan or build any scene after two prompts' });
+    return { stop: true, idleAction: 'none' };
+  }
+
   /** Auto-finish. A refused gate keeps the session open with the idle counter reset, as the native loop does. */
   async function finish(state: State): Promise<Partial<State>> {
     if (await autoFinish(crew)) return { finished: true, stop: true, idleAction: 'none' };
@@ -165,6 +186,8 @@ export function createShowrunnerGraph(opts: ShowrunnerGraphOptions) {
     .addNode('turn', turn)
     .addNode('idle_check', idleCheck)
     .addNode('nudge', nudge)
+    .addNode('plan', plan)
+    .addNode('fail', fail)
     .addNode('finish', finish)
     .addEdge(START, 'wake')
     .addConditionalEdges('wake', (s: State) => (s.stop ? END : 'turn'))
@@ -173,9 +196,13 @@ export function createShowrunnerGraph(opts: ShowrunnerGraphOptions) {
       if (s.stop) return END;
       if (s.idleAction === 'nudge') return 'nudge';
       if (s.idleAction === 'finish') return 'finish';
+      if (s.idleAction === 'plan') return 'plan';
+      if (s.idleAction === 'fail') return 'fail';
       return 'wake';
     })
     .addEdge('nudge', 'wake')
+    .addEdge('plan', 'wake')
+    .addEdge('fail', END)
     .addConditionalEdges('finish', (s: State) => (s.stop ? END : 'wake'))
     .compile({ ...(checkpointer ? { checkpointer } : {}) });
 
