@@ -23,8 +23,8 @@ export type Theme = 'light' | 'dark';
 
 function apply(theme: Theme): void {
   if (typeof document === 'undefined') return;
-  if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-  else document.documentElement.removeAttribute('data-theme');
+  // always explicit: removing the attribute would hand control back to the system setting
+  document.documentElement.setAttribute('data-theme', theme);
 }
 
 function readTheme(): Theme {

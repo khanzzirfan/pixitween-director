@@ -220,6 +220,7 @@
 .sh [data-testid^='gen-'] > div:first-of-type { flex: 1; }
 
 .sh-bare { padding: 0; border: 0; background: transparent; color: inherit; text-align: left; border-radius: 8px; }
+.sh-home { display: inline-flex; align-items: center; gap: 10px; padding: 4px 6px; margin-left: -6px; cursor: pointer; }
 .sh-bare:hover { background: var(--sh-raise); }
 
 /* Review: compact scene blocks, the panel head already says "Review" */
@@ -251,3 +252,4 @@
 .sh [data-pane='review'] .panel-heading { justify-content: flex-end; }
 /* the crew badge style is global; the gallery's "Includes generated clip" is plain text */
 .sh .gallery-card .badge { background: none; color: var(--muted); padding: 0; border-radius: 0; font-weight: 500; }
+.gallery-new { margin: 0 0 10px; }

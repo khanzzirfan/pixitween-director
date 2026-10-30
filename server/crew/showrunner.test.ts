@@ -80,6 +80,31 @@ describe('the loop', () => {
     expect(JSON.stringify(s.backend.sent[1])).toContain('Every tool call in your last turn failed');
   });
 
+  it('a turn where some calls fail and no job is running gets one repair turn', async () => {
+    // the live stall: the scenes were added without ids, so 'after', dispatch and proposeGenerate named scenes that do not exist
+    const half: Entry = [
+      { name: 'setStyleBible', args: bible },
+      { name: 'reviseStoryboard', args: { ops: [{ op: 'add', after: null, scene }, { op: 'add', after: 'hero', scene }] } },
+      { name: 'dispatch', args: { kind: 'build-scene', sceneId: 'hero', brief: 'b', reason: 'r' } },
+    ];
+    const s = await start([half, planning], { instant: true });
+    s.inbox.push(item('system', 'New film'));
+    await s.done;
+    expect(s.backend.turns()).toBe(2);
+    expect(JSON.stringify(s.backend.sent[1])).toContain('no job is running');
+  });
+
+  it('a turn where some calls fail while a job is running waits for the inbox', async () => {
+    const half: Entry = [...planning, { name: 'cancel', args: { jobId: 'j9' } }];
+    const s = await start([half, [{ name: 'say', args: { text: 'unused' } }]]);
+    s.inbox.push(item('system', 'New film'));
+    await waitFor(() => s.board.list().length === 4);
+    await settle();
+    expect(s.backend.turns()).toBe(1);
+    s.ac.abort();
+    await s.done;
+  });
+
   it('a repair turn that succeeds ends the repair, and the next inbox batch starts clean', async () => {
     const bad: Entry = [{ name: 'cancel', args: { jobId: 'j9' } }];
     const s = await start([bad, [{ name: 'say', args: { text: 'fixed' } }], [{ name: 'say', args: { text: 'later' } }]], { idleEndMs: 200 });
@@ -219,8 +244,8 @@ describe('job chains', () => {
     await settle();
     await scheduler.idle();
     expect(board.list().map((j) => [j.kind, j.sceneId])).toEqual([['build-scene', 's2'], ['continuity', 's2'], ['critique', 's2']]);
-    // the build is news; the two checks report their own findings
-    expect(pushed.map((p) => p.text)).toEqual(['build-scene s2 done: 7 tool calls']);
+    // the build is news; the two checks report their own findings, and the last one says the board is clear so finish can follow
+    expect(pushed.map((p) => p.text)).toEqual(['build-scene s2 done: 7 tool calls', 'critique s2 done. Nothing is running now.']);
     expect(pushed[0]).toMatchObject({ from: 'job', jobId: 'j1' });
     expect(ran).toEqual(['build-scene', 'continuity', 'critique']);
   });
@@ -259,7 +284,8 @@ describe('job chains', () => {
     board.update('j1', { costUsd: 0.02 });
     await settle();
     expect(board.list().map((j) => j.kind)).toEqual(['restyle-scene', 'continuity', 'critique']);
-    expect(pushed).toHaveLength(1);
+    // the restyle once, and the clear board once; the patch adds nothing
+    expect(pushed.map((p) => p.text)).toEqual(['restyle-scene s1 done', 'critique s1 done. Nothing is running now.']);
   });
 
   it('stops queueing automatic critiques for a scene after three rounds', async () => {

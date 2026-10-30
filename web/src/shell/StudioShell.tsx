@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from 'react-resizable-panels';
 import { Icon, type IconName } from './Icon';
 import { useTheme, useWide } from './hooks';
+import { goHome } from './nav';
 import './shell.css';
 
 export interface ShellTab {
@@ -177,8 +178,10 @@ export function StudioShell(p: StudioShellProps) {
   return (
     <div className={`sh ${wide ? 'is-wide' : 'is-narrow'}`} data-testid={p.testId}>
       <header className="sh-header">
-        <span className="sh-logo" aria-hidden="true" />
-        <strong className="sh-brand">PixiTween Director</strong>
+        <button type="button" className="sh-bare sh-home" title="Home: start a new film" aria-label="PixiTween Director, home" onClick={goHome}>
+          <span className="sh-logo" aria-hidden="true" />
+          <strong className="sh-brand">PixiTween Director</strong>
+        </button>
         <span className="sh-title" title={p.title}>{p.title}</span>
         <ol className="sh-steps" aria-label="Progress">
           {p.steps.map((s, i) => (

@@ -87,5 +87,6 @@ export function App() {
   if (params.get('fixture') === '1') return <FixturePage />;
   const filmParam = params.get('film');
   if (params.get('replay') === '1' && filmParam) return <ReplayPage key={filmParam} filmId={filmParam} />;
-  return <Director filmId={params.get('film')} />;
+  // keyed, so going home (or opening another film) starts the shell fresh on the right tab
+  return <Director key={filmParam ?? 'new'} filmId={filmParam} />;
 }

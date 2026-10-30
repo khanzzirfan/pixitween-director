@@ -37,6 +37,14 @@ describe('useTheme', () => {
     expect(localStorage.getItem('studio.theme')).toBe('dark');
   });
 
+  it('toggling back to light sets data-theme=light, so a dark system setting cannot win', () => {
+    localStorage.setItem('studio.theme', 'dark');
+    const { result } = renderHook(() => useTheme());
+    expect(result.current.theme).toBe('dark');
+    expect(result.current.toggle()).toBe('light');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+  });
+
   it('still returns a value when localStorage.setItem throws', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('blocked');

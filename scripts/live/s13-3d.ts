@@ -45,16 +45,20 @@ export const run: LiveScript['run'] = async ({ env, log }) => {
   if (!env.PRODUCT_3D) throw new Error('PRODUCT_3D is off: set PRODUCT_3D=true (and use engine 0.3.0-alpha.5) before running s13-3d');
   if (!env.metaApiKey) throw new Error('META_API_KEY is required for s13-3d');
   const deps = await buildDeps(env);
-  const photo = readFileSync(new URL('../../fixtures/seed/mug-product.png', import.meta.url));
+  // a can, to match the brief: with the mug photo the cut-out finds no can and the hero falls back to motion
+  const photo = readFileSync(new URL('../../fixtures/s13/can-product.png', import.meta.url));
   const asset = await deps.assets.put(photo, 'image/png', { role: 'product-photo' });
   const film = await deps.films.create({ aspect: '16:9', title: 'Coffee Co.', brief: { text: BRIEF, productAssetId: asset.id }, assets: [asset], crew: true });
 
   const events: FilmEvent[] = [];
   const stop = deps.bus.subscribe(film.id, (e) => events.push(e.event));
+  mkdirSync('debug/s13b', { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  let session: Awaited<ReturnType<ReturnType<typeof createCrew>['start']>> | undefined;
   try {
     bindCrew(deps, { idleEndMs: FILM_TIMEOUT_MS });
     const crew = createCrew(deps, { idleEndMs: FILM_TIMEOUT_MS });
-    const session = await crew.start(film.id);
+    session = await crew.start(film.id);
     const t0 = Date.now();
     for (;;) {
       await new Promise((r) => setTimeout(r, 1000));
@@ -64,9 +68,16 @@ export const run: LiveScript['run'] = async ({ env, log }) => {
       if (now.status === 'failed') throw new Error('the crew film failed');
       if (Date.now() - t0 > FILM_TIMEOUT_MS) throw new Error('the crew film did not finish in time');
     }
-    session.stop();
-    await session.done;
+  } catch (e) {
+    // what the crew did up to the failure, so a failed paid run still says why
+    const file = `debug/s13b/mg1-failed-${stamp}.json`;
+    writeFileSync(file, JSON.stringify({ filmId: film.id, error: String(e), board: session?.crew.board.list() ?? [], events }, null, 2));
+    log(`wrote ${file}`);
+    throw e;
   } finally {
+    // stops the workers too: without this a timed-out run keeps spending
+    session?.stop();
+    await session?.done;
     stop();
   }
 
@@ -76,8 +87,7 @@ export const run: LiveScript['run'] = async ({ env, log }) => {
   for (const s of summary.modes) log(`  ${s.id}: ${s.mode.padEnd(8)} ${s.modeReason}`);
   log(`hero scene mode: ${summary.heroMode} | 3D layer built: ${summary.has3DLayer} | cost $${summary.costUsd.toFixed(2)} | ${summary.wallTimeSec.toFixed(0)} s`);
   log(`Open /?film=${film.id} and capture scene 1 at the start, middle and end of the turn. Score the realism 1-5: keep 3D in the demo only at 4 or above.`);
-  mkdirSync('debug/s13b', { recursive: true });
-  const file = `debug/s13b/mg1-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  const file = `debug/s13b/mg1-${stamp}.json`;
   writeFileSync(file, JSON.stringify({ summary, events }, null, 2));
   log(`wrote ${file}`);
 };
