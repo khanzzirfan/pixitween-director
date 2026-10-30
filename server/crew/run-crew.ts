@@ -8,6 +8,8 @@ import { resizeFit } from '../media/image';
 import type { AppDeps } from '../http/deps';
 import { isFakeDirector } from '../agent/fake-director';
 import { createBoard, TERMINAL } from './board';
+import { createDeadline } from './deadline';
+import { autoFinish } from './showrunner';
 import { createBudget } from './budget';
 import { createJobChains } from './chains';
 import { createTakes } from './takes';
@@ -38,6 +40,8 @@ export interface CrewOptions {
   model?: string;
   /** Overrides CREW_IDLE_END_MS. */
   idleEndMs?: number;
+  /** Overrides CREW_FILM_DEADLINE_MS. */
+  deadlineMs?: number;
   /** Pause per fake job and turn when DIRECTOR_FAKE=1. */
   fakeDelayMs?: number;
   /** The workers to run instead of the real ones. A kind missing from it fails its jobs. */
@@ -102,8 +106,10 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     let children: string[] = [];
     void deps.films.list().then((all) => (children = all.filter((f) => f.parentId === filmId).map((f) => f.id))).catch(() => undefined);
 
+    const deadline = createDeadline(o.deadlineMs ?? env.CREW_FILM_DEADLINE_MS);
     const scheduler = createScheduler({
       board,
+      deadline,
       maxWorkers: env.CREW_MAX_WORKERS,
       runWorker: (job, signal) => runRegisteredWorker(job, signal, crew, fake?.workers[job.kind] ?? workers[job.kind]),
       budget,
@@ -121,7 +127,7 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     } catch {
       // the photo is optional context; the brief still says what the product is
     }
-    const common = { crew, backend, model, productImageUrl, events: () => events, idleEndMs: o.idleEndMs ?? env.CREW_IDLE_END_MS };
+    const common = { crew, backend, model, productImageUrl, events: () => events, idleEndMs: o.idleEndMs ?? env.CREW_IDLE_END_MS, deadline };
     const [{ createShowrunnerGraph }, { createCrewCheckpointer }] = await Promise.all([import('./engine/showrunner-graph'), import('./engine/checkpointer')]);
     const checkpointer = createCrewCheckpointer(deps.dataDir ?? env.DATA_DIR, filmId);
     const showrunner = createShowrunnerGraph({ ...common, checkpointer, threadId: filmId });
@@ -131,6 +137,18 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
       await deps.films.update(filmId, { status: value });
       toolCtx.emit({ type: 'film.status', status: value });
     };
+
+    // the hard clock: at the deadline, stop what is open (writers roll back), finish with what exists and end the session
+    const wrapTimer = setTimeout(() => {
+      void (async () => {
+        if (ac.signal.aborted) return;
+        crew.emit({ type: 'showrunner.say', kind: 'note', text: 'Out of time: wrapping up with what is built.' });
+        for (const j of board.list()) if (!TERMINAL.includes(j.status)) await scheduler.cancel(j.id).catch(() => undefined);
+        await autoFinish(crew).catch(() => false);
+        ac.abort();
+      })();
+    }, deadline.totalMs);
+    wrapTimer.unref?.();
 
     const done = (async () => {
       try {
@@ -150,6 +168,7 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
           // keep the original failure
         }
       } finally {
+        clearTimeout(wrapTimer);
         unsubscribe();
         inbox.close();
         ac.abort();

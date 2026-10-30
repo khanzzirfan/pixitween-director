@@ -101,6 +101,20 @@ describe('runCrew', () => {
     expect(job).toMatchObject({ job: { status: 'failed', error: 'no worker for build-scene' } });
   });
 
+  it('the film clock stops a worker that never ends (its job timer fires first) and ends the session long before the idle wait', async () => {
+    const deps = await makeTestDeps();
+    const backend = scripted([[
+      { name: 'reviseStoryboard', args: { ops: [{ op: 'add', scene }, { op: 'add', scene }] } },
+      { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's1', brief: 'b', reason: 'r' } },
+    ]]);
+    const slow = (_job: unknown, signal: AbortSignal) => new Promise<never>((_, reject) => signal.addEventListener('abort', () => reject(Object.assign(new Error('stopped'), { name: 'AbortError' }))));
+    const t0 = Date.now();
+    await createCrew(deps, { backend, idleEndMs: 60_000, deadlineMs: 1500, workers: { 'build-scene': slow as never } }).runCrew(deps.filmId);
+    expect(Date.now() - t0).toBeLessThan(5000);
+    const job = [...deps.events].reverse().find((e) => e.type === 'job.update' && e.job.id === 'j1');
+    expect(job).toMatchObject({ job: { status: expect.stringMatching(/cancelled|failed/) } });
+  });
+
   it('keeps one session per film and removes it when the session ends', async () => {
     const deps = await makeTestDeps();
     const crew = createCrew(deps, { backend: scripted([]), idleEndMs: 50 });

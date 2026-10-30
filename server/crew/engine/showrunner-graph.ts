@@ -88,6 +88,8 @@ export function createShowrunnerGraph(opts: ShowrunnerGraphOptions) {
         continue;
       }
       if (!batch.length) return { stop: true };
+      // past the polish phase the clock wraps the film up; the showrunner takes no more turns
+      if (opts.deadline?.phase() === 'wrap') continue;
       const hadUser = batch.some((i) => i.from === 'user');
       if (state.finished && hadUser) {
         await crew.films.update(crew.filmId, { status: 'building' });

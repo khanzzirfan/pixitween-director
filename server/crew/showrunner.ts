@@ -13,6 +13,7 @@ import { showrunnerSystem } from './prompts';
 import { createBoardTools, finishFilm, finishGate, newTurn, type CrewCtx } from './showrunner-tools';
 import { createId } from './ids';
 import { TERMINAL } from './board';
+import type { Deadline } from './deadline';
 
 export interface ShowrunnerDeps {
   crew: CrewCtx;
@@ -28,6 +29,8 @@ export interface ShowrunnerDeps {
   events?: () => FilmEvent[];
   /** How long to wait with an empty inbox before the session ends (CREW_IDLE_END_MS). */
   idleEndMs?: number;
+  /** The film clock. Past the polish phase the showrunner takes no more turns. */
+  deadline?: Deadline;
   /** A guard against a runaway loop. */
   maxTurns?: number;
   /** The S12f done nudge and auto-finish. Default true; tests can turn it off. */

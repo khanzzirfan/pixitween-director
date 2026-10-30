@@ -9,7 +9,9 @@ import type { LiveScript } from './run';
 const BRIEF = 'A 15 second film for Coffee Co., a fictional cold-brew coffee can: calm early-morning light, the pour, a close look at the label, and an end card.';
 export const MID_BUILD_MESSAGE = 'add a sunset scene after the second one, and warmer light everywhere';
 const MESSAGE_DELAY_MS = 6000;
-const FILM_TIMEOUT_MS = 15 * 60_000;
+// the crew's own clock ends the film at 3 minutes; the script waits a little longer for the wrap-up
+const FILM_DEADLINE_MS = 3 * 60_000;
+const FILM_TIMEOUT_MS = FILM_DEADLINE_MS + 30_000;
 
 export const describe: LiveScript['describe'] = () =>
   'MG-2 / MG-3: one real crew film on the Coffee Co. brief, with the message "' + MID_BUILD_MESSAGE + '" sent 6 s after the first job starts. With --ab it also runs the sequential director and a Spark-led crew and prints the 08 section 7 table.';
@@ -101,7 +103,7 @@ export async function crewFilm(deps: Deps, log: (l: string) => void, showrunnerM
   process.env.SHOWRUNNER_MODEL = showrunnerModel;
   const film = await newFilm(deps, true);
   bindCrew(deps, { idleEndMs: FILM_TIMEOUT_MS });
-  const crew = createCrew(deps, { idleEndMs: FILM_TIMEOUT_MS });
+  const crew = createCrew(deps, { idleEndMs: FILM_TIMEOUT_MS, deadlineMs: FILM_DEADLINE_MS });
   return collect(deps, film.id, async () => {
     const session = await crew.start(film.id);
     const t0 = Date.now();

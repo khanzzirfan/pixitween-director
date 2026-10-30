@@ -3,6 +3,7 @@ import { JOB_PRIORITY, WRITING_KINDS, type Job } from '@shared/crew';
 import type { FilmStore } from '@shared/ports';
 import { TERMINAL, type Board, type NewJob } from './board';
 import type { CrewPersist } from './persist';
+import type { Deadline } from './deadline';
 import { restoreScene, snapshotScene, type SceneSnapshot } from './scene-snapshot';
 
 export interface WorkerResult {
@@ -29,6 +30,8 @@ export interface SchedulerDeps {
   films?: Pick<FilmStore, 'get' | 'mutate'>;
   persist?: Pick<CrewPersist, 'saveSnapshot'>;
   log?: (line: string) => void;
+  /** The film clock. Without it nothing is gated or timed. */
+  deadline?: Deadline;
 }
 
 export interface Scheduler {
@@ -51,6 +54,15 @@ interface Active {
 const isWriting = (j: Pick<Job, 'kind'>) => WRITING_KINDS.includes(j.kind);
 const sameScene = (a: Job, b: Job) => a.filmId === b.filmId && a.sceneId === b.sceneId;
 const idNum = (id: string) => Number(/\d+/.exec(id)?.[0] ?? 0);
+
+/** The abort reason of a job that ran out of its time. Workers that can keep partial work check for it. */
+export class JobTimeoutError extends Error {
+  constructor(jobId: string, ms: number) {
+    super(`${jobId} ran out of time (${Math.round(ms / 1000)} s)`);
+    this.name = 'JobTimeoutError';
+  }
+}
+export const timedOut = (signal: AbortSignal): boolean => signal.aborted && signal.reason instanceof JobTimeoutError;
 
 export function createScheduler(deps: SchedulerDeps): Scheduler {
   const { board, maxWorkers } = deps;
@@ -80,7 +92,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
       const next = all
         .filter((j) => board.get(j.id)?.status === 'queued')
         .sort((a, b) => JOB_PRIORITY(a) - JOB_PRIORITY(b) || a.createdAt.localeCompare(b.createdAt) || idNum(a.id) - idNum(b.id))
-        .find((j) => startable(j, all));
+        .find((j) => startable(j, all) && (deps.deadline?.mayStart(j.kind) ?? true));
       if (!next) return;
       if (deps.budget && !deps.budget.allows(next)) {
         board.update(next.id, { status: 'failed', error: 'budget' });
@@ -96,6 +108,10 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     const entry: Active = { controller, cancelled: false, done: Promise.resolve() };
     const slot = [...Array(maxWorkers).keys()].find((n) => ![...active.keys()].some((id) => board.get(id)?.worker === `w${n + 1}`)) ?? 0;
     const running = board.update(job.id, { status: 'running', worker: job.worker ?? `w${slot + 1}` });
+    // an overlong job is stopped, not cancelled: the builder keeps what it drew and the scene basics fill the rest
+    const budgetMs = deps.deadline?.jobBudgetMs(job.kind);
+    const timer = budgetMs === undefined ? undefined : setTimeout(() => controller.abort(new JobTimeoutError(job.id, budgetMs)), budgetMs);
+    timer?.unref?.();
     entry.done = (async () => {
       try {
         await takeSnapshot(running);
@@ -115,6 +131,7 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
           }
         }
       } finally {
+        if (timer) clearTimeout(timer);
         active.delete(job.id);
         deps.budget?.check?.();
         pump();
@@ -163,7 +180,13 @@ export function createScheduler(deps: SchedulerDeps): Scheduler {
     pump();
   }
 
-  async function dispatch(input: NewJob): Promise<Job> {
+  async function dispatch(requested: NewJob): Promise<Job> {
+    let input = requested;
+    if (deps.deadline) {
+      const kind = deps.deadline.kindFor(input.kind);
+      if (!kind) throw new Error('too late for this change: the film is being wrapped up');
+      if (kind !== input.kind) input = { ...input, kind };
+    }
     const sceneId = input.sceneId;
     const filmId = input.filmId;
     if (sceneId && filmId && deps.films) {

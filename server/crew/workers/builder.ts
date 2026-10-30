@@ -15,7 +15,7 @@ import { pickBackend } from '../../llm/router';
 import { BUILDER_DIRECTION, renderBibleBlock, renderJobBlock, renderOutlineBlock } from '../prompts';
 import { applyTextLane, fitTextToSafeArea } from '../text-lane';
 import { restoreScene } from '../scene-snapshot';
-import type { WorkerResult } from '../scheduler';
+import { timedOut, type WorkerResult } from '../scheduler';
 import type { CrewCtx } from '../showrunner-tools';
 import { scopedRunTool } from './scope';
 
@@ -121,14 +121,18 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
       extraSystem: [film.styleBible ? renderBibleBlock(film.styleBible) : '', film.storyboard ? renderOutlineBlock(film.storyboard, sceneId) : '', SAFE_AREA, BUILDER_DIRECTION, renderJobBlock(job)].filter(Boolean).join('\n'),
       toolFilter: building ? (t: ToolDef) => !EDIT_ONLY_TOOLS.includes(t.name) : () => true,
       signal,
+      ...(building ? { maxTurns: loadEnv().CREW_BUILD_MAX_TURNS } : {}),
       run: scopedRunTool(sceneId),
     });
-    if (r.aborted || signal.aborted) throw abortError();
-    if (building) await ensureSceneBasics({ ctx, scene, product: { assetId: film.brief.productAssetId }, palette });
-    if (!r.calls || r.stalled) throw new Error(r.failures.at(-1) ? `builder stalled: ${r.failures.at(-1)}`.slice(0, 280) : 'builder made no progress');
+    // a job that ran out of time keeps what it drew; the basics below fill the rest
+    const late = timedOut(signal);
+    if ((r.aborted || signal.aborted) && !late) throw abortError();
+    const basicsCtx: ToolCtx = late ? { ...ctx, signal: undefined } : ctx;
+    if (building) await ensureSceneBasics({ ctx: basicsCtx, scene, product: { assetId: film.brief.productAssetId }, palette });
+    if (!late && (!r.calls || r.stalled)) throw new Error(r.failures.at(-1) ? `builder stalled: ${r.failures.at(-1)}`.slice(0, 280) : 'builder made no progress');
     await runTextLane(crew, job, sceneId, film.styleBible);
     const after = await crew.films.get(job.filmId);
-    return { summary: `${r.calls} tool calls, ${r.ok} ok`, version: after.version, costUsd: Math.max(0, crew.toolCtx.ledger.total(job.filmId) - spentBefore), model };
+    return { summary: `${r.calls} tool calls, ${r.ok} ok${late ? ', out of time' : ''}`, version: after.version, costUsd: Math.max(0, crew.toolCtx.ledger.total(job.filmId) - spentBefore), model };
   } finally {
     crew.emit({ type: 'crew.agent', lane, worker, state: 'idle', jobId: job.id, model });
   }
