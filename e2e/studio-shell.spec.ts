@@ -1,10 +1,10 @@
 import path from 'node:path';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 // The compact studio: one full-height page, a rail, resizable panels, no page scroll on desktop, no sideways scroll on a phone.
 const PRODUCT = path.resolve('fixtures/seed/mug-product.png');
 
-async function makeFilm(page: import('@playwright/test').Page) {
+async function makeFilm(page: Page) {
   await page.goto('/');
   await page.getByLabel('Product photo').setInputFiles(PRODUCT);
   await page.getByRole('textbox', { name: 'Brief', exact: true }).fill('A morning ritual with a ceramic mug, warm sunrise light');
