@@ -35,8 +35,16 @@ export const DEFAULT_BOX_FRACTIONS: Record<string, { x: number; y: number; w: nu
   caption: { x: 0.1, y: 0.84, w: 0.8, h: 0.1 },
 };
 
+export const BIBLE_FONT_STACKS = {
+  sans: 'Inter, system-ui, sans-serif',
+  serif: 'Georgia, "Times New Roman", serif',
+  rounded: 'ui-rounded, "SF Pro Rounded", system-ui, sans-serif',
+  condensed: '"Arial Narrow", "Roboto Condensed", system-ui, sans-serif',
+  mono: 'ui-monospace, Menlo, Consolas, monospace',
+} as const;
+
 export const TEXT_DEFAULTS = {
-  font: 'Inter, system-ui, sans-serif',
+  font: BIBLE_FONT_STACKS.sans,
   fill: '#ffffff',
   weight: 700,
   align: 'center',

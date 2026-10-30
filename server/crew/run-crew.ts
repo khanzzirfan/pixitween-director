@@ -18,7 +18,6 @@ import { createId } from './ids';
 import { createInbox, type Inbox } from './inbox';
 import { createCrewPersist } from './persist';
 import { createScheduler, type Scheduler } from './scheduler';
-import { createShowrunner } from './showrunner';
 import { newTurn, type CrewCtx } from './showrunner-tools';
 import { runRegisteredWorker } from './workers';
 
@@ -57,7 +56,7 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     const film = await deps.films.get(filmId);
     const persist = createCrewPersist(deps.dataDir ?? env.DATA_DIR, filmId);
     const events: FilmEvent[] = [];
-    const unsubscribe = deps.bus.subscribe(filmId, (env2) => events.push(env2.event));
+    const unsubscribe = deps.bus.subscribe(filmId, (env2) => events.push(env2.event), { internal: true });
 
     const inbox: Inbox = createInbox({ debounceMs: env.CREW_INBOX_DEBOUNCE_MS });
     const push: CrewSession['push'] = (item) => {
@@ -112,7 +111,7 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
       persist,
       log: (line) => console.log(line),
     });
-    crew = { filmId, films: deps.films, board, scheduler, budget, inbox, emit: toolCtx.emit, source: 'showrunner', takesMax: env.CREW_TAKES_MAX, removedIds: new Set(), toolCtx, makeToolCtx: deps.makeToolCtx, turn: newTurn(), snapshots: { load: (id) => persist.loadSnapshot(id) }, takes: { pick: (args) => takes.pick(crew, args) } };
+    crew = { filmId, films: deps.films, board, scheduler, budget, inbox, emit: toolCtx.emit, source: 'showrunner', takesMax: env.CREW_TAKES_MAX, maxFixes: env.CREW_MAX_FIXES_PER_SCENE, removedIds: new Set(), toolCtx, makeToolCtx: deps.makeToolCtx, subscriberCount: (id) => deps.bus.subscriberCount(id), turn: newTurn(), snapshots: { load: (id) => persist.loadSnapshot(id) }, takes: { pick: (args) => takes.pick(crew, args) } };
 
     const model = o.model ?? env.SHOWRUNNER_MODEL;
     const backend = o.backend ?? fake?.backend ?? pickBackend('showrunner', { onFallback: (i) => toolCtx.emit({ type: 'error', where: 'showrunner', message: `${i.from} unavailable (${i.reason}); this turn used ${i.to}` }) });
@@ -122,7 +121,10 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     } catch {
       // the photo is optional context; the brief still says what the product is
     }
-    const showrunner = createShowrunner({ crew, backend, model, productImageUrl, events: () => events, idleEndMs: o.idleEndMs ?? env.CREW_IDLE_END_MS });
+    const common = { crew, backend, model, productImageUrl, events: () => events, idleEndMs: o.idleEndMs ?? env.CREW_IDLE_END_MS };
+    const [{ createShowrunnerGraph }, { createCrewCheckpointer }] = await Promise.all([import('./engine/showrunner-graph'), import('./engine/checkpointer')]);
+    const checkpointer = createCrewCheckpointer(deps.dataDir ?? env.DATA_DIR, filmId);
+    const showrunner = createShowrunnerGraph({ ...common, checkpointer, threadId: filmId });
 
     const ac = new AbortController();
     const status = async (value: 'planning' | 'building' | 'ready' | 'failed') => {

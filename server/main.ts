@@ -5,7 +5,7 @@ import type { Hono } from 'hono';
 import { createDirectAdmission } from './admission';
 import { bootHooks } from './boot';
 import { getValidator } from './engine/validate';
-import { loadEnv, type Env } from './env';
+import { hostedTracingVars, loadEnv, type Env } from './env';
 import { createEventBus } from './events/bus';
 import { createApp } from './http/app';
 import { emitStamped, makeToolCtx, type AppDeps } from './http/deps';
@@ -44,6 +44,8 @@ export async function createServerApp(deps: AppDeps, opts: { staticRoot?: string
 export async function main(): Promise<void> {
   if (existsSync('.env')) process.loadEnvFile('.env');
   const env = loadEnv();
+  const tracing = hostedTracingVars();
+  if (tracing.length) console.warn(`[privacy] hosted tracing is off, but ${tracing.join(', ')} ${tracing.length === 1 ? 'is' : 'are'} set; nothing is sent to any tracing service.`);
   const app = await createServerApp(await buildDeps(env));
   const server = serve({ fetch: app.fetch, port: env.PORT });
   console.log(`PixiTween Director listening on http://localhost:${env.PORT}`);

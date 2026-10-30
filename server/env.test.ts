@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { ConfigError } from './errors';
-import { loadEnv } from './env';
+import { hostedTracingVars, loadEnv } from './env';
 
 const throwsNaming = (src: Record<string, string>, name: string) => {
   try {
@@ -57,9 +57,14 @@ it('has crew defaults', () => {
     CREW_FILM_BUDGET_USD: 1.5,
     CREW_TAKES_MAX: 3,
     CREW_INBOX_DEBOUNCE_MS: 1500,
-    CREW_CAPTURE_TIMEOUT_MS: 90000,
-    CREW_IDLE_END_MS: 600000,
+    CREW_CAPTURE_TIMEOUT_MS: 20000,
+    CREW_IDLE_END_MS: 90000,
   });
+});
+it('names hosted tracing variables so startup can warn without sending anything', () => {
+  expect(hostedTracingVars({})).toEqual([]);
+  expect(hostedTracingVars({ LANGCHAIN_TRACING_V2: 'true', OTHER: 'x' })).toEqual(['LANGCHAIN_TRACING_V2']);
+  expect(hostedTracingVars({ LANGSMITH_API_KEY: 'k', LANGSMITH_ENDPOINT: '' })).toEqual(['LANGSMITH_API_KEY']);
 });
 it('parses CREW_ENABLED=false and 0 to false, and an empty value to the default', () => {
   expect(loadEnv({ CREW_ENABLED: 'false' }).CREW_ENABLED).toBe(false);

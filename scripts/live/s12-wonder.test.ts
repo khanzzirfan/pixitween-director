@@ -3,7 +3,7 @@ import * as wonder from './s12-wonder';
 
 const call = (name: string, args: unknown, id = 'c') => ({ id, name, args });
 const dispatch = { kind: 'build-scene', sceneId: 's1', brief: 'build the hero shot', reason: 'first scene' };
-const bible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'Inter', weight: 700, case: 'upper' }, productLine: 'a can', mood: 'calm' };
+const bible = { palette: ['#1f2937', '#f59e0b'], light: 'warm', camera: 'slow', type: { font: 'sans', weight: 700, case: 'upper' }, productLine: 'a can', mood: 'calm' };
 
 it('describes itself and estimates 30 cents, offline', () => {
   expect(wonder.describe()).toContain('Wonder');
