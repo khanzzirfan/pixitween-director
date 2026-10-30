@@ -4,12 +4,17 @@ import { Annotation, END, START, StateGraph, type LangGraphRunnableConfig } from
 import type { BaseCheckpointSaver } from '@langchain/langgraph-checkpoint';
 import type { InboxItem } from '@shared/crew';
 import type { ChatMessage } from '@shared/ports';
+import { loadEnv } from '../../env';
 import { TERMINAL } from '../board';
 import {
   REPAIR,
   REPAIR_STALLED,
   autoDispatch,
   createShowrunnerAgent,
+  autoFinish,
+  idleDecision,
+  pushDoneNudge,
+  type IdleAction,
   type ShowrunnerAgent,
   type ShowrunnerDeps,
 } from '../showrunner';
@@ -27,6 +32,9 @@ const CrewState = Annotation.Root({
   dispatched: Annotation<string[]>(last<string[]>(() => [])),
   /** 'none' on a normal turn; 'all' or 'stalled' when the next turn is the single repair turn. */
   repair: Annotation<'none' | 'all' | 'stalled'>(last<'none' | 'all' | 'stalled'>(() => 'none')),
+  nudged: Annotation<boolean>(last<boolean>(() => false)),
+  idleTurns: Annotation<number>(last<number>(() => 0)),
+  idleAction: Annotation<IdleAction>(last<IdleAction>(() => 'none')),
   stop: Annotation<boolean>(last<boolean>(() => false)),
 });
 
@@ -121,27 +129,54 @@ export function createShowrunnerGraph(opts: ShowrunnerGraphOptions) {
     };
   }
 
-  /** Auto-dispatch the scenes the turn left without a builder, then apply the budget stop. */
-  async function dispatch(state: State): Promise<Partial<State>> {
+  /** Auto-dispatch and the budget stop. Then decides, without side effects, whether the idle board needs a nudge or an auto-finish. */
+  async function idleCheck(state: State): Promise<Partial<State>> {
     restoreTurn(crew, state);
     await autoDispatch(crew);
+    const base = { repair: 'none' as const, batch: [], hadUser: false, needsBuilder: [], dispatched: [], idleAction: 'none' as IdleAction };
     if (crew.budget.level() === 'stop') {
       crew.emit({ type: 'error', where: 'showrunner', message: 'the film budget is spent; the crew stops here' });
       agentState('idle');
-      return { stop: true, repair: 'none', batch: [], hadUser: false, needsBuilder: [], dispatched: [] };
+      return { ...base, stop: true };
     }
+    if (opts.wrapUp === false) {
+      agentState('idle');
+      return { ...base, stop: false };
+    }
+    const d = await idleDecision(crew, { nudged: state.nudged, idleTurns: state.idleTurns }, { autoFinish: loadEnv().CREW_AUTO_FINISH, hadUser: state.hadUser, finished: state.finished });
     agentState('idle');
-    return { stop: false, repair: 'none', batch: [], hadUser: false, needsBuilder: [], dispatched: [] };
+    return { ...base, stop: false, idleAction: d.action, nudged: d.nudged, idleTurns: d.idleTurns };
+  }
+
+  /** The done nudge (or a reminder after an idle turn) goes into the inbox; the wake node picks it up on the next pass. */
+  async function nudge(): Promise<Partial<State>> {
+    pushDoneNudge(crew);
+    return {};
+  }
+
+  /** Auto-finish. A refused gate keeps the session open with the idle counter reset, as the native loop does. */
+  async function finish(state: State): Promise<Partial<State>> {
+    if (await autoFinish(crew)) return { finished: true, stop: true, idleAction: 'none' };
+    return { finished: state.finished, stop: false, idleTurns: 0, nudged: true, idleAction: 'none' };
   }
 
   const graph = new StateGraph(CrewState)
     .addNode('wake', wake)
     .addNode('turn', turn)
-    .addNode('dispatch', dispatch)
+    .addNode('idle_check', idleCheck)
+    .addNode('nudge', nudge)
+    .addNode('finish', finish)
     .addEdge(START, 'wake')
     .addConditionalEdges('wake', (s: State) => (s.stop ? END : 'turn'))
-    .addConditionalEdges('turn', (s: State) => (s.stop ? END : s.repair !== 'none' ? 'turn' : 'dispatch'))
-    .addConditionalEdges('dispatch', (s: State) => (s.stop ? END : 'wake'))
+    .addConditionalEdges('turn', (s: State) => (s.stop ? END : s.repair !== 'none' ? 'turn' : 'idle_check'))
+    .addConditionalEdges('idle_check', (s: State) => {
+      if (s.stop) return END;
+      if (s.idleAction === 'nudge') return 'nudge';
+      if (s.idleAction === 'finish') return 'finish';
+      return 'wake';
+    })
+    .addEdge('nudge', 'wake')
+    .addConditionalEdges('finish', (s: State) => (s.stop ? END : 'wake'))
     .compile({ ...(checkpointer ? { checkpointer } : {}) });
 
   return {
@@ -150,7 +185,7 @@ export function createShowrunnerGraph(opts: ShowrunnerGraphOptions) {
     async run(signal: AbortSignal): Promise<void> {
       try {
         await graph.invoke(
-          { stop: false },
+          { stop: false, nudged: false, idleTurns: 0 },
           {
             configurable: { thread_id: threadId },
             signal,
