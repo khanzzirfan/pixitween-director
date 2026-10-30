@@ -31,6 +31,9 @@ export function swapInClip(
   c = reorderLayer(c, clipId, firstText ? { below: firstText } : 'front');
 
   for (const role of HIDDEN_ROLES) for (const id of layerIdsByRole(c, role, sceneId)) c = setLayerHidden(c, id, true);
+  // the "pending approval" caption has done its job: the real clip is in
+  const meta = (c.meta as { director?: { layers?: Record<string, { sceneId: string; placeholder?: boolean }> } } | undefined)?.director?.layers ?? {};
+  for (const [id, m] of Object.entries(meta)) if (m.sceneId === sceneId && m.placeholder) c = removeLayer(c, id);
 
   if (scene && o.clipSec >= 1 && o.clipSec < scene.durationSec - 0.2) c = setSceneDuration(c, sceneId, o.clipSec);
   return c;

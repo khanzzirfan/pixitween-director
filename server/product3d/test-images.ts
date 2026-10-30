@@ -69,6 +69,21 @@ export function bottle(): { img: Rgba; truth: { bodyTop: number; bodyBottom: num
   return { img, truth: { bodyTop, bodyBottom, neckBottom: 150 } };
 }
 
+/** A perfume flacon: a wide ornate cap and neck over a straight body that is only about half the height (the Habik shape). */
+export function flacon(): Rgba {
+  const img = blank(300, 600);
+  const cx = 150;
+  for (let y = 20; y <= 580; y++) {
+    let half: number;
+    if (y < 90) half = 70 - (y % 20) * 0.6; // an ornate crown: the width wobbles
+    else if (y < 160) half = 30; // neck
+    else if (y < 280) half = 30 + (60 * (y - 160)) / 120; // shoulders
+    else half = 90; // body
+    for (let x = Math.ceil(cx - half); x < Math.floor(cx + half); x++) put(img, x, y, [180, 40, 110]);
+  }
+  return img;
+}
+
 /** A solid triangle: no straight body at all. */
 export function triangle(): Rgba {
   const img = blank(300, 300);

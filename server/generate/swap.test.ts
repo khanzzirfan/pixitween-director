@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addLayer, addScene, registerAsset, sceneInfo } from '../authoring/api';
+import { addLayer, addScene, markPlaceholder, registerAsset, sceneInfo } from '../authoring/api';
 import { deepFreeze, mugScene } from '../authoring/test-helpers';
 import { getValidator } from '../engine/validate';
 import { coverBox, revertToMotion, swapInClip } from './swap';
@@ -17,6 +17,16 @@ describe('coverBox', () => {
     expect(b.h).toBe(1920);
     expect(b.w).toBeCloseTo(3413.33, 1);
     expect(b.x).toBeCloseTo(-1166.67, 1);
+  });
+});
+
+describe('swapInClip and the pending caption', () => {
+  it('removes the placeholder caption when the real clip goes in, and keeps a real headline', () => {
+    let c = addLayer(mugScene(), { sceneId: 's1', role: 'caption', kind: 'text', text: 'Clip pending approval' });
+    c = markPlaceholder(c, 's1:caption', true);
+    const out = swapInClip(c, { sceneId: 's1', asset: ASSET, clipSec: 4, frame, clipSize });
+    expect(layerIds(out, 's1')).not.toContain('s1:caption');
+    expect(layerIds(out, 's1')).toContain('s1:headline');
   });
 });
 
