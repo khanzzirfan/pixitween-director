@@ -1,7 +1,7 @@
 // Owned by S12b. What happens on its own when a job ends (design.md 5.5): a finished writer is checked and critiqued,
 // and its outcome goes to the showrunner's inbox, so the showrunner spends turns on decisions, not bookkeeping.
 import { WRITING_KINDS, type Job } from '@shared/crew';
-import type { Board } from './board';
+import { TERMINAL, type Board } from './board';
 import type { Inbox } from './inbox';
 import type { Scheduler } from './scheduler';
 
@@ -38,6 +38,9 @@ export function createJobChains(deps: ChainDeps): (job: Job) => void {
     // a check that finished says its findings itself; only its failure is news
     if (!isChecker || job.status === 'failed') {
       deps.inbox.push({ id: id(), at: new Date().toISOString(), from: 'job', jobId: job.id, text: describe(job) });
+    } else if (deps.board().list().every((j) => TERMINAL.includes(j.status))) {
+      // the last open job was a check: without this, a clean check leaves the showrunner waiting and finish is never called
+      deps.inbox.push({ id: id(), at: new Date().toISOString(), from: 'job', jobId: job.id, text: `${describe(job)}. Nothing is running now.` });
     }
     if (job.status !== 'done' || !WRITING_KINDS.includes(job.kind) || !job.sceneId) return;
 

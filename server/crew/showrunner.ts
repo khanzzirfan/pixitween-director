@@ -30,6 +30,7 @@ export interface ShowrunnerDeps {
 }
 
 const REPAIR = 'Every tool call in your last turn failed. Read the errors, fix the arguments and call the tools again.';
+const REPAIR_STALLED = 'Some tool calls in your last turn failed and no job is running, so nothing will wake you. Read the errors, fix the arguments and call those tools again.';
 
 /** Dispatches an 'auto' job for every scene that needs a builder and got none from the showrunner this turn (design 5.4). */
 export async function autoDispatch(crew: CrewCtx, origin: 'auto' | 'user' = 'auto'): Promise<string[]> {
@@ -72,8 +73,8 @@ export function createShowrunner(deps: ShowrunnerDeps) {
     });
   }
 
-  /** One model turn: send, run each call, record cost. Returns whether every call failed. */
-  async function turn(userContent: ChatMessage['content'], signal: AbortSignal): Promise<{ allFailed: boolean }> {
+  /** One model turn: send, run each call, record cost. Returns whether every call failed, and whether any did. */
+  async function turn(userContent: ChatMessage['content'], signal: AbortSignal): Promise<{ allFailed: boolean; anyFailed: boolean }> {
     history.push({ role: 'user', content: userContent });
     turns++;
     const sent = compact(history, 8, storySoFar(deps.events?.() ?? []));
@@ -96,7 +97,7 @@ export function createShowrunner(deps: ShowrunnerDeps) {
       await (await getRegistry()).run(crew.toolCtx, 'say', { text: response.content.trim().slice(0, 240) });
     }
     if (results.some((r, i) => r.ok && calls[i]!.name === 'finish')) finished = true;
-    return { allFailed: results.length > 0 && results.every((r) => !r.ok) };
+    return { allFailed: results.length > 0 && results.every((r) => !r.ok), anyFailed: results.some((r) => !r.ok) };
   }
 
   /** Waits for the next batch, or for the end of the session. Undefined means stop. */
@@ -147,8 +148,10 @@ export function createShowrunner(deps: ShowrunnerDeps) {
           sentImage = true;
           const content: ChatMessage['content'] = first && deps.productImageUrl ? [{ type: 'text', text }, { type: 'image_url', image_url: { url: deps.productImageUrl } }] : text;
           let r = await turn(content, signal);
-          // one repair turn, at once, when everything failed; a second failed turn waits for the inbox
-          if (r.allFailed && !signal.aborted) r = await turn(REPAIR, signal);
+          // one repair turn, at once, when everything failed, or when some calls failed and no job is left to wake the inbox;
+          // a second failed turn waits for the inbox
+          const stalled = r.anyFailed && crew.board.list().every((j) => TERMINAL.includes(j.status));
+          if ((r.allFailed || stalled) && !signal.aborted) r = await turn(r.allFailed ? REPAIR : REPAIR_STALLED, signal);
           await autoDispatch(crew);
           if (crew.budget.level() === 'stop') {
             crew.emit({ type: 'error', where: 'showrunner', message: 'the film budget is spent; the crew stops here' });

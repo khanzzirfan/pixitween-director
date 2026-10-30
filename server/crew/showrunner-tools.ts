@@ -156,7 +156,8 @@ export function createBoardTools(crew: CrewCtx): ToolDef[] {
 
   def({
     name: 'reviseStoryboard',
-    description: 'Add, update, remove or move scenes. 2 to 6 scenes, 2 to 8 seconds each, 30 seconds at most. The whole batch applies or none of it.',
+    description:
+      "Add, update, remove or move scenes. 2 to 6 scenes, 2 to 8 seconds each, 30 seconds at most. The whole batch applies or none of it. Give every added scene an id (lowercase, like 'hero') and use that id in after, dispatch and proposeGenerate; a scene added without one gets s1, s2 and so on.",
     params: z.object({ ops: z.array(storyboardOpSchema).min(1).max(8), reason: z.string().max(200).optional(), productShape: z.enum(PRODUCT_SHAPES).optional() }),
     async run(_ctx, a) {
       try {
