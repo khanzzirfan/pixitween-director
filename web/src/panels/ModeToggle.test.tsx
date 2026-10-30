@@ -25,3 +25,24 @@ it('disables both options when busy and marks the selection', () => {
   expect(screen.getByRole('radio', { name: 'MOTION' })).toBeDisabled();
   expect(generate()).toHaveAttribute('aria-checked', 'true');
 });
+
+it('offers 3D as a third option when product3d is on, and clicking it asks for 3d', () => {
+  const onChange = vi.fn();
+  render(<ModeToggle sceneId="s1" mode="motion" product3d onChange={onChange} />);
+  expect(screen.getAllByRole('radio').map((r) => r.textContent)).toEqual(['MOTION', '3D', 'GENERATE']);
+  fireEvent.click(screen.getByRole('radio', { name: '3D' }));
+  expect(onChange).toHaveBeenCalledWith('3d');
+});
+
+it('shows only the two options when product3d is off', () => {
+  render(<ModeToggle sceneId="s1" mode="motion" onChange={() => undefined} />);
+  expect(screen.getAllByRole('radio').map((r) => r.textContent)).toEqual(['MOTION', 'GENERATE']);
+  expect(screen.queryByRole('radio', { name: '3D' })).toBeNull();
+});
+
+it('marks 3D as the selection and says what it is', () => {
+  render(<ModeToggle sceneId="s1" mode="3d" product3d onChange={() => undefined} />);
+  expect(screen.getByRole('radio', { name: '3D' })).toHaveAttribute('aria-checked', 'true');
+  expect(screen.getByText(/real product turns in studio light/i)).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'MOTION' })).toHaveAttribute('aria-checked', 'false');
+});

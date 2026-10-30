@@ -107,3 +107,28 @@ describe('mp4 option', () => {
     expect(mp4).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('a 3D product (S13b)', () => {
+  const p3d = (ready: boolean) => ({ ...player(), whenReady: vi.fn(async () => ready) });
+
+  it('waits for the 3D product before it records', async () => {
+    const p = p3d(true);
+    const rec = vi.fn(async (_o: unknown) => new Blob(['x']));
+    render(<ExportPanel film={film()} events={[]} getPlayer={() => p} deps={{ recordCanvas: rec, mixAudio: mixNone as never, now: fixedNow, mp4Supported: async () => false }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Export video' }));
+    await screen.findByRole('link');
+    expect(p.whenReady).toHaveBeenCalledWith(20);
+    expect(rec).toHaveBeenCalledTimes(1);
+  });
+
+  it('never starts the recorder when the 3D product did not draw, and says so', async () => {
+    const p = p3d(false);
+    const rec = vi.fn(async (_o: unknown) => new Blob(['x']));
+    const mix = vi.fn(async () => ({ buffer: null, warnings: [] }));
+    render(<ExportPanel film={film()} events={[]} getPlayer={() => p} deps={{ recordCanvas: rec, mixAudio: mix as never, now: fixedNow, mp4Supported: async () => false }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Export video' }));
+    expect(await screen.findByText(/3D product did not finish drawing/)).toBeVisible();
+    expect(rec).not.toHaveBeenCalled();
+    expect(mix).not.toHaveBeenCalled();
+  });
+});

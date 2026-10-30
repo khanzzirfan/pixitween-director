@@ -1,5 +1,5 @@
 import type { PlayerHandle } from '../player/Player';
-import type { Storyboard } from '@shared/storyboard';
+import { compositionMode, type Storyboard } from '@shared/storyboard';
 import { ASPECT_SIZES } from '@shared/composition';
 import { CAPTURE_FPS, planFrames } from './plan';
 import { captureFrames, isFlatSignature, type CaptureDriver, type CapturedFrame } from './stable';
@@ -12,7 +12,13 @@ export interface MeasuredText {
 export interface ReviewCapture {
   frames: Array<{ sceneId: string; atSec: number; blob: Blob; unstable: boolean; blank: boolean }>;
   textBoxes: Record<string, MeasuredText>;
+  /** The 3D product had not finished drawing when the wait ended, so its frames may be missing it. */
+  notReady?: boolean;
 }
+
+/** How long a capture waits for the 3D product to draw before it goes on without it, in seconds. */
+export const CAPTURE_READY_WAIT_SEC = 10;
+const waitForRender = (player: PlayerHandle): Promise<boolean> => (player.whenReady ? player.whenReady(CAPTURE_READY_WAIT_SEC) : Promise.resolve(true));
 
 const tick = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 const SIG_W = 32;
@@ -73,9 +79,10 @@ export async function captureReview(
   storyboard: Storyboard,
   o: { onProgress?: (done: number, total: number) => void } = {},
 ): Promise<ReviewCapture> {
+  const ready = await waitForRender(player);
   let start = 0;
   const scenes = storyboard.scenes.map((s) => {
-    const out = { id: s.id, startSec: start, durationSec: s.durationSec, mode: s.mode };
+    const out = { id: s.id, startSec: start, durationSec: s.durationSec, mode: compositionMode(s.mode) };
     start += s.durationSec;
     return out;
   });
@@ -100,6 +107,7 @@ export async function captureReview(
   return {
     frames: results.map((r) => ({ sceneId: r.sceneId, atSec: r.atSec, blob: r.image, unstable: r.unstable, blank: r.blank })),
     textBoxes,
+    ...(ready ? {} : { notReady: true }),
   };
 }
 
@@ -112,6 +120,7 @@ function textLayerIds(storyboard: Storyboard, sceneId: string): string[] {
 
 /** Captures the frames a crew critic asked for: times are seconds from the start of the scene, so the film time adds the scene's start. */
 export async function captureScene(player: PlayerHandle, storyboard: Storyboard, sceneId: string, timesSec: number[]): Promise<ReviewCapture> {
+  const ready = await waitForRender(player);
   let start = 0;
   let found = false;
   for (const s of storyboard.scenes) {
@@ -135,5 +144,5 @@ export async function captureScene(player: PlayerHandle, storyboard: Storyboard,
       for (const [id, box] of Object.entries(measured)) if (!textBoxes[id]) textBoxes[id] = { frame: Math.round(r.atSec * CAPTURE_FPS), box };
     }
   }
-  return { frames: results.map((r) => ({ sceneId, atSec: r.atSec, blob: r.image, unstable: r.unstable, blank: r.blank })), textBoxes };
+  return { frames: results.map((r) => ({ sceneId, atSec: r.atSec, blob: r.image, unstable: r.unstable, blank: r.blank })), textBoxes, ...(ready ? {} : { notReady: true }) };
 }

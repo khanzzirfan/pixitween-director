@@ -41,7 +41,8 @@ function AddSlot({ onAdd }: { onAdd(intent: string): void }) {
   );
 }
 
-export function LiveStoryboard({ crew, now = Date.now(), onOps }: { crew: CrewState; now?: number; onOps(ops: StoryboardOp[]): Promise<unknown> | void }) {
+/** Without onOps the storyboard is a replay's: nothing on it can be edited. */
+export function LiveStoryboard({ crew, now = Date.now(), onOps }: { crew: CrewState; now?: number; onOps?(ops: StoryboardOp[]): Promise<unknown> | void }) {
   const scenes = crew.storyboard?.scenes ?? [];
   const jobs = Object.values(crew.jobs);
   const dragged = useRef<string | null>(null);
@@ -49,7 +50,7 @@ export function LiveStoryboard({ crew, now = Date.now(), onOps }: { crew: CrewSt
   const send = async (ops: StoryboardOp[]) => {
     setError('');
     try {
-      await onOps(ops);
+      await onOps?.(ops);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The edit was refused.');
     }
@@ -91,7 +92,7 @@ export function LiveStoryboard({ crew, now = Date.now(), onOps }: { crew: CrewSt
         <div className="empty-state"><span className="pulse-dot" aria-hidden="true" />The showrunner is sketching the plan…</div>
       ) : (
         <div className="cards">
-          <AddSlot onAdd={(t) => addAfter(null, t)} />
+          {onOps && <AddSlot onAdd={(t) => addAfter(null, t)} />}
           {scenes.map((s, i) => (
             <Fragment key={s.id}>
               <SceneCard
@@ -106,8 +107,9 @@ export function LiveStoryboard({ crew, now = Date.now(), onOps }: { crew: CrewSt
                 onMove={move}
                 onDragStart={(id) => { dragged.current = id; }}
                 onDropOn={dropOn}
+                readOnly={!onOps}
               />
-              <AddSlot onAdd={(t) => addAfter(s.id, t)} />
+              {onOps && <AddSlot onAdd={(t) => addAfter(s.id, t)} />}
             </Fragment>
           ))}
         </div>

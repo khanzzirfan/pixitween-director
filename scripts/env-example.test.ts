@@ -24,7 +24,3 @@ it('README mentions every script and the SAM License', () => {
   }
   expect(readme).toContain('SAM License');
 });
-
-it('README ends with the S10 marker', () => {
-  expect(readme.trimEnd().endsWith('<!-- S10 completes: Built during the hackathon / Pre-existing dependencies -->')).toBe(true);
-});

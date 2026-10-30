@@ -2,7 +2,9 @@ import type { ToolCtx, ToolDef, ToolResult } from '@shared/tools';
 import { tools as art } from './art';
 import { tools as authoring } from './authoring';
 import { tools as edit } from './edit';
+import { loadEnv } from '../env';
 import { tools as generate } from './generate';
+import { tools as product3d } from './product3d';
 import { tools as review } from './review';
 
 export { makeToolCtx } from '../http/deps';
@@ -21,9 +23,10 @@ export interface Registry {
   run(ctx: ToolCtx, name: string, args: unknown): Promise<ToolResult>;
 }
 
-export function createRegistry(arrays: ToolDef[][]): Registry {
+/** `gated` tools are listed only while its switch is on; it is read each time, so a test can flip the environment. */
+export function createRegistry(arrays: ToolDef[][], gated: Array<{ on: () => boolean; tools: ToolDef[] }> = []): Registry {
   const all = (): ToolDef[] => {
-    const flat = arrays.flat();
+    const flat = [...arrays.flat(), ...gated.filter((g) => g.on()).flatMap((g) => g.tools)];
     const seen = new Set<string>();
     const dup = new Set<string>();
     for (const t of flat) (seen.has(t.name) ? dup : seen).add(t.name);
@@ -65,7 +68,7 @@ export function createRegistry(arrays: ToolDef[][]): Registry {
   };
 }
 
-const registry = createRegistry([authoring, art, review, edit, generate]);
+const registry = createRegistry([authoring, art, review, edit, generate], [{ on: () => loadEnv().PRODUCT_3D, tools: product3d }]);
 export const allTools = (): ToolDef[] => registry.all();
 export const getTool = (name: string): ToolDef | undefined => registry.get(name);
 export const runTool = (ctx: ToolCtx, name: string, args: unknown): Promise<ToolResult> => registry.run(ctx, name, args);

@@ -45,3 +45,18 @@ it('opens a film through onOpen, or by setting ?film= by default', async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Motion film, 0:12' }));
   expect(window.location.search).toBe('?film=mot');
 });
+
+it("shows 'Watch it being made' on a crew film only, and opens ?film=…&replay=1", async () => {
+  const onReplay = vi.fn();
+  const mixed = [film({ id: 'crw', title: 'Crew film', crew: true, storyboard: { scenes: [sc('a', 'motion')] } }), film({ id: 'old', title: 'Old film', createdAt: '2026-11-02T09:00:00Z', storyboard: { scenes: [sc('a', 'motion')] } })];
+  render(<Gallery fetchFilms={async () => mixed} onOpen={() => undefined} onReplay={onReplay} />);
+  const buttons = await screen.findAllByRole('button', { name: 'Watch it being made' });
+  expect(buttons).toHaveLength(1);
+  fireEvent.click(buttons[0]!);
+  expect(onReplay).toHaveBeenCalledWith('crw');
+});
+it('sets replay=1 in the address by default', async () => {
+  render(<Gallery fetchFilms={async () => [film({ id: 'crw', title: 'Crew film', crew: true })]} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Watch it being made' }));
+  expect(window.location.search).toBe('?film=crw&replay=1');
+});

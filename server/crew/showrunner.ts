@@ -7,7 +7,7 @@ import { assistantMessageFrom, toolResultMessage } from '../llm/messages';
 import { priceSpark } from '../pricing';
 import type { Registry } from '../tools/registry';
 import { compact, renderTurn, storySoFar, type Finding } from './history';
-import { SHOWRUNNER_SYSTEM } from './prompts';
+import { showrunnerSystem } from './prompts';
 import { createBoardTools, newTurn, type CrewCtx } from './showrunner-tools';
 import { TERMINAL } from './board';
 
@@ -52,7 +52,7 @@ export function createShowrunner(deps: ShowrunnerDeps) {
   // loaded on first use: the registry pulls in every tool module, which a route registration does not need
   let registry: Registry | undefined;
   const getRegistry = async (): Promise<Registry> => (registry ??= (await import('../tools/registry')).createRegistry([tools]));
-  const history: ChatMessage[] = [{ role: 'system', content: SHOWRUNNER_SYSTEM }];
+  const history: ChatMessage[] = [{ role: 'system', content: showrunnerSystem() }];
   const maxTurns = deps.maxTurns ?? 40;
   let turns = 0;
   let sentImage = false;

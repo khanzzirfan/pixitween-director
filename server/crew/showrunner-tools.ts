@@ -4,9 +4,10 @@ import { z } from 'zod';
 import { jobKindSchema, storyboardOpSchema, styleBibleSchema, WRITING_KINDS, type JobKind, type StoryboardOp } from '@shared/crew';
 import type { FilmState } from '@shared/composition';
 import type { FilmStore } from '@shared/ports';
-import { MAX_GENERATE_SCENES, type Storyboard } from '@shared/storyboard';
+import { MAX_GENERATE_SCENES, PRODUCT_SHAPES, type ProductShape, type Storyboard } from '@shared/storyboard';
 import type { ToolCtx, ToolDef, ToolResult } from '@shared/tools';
 import { newFilmComposition, registerAsset } from '../authoring/api';
+import { readDirector, writeDirector } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
 import { setSceneMode } from '../generate/mode';
 import { runRules } from '../review/rules';
@@ -88,7 +89,7 @@ export interface Revision {
 }
 
 /** Applies storyboard ops: validates, cancels jobs of removed scenes, syncs the composition, saves the storyboard and announces it. */
-export async function reviseStoryboard(crew: CrewCtx, ops: StoryboardOp[]): Promise<Revision> {
+export async function reviseStoryboard(crew: CrewCtx, ops: StoryboardOp[], extra: { productShape?: ProductShape } = {}): Promise<Revision> {
   const film = await crew.films.get(crew.filmId);
   const before = film.storyboard ?? blankStoryboard(film);
   const preview = applyOps(before, ops, [...crew.removedIds]); // throws StoryboardOpError before anything is touched
@@ -103,7 +104,13 @@ export async function reviseStoryboard(crew: CrewCtx, ops: StoryboardOp[]): Prom
     (f) => {
       const base = f.storyboard ?? blankStoryboard(f);
       const r = applyOps(base, ops, [...crew.removedIds]);
-      const s = syncComposition((f.composition as Comp | undefined) ?? blankComposition(f, base), base, r.storyboard, r);
+      if (extra.productShape) r.storyboard = { ...r.storyboard, productShape: extra.productShape };
+      const s = { ...syncComposition((f.composition as Comp | undefined) ?? blankComposition(f, base), base, r.storyboard, r) };
+      if (extra.productShape) {
+        const meta = readDirector(s.next);
+        meta.productShape = extra.productShape;
+        s.next = writeDirector(s.next, meta);
+      }
       return { next: s.next, data: { r, needsBuilder: s.needsBuilder, needsMode: s.needsMode, rev: (f.storyboardRev ?? 0) + 1 } };
     },
     crew.source === 'user' ? 'user' : 'director',
@@ -150,10 +157,10 @@ export function createBoardTools(crew: CrewCtx): ToolDef[] {
   def({
     name: 'reviseStoryboard',
     description: 'Add, update, remove or move scenes. 2 to 6 scenes, 2 to 8 seconds each, 30 seconds at most. The whole batch applies or none of it.',
-    params: z.object({ ops: z.array(storyboardOpSchema).min(1).max(8), reason: z.string().max(200).optional() }),
+    params: z.object({ ops: z.array(storyboardOpSchema).min(1).max(8), reason: z.string().max(200).optional(), productShape: z.enum(PRODUCT_SHAPES).optional() }),
     async run(_ctx, a) {
       try {
-        const r = await reviseStoryboard(crew, a.ops);
+        const r = await reviseStoryboard(crew, a.ops, { ...(a.productShape ? { productShape: a.productShape } : {}) });
         return { ok: true, data: r };
       } catch (e) {
         return fail(e instanceof StoryboardOpError ? e.message : `could not revise the storyboard: ${message(e)}`);

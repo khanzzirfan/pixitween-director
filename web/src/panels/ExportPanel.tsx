@@ -6,7 +6,7 @@ import { exportMp4, mp4Supported } from '../export/mp4Export';
 import { mixAudio } from '../export/mixAudio';
 import { getExportCanvas, isDrawingBufferPreserved, playerToDriver } from '../export/playerCanvas';
 import { recordCanvas } from '../export/recordCanvas';
-import { ExportError, type ExportPlayerHandle } from '../export/types';
+import { EXPORT_READY_WAIT_SEC, ExportError, NOT_READY_MESSAGE, type ExportPlayerHandle } from '../export/types';
 import type { PanelProps } from './types';
 
 export const STUB_OWNER = 'S8a' as const;
@@ -61,6 +61,8 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
     try {
       const handle = getPlayer?.() ?? null;
       const canvas = getExportCanvas(handle);
+      // a 3D product that has not drawn would be recorded as an empty frame: wait for it, and never start the recorder without it
+      if (handle?.whenReady && !(await handle.whenReady(EXPORT_READY_WAIT_SEC))) throw new ExportError('not-ready', NOT_READY_MESSAGE);
       const durationSec = comp.durationInFrames / comp.fps;
       const messages: string[] = [];
       if (isDrawingBufferPreserved(canvas) === false) messages.push('Export may produce blank frames in this browser.');

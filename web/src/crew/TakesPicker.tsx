@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import type { CrewState } from './crewReducer';
 
-export function TakesPicker({ crew, onPick }: { crew: CrewState; onPick(jobId: string, takeFilmId: string): Promise<unknown> | void }) {
+export function TakesPicker({ crew, onPick }: { crew: CrewState; onPick?(jobId: string, takeFilmId: string): Promise<unknown> | void }) {
   const [picked, setPicked] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const groups = Object.entries(crew.takes).filter(([, t]) => t.length > 0);
@@ -10,7 +10,7 @@ export function TakesPicker({ crew, onPick }: { crew: CrewState; onPick(jobId: s
   const pick = async (jobId: string, takeFilmId: string) => {
     setError('');
     try {
-      await onPick(jobId, takeFilmId);
+      await onPick?.(jobId, takeFilmId);
       setPicked((p) => ({ ...p, [jobId]: takeFilmId }));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The pick was refused.');
@@ -34,7 +34,7 @@ export function TakesPicker({ crew, onPick }: { crew: CrewState; onPick(jobId: s
                       <span className="take-label">Take {t.label}</span>
                       {t.score !== undefined && <span className="take-score">{t.score}/10</span>}
                       {isBest && <span className="badge">critic's pick</span>}
-                      {inFilm ? <span className="in-film">in the film</span> : <button type="button" className="primary" onClick={() => void pick(jobId, t.takeFilmId)}>Pick</button>}
+                      {inFilm ? <span className="in-film">in the film</span> : onPick && <button type="button" className="primary" onClick={() => void pick(jobId, t.takeFilmId)}>Pick</button>}
                     </figcaption>
                   </figure>
                 );

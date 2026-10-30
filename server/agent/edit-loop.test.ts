@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { LlmBackend } from '@shared/ports';
 import { addLayer, addScene, newFilmComposition } from '../authoring/api';
+import { placeProduct3D } from '../product3d/authoring';
 import { makeTestFilm } from '../test-utils/film';
 import { allTools } from '../tools/registry';
+import { buildEditMessages, EDIT_SYSTEM_PROMPT } from './edit-prompt';
 import { assertEditable, FilmBusyError, FilmNotReadyError, MAX_TURNS, runEditWithCtx } from './edit-loop';
 
 async function filmWithText() {
@@ -116,5 +118,50 @@ describe('runEditWithCtx', () => {
     expect(out).toMatchObject({ ok: false, error: 'upstream 500' });
     await new Promise((r) => setTimeout(r, 50)); // the bus delivers after it has appended to disk
     expect(t.events.some((e) => e.type === 'error' && e.where === 'edit')).toBe(true);
+  });
+});
+
+describe('3D edits (S13b)', () => {
+  const sys = (comp: unknown) => buildEditMessages({ comp: comp as never, message: 'turn it more' })[0]!.content as string;
+
+  async function filmWith3D() {
+    const t = await filmWithText();
+    const film = await t.films.get(t.filmId);
+    const comp = placeProduct3D(film.composition as never, {
+      sceneId: 's1',
+      box: { x: 760, y: 140, w: 400, h: 800 },
+      shape: 'can',
+      texture: { id: 'ast_11111111111111111111111111111111', url: '/api/assets/ast_11111111111111111111111111111111', width: 2048, height: 1024, kind: 'label' },
+      side: '#1f2937',
+      aspect: 2,
+    });
+    expect((await t.films.commit(t.filmId, comp, 'director')).ok).toBe(true);
+    return t;
+  }
+
+  it("names turnProduct in the system text of a film with a 3D product, and not in a 2D film's", async () => {
+    const flat = await filmWithText();
+    const three = await filmWith3D();
+    expect(sys((await three.films.get(three.filmId)).composition)).toContain('turnProduct');
+    expect(sys((await three.films.get(three.filmId)).composition)).toContain('lightProduct');
+    expect(sys((await flat.films.get(flat.filmId)).composition)).not.toContain('turnProduct');
+    expect(sys((await flat.films.get(flat.filmId)).composition)).toBe(EDIT_SYSTEM_PROMPT);
+  });
+
+  it("a scripted turnProduct with to 30 commits one new version with source 'chat'", async () => {
+    process.env.PRODUCT_3D = 'true';
+    try {
+      const t = await filmWith3D();
+      const before = (await t.films.get(t.filmId)).version;
+      const out = await runEditWithCtx(t.ctx, { message: 'turn it more' }, { backend: scripted([{ name: 'turnProduct', args: { sceneId: 's1', to: 30 } }]), tools: allTools() });
+      expect(out).toMatchObject({ ok: true, applied: 1, failed: 0 });
+      const versions = await t.films.versions(t.filmId);
+      expect(versions.length).toBe(before + 1);
+      expect(versions.at(-1)).toMatchObject({ source: 'chat' });
+      const l = (((await t.films.get(t.filmId)).composition as { precomps: Record<string, { layers: Array<Record<string, any>> }> }).precomps.s1!.layers).find((x) => x.id === 's1:product3d')!;
+      expect(l.view.rotation.at(-1).v).toEqual([4, 30, 0]);
+    } finally {
+      delete process.env.PRODUCT_3D;
+    }
   });
 });

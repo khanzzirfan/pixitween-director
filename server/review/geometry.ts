@@ -107,6 +107,10 @@ export function layerBoxAt(
     const asset = assets[layer.assetId];
     iw = asset?.width ?? iw;
     ih = asset?.height ?? ih;
+  } else if (layer.kind === 'model3d') {
+    // a 3D layer is its own offscreen rectangle: the viewport is its size
+    iw = layer.viewport?.width ?? iw;
+    ih = layer.viewport?.height ?? ih;
   }
   let w = iw * Math.abs(sx),
     h = ih * Math.abs(sy);
@@ -139,7 +143,18 @@ export function layerBoxAt(
   ].map(([x, y]) => [pos[0] + Math.cos(rotation) * x - Math.sin(rotation) * y, pos[1] + Math.sin(rotation) * x + Math.cos(rotation) * y]);
   const xs = corners.map((c) => c[0]),
     ys = corners.map((c) => c[1]);
-  const box = { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+  let box = { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+  if (layer.kind === 'model3d') {
+    // the product fills 1/fit of its viewport; the rest is headroom for the shadow, so the product's own box is the viewport shrunk about its centre
+    const k = 1 / (layer.camera?.fit ?? 1.3);
+    const cx = (box.left + box.right) / 2;
+    const cy = (box.top + box.bottom) / 2;
+    const hw = ((box.right - box.left) / 2) * k;
+    const hh = ((box.bottom - box.top) / 2) * k;
+    box = { left: cx - hw, top: cy - hh, right: cx + hw, bottom: cy + hh };
+    w *= k;
+    h *= k;
+  }
   return {
     box,
     position: pos,

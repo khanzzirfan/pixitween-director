@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { addLayer, addScene, newFilmComposition, registerAsset } from '../authoring/api';
+import { fixturePath } from '../test-utils/fixtures';
+import { layerBoxAt } from './geometry';
 import { runRules } from './rules';
 
 const base = () => {
@@ -57,5 +60,28 @@ describe('runRules', () => {
     const { findings, skipped } = await runRules(comp, null);
     expect(findings).toEqual([]);
     expect(skipped).toContainEqual({ rule: '*', sceneId: 's1', reason: 'generate-mode scene' });
+  });
+});
+
+describe('a 3D product (S13a)', () => {
+  const fixture = () => JSON.parse(readFileSync(fixturePath('s13a', 'text-over-product3d.json'), 'utf8'));
+
+  it('is the product for the text-over-product rule: one finding, drawn on the product, not its headroom', async () => {
+    const { findings } = await runRules(fixture(), null);
+    const hits = findings.filter((f) => f.kind === 'text-over-product');
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ sceneId: 's1', layerId: 's1:headline' });
+  });
+
+  it('measures the product inside the viewport, not the viewport with its headroom', () => {
+    const { box } = layerBoxAt(fixture(), 's1:product3d', 10);
+    expect(box.right - box.left).toBeCloseTo(400, 0);
+    expect(box.bottom - box.top).toBeCloseTo(800, 0);
+    expect((box.left + box.right) / 2).toBeCloseTo(960, 0);
+  });
+
+  it('still reports no product-hidden finding for a 3D product that is in frame', async () => {
+    const { findings } = await runRules(fixture(), null);
+    expect(findings.some((f) => f.kind === 'product-hidden')).toBe(false);
   });
 });

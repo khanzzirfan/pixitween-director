@@ -8,6 +8,8 @@ export interface GalleryItem {
   thumbUrl: string;
   sceneCount: number;
   hasGenerated: boolean;
+  /** made by the crew, so its event log can be replayed */
+  crew: boolean;
   /** short local date, empty when the film has no valid createdAt */
   createdLabel: string;
 }
@@ -33,6 +35,7 @@ export function toGalleryItems(films: FilmState[]): GalleryItem[] {
         durationSec: Math.round((c.durationInFrames / c.fps) * 10) / 10,
         thumbUrl: product?.url ?? `/api/assets/${f.brief.productAssetId}`,
         sceneCount: f.storyboard?.scenes.length ?? 0,
+        crew: !!f.crew,
         hasGenerated: f.storyboard?.scenes.some((s) => s.mode === 'generate') ?? false,
         createdLabel: Number.isFinite(time(f.createdAt)) ? new Date(f.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '',
       };

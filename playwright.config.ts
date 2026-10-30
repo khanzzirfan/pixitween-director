@@ -35,6 +35,7 @@ export default defineConfig({
         DIRECTOR_FAKE: '1',
         DIRECTOR_FAKE_DELAY_MS: crew ? '1200' : '50',
         CREW_ENABLED: crew ? 'true' : 'false', // crew mode is on by default; the classic flow tests the single director
+        PRODUCT_3D: crew ? 'true' : 'false', // the crew run has a 3d hero scene, so the 3D path is rehearsed offline
         PORT: String(API_PORT),
         DATA_DIR: dataDir,
       },

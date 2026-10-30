@@ -49,7 +49,7 @@ describe('GET /api/crew/config', () => {
       process.env.CREW_ENABLED = flag;
       const res = await t.app.request('/api/crew/config');
       expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ enabled });
+      expect(await res.json()).toEqual({ enabled, product3d: false });
     }
   });
 });

@@ -22,7 +22,7 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -48,7 +48,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -75,7 +75,7 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -100,7 +100,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -126,7 +126,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -156,7 +156,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-005"
@@ -185,7 +185,7 @@
         "`npm run lint` passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -210,7 +210,7 @@
         "`npm run lint` passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-007"
@@ -237,7 +237,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-007"
@@ -264,7 +264,7 @@
         "`npm run lint` passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001",
@@ -292,7 +292,7 @@
         "`npm run lint` passes"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -318,7 +318,7 @@
         "`npm run lint` passes"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -396,6 +396,7 @@
     },
     "manualGates": [
       "MG-1: owner sets PRODUCT_3D=true with engine 0.3.0-alpha.5 installed, runs `npm run live -- s13-3d` (estimate about $0.40), then `--yes`: one Coffee Co. film whose hero scene is 3d. Record three frames (start, middle and end of the sway), the storyboard's modeReason for that scene, cost, and a realism score 1-5. Keep 3D in the demo only at 4 or above."
-    ]
+    ],
+    "completion": "S13b: built and tested 30 Oct 2026 (unit tests, a browser check on engine 0.3.0-alpha.5, crew e2e). Live gate MG-1 is the owner's."
   }
 }

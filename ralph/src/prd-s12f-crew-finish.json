@@ -1,0 +1,327 @@
+{
+  "name": "PixiTween Director S12f: the crew finishes the film (text lane, protected requests, fix cap, finish gate, auto-finish)",
+  "branchName": "ralph/s12f-crew-finish",
+  "description": "Fixes the five causes found in the MG-2 event log: the showrunner removed the director's sunset scene twice, a queued build for a removed scene failed, slide-in headlines kept failing the safe-area rule, the style bible font was free text, and the finish gate could never pass while critiques waited 90 s for a browser. Adds a deterministic text lane (type and safe area) after every builder job, the film outline in builder prompts, protected user scenes, a fix cap, a finish gate that accepts capped findings, a done nudge with auto-finish, and honest metrics.",
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md",
+      "docs/hackathon/steps/step-12-crew-swarm/design.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md (all of it)",
+      "docs/hackathon/06-contracts.md (D-19 amendment and D-28)",
+      "docs/hackathon/steps/step-12-crew-swarm/design.md (sections 5.5, 5.9, 5.12 and 6.1)"
+    ],
+    "requires": [
+      "prd-s12b-showrunner",
+      "prd-s12c-crew-workers"
+    ],
+    "owns": [
+      "server/crew/text-lane.ts",
+      "server/crew/brief-facts.ts",
+      "server/crew/scene-removal.test.ts",
+      "server/crew/finish.scenario.test.ts",
+      "fixtures/s12f/*"
+    ],
+    "sharedEdits": [
+      "shared/crew.ts",
+      "shared/storyboard.ts",
+      "server/review/rules-core.ts",
+      "server/events/bus.ts",
+      "server/env.ts",
+      ".env.example",
+      "server/authoring/constants.ts",
+      "server/crew/prompts.ts",
+      "server/crew/history.ts",
+      "server/crew/showrunner.ts",
+      "server/crew/showrunner-tools.ts",
+      "server/crew/scheduler.ts",
+      "server/crew/continuity.ts",
+      "server/crew/workers/builder.ts",
+      "server/crew/workers/critic.ts",
+      "server/crew/workers.ts",
+      "server/crew/takes.ts",
+      "server/crew/run-crew.ts",
+      "scripts/live/s12-crew.ts"
+    ],
+    "extraGuardrails": [
+      "The text lane is deterministic code: never ask a model where text goes or which font it uses.",
+      "Do not raise maxTurns, the budget or any timeout to make the crew finish; the spec's causes are the fix.",
+      "R2 still reports text that rests outside the safe area; only motion through the edge stops counting.",
+      "Keep CREW_ENABLED=false behaviour unchanged apart from the R2 rest-frame change, and say in notes which S5a tests changed."
+    ],
+    "manualGates": [
+      "MG-2 re-run: owner runs `npm run live -- s12-crew --yes` (about $0.60). Pass: ready by finish or auto-finish within 4 min, cost at most $0.60, the sunset scene built and present, 0 failed jobs, at most 3 fix jobs on any scene, 4 builders at once at least once. Record the table in 09-crew-swarm.md."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Honest crew metrics and MG-2 regression fixtures",
+      "description": "As a owner, I want the live crew report to name its numbers correctly and the failed MG-2 run kept as fixtures so that every later story is tested against what really happened.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md sections 1, 3.10 and 5, and scripts/live/s12-crew.ts computeMetrics.",
+        "Edit scripts/live/s12-crew.ts: report Showrunner turns (crew.agent lane showrunner state thinking), Model turns (all agents) (agent.turn count), Fix jobs, Accepted findings (from the finish note, 0 if none), Failed jobs, Time to ready (first event to film.status ready, '-' if never) and Ended by ('finish', 'auto-finish' or 'idle'). Update scripts/live/s12-crew.test.ts.",
+        "Create fixtures/s12f/mg2-final.comp.json from the MG-2 film's last version (the owner places the source at debug/s12f/mg2/versions/ and events.jsonl beside it; if it is missing, set notes to 'blocked: owner copies data/films/film_cc0b50958184 to debug/s12f/mg2' and build a synthetic composition with three slide-in headlines whose entrance starts off-frame instead). Replace asset URLs with fixture ids; no data: URL longer than 200 characters.",
+        "Create fixtures/s12f/mg2-events.jsonl with only the storyboard.revised, job.update, review.finding, showrunner.heard and showrunner.say events, and fixtures/s12f/README.md saying where they came from."
+      ],
+      "acceptance": [
+        "computeMetrics on fixtures/s12f/mg2-events.jsonl reports Showrunner turns 21 and Model turns larger than 21 (or, with the synthetic fallback, the counts the test builds)",
+        "Ended by is 'idle' for the MG-2 events and 'finish' for an event list ending in a successful finish",
+        "Neither fixture contains 'Authorization', an API key pattern or a data: URL over 200 characters (test)"
+      ],
+      "labels": [
+        "backend",
+        "testing"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Rule R2 judges text at rest",
+      "description": "As a reviewer of the film, I want the safe-area rule to look only at where text comes to rest so that an entrance sliding in from the edge is not a violation.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md section 3.4, server/review/rules-core.ts (the R2 block), server/review/geometry.ts and the R2 tests.",
+        "Edit server/review/rules-core.ts: for each text layer, compute its rest frames = samples at or after its last position, scale or opacity keyframe frame (all samples when it has none; its last visible sample when none qualify). R2 checks only rest frames and its evidence says 'at rest'.",
+        "Update the existing R2 tests for the new sampling and add a test with a headline that slides in from x = -400 and rests inside the safe area."
+      ],
+      "acceptance": [
+        "A headline whose entrance starts off-frame and rests inside the safe area yields no outside-safe-area finding",
+        "A headline resting 40 px past the right safe edge still yields an outside-safe-area error whose evidence contains 'at rest'",
+        "A static headline outside the safe area is still reported (unchanged behaviour)"
+      ],
+      "labels": [
+        "backend"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "fitTextToSafeArea moves text into the safe area at rest",
+      "description": "As a text lane, I want a pure function that fits every text layer's rest box inside the safe area so that safe-area findings cannot happen after a build.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md section 3.4, server/authoring/placement.ts, server/authoring/layers.ts and server/review/geometry.ts layerBoxAt.",
+        "Create server/crew/text-lane.ts exporting fitTextToSafeArea(comp, sceneId, { inset = 0.05, margin = 0.01 }) that returns { comp, moved }. Per text layer: rest box as in US-002; if wider than the safe rect set style.boxWidth to the safe width; if still taller reduce style.size in 5 % steps down to 70 % of the role default (textSize); then translate by the smallest move into the safe rect and shift every position keyframe by the same delta. Pure: the input is not mutated.",
+        "Create server/crew/text-lane.test.ts."
+      ],
+      "acceptance": [
+        "On fixtures/s12f/mg2-final.comp.json, running fitTextToSafeArea on every scene and then runRules gives 0 outside-safe-area findings",
+        "A text layer that already fits is returned unchanged and is absent from moved",
+        "For a slide-in headline moved by dx = 120, every position keyframe's x grows by exactly 120",
+        "A 120-character headline at 1080x1920 ends with boxWidth equal to the safe width and size not below 70 % of the default"
+      ],
+      "labels": [
+        "backend"
+      ],
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Style bible fonts and applyTextLane",
+      "description": "As a crew, I want the style bible to name a real font stack and a lane that applies it to every text layer so that type drift between parallel builders cannot happen.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md section 3.3, shared/crew.ts (styleBibleSchema), server/authoring/constants.ts, server/crew/showrunner-tools.ts (setStyleBible) and server/crew/continuity.ts (C3).",
+        "Edit shared/crew.ts (contract D-19 amendment): type.font becomes z.enum(['sans', 'serif', 'rounded', 'condensed', 'mono']). Add BIBLE_FONT_STACKS with the five stacks from the spec to server/authoring/constants.ts.",
+        "Edit the setStyleBible tool description and schema to list the five ids; a free-text font fails with a hint naming them. Update prompts.ts renderBibleBlock to print the id and its stack.",
+        "Add applyTextLane(comp, sceneId, bible) to server/crew/text-lane.ts: set each text layer's font stack and weight from the bible (captions weight minus 200, minimum 300) and apply case (upper, title, sentence) to its source. Idempotent.",
+        "Edit server/crew/continuity.ts C3 to compare font stacks. Update the affected tests and fixtures that use a free-text font."
+      ],
+      "acceptance": [
+        "setStyleBible with font 'Clean modern sans-serif' is refused and the message lists sans, serif, rounded, condensed and mono",
+        "applyTextLane with case 'upper' turns 'wake up slow' into 'WAKE UP SLOW' and sets the 'sans' stack; running it twice gives a deep-equal result",
+        "On fixtures/s12f/mg2-final.comp.json, after applyTextLane on every scene, continuity reports 0 type-drift findings"
+      ],
+      "labels": [
+        "backend"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Builder runs the text lane and sees the film outline",
+      "description": "As a builder, I want my scene's text fitted and styled before I report done, and the outline of the other scenes in my prompt, so that my scene passes the rules and does not repeat another scene.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md sections 3.4 and 3.5, server/crew/workers/builder.ts runBuilderJob and server/crew/takes.ts.",
+        "Add renderOutlineBlock(storyboard, sceneId) to server/crew/prompts.ts in the format of spec section 3.5 (intent cut to 60 characters, the scene's text or '(no headline yet)', 'YOU' on the builder's own row) and append it to the builder's extraSystem after the bible block.",
+        "In runBuilderJob, after buildScene succeeds and ensureSceneBasics runs, apply applyTextLane (when a style bible exists) and fitTextToSafeArea to the job's scene in one crew.films.mutate with source 'director' and note 'text lane <sceneId>'. Skip the write when nothing changed. Do the same in the take build path.",
+        "Update server/crew/workers/builder.test.ts and prompts.test.ts."
+      ],
+      "acceptance": [
+        "A builder job whose fake backend places a headline 200 px past the left safe edge ends with the headline inside the safe area, and the auto continuity job sees the fitted version",
+        "A builder job whose text already fits writes no extra version (version count unchanged by the lane)",
+        "The builder's system prompt for scene 3 of 5 contains 'FILM OUTLINE (you build scene 3 of 5' and one line per scene"
+      ],
+      "labels": [
+        "backend"
+      ],
+      "dependsOn": [
+        "US-004"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Scenes the director asked for are protected",
+      "description": "As a director, I want scenes I asked for to stay until I say otherwise so that the showrunner cannot overrule my request.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md section 3.1, shared/storyboard.ts, server/crew/showrunner-tools.ts (reviseStoryboard, applyStoryboardOps), server/crew/history.ts (renderTurn, storySoFar) and server/crew/prompts.ts.",
+        "Edit shared/storyboard.ts (contract D-19 amendment): sceneSchema gains requestedBy: z.literal('user').optional().",
+        "In reviseStoryboard, set requestedBy 'user' on every scene added or updated when crew.turn.hadUser is true; POST /storyboard user ops set it too. Refuse a batch that removes a requestedBy 'user' scene unless the current turn holds a user item, with the message '<id> was asked for by the director; ask before removing it'.",
+        "Edit renderTurn to add the never-compacted DIRECTOR'S REQUESTS block from spec section 3.1 (newest first, up to 10, 160 characters each, from showrunner.heard events with from 'user').",
+        "Replace prompt rule 1 with the text in spec section 3.1. Update the affected tests."
+      ],
+      "acceptance": [
+        "After a user-woken turn adds sunset-glow, a later showrunner-only turn that removes it is refused and the storyboard still holds sunset-glow",
+        "A turn whose batch holds the user message 'drop the sunset scene' may remove it",
+        "renderTurn output after 12 earlier turns still contains 'DIRECTOR'S REQUESTS' and the sunset message",
+        "SHOWRUNNER_SYSTEM contains 'never remove and re-add it'"
+      ],
+      "labels": [
+        "backend"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Removing a scene cancels its jobs; a vanished scene is cancelled, not failed",
+      "description": "As a crew, I want every job for a removed scene to end cancelled so that the showrunner never retries a build for a scene that no longer exists.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md section 3.2, server/crew/scheduler.ts, server/crew/showrunner-tools.ts (removal loop), server/crew/run-crew.ts (autoDispatch) and server/crew/workers.ts.",
+        "Write server/crew/scene-removal.test.ts first: 4 workers busy, add scene X, dispatch build-scene X (queued), then remove X in a later batch; assert the X job ends 'cancelled'. Record in notes what made it fail before the fix.",
+        "Fix the cause the test shows. Make scheduler.dispatch refuse a job whose sceneId is not in the current storyboard, creating no job.",
+        "In runBuilderJob throw SceneGoneError when the scene is missing at start; the worker wrapper ends that job 'cancelled' with summary 'scene removed'."
+      ],
+      "acceptance": [
+        "The scene-removal test passes: the queued job for the removed scene ends 'cancelled' and never 'failed'",
+        "dispatch for a scene id not in the storyboard returns a failure and the board has no new job",
+        "A builder job that starts after its scene vanished ends 'cancelled' with summary 'scene removed'"
+      ],
+      "labels": [
+        "backend",
+        "testing"
+      ],
+      "dependsOn": [
+        "US-006"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Fix cap per scene and a finish gate that can pass",
+      "description": "As a showrunner, I want a limit on fix jobs per scene and a finish gate that accepts what the limit leaves so that the film always reaches ready.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md section 3.6, server/crew/showrunner-tools.ts (dispatch, finish), server/crew/history.ts (the board table) and server/env.ts.",
+        "Add CREW_MAX_FIXES_PER_SCENE (int, default 3, 1 to 10) to server/env.ts, .env.example and the env tests.",
+        "dispatch refuses a fix job for a scene that already has that many fix jobs in any status except cancelled, with the message from the spec.",
+        "finish blocks on open jobs and on rule errors in scenes under the cap; errors on capped scenes are accepted, finish succeeds, and its note ends with 'accepted: <scene> <kind> (<n> fixes tried)' for each.",
+        "The board table in renderTurn shows 'fixes n/3' per scene."
+      ],
+      "acceptance": [
+        "The fourth fix dispatch for one scene is refused with 'fix cap reached for'",
+        "With one capped scene holding a text-over-product error and nothing open, finish succeeds and its note contains 'accepted: <scene> text-over-product (3 fixes tried)'",
+        "With an uncapped scene holding a rule error, finish is still refused (unchanged)"
+      ],
+      "labels": [
+        "backend"
+      ],
+      "dependsOn": [
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Done nudge and auto-finish",
+      "description": "As a director, I want the crew to wrap up once everything is built and checked so that a film never sits in building with nothing left to do.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md section 3.7, server/crew/showrunner.ts (run loop), server/crew/inbox.ts and server/crew/run-crew.ts.",
+        "Add CREW_AUTO_FINISH (boolean, default true) to server/env.ts and .env.example.",
+        "When the board becomes idle and the finish gate would pass, push one system inbox item with the nudge text from the spec, once per idle period.",
+        "If two showrunner turns after the nudge end with the board idle and no successful finish, call finish with summary '<n> scenes built and checked' and emit showrunner.say note 'Wrapping up: everything is built.'. Mark the session ended by 'auto-finish' for the US-001 metric. A later user message reopens the film as today."
+      ],
+      "acceptance": [
+        "With a fake backend that only calls say, the film reaches status ready after the nudge plus two turns, and the last showrunner.say is 'Wrapping up: everything is built.'",
+        "With CREW_AUTO_FINISH=false the same run ends idle without ready",
+        "The nudge is pushed once per idle period, not once per turn"
+      ],
+      "labels": [
+        "backend"
+      ],
+      "dependsOn": [
+        "US-008"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "The critic does not wait for a browser that is not there",
+      "description": "As a crew, I want critiques to fall back to rules at once when no browser is watching so that they do not hold the film for 90 s each.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md section 3.8, server/events/bus.ts and server/crew/workers/critic.ts.",
+        "Add subscriberCount(filmId) to the EventBus interface and implementation, with a test.",
+        "In the critic, when subscriberCount is 0 skip the capture request and finish with summary 'no browser connected; rules only'.",
+        "Change the CREW_CAPTURE_TIMEOUT_MS default in server/env.ts to 20000 and update .env.example and the env test."
+      ],
+      "acceptance": [
+        "With no subscriber, a critique job ends in under 1 s (fake timers not advanced) with summary 'no browser connected; rules only'",
+        "With one subscriber, the critique still emits capture.request and waits (existing tests pass)",
+        "loadEnv() with no override gives CREW_CAPTURE_TIMEOUT_MS 20000"
+      ],
+      "labels": [
+        "backend"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Fake-mode scenario: the crew finishes with the director's scene",
+      "description": "As a owner, I want one offline scenario that replays the MG-2 failure modes so that the demo's ending is rehearsed on every change.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md section 5, server/crew/fake-showrunner.ts and server/crew/run-crew.test.ts.",
+        "Create server/crew/finish.scenario.test.ts with a scripted showrunner backend: plan 4 scenes; on the user message add sunset-glow; later try to remove sunset-glow (refused); dispatch 4 fixes on one scene (the 4th refused); then only say. Builders use a fake backend that places a slide-in headline off the safe edge.",
+        "Assert the end state listed in acceptance. No network: the test fails on any fetch to a non-local host."
+      ],
+      "acceptance": [
+        "The film ends with status ready, ended by 'finish' or 'auto-finish'",
+        "The final storyboard contains sunset-glow and it was built (a done build-scene or rebuild-scene job for it)",
+        "No job ended 'failed', no scene has more than 3 fix jobs, and runRules on the final composition reports 0 outside-safe-area findings"
+      ],
+      "labels": [
+        "backend",
+        "testing"
+      ],
+      "dependsOn": [
+        "US-007",
+        "US-009",
+        "US-010"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Brief facts copied exactly (stretch)",
+      "description": "As a director, I want my product name, prices and on-screen lines copied word for word so that no model misspells them.",
+      "steps": [
+        "Read docs/hackathon/steps/step-12-crew-swarm/s12f-crew-finish.md section 3.9, server/crew/history.ts, server/crew/prompts.ts and server/crew/continuity.ts.",
+        "Create server/crew/brief-facts.ts exporting extractBriefFacts(brief, title) returning string[]: the product name, quoted strings, prices, URLs, e-mail addresses, phone numbers and 'Text on screen:' lines, deduplicated, at most 12. Pure, no model.",
+        "Add a 'FACTS (copy exactly): ...' line to the showrunner's first turn and to renderOutlineBlock.",
+        "Add continuity C4 fact-misspelt (warning): a headline holding a case-insensitive near match (edit distance 1 or 2) of a fact but not the fact itself."
+      ],
+      "acceptance": [
+        "extractBriefFacts('Launch \"Slow Morning\" cold brew, $4.50 a can, slowmorning.example', 'Slow Morning') returns 'Slow Morning', '$4.50' and 'slowmorning.example'",
+        "A headline 'Slow Mornig' with fact 'Slow Morning' yields one fact-misspelt warning; 'Slow Morning' yields none",
+        "The builder outline for any scene contains the FACTS line when facts exist and omits it when none do"
+      ],
+      "labels": [
+        "backend"
+      ],
+      "dependsOn": [
+        "US-005"
+      ]
+    }
+  ]
+}

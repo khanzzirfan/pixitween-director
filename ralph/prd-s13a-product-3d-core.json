@@ -22,7 +22,7 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -48,7 +48,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -74,7 +74,7 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -103,7 +103,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -129,7 +129,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-004"
@@ -156,7 +156,7 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-004"
@@ -183,7 +183,7 @@
         "`npm run lint` passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-006"
@@ -211,7 +211,7 @@
         "`npm run lint` passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -237,7 +237,7 @@
         "`npm run lint` passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-005",
@@ -269,7 +269,7 @@
         "`npm run lint` passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-003"
@@ -297,7 +297,7 @@
         "`npm run lint` passes"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-010"
@@ -326,7 +326,7 @@
         "`npm run lint` passes"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001",
@@ -355,7 +355,7 @@
         "`npm run lint` passes"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-010"
@@ -434,6 +434,7 @@
     },
     "manualGates": [
       "Covered by S13b MG-1 (`npm run live -- s13-3d`, about $0.40)."
-    ]
+    ],
+    "completion": "S13a: built and tested 30 Oct 2026 (unit tests)."
   }
 }

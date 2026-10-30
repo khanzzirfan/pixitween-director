@@ -77,3 +77,39 @@ describe('phases', () => {
     expect(screen.getByText(/Open a film/)).toBeInTheDocument();
   });
 });
+
+describe('3D (S13b)', () => {
+  const comp3d = (three: boolean) =>
+    ({
+      meta: { director: { scenes: { s1: { mode: 'motion' } } } },
+      precomps: { s1: { layers: three ? [{ id: 's1:product3d', kind: 'model3d' }] : [{ id: 's1:product', kind: 'image' }] } },
+    }) as unknown as AepCompositionJson;
+
+  it('shows three options with product3d on, and clicking 3D posts { mode: 3d } for that scene', async () => {
+    const api = mkApi();
+    render(<GenerateApproval filmId={F} comp={comp3d(false)} events={[]} api={api} product3d />);
+    expect(screen.getAllByRole('radio').map((r) => r.textContent)).toEqual(['MOTION', '3D', 'GENERATE']);
+    fireEvent.click(screen.getByRole('radio', { name: '3D' }));
+    await waitFor(() => expect(api.setMode).toHaveBeenCalledWith(F, 's1', '3d'));
+  });
+
+  it('shows the two options it always had with product3d off', () => {
+    render(<GenerateApproval filmId={F} comp={comp3d(false)} events={[]} api={mkApi()} product3d={false} />);
+    expect(screen.getAllByRole('radio').map((r) => r.textContent)).toEqual(['MOTION', 'GENERATE']);
+  });
+
+  it('selects 3D for a scene that has a 3D product layer and switches back to motion for free', async () => {
+    const api = mkApi();
+    render(<GenerateApproval filmId={F} comp={comp3d(true)} events={[]} api={api} product3d />);
+    expect(screen.getByRole('radio', { name: '3D' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: 'MOTION' }));
+    await waitFor(() => expect(api.setMode).toHaveBeenCalledWith(F, 's1', 'motion'));
+  });
+
+  it('shows why a switch to 3D was refused', async () => {
+    const api: GenerateApi = { setMode: vi.fn(async () => { throw new GenerateApiError(422, { error: 'cannot_place', message: 'scene s1 has no product cut-out yet' }); }), approve: vi.fn() } as never;
+    render(<GenerateApproval filmId={F} comp={comp3d(false)} events={[]} api={api} product3d />);
+    fireEvent.click(screen.getByRole('radio', { name: '3D' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('no product cut-out');
+  });
+});

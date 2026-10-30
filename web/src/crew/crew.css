@@ -226,3 +226,14 @@
 @media (prefers-reduced-motion: reduce) {
   .studio *, .thread *, .phone-view * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* S12e: the replay bar under the player */
+.replay-bar { display: flex; align-items: center; gap: 10px; width: min(100%, 560px); margin-top: 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.replay-tag { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; color: var(--accent); }
+.replay-play { width: 34px; height: 34px; border-radius: 99px; border: 0; background: var(--accent); color: #fff; font-size: 13px; font-weight: 800; flex: none; }
+.replay-scrub { flex: 1; min-width: 60px; accent-color: var(--accent); }
+.replay-time { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted, var(--text)); flex: none; }
+.replay-speeds { display: flex; gap: 2px; flex: none; }
+.replay-speeds button { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 8px; padding: 3px 7px; font-size: 12px; font-weight: 700; }
+.replay-speeds button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.replay-missing { padding: 40px 20px; text-align: center; }

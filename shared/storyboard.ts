@@ -12,10 +12,13 @@ export const sceneSchema = z.object({
   camera: z.enum(['static', 'dolly-in', 'pan', 'orbit', 'parallax']),
   layersWanted: z.array(z.enum(['bg', 'product', 'subject', 'headline', 'caption'])).min(1),
   text: z.string().max(120).optional(),
-  mode: z.enum(['motion', 'generate']),
+  mode: z.enum(['motion', 'generate', '3d']),
   modeReason: z.string().min(1).max(240),
   estCredits: z.number().min(0).optional(),
 });
+
+export const PRODUCT_SHAPES = ['can', 'bottle', 'box', 'jar', 'tube', 'pouch', 'other'] as const;
+export type ProductShape = (typeof PRODUCT_SHAPES)[number];
 
 export const storyboardSchema = z
   .object({
@@ -24,6 +27,8 @@ export const storyboardSchema = z
     durationSec: z.number().max(MAX_FILM_SECONDS),
     palette: z.array(z.string().regex(/^#[0-9a-fA-F]{6}$/)).min(1).max(6),
     scenes: z.array(sceneSchema).min(2).max(6),
+    /** The packaging shape of the product in the photo; set when the film has 3D scenes (S13). */
+    productShape: z.enum(PRODUCT_SHAPES).optional(),
   })
   .superRefine((sb, ctx) => {
     const total = sb.scenes.reduce((n, s) => n + s.durationSec, 0);
@@ -38,4 +43,7 @@ export const storyboardSchema = z
   });
 
 export type Scene = z.infer<typeof sceneSchema>;
+
+/** A 3D scene is a motion scene to the composition: its layers are laid out, reviewed and captured like any other. Only generate differs. */
+export const compositionMode = (mode: Scene['mode']): 'motion' | 'generate' => (mode === 'generate' ? 'generate' : 'motion');
 export type Storyboard = z.infer<typeof storyboardSchema>;

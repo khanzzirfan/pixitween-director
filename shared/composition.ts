@@ -11,7 +11,7 @@ export interface AssetRef {
   mime: string;
   width?: number;
   height?: number;
-  role?: 'product-photo' | 'plate' | 'still' | 'cutout' | 'mask' | 'clip' | 'frame' | 'audio';
+  role?: 'product-photo' | 'plate' | 'still' | 'cutout' | 'mask' | 'clip' | 'frame' | 'audio' | 'label';
   sceneId?: string;
   /** Review frames only: the film they were captured for, the time they show and whether they are before or after a fix. */
   filmId?: FilmId;

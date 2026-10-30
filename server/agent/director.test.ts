@@ -32,6 +32,31 @@ describe('createDirector', () => {
     expect(t.events.map((e) => e.type)).toEqual(expect.arrayContaining(['director.storyboard', 'film.status']));
   });
 
+  it("with PRODUCT_3D the fake plan has a 3d hero scene, and the film ends ready with s1:product3d in it", async () => {
+    process.env.DIRECTOR_FAKE = '1';
+    process.env.PRODUCT_3D = 'true';
+    const t = await makeTestFilm();
+    await createDirector(depsFor(t), { delayMs: 0 }).runDirector(t.filmId);
+    const film = await t.films.get(t.filmId);
+    expect(film.status).toBe('ready');
+    expect(film.storyboard).toMatchObject({ productShape: 'can' });
+    expect(film.storyboard?.scenes[0]).toMatchObject({ id: 's1', mode: '3d' });
+    expect(film.storyboard?.scenes[1]?.mode).toBe('generate');
+    const s1 = (film.composition?.precomps as Record<string, { layers: Array<{ id: string; kind: string }> }>).s1!.layers;
+    expect(s1.find((l) => l.id === 's1:product3d')?.kind).toBe('model3d');
+    expect(s1.some((l) => l.id === 's1:product')).toBe(false);
+  });
+
+  it('without PRODUCT_3D the same fake plan has no 3d scene and no 3D layer', async () => {
+    process.env.DIRECTOR_FAKE = '1';
+    delete process.env.PRODUCT_3D;
+    const t = await makeTestFilm();
+    await createDirector(depsFor(t), { delayMs: 0 }).runDirector(t.filmId);
+    const film = await t.films.get(t.filmId);
+    expect(film.storyboard?.scenes.map((s) => s.mode)).toEqual(['motion', 'generate', 'motion']);
+    expect(JSON.stringify(film.composition)).not.toContain('model3d');
+  });
+
   it('marks the film failed and emits an error when the storyboard cannot be parsed', async () => {
     const t = await makeTestFilm();
     const bad = { content: 'this is not json', toolCalls: [], ms: 1, model: 'muse-spark-1.3-contributor' };

@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { Storyboard } from '@shared/storyboard';
+import type { PlayerHandle } from '../player/Player';
+import { captureReview, captureScene } from './driver';
 import { planFrames } from './plan';
 import { fitTransform, toCompSpace } from './fit';
 import { captureFrames, isFlatSignature, waitForStable } from './stable';
@@ -149,5 +152,42 @@ describe('measureTextBoxes', () => {
   it('finds a text node nested two levels down', () => {
     const deep: PixiNodeLike = { children: [{ children: [{ text: 'hi', getBounds: () => ({ x: 0, y: 0, width: 1, height: 1 }) }] }] };
     expect(findTextNode(deep)?.text).toBe('hi');
+  });
+});
+
+describe('capture waits for the 3D product (S13b)', () => {
+  const storyboard = { title: 't', aspect: '16:9', durationSec: 8, palette: ['#000000'], scenes: [{ id: 's1', durationSec: 4, mode: 'motion', layersWanted: ['bg'] }, { id: 's2', durationSec: 4, mode: '3d', layersWanted: ['bg'] }] } as unknown as Storyboard;
+  function recordingPlayer(ready: boolean, log: string[]): PlayerHandle {
+    const canvas = document.createElement('canvas');
+    canvas.toBlob = (cb: BlobCallback) => cb(new Blob(['png']));
+    return {
+      getCanvas: () => canvas,
+      getApp: () => null,
+      play: () => undefined,
+      pause: () => undefined,
+      seek: (s: number) => void log.push(`seek ${s}`),
+      getTime: () => 0,
+      whenReady: async (sec: number) => (log.push(`whenReady ${sec}`), ready),
+    };
+  }
+
+  it('awaits whenReady before the first seek, for a scene capture', async () => {
+    const log: string[] = [];
+    await captureScene(recordingPlayer(true, log), storyboard, 's2', [0.5]);
+    expect(log[0]).toBe('whenReady 10');
+    expect(log.findIndex((l) => l.startsWith('seek'))).toBeGreaterThan(0);
+  });
+
+  it('awaits whenReady before the first seek, for a whole review, and notes when it never came', async () => {
+    const log: string[] = [];
+    const r = await captureReview(recordingPlayer(false, log), storyboard);
+    expect(log[0]).toBe('whenReady 10');
+    expect(r.notReady).toBe(true);
+    expect(r.frames.length).toBeGreaterThan(0);
+  });
+
+  it('does not set notReady when the 3D product drew', async () => {
+    const r = await captureScene(recordingPlayer(true, []), storyboard, 's1', [0.5]);
+    expect(r.notReady).toBeUndefined();
   });
 });

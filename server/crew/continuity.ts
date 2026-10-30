@@ -35,7 +35,7 @@ function scaleDrift(comp: Comp, storyboard: Storyboard | undefined): ContinuityF
   const heights = new Map<string, { sceneId: string; shotType: string; h: number; layerId: string }>();
   for (const s of listScenes(comp)) {
     if (s.mode === 'generate') continue;
-    const product = layersOf(comp, s.precompId).find((l) => roleOf(comp, l.id) === 'product');
+    const product = layersOf(comp, s.precompId).find((l) => ['product', 'product3d'].includes(roleOf(comp, l.id) ?? ''));
     const shot = storyboard.scenes.find((x) => x.id === s.sceneId)?.shotType;
     if (!product || !shot) continue;
     try {

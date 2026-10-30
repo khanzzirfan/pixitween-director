@@ -1,7 +1,7 @@
 {
-  "name": "PixiTween Director S12d: crew UI (crew board, live storyboard, director's notes, takes, budget, push-to-talk, capture bridge)",
+  "name": "PixiTween Director S12d: crew UI (crew board, crew map, live storyboard, director's notes, takes, budget, push-to-talk, capture bridge, chat intake)",
   "branchName": "ralph/s12d-crew-ui",
-  "description": "The studio view of a crew film: a pure reducer from events to crew state, the crew board with one lane per agent, director's notes with ask buttons, editable live storyboard cards, the takes picker, the budget meter, push-to-talk to the showrunner, the browser capture bridge for the critic and the crew layout in App. Built against recorded event fixtures so it does not wait for S12b.",
+  "description": "The studio view of a crew film: a pure reducer from events to crew state, the crew board with one lane per agent, director's notes with ask buttons, editable live storyboard cards, the takes picker, the budget meter, push-to-talk to the showrunner, the browser capture bridge for the critic and the crew layout in App. Built against recorded event fixtures so it does not wait for S12b. It also adds the crew map (a live topology of the agents driven only by real crew events), a chat-thread intake that replaces the form for crew films, and an optional phone frame around the thread (cut line).",
   "metadata": {
     "specs": [
       "docs/hackathon/09-crew-swarm.md",
@@ -10,7 +10,8 @@
     "readFirst": [
       "docs/hackathon/06-contracts.md (sections 5 and 7)",
       "docs/hackathon/steps/step-12-crew-swarm/design.md (sections 3.2, 3.3, 4 and 5.9)",
-      "docs/architecture/README.md section 2 (the panels and useFilm)"
+      "docs/architecture/README.md section 2 (the panels and useFilm)",
+      "docs/hackathon/steps/step-12-crew-swarm/design.md section 3.4 (crew map and chat intake)"
     ],
     "requires": [
       "prd-s12a-crew-core"
@@ -31,16 +32,25 @@
       "web/src/crew/crew.css",
       "web/src/crew/api.ts",
       "e2e/crew.spec.ts",
-      "fixtures/s12d/*"
+      "fixtures/s12d/*",
+      "web/src/crew/topology.ts",
+      "web/src/crew/CrewMap.tsx",
+      "web/src/crew/ChatIntake.tsx",
+      "web/src/crew/ChatThread.tsx",
+      "web/src/crew/PhoneFrame.tsx"
     ],
     "sharedEdits": [
       "web/src/App.tsx",
-      "web/src/review/useAutoReview.ts"
+      "web/src/review/useAutoReview.ts",
+      "web/src/panels/NewFilm.tsx",
+      "server/http/handlers/crew.ts"
     ],
     "extraGuardrails": [
       "Every component reads crew state from crewReducer; no component keeps its own copy of jobs or the storyboard.",
       "Use the existing theme tokens (light and dark, from S8b) and keep the 375 px layout usable.",
-      "Every action is reachable by keyboard: card reorder has Move up / Move down buttons, push-to-talk works with a button as well as holding Space."
+      "Every action is reachable by keyboard: card reorder has Move up / Move down buttons, push-to-talk works with a button as well as holding Space.",
+      "The crew map animates only in response to a crew event folded by crewReducer. No timer, random number or fixed schedule may create a pulse or light a node.",
+      "No messaging-app branding: no app names, logos, green-bubble palettes, read-receipt ticks or other look-alike details. The chat thread and the phone frame use the existing theme tokens only."
     ],
     "manualGates": [
       "MG-4: owner runs the 09-crew-swarm.md section 4 demo script in the browser against the live API twice in a row and records a screen capture of the crew board with 4 builder lanes busy at once."
@@ -350,6 +360,92 @@
       ],
       "dependsOn": [
         "US-013"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "Crew map: live agent topology from crew events",
+      "description": "As a viewer, I want a map of the crew where agents light up and work visibly moves between them so that I can see the agents working in parallel and my messages changing their plan.",
+      "steps": [
+        "Read design.md section 3.4, shared/events.ts (crew.agent, job.update, showrunner.heard, showrunner.say, review.finding, storyboard.revised) and web/src/crew/crewReducer.ts.",
+        "Create web/src/crew/topology.ts: a pure linkFor(event) returning { from, to, kind, label? } or null, using node ids 'you', 'showrunner', 'critic', 'continuity', 'producer', 'listener', 'local' and one 'builder:<worker>' per builder worker. Mapping: showrunner.heard with from 'user' -> you->showrunner (kind 'message'); storyboard.revised with source 'user' -> you->showrunner ('edit'); job.update to status 'running' with a worker -> showrunner->that worker's node ('dispatch', label = job.kind + scene); job.update to 'done' -> worker node->showrunner ('result'); to 'failed', 'cancelled' or 'superseded' -> worker node->showrunner ('stopped'); review.finding -> critic->showrunner when deterministic is false, continuity->showrunner when true ('finding'); showrunner.say -> showrunner->you ('reply'). Every other event returns null.",
+        "Edit web/src/crew/crewReducer.ts: add links: Array<{ id, from, to, kind, label?, at }> to the state, keeping the newest 24; at = the event's own timestamp so a replay draws the same links. Add tests for linkFor and for the reducer's links.",
+        "Create web/src/crew/CrewMap.tsx: an inline SVG (no new dependency) with 'showrunner' in the centre, 'you' on the left, the builder nodes on an arc on the right, critic and continuity below, producer, listener and local above. Builder nodes appear when a crew.agent event first names that worker. A node is lit while its lane state is 'thinking' or 'working' and dimly pulsing while 'waiting'; it shows the agent's model label and the job reason under it. Each link made in the last 1.5 s of the clock draws a dot travelling along its edge, coloured by kind; the edge keeps a faint trail for 4 s. With prefers-reduced-motion, show the edge highlight without the travelling dot. Each node has an accessible name ('Builder 2, working: build s3'), and a visually hidden live region announces dispatches and your messages.",
+        "Edit web/src/crew/CrewBoard.tsx: add a two-option toggle, 'Lanes' and 'Map', with role tablist and arrow-key support. Remember the choice in localStorage inside try/catch, and default to Lanes when storage is unavailable.",
+        "Edit e2e/crew.spec.ts: switch to Map during the fake run, assert 4 builder nodes are lit at the same moment, and assert a you->showrunner link appears after the mid-build message.",
+        "Create web/src/crew/CrewMap.test.tsx and web/src/crew/topology.test.ts."
+      ],
+      "acceptance": [
+        "linkFor maps each event type listed in the steps to the stated from, to and kind, and returns null for film.status, cost and art.asset",
+        "Folding the US-001 fixture to the 4-builds point and rendering CrewMap gives 4 builder nodes with the lit state",
+        "After the fixture's user message, the reducer's newest link is { from: 'you', to: 'showrunner', kind: 'message' }",
+        "With no new events, advancing fake timers by 10 s leaves zero travelling dots and does not change the reducer state (=== check)",
+        "Under a mocked prefers-reduced-motion: reduce, no element with the travelling-dot class is rendered",
+        "The Lanes/Map toggle switches with ArrowRight and Enter, and the choice survives a remount when localStorage works and falls back to Lanes when getItem throws",
+        "Browser check: on the fake crew run the map shows 4 lit builders at once, a dot runs from You to Showrunner after typing a message, and the 375 px layout has no horizontal scroll"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-013",
+        "US-014"
+      ]
+    },
+    {
+      "id": "US-016",
+      "title": "Chat-thread intake for crew films",
+      "description": "As a user, I want to start my film by chatting with the showrunner and keep talking in the same thread while it builds so that the brief and my mid-build directions feel like one conversation.",
+      "steps": [
+        "Read web/src/panels/NewFilm.tsx (the fields, validation and api.createFilm call), web/src/crew/DirectorNotes.tsx, web/src/crew/PushToTalk.tsx and design.md section 3.4.",
+        "Create web/src/crew/ChatThread.tsx: a message list (your bubbles on the right, the showrunner's on the left, an image bubble for an attached photo, an audio bubble for a voice brief) and a composer with a text box, an attach-photo button, a record button (useRecorder) and aspect chips 16:9 / 9:16 / 1:1. It reuses the theme tokens.",
+        "Create web/src/crew/ChatIntake.tsx: before a film exists, the thread opens with one fixed showrunner line ('What are we making? Send a photo of the product and tell me about it.'). Attaching a photo adds an image bubble; the first text or voice message with a photo present sends exactly the same FormData that NewFilm sends (product, aspect, optional title, brief or audio) and keeps NewFilm's passcode and error handling. The product name is optional and set from a 'Name it' chip that pre-fills the composer. If no photo is attached, the send button stays disabled and the composer hint says a photo is needed.",
+        "After the film is created, the same thread renders the crew conversation from crewReducer: heard messages as your bubbles, showrunner.say notes and replies as its bubbles, ask options as reply chips. Edit web/src/crew/CrewStudio.tsx so its DirectorNotes slot renders this thread; DirectorNotes stays as the list used inside it.",
+        "Edit server/http/handlers/crew.ts: add GET /api/crew/config returning { enabled } from loadEnv().CREW_ENABLED (no auth, no model call), and add getCrewConfig() to web/src/crew/api.ts. Edit web/src/panels/NewFilm.tsx: render ChatIntake when enabled is true, and the current form when it is false or the request fails. Non-crew behaviour and the existing NewFilm tests are unchanged.",
+        "Create web/src/crew/ChatIntake.test.tsx and web/src/crew/ChatThread.test.tsx."
+      ],
+      "acceptance": [
+        "Sending 'a cold brew launch film, bright and summery' with a photo attached calls api.createFilm once with FormData holding product, aspect '16:9' and that brief, matching what NewFilm sends for the same input",
+        "Without a photo the send button is disabled; with a photo and an empty text box it is disabled until text or a recording exists",
+        "A 401 from createFilm shows the passcode field inside the thread, and the next send stores it the same way NewFilm does",
+        "Folding the US-001 fixture renders the fixture's user message as a right-side bubble and each showrunner.say as a left-side bubble, in event order",
+        "GET /api/crew/config returns { enabled: true } with CREW_ENABLED=true and { enabled: false } with CREW_ENABLED=false (route test)",
+        "With crew mode off, or when /api/crew/config fails, NewFilm renders the classic form and all existing NewFilm and App tests pass unchanged",
+        "Browser check: in fake crew mode, start a film from the thread, type the sunset message mid-build in the same thread, and see the showrunner's reply appear under it"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-013"
+      ]
+    },
+    {
+      "id": "US-017",
+      "title": "Optional phone frame around the chat thread",
+      "description": "As a demo viewer, I want the chat thread shown inside a generic phone so that it reads as directing a film crew from your phone, with the finished film arriving as a message.",
+      "steps": [
+        "Read web/src/crew/ChatThread.tsx, web/src/crew/CrewStudio.tsx and the theme tokens in web/src/styles.css.",
+        "Create web/src/crew/PhoneFrame.tsx: a CSS-only device outline (rounded body, notch, status bar showing only the time) wrapping its children, max width 390 px, using the theme tokens in light and dark. No app name, logo, brand colour or read-receipt ticks.",
+        "Wrap ChatThread in PhoneFrame in CrewStudio and ChatIntake when the 'Phone view' toggle is on (default on at widths of 1024 px and up; remembered in localStorage inside try/catch). Below 640 px the frame is never drawn, because the device is already a phone.",
+        "When film.status becomes 'ready', add one showrunner bubble 'Your film is ready' with a poster image (the Player's first frame from the existing capture helper, or the product photo if capture fails) and a 'Play' button that scrolls to the Player and plays from 0. For a 9:16 film, the bubble's poster keeps the 9:16 ratio.",
+        "Create web/src/crew/PhoneFrame.test.tsx."
+      ],
+      "acceptance": [
+        "With the toggle on at 1280 px the thread is inside an element with role 'group' named 'Phone view'; at 600 px (matchMedia mocked) no frame element is rendered",
+        "A film.status 'ready' event adds exactly one 'Your film is ready' bubble, and clicking Play calls the player's seek(0) and play()",
+        "If the capture helper rejects, the ready bubble uses the product photo URL as its poster",
+        "The rendered markup contains no text matching /whatsapp|telegram|messenger|imessage|signal/i",
+        "Browser check: at 1280 px the phone sits on the left with the thread inside, the ready bubble appears at the end of the fake run, and dark and light themes both keep readable contrast"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-016"
       ]
     }
   ]

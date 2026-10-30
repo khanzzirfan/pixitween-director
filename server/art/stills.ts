@@ -15,7 +15,7 @@ export const platePrompt = (setting: string, mood?: string) =>
 export const productEditPrompt = (noun: string, lighting = 'soft warm light from the left') =>
   `The ${noun} from the reference image, unchanged in shape, colour and printed details, ${lighting}, centred on a plain neutral studio backdrop, product photograph. Nothing else in the frame. No added text, no added logos.`;
 export const subjectPrompt = (description: string) =>
-  `${description.trim()}. Single subject centred on a plain neutral background, clearly separated from it, photographic. No text, no logos. A generic person, not the likeness of any real individual.`;
+  `${description.trim()}. Single subject centred on a plain neutral background, clearly separated from it, photographic. No text, no logos. A generic invented person, nobody real.`;
 export const plateSizeFor = (aspect: Aspect): '1536x1024' | '1024x1536' => (aspect === '9:16' ? '1024x1536' : '1536x1024');
 const aspectSize = (aspect: Aspect) =>
   aspect === '16:9' ? { width: 1920, height: 1080 } : aspect === '9:16' ? { width: 720, height: 1280 } : { width: 1280, height: 1280 };

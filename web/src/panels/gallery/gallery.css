@@ -21,3 +21,8 @@
 .gallery-card .badge { font-size: 12px; color: var(--muted, #666); }
 .gallery-skeleton { height: 140px; border-radius: 14px; background: linear-gradient(100deg, #eee8e1 20%, #f8f5f0 40%, #eee8e1 60%); background-size: 200% 100%; animation: gallery-shimmer 1.4s ease-in-out infinite; }
 @keyframes gallery-shimmer { to { background-position-x: -200%; } }
+
+/* S12e */
+.gallery-item { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.gallery-replay { border: 1px solid var(--border); background: var(--surface); color: var(--accent); border-radius: 10px; padding: 6px 10px; font-size: 12.5px; font-weight: 700; }
+.gallery-replay:hover { border-color: var(--accent); }

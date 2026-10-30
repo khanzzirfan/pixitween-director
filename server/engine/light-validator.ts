@@ -1,12 +1,21 @@
 // Engine-independent subset of the engine's `aepCompositionSchema` (composition.ts refinements 1-5
 // plus the shape checks an agent can get wrong). Browser-safe: no node: imports.
+import { parseModel3D } from '../product3d/types';
+
 export interface CompositionIssue {
   path: string;
   message: string;
 }
 export type ValidationResult = { ok: true; data: unknown } | { ok: false; issues: CompositionIssue[] };
 
-const KINDS = ['image', 'video', 'audio', 'gif', 'lottie', 'svg', 'text', 'shape', 'null', 'precomp', 'camera', 'light'];
+const KINDS = ['image', 'video', 'audio', 'gif', 'lottie', 'svg', 'text', 'shape', 'null', 'precomp', 'camera', 'light', 'model3d'];
+/** The engine rejects a model3d layer in a composition declaring an older schema. */
+const MODEL3D_MIN_VERSION = [1, 4, 0] as const;
+const versionAtLeast = (v: string, min: readonly number[]): boolean => {
+  const p = v.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((p[i] ?? 0) !== min[i]) return (p[i] ?? 0) > min[i]!;
+  return true;
+};
 const ASSET_KINDS = ['image', 'video', 'audio', 'gif', 'lottie', 'svg'];
 
 type Obj = Record<string, unknown>;
@@ -87,6 +96,23 @@ function validateComp(c: unknown, path: string, issues: CompositionIssue[]): voi
           if (a.type !== 'composition') issues.push({ path: `${lp}.compId`, message: `compId '${l.compId}' resolves to an asset that is not a composition` });
         } else if (!(l.compId in precomps)) {
           issues.push({ path: `${lp}.compId`, message: `precomp compId '${l.compId}' is not an asset or an inline precomp` });
+        }
+      }
+    }
+    if (l.kind === 'model3d') {
+      if (typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version) && !versionAtLeast(version, MODEL3D_MIN_VERSION)) {
+        issues.push({ path: at('version'), message: `model3d layers require schema >= 1.4.0 (got ${version})` });
+      }
+      const parsed = parseModel3D(l);
+      if (!parsed.ok) for (const i of parsed.issues) issues.push({ path: `${lp}.${i.path}`.replace(/\.$/, ''), message: i.message });
+      else {
+        const refs: Array<[string, string | undefined]> = [
+          ['textures.label', parsed.layer.textures?.label],
+          ['textures.front', parsed.layer.textures?.front],
+          ['source.assetId', parsed.layer.source.type === 'gltf' ? parsed.layer.source.assetId : undefined],
+        ];
+        for (const [where, id] of refs) {
+          if (id && !(id in assets)) issues.push({ path: `${lp}.${where}`, message: `model3d layer '${l.id}' references unknown assetId '${id}' in this composition's assets` });
         }
       }
     }

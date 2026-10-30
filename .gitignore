@@ -26,3 +26,10 @@ docs/engine
 # Local tool state
 .claude/
 .commandcode/
+
+# Submission-internal docs: kept local (preflight still checks they exist), not published
+docs/demo-script.md
+docs/submission-answers.md
+docs/x-post.md
+docs/s1-evidence.md
+docs/studio-ui-redesign-spec.md

@@ -1,6 +1,7 @@
 import type { AepCompositionJson } from 'reacthub-pixitweenjs';
 import type { MetaClients, LlmBackend } from '@shared/ports';
 import type { Storyboard } from '@shared/storyboard';
+import { loadEnv } from '../env';
 import { makeFakeMeta } from '../meta/fakes';
 
 export const isFakeDirector = (): boolean => process.env.DIRECTOR_FAKE === '1';
@@ -9,9 +10,12 @@ export function createFakeParts(o: { delayMs?: number } = {}): {
   meta: MetaClients;
   backendFor(storyboard: Storyboard, productAssetId: string): LlmBackend;
 } {
+  // with PRODUCT_3D the hero scene shows the product turning in 3D, so the whole 3D path is rehearsed offline
+  const three = loadEnv().PRODUCT_3D;
   const storyboard = {
     title: 'Morning Ritual',
     palette: ['#f5e6d3', '#3b2a20'],
+    ...(three ? { productShape: 'can' } : {}),
     scenes: [
       {
         id: 's1',
@@ -21,8 +25,8 @@ export function createFakeParts(o: { delayMs?: number } = {}): {
         camera: 'dolly-in',
         layersWanted: ['bg', 'product', 'headline'],
         text: 'Slow mornings',
-        mode: 'motion',
-        modeReason: 'A tabletop product works with a still.',
+        mode: three ? '3d' : 'motion',
+        modeReason: three ? 'The product itself is the shot, so the real product turns in the light.' : 'A tabletop product works with a still.',
       },
       {
         id: 's2',
@@ -73,6 +77,7 @@ export function createFakeParts(o: { delayMs?: number } = {}): {
             { name: 'addLayer', args: { sceneId: scene.id, role: 'bg', kind: 'shape', fill: plan.palette[0] } },
             { name: 'addLayer', args: { sceneId: scene.id, role: 'product', kind: 'image', assetId: productId } },
           ];
+          if (scene.mode === '3d') calls.push({ name: 'placeProduct3D', args: { sceneId: scene.id } });
           if (scene.text) calls.push({ name: 'addLayer', args: { sceneId: scene.id, role: 'headline', kind: 'text', text: scene.text } });
           if (scene.text)
             calls.push({

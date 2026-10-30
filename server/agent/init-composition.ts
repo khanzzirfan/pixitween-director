@@ -1,7 +1,8 @@
 import type { FilmState, AssetRef } from '@shared/composition';
-import type { Storyboard } from '@shared/storyboard';
+import { compositionMode, type Storyboard } from '@shared/storyboard';
 import type { ToolCtx } from '@shared/tools';
 import { addScene, newFilmComposition, registerAsset } from '../authoring/api';
+import { readDirector, writeDirector } from '../authoring/meta';
 
 export async function initFilmComposition(o: {
   ctx: ToolCtx;
@@ -13,7 +14,12 @@ export async function initFilmComposition(o: {
   let comp = newFilmComposition({ aspect: o.film.aspect, title: o.storyboard.title, palette: o.storyboard.palette });
   comp = registerAsset(comp, { id: product.id, kind: 'image', src: product.url, width: product.width, height: product.height });
   for (const scene of o.storyboard.scenes)
-    comp = addScene(comp, { id: scene.id, durationSec: scene.durationSec, mode: scene.mode, intent: scene.intent });
+    comp = addScene(comp, { id: scene.id, durationSec: scene.durationSec, mode: compositionMode(scene.mode), intent: scene.intent });
+  if (o.storyboard.productShape) {
+    const meta = readDirector(comp);
+    meta.productShape = o.storyboard.productShape;
+    comp = writeDirector(comp, meta);
+  }
   const result = await o.ctx.films.commit(o.ctx.filmId, comp, 'director', 'storyboard skeleton');
   if (!result.ok) {
     const issues = result.issues as Array<{ message?: string }>;

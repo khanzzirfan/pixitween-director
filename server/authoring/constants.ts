@@ -9,13 +9,14 @@ export const ROLE_KINDS: Record<LayerRole, string[]> = {
   clip: ['video'],
   subject: ['image'],
   product: ['image'],
+  product3d: [], // written by placeProduct3D, never by addLayer
   headline: ['text'],
   caption: ['text'],
   camera: [],
 };
 
 /** z = distance from the camera; larger is farther. */
-export const DEFAULT_Z: Record<string, number> = { bg: 10, clip: 10, subject: 3, product: 1, headline: 0, caption: 0 };
+export const DEFAULT_Z: Record<string, number> = { bg: 10, clip: 10, subject: 3, product: 1, product3d: 1, headline: 0, caption: 0 };
 
 export const EASE_HANDLES: Record<Ease, [number, number, number, number] | undefined> = {
   linear: undefined,

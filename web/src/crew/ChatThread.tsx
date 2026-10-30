@@ -76,9 +76,11 @@ export interface ChatThreadProps {
   onPlay(): void;
   onSend(text: string): Promise<unknown> | void;
   onVoice(blob: Blob): Promise<unknown> | void;
+  /** A replay: the thread is shown with no composer, no push-to-talk and no answer chips. */
+  readOnly?: boolean;
 }
 
-export function ChatThread({ crew, now, filmStatus, aspect, productUrl, getPoster, onPlay, onSend, onVoice }: ChatThreadProps) {
+export function ChatThread({ crew, now, filmStatus, aspect, productUrl, getPoster, onPlay, onSend, onVoice, readOnly }: ChatThreadProps) {
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [poster, setPoster] = useState<string | undefined>();
@@ -108,10 +110,11 @@ export function ChatThread({ crew, now, filmStatus, aspect, productUrl, getPoste
   };
   return (
     <div className="thread">
-      <DirectorNotes crew={crew} now={now} onAsk={(o) => void send(o)}>
+      <DirectorNotes crew={crew} now={now} onAsk={(o) => void send(o)} readOnly={readOnly}>
         {ready && <ReadyBubble posterUrl={poster ?? productUrl} aspect={aspect} onPlay={onPlay} />}
       </DirectorNotes>
       {error && <p role="alert" className="crew-error">{error}</p>}
+      {!readOnly && (
       <Composer
         value={text}
         onChange={setText}
@@ -119,6 +122,7 @@ export function ChatThread({ crew, now, filmStatus, aspect, productUrl, getPoste
         hint="Enter to send · hold Space to talk"
         tools={<PushToTalk onVoice={onVoice} />}
       />
+      )}
     </div>
   );
 }

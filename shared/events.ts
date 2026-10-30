@@ -12,7 +12,7 @@ const assetRefSchema = z.object({
   mime: z.string(),
   width: z.number().optional(),
   height: z.number().optional(),
-  role: z.enum(['product-photo', 'plate', 'still', 'cutout', 'mask', 'clip', 'frame', 'audio']).optional(),
+  role: z.enum(['product-photo', 'plate', 'still', 'cutout', 'mask', 'clip', 'frame', 'audio', 'label']).optional(),
   sceneId: z.string().optional(),
   filmId: z.string().optional(),
   atSec: z.number().optional(),

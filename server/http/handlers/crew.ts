@@ -45,7 +45,7 @@ async function getFilm(deps: AppDeps, id: string): Promise<FilmState | undefined
 
 export function registerCrewRoutes(app: Hono, deps: AppDeps): void {
   // no auth, no model call: the page asks it once to choose between the chat intake and the form
-  app.get('/api/crew/config', (c) => c.json({ enabled: loadEnv().CREW_ENABLED }));
+  app.get('/api/crew/config', (c) => c.json({ enabled: loadEnv().CREW_ENABLED, product3d: loadEnv().PRODUCT_3D }));
 
   app.get('/api/films/:id/crew', async (c) => {
     const film = await getFilm(deps, c.req.param('id'));

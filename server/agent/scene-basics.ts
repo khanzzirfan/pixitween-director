@@ -25,7 +25,7 @@ export async function ensureSceneBasics(o: {
   };
   if (!layerIdsByRole(comp, 'bg', o.scene.id).length)
     await add({ sceneId: o.scene.id, role: 'bg', kind: 'shape', fill: o.palette[0] ?? '#111827' });
-  if (comp && !layerIdsByRole(comp, 'product', o.scene.id).length)
+  if (comp && !layerIdsByRole(comp, 'product', o.scene.id).length && !layerIdsByRole(comp, 'product3d', o.scene.id).length)
     await add({ sceneId: o.scene.id, role: 'product', kind: 'image', assetId: o.product.assetId });
   if (comp && o.scene.text && !layerIdsByRole(comp, 'headline', o.scene.id).length)
     await add({ sceneId: o.scene.id, role: 'headline', kind: 'text', text: o.scene.text, style: { color: '#ffffff' } });

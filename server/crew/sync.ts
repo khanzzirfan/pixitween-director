@@ -1,6 +1,6 @@
 // Owned by S12a. Applies a storyboard revision to the composition without a model (design.md 5.4):
 // scenes added, removed and moved, plus duration, camera and headline text. What needs a builder or a mode change is only reported.
-import type { Scene, Storyboard } from '@shared/storyboard';
+import { compositionMode, type Scene, type Storyboard } from '@shared/storyboard';
 import { addLayer, addScene, removeScene, setCamera, setSceneDuration, setText, swapScenes } from '../authoring/api';
 import { layerMeta, sceneIds } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
@@ -57,7 +57,7 @@ export function syncComposition(comp: Comp, before: Storyboard, after: Storyboar
   for (const s of changed.filter((c) => c.durationSec < durationOf(c.id)!)) next = setSceneDuration(next, s.id, s.durationSec);
   for (const id of added) {
     const s = sceneOf(id);
-    next = addScene(next, { id, durationSec: s.durationSec, mode: s.mode, intent: s.intent });
+    next = addScene(next, { id, durationSec: s.durationSec, mode: compositionMode(s.mode), intent: s.intent });
   }
   for (const s of changed.filter((c) => c.durationSec > durationOf(c.id)!)) next = setSceneDuration(next, s.id, s.durationSec);
 

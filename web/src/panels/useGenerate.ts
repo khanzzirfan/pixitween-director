@@ -46,7 +46,7 @@ export function reduceGenerate(state: GenState, e: FilmEvent): GenState {
 }
 
 export interface GenerateApi {
-  setMode(filmId: string, sceneId: string, mode: 'motion' | 'generate'): Promise<ModeResponse>;
+  setMode(filmId: string, sceneId: string, mode: 'motion' | 'generate' | '3d'): Promise<ModeResponse>;
   approve(filmId: string, sceneId: string, token: string): Promise<unknown>;
 }
 
@@ -82,6 +82,8 @@ export const defaultGenerateApi: GenerateApi = {
 export interface SceneView extends SceneGen {
   id: string;
   mode: 'motion' | 'generate';
+  /** The scene shows its product as a turning 3D model (a motion scene to the composition). */
+  three: boolean;
   proposal?: Proposal;
   error?: { code: string; message?: string; retryAfterSec?: number };
   busy: boolean;
@@ -107,7 +109,8 @@ export function useGenerate(o: { filmId: string | null | undefined; comp: AepCom
       const l = local[id] ?? {};
       const ev = fromEvents[id];
       const base: SceneGen = m.mode === 'motion' || l.reverted ? { phase: 'motion' } : ev && ev.phase !== 'motion' ? ev : l.proposal ? { phase: 'proposed', token: l.proposal.token, reason: l.proposal.reason, estCredits: 25 } : { phase: 'idle' };
-      return { id, mode: m.mode, ...base, proposal: l.proposal, error: l.error, busy: !!l.busy };
+      const three = !!(comp?.precomps?.[id] as { layers?: Array<{ kind?: string }> } | undefined)?.layers?.some((layer) => layer.kind === 'model3d');
+      return { id, mode: m.mode, three, ...base, proposal: l.proposal, error: l.error, busy: !!l.busy };
     });
   }, [comp, fromEvents, local]);
 
@@ -158,5 +161,20 @@ export function useGenerate(o: { filmId: string | null | undefined; comp: AepCom
     [api, filmId, patch],
   );
 
-  return { scenes, review, approve, keepMotion };
+  const choose3D = useCallback(
+    async (sceneId: string) => {
+      if (!filmId) return;
+      patch(sceneId, { busy: true, error: undefined, reverted: false });
+      try {
+        await api.setMode(filmId, sceneId, '3d');
+        patch(sceneId, { busy: false, proposal: undefined });
+      } catch (e) {
+        const err = e as GenerateApiError;
+        patch(sceneId, { busy: false, error: { code: err.body?.error ?? 'error', message: err.body?.message } });
+      }
+    },
+    [api, filmId, patch],
+  );
+
+  return { scenes, review, approve, keepMotion, choose3D };
 }

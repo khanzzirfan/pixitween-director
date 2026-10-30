@@ -5,6 +5,7 @@ import type { LlmBackend, ToolCall } from '@shared/ports';
 import { addLayer, removeLayer } from '../authoring/api';
 import { readDirector } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
+import { loadEnv } from '../env';
 import type { CrewCtx } from './showrunner-tools';
 import type { WorkerFn } from './workers';
 
@@ -36,8 +37,9 @@ const BIBLE = {
   mood: 'calm, early',
 };
 
-const scene = (p: { intent: string; shotType: string; camera: string; text: string }, durationSec = 4) => ({
-  durationSec, intent: p.intent, shotType: p.shotType, camera: p.camera, layersWanted: ['bg', 'product', 'headline'], text: p.text, mode: 'motion', modeReason: 'A still is enough for this shot.',
+const scene = (p: { intent: string; shotType: string; camera: string; text: string }, durationSec = 4, mode: 'motion' | '3d' = 'motion') => ({
+  durationSec, intent: p.intent, shotType: p.shotType, camera: p.camera, layersWanted: ['bg', 'product', 'headline'], text: p.text, mode,
+  modeReason: mode === '3d' ? 'The product itself is the shot, so the real product turns in the light.' : 'A still is enough for this shot.',
 });
 
 /** Reads the BOARD table: scene ids with their status, and the running and queued counts. */
@@ -56,6 +58,7 @@ export function createFakeShowrunner(o: { delayMs?: number } = {}): LlmBackend {
   const handled = new Set<string>();
   const fixed = new Set<string>();
   let n = 0;
+  let takeRounds = 0;
 
   return {
     id: 'wonder',
@@ -71,7 +74,9 @@ export function createFakeShowrunner(o: { delayMs?: number } = {}): LlmBackend {
       if (!planned && inbox.includes('New film')) {
         planned = true;
         calls.push({ name: 'setStyleBible', args: BIBLE });
-        calls.push({ name: 'reviseStoryboard', args: { ops: PLAN.map((p) => ({ op: 'add', scene: scene(p) })), reason: 'Four scenes' } });
+        // with PRODUCT_3D the hero scene shows the product turning, so the 3D path is rehearsed offline
+        const three = loadEnv().PRODUCT_3D;
+        calls.push({ name: 'reviseStoryboard', args: { ops: PLAN.map((p, i) => ({ op: 'add', scene: scene(p, 4, three && i === 0 ? '3d' : 'motion') })), reason: 'Four scenes', ...(three ? { productShape: 'can' } : {}) } });
         calls.push({ name: 'say', args: { text: 'Four scenes: the reveal, the pour, the label and the close.' } });
         PLAN.forEach((p, i) => calls.push({ name: 'dispatch', args: { kind: 'build-scene', sceneId: `s${i + 1}`, brief: p.intent, reason: 'first build' } }));
         return reply(n++, calls);
@@ -84,6 +89,13 @@ export function createFakeShowrunner(o: { delayMs?: number } = {}): LlmBackend {
         if (!user) continue;
         const msg = user[1]!;
         if (/warm/i.test(msg)) warmer = true;
+        const takeScene = /\btakes?\b/i.test(msg) ? /scene (\d)/i.exec(msg)?.[1] : undefined;
+        if (takeScene && board.rows.some((r) => r.id === `s${takeScene}`)) {
+          calls.push({ name: 'dispatch', args: { kind: 'take', sceneId: `s${takeScene}`, brief: 'Three variations of the scene', reason: 'you asked for takes', takes: 3 } });
+          calls.push({ name: 'say', args: { text: `Three takes of scene ${takeScene} are coming.` } });
+          takeRounds++;
+          continue;
+        }
         if (/scene/i.test(msg) && /(add|new|another|sunset)/i.test(msg)) {
           const after = /after (?:scene )?(\d)/i.exec(msg)?.[1];
           const id = `s${nextId++}`;
@@ -110,7 +122,7 @@ export function createFakeShowrunner(o: { delayMs?: number } = {}): LlmBackend {
 
       const dispatching = calls.some((c) => c.name === 'dispatch');
       const allDone = board.rows.length > 0 && board.rows.every((r) => r.status === 'done');
-      const signature = `${board.rows.length}:${[...restyled].join(',')}:${handled.size}`;
+      const signature = `${board.rows.length}:${[...restyled].join(',')}:${handled.size}:${takeRounds}`;
       if (!dispatching && allDone && board.running === 0 && board.queued === 0 && finishedFor !== signature) {
         finishedFor = signature;
         calls.push({ name: 'finish', args: { summary: `${board.rows.length} scenes built and checked.` } });
@@ -180,7 +192,15 @@ export function createFakeWorkers(o: { delayMs?: number } = {}): Partial<Record<
     );
     if (!r.ok) throw new Error('the composition was refused');
     crew.toolCtx.ledger.add(job.filmId, 'muse-spark-1.3-contributor', `fake ${job.kind}`, PRICE[kind] ?? 0.02);
-    return { summary: `${kind} on ${sceneId}`, costUsd: PRICE[kind] ?? 0.02, version: r.version, model: 'fake' };
+    let version = r.version;
+    // a 3d scene gets its turning product once its layers are in, through the same tool a real builder calls
+    if (sc.mode === '3d' && (kind === 'build-scene' || kind === 'rebuild-scene') && loadEnv().PRODUCT_3D) {
+      const { getTool } = await import('../tools/registry');
+      const placed = await getTool('placeProduct3D')?.run({ ...crew.toolCtx, filmId: job.filmId, source: 'director' }, { sceneId });
+      if (!placed?.ok) throw new Error(`placeProduct3D: ${placed ? placed.error : 'the tool is not available'}`);
+      version = placed.version ?? version;
+    }
+    return { summary: `${kind} on ${sceneId}`, costUsd: PRICE[kind] ?? 0.02, version, model: 'fake' };
   };
 
   return {
@@ -198,6 +218,22 @@ export function createFakeWorkers(o: { delayMs?: number } = {}): Partial<Record<
       }
       crew.toolCtx.ledger.add(job.filmId, 'muse-spark-1.3-contributor', 'fake critique', PRICE.critique ?? 0.01);
       return { summary: 'one finding', costUsd: PRICE.critique, model: 'fake' };
+    }),
+    // a take is a copy of the film under a new id, scored by a fixed table: it shows the picker without a model
+    take: (job, signal, crew) => lane(job, crew, 'builder', async () => {
+      await sleep(delay(), signal);
+      const sceneId = job.sceneId;
+      if (!sceneId) throw new Error('a take needs a scene');
+      const label = job.takeLabel ?? 'A';
+      const parent = await crew.films.get(job.filmId);
+      if (!parent.composition) throw new Error('the film has no composition to take from');
+      const child = await crew.films.create({ aspect: parent.aspect, brief: parent.brief, assets: parent.assets, title: `${parent.title ?? 'Film'} (take ${label})`, parentId: parent.id, crew: false, ...(parent.storyboard ? { storyboard: parent.storyboard } : {}) });
+      const committed = await crew.films.commit(child.id, parent.composition as Comp, 'director', `take ${label} base`);
+      if (!committed.ok) throw new Error('the take could not start from the current film');
+      await crew.films.update(child.id, { status: 'ready' });
+      crew.emit({ type: 'take.ready', jobId: job.id, takeOf: job.takeOf ?? sceneId, sceneId, label, takeFilmId: child.id, thumbAssetId: parent.brief.productAssetId, score: { A: 6, B: 8, C: 7 }[label], note: 'fake take: a copy of the scene, not rebuilt' });
+      crew.toolCtx.ledger.add(job.filmId, 'muse-spark-1.3-contributor', 'fake take', PRICE.edit ?? 0.02);
+      return { summary: `take ${label} of ${sceneId}`, costUsd: PRICE.edit ?? 0.02, model: 'fake' };
     }),
     async continuity(_job, signal) {
       await sleep(10, signal);

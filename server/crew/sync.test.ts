@@ -16,7 +16,7 @@ const storyboard = (ids: string[]): Storyboard => ({ title: 'T', aspect: '16:9',
 const build = (sb: Storyboard): Comp => {
   let c = newFilmComposition({ aspect: sb.aspect, title: sb.title, palette: sb.palette });
   for (const s of sb.scenes) {
-    c = addScene(c, { id: s.id, durationSec: s.durationSec, mode: s.mode, intent: s.intent });
+    c = addScene(c, { id: s.id, durationSec: s.durationSec, mode: s.mode === 'generate' ? 'generate' : 'motion', intent: s.intent });
     c = addLayer(c, { sceneId: s.id, role: 'bg', kind: 'shape', fill: '#223344' });
     c = addLayer(c, { sceneId: s.id, role: 'headline', kind: 'text', text: `Title ${s.id}` });
   }

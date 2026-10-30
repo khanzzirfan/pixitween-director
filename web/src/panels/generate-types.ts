@@ -12,7 +12,7 @@ export interface Proposal {
   expiresAt: string;
 }
 export interface ModeResponse {
-  mode: 'motion' | 'generate';
+  mode: 'motion' | 'generate' | '3d';
   proposal?: Proposal;
 }
 export type GenerateErrorCode =

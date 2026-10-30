@@ -3,7 +3,7 @@ import { isAnimated, type Kf, type Vec2 } from './keyframes';
 import { readDirector, sceneMeta, writeDirector } from './meta';
 import type { CameraMove, Comp, Obj } from './types';
 
-const AFFECTED = new Set(['bg', 'product', 'subject', 'clip']);
+const AFFECTED = new Set(['bg', 'product', 'product3d', 'subject', 'clip']);
 const EPS = 1e-6;
 const firstOf = <T>(f: T | Kf<T>[]): T => (isAnimated(f) ? (f as Kf<T>[])[0]!.v : (f as T));
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));

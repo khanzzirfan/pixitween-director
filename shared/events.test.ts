@@ -53,3 +53,8 @@ it('makeEvent stamps an ISO at and validates', () => {
   expect(e.at).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d+Z$/);
   expect(filmEventSchema.safeParse(makeEvent(filmId, { type: 'agent.turn', backend: 'glimmer', ms: 1, calls: 0, reply: 'Done' })).success).toBe(true);
 });
+
+it("parses an art.asset event whose asset role is 'label' (S13a)", () => {
+  const e = makeEvent(filmId, { type: 'art.asset', asset: { ...asset, role: 'label' }, at });
+  expect(filmEventSchema.parse(e)).toMatchObject({ asset: { role: 'label' } });
+});

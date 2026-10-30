@@ -11,18 +11,21 @@ export const STUB_OWNER = 'S8a' as const;
 export interface GalleryProps extends Partial<PanelProps> {
   fetchFilms?: () => Promise<FilmState[]>;
   onOpen?: (filmId: string) => void;
+  onReplay?: (filmId: string) => void;
 }
 
-function defaultOpen(filmId: string) {
+function defaultOpen(filmId: string, replay = false) {
   const url = new URL(window.location.href);
   url.searchParams.set('film', filmId);
+  if (replay) url.searchParams.set('replay', '1');
+  else url.searchParams.delete('replay');
   window.history.pushState({}, '', url);
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
 const ratio = (a: GalleryItem['aspect']) => a.replace(':', ' / ');
 
-export default function Gallery({ fetchFilms = api.listFilms, onOpen = defaultOpen }: GalleryProps) {
+export default function Gallery({ fetchFilms = api.listFilms, onOpen = defaultOpen, onReplay = (id) => defaultOpen(id, true) }: GalleryProps) {
   const [state, setState] = useState<{ kind: 'loading' } | { kind: 'error' } | { kind: 'ready'; items: GalleryItem[] }>({ kind: 'loading' });
 
   const load = useCallback(() => {
@@ -48,7 +51,8 @@ export default function Gallery({ fetchFilms = api.listFilms, onOpen = defaultOp
       {state.kind === 'ready' && state.items.length > 0 && (
         <div className="gallery-grid">
           {state.items.map((it) => (
-            <button key={it.id} type="button" className="gallery-card" aria-label={`${it.title}, ${formatDuration(it.durationSec)}`} onClick={() => onOpen(it.id)}>
+            <div key={it.id} className="gallery-item">
+            <button type="button" className="gallery-card" aria-label={`${it.title}, ${formatDuration(it.durationSec)}`} onClick={() => onOpen(it.id)}>
               <img src={it.thumbUrl} alt={it.title} style={{ aspectRatio: ratio(it.aspect) }} />
               <span className="meta">
                 <span className="title">{it.title}</span>
@@ -58,6 +62,8 @@ export default function Gallery({ fetchFilms = api.listFilms, onOpen = defaultOp
                 <span className="badge">{it.hasGenerated ? 'Includes generated clip' : 'Motion only'}</span>
               </span>
             </button>
+            {it.crew && <button type="button" className="gallery-replay" onClick={() => onReplay(it.id)}>Watch it being made</button>}
+            </div>
           ))}
         </div>
       )}

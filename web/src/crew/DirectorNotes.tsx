@@ -17,7 +17,7 @@ export function bubblesOf(crew: CrewState): Bubble[] {
   return [...mine, ...theirs].sort((a, b) => a.at.localeCompare(b.at));
 }
 
-export function DirectorNotes({ crew, now = Date.now(), onAsk, children }: { crew: CrewState; now?: number; onAsk(option: string): void; children?: ReactNode }) {
+export function DirectorNotes({ crew, now = Date.now(), onAsk, children, readOnly }: { crew: CrewState; now?: number; onAsk(option: string): void; children?: ReactNode; readOnly?: boolean }) {
   const bubbles = bubblesOf(crew);
   const lastAsk = bubbles.findLastIndex((b) => b.kind === 'ask');
   const thinking = crew.lanes.showrunner?.state === 'thinking';
@@ -37,7 +37,7 @@ export function DirectorNotes({ crew, now = Date.now(), onAsk, children }: { cre
           {b.options && (
             <div className="reply-chips">
               {b.options.map((o) => (
-                <button key={o} type="button" className="chip" disabled={i !== lastAsk} onClick={() => onAsk(o)}>
+                <button key={o} type="button" className="chip" disabled={readOnly || i !== lastAsk} onClick={() => onAsk(o)}>
                   {o}
                 </button>
               ))}

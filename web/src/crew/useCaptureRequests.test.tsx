@@ -11,7 +11,7 @@ const req = (id: string, sceneId = 's1', times = [0.8, 2]): CaptureRequest => ({
 
 function fakePlayer(log: string[]): PlayerHandle {
   let t = 1.5;
-  return { getCanvas: () => document.createElement('canvas'), getApp: () => null, play: () => void log.push('play'), pause: () => void log.push('pause'), seek: (s) => void (log.push(`seek ${s}`), (t = s)), getTime: () => t };
+  return { getCanvas: () => document.createElement('canvas'), getApp: () => null, play: () => void log.push('play'), pause: () => void log.push('pause'), seek: (s) => void (log.push(`seek ${s}`), (t = s)), getTime: () => t, whenReady: async () => true };
 }
 const blob = () => new Blob(['png'], { type: 'image/png' });
 

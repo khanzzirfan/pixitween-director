@@ -10,6 +10,8 @@ import { getGenerateServices } from '../../generate/services';
 import { selectSource } from '../../generate/source-still';
 import { modeRequestSchema, type Proposal } from '../../generate/types';
 import { CLIPPY_ESTIMATED_CREDITS } from '../../clippy/types';
+import { has3D, unplaceProduct3D } from '../../product3d/authoring';
+import { getTool } from '../../tools/registry';
 import type { AppDeps } from '../deps';
 
 export const STUB_OWNER = 'S7a' as const; // kept so S2's table of owners still resolves; the routes below are real
@@ -38,6 +40,47 @@ export function registerGenerateRoutes(app: Hono, deps: AppDeps): void {
     const current = (found.comp.meta as { director: { scenes: Record<string, { mode: string }> } }).director.scenes[sceneId]!.mode;
     const mode = body.data.mode;
 
+    const setStoryboardMode = async (to: 'motion' | '3d') => {
+      const f = await deps.films.get(id);
+      if (!f.storyboard?.scenes.some((s) => s.id === sceneId)) return;
+      const scenes = f.storyboard.scenes.map((s) => (s.id === sceneId ? { ...s, mode: to, ...(to === '3d' ? { modeReason: 'You chose the real product turning in 3D for this scene.' } : {}) } : s));
+      await deps.films.update(id, { storyboard: { ...f.storyboard, scenes } });
+    };
+
+    // motion and 3d swap for free: no model call, only the product's layer changes
+    if (mode === '3d') {
+      if (!loadEnv().PRODUCT_3D) return c.json({ error: '3d_disabled' }, 400);
+      if (current === 'generate') {
+        const r = await deps.films.mutate(id, (f) => ({ next: setSceneMode(f.composition!, sceneId, 'motion'), data: null }), 'user', `scene ${sceneId} -> motion`);
+        if (!r.ok) return c.json({ error: 'invalid_composition' }, 422);
+        try {
+          await getRevertHandler()?.(ctx, sceneId);
+        } catch (e) {
+          console.error('revert handler failed', e);
+        }
+      }
+      if (!has3D((await deps.films.get(id)).composition!, sceneId)) {
+        const place = getTool('placeProduct3D');
+        const done = place ? await place.run({ ...ctx, source: 'user' }, { sceneId }) : { ok: false as const, error: 'the 3D tools are not available' };
+        if (!done.ok) return c.json({ error: 'cannot_place', message: done.error }, 422);
+      }
+      await setStoryboardMode('3d');
+      ctx.emit({ type: 'tool.call', name: 'setSceneMode', args: { sceneId, mode: '3d' }, ok: true, version: (await deps.films.get(id)).version });
+      return c.json({ mode: '3d' });
+    }
+    if (has3D(found.comp, sceneId)) {
+      const film = await deps.films.get(id);
+      const photo = film.assets.find((a) => a.id === film.brief.productAssetId);
+      const r = await deps.films.mutate(
+        id,
+        (f) => ({ next: unplaceProduct3D(f.composition!, sceneId, photo ? { assetId: photo.id, url: photo.url, width: photo.width ?? 1000, height: photo.height ?? 1000 } : undefined), data: null }),
+        'user',
+        `scene ${sceneId} -> motion`,
+      );
+      if (!r.ok) return c.json({ error: 'invalid_composition' }, 422);
+      await setStoryboardMode('motion');
+      ctx.emit({ type: 'tool.call', name: 'setSceneMode', args: { sceneId, mode: 'motion' }, ok: true, version: (await deps.films.get(id)).version });
+    }
     if (mode === 'generate' && current !== 'generate' && countGenerateScenes(found.comp) >= MAX_GENERATE_SCENES) return c.json({ error: 'generate_cap' }, 409);
     if (current !== mode) {
       const r = await deps.films.mutate(id, (f) => ({ next: setSceneMode(f.composition!, sceneId, mode), data: null }), 'user', `scene ${sceneId} -> ${mode}`);

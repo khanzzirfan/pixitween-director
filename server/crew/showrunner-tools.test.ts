@@ -3,7 +3,7 @@ import type { StoryboardOp } from '@shared/crew';
 import type { Scene } from '@shared/storyboard';
 import type { ToolDef, ToolResult } from '@shared/tools';
 import { addLayer, setTransform } from '../authoring/api';
-import { sceneIds } from '../authoring/meta';
+import { readDirector, sceneIds } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
 import { createBoardTools } from './showrunner-tools';
 import { makeTestCrew } from './test-helpers';
@@ -31,6 +31,20 @@ describe('setStyleBible and reviseStoryboard', () => {
     expect((await t.film.films.get(t.film.filmId)).styleBible).toEqual(bible);
     await settle();
     expect(t.events.map((e) => e.type)).toContain('style.bible');
+  });
+
+  it("keeps the product's shape in the storyboard and in the composition, and a 3d scene", async () => {
+    const t = await setup();
+    const r = await t.run('reviseStoryboard', { ops: [{ op: 'add', scene: { ...scene, mode: '3d', modeReason: 'the can itself turns' } }, ...add(1)], productShape: 'can' });
+    expect(r.ok, JSON.stringify(r)).toBe(true);
+    const film = await t.film.films.get(t.film.filmId);
+    expect(film.storyboard?.productShape).toBe('can');
+    expect(film.storyboard?.scenes[0]!.mode).toBe('3d');
+    expect(readDirector(film.composition as Comp).productShape).toBe('can');
+    // a 3d scene is a motion scene to the composition
+    expect(readDirector(film.composition as Comp).scenes['s1']!.mode).toBe('motion');
+    await t.run('reviseStoryboard', { ops: [{ op: 'update', sceneId: 's2', patch: { intent: 'x' } }] });
+    expect((await t.film.films.get(t.film.filmId)).storyboard?.productShape).toBe('can');
   });
 
   it('rejects a palette entry that is a colour name', async () => {

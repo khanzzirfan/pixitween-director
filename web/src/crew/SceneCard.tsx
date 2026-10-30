@@ -37,9 +37,11 @@ interface CardProps {
   onMove(sceneId: string, dir: -1 | 1): void;
   onDragStart(sceneId: string): void;
   onDropOn(sceneId: string): void;
+  /** A replay: the fields are plain text and the card has no actions. */
+  readOnly?: boolean;
 }
 
-function EditableText({ value, label, multiline, onSave }: { value: string; label: string; multiline?: boolean; onSave(v: string): void }) {
+function EditableText({ value, label, multiline, onSave, readOnly }: { value: string; label: string; multiline?: boolean; onSave(v: string): void; readOnly?: boolean }) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
   const commit = () => {
@@ -51,6 +53,7 @@ function EditableText({ value, label, multiline, onSave }: { value: string; labe
     <textarea
       className={`card-edit${multiline ? ' multi' : ''}`}
       aria-label={label}
+      readOnly={readOnly}
       rows={multiline ? 2 : 1}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
@@ -65,7 +68,7 @@ function EditableText({ value, label, multiline, onSave }: { value: string; labe
   );
 }
 
-export function SceneCard({ scene, index, total, ring, isNew, canRemove, onPatch, onRemove, onMove, onDragStart, onDropOn }: CardProps) {
+export function SceneCard({ scene, index, total, ring, isNew, canRemove, onPatch, onRemove, onMove, onDragStart, onDropOn, readOnly }: CardProps) {
   const drag = (e: DragEvent) => {
     e.dataTransfer.setData('text/plain', scene.id);
     e.dataTransfer.effectAllowed = 'move';
@@ -75,7 +78,7 @@ export function SceneCard({ scene, index, total, ring, isNew, canRemove, onPatch
     <article
       className={`scene-card ring-${ring}${isNew ? ' is-new' : ''}`}
       data-scene={scene.id}
-      draggable
+      draggable={!readOnly}
       onDragStart={drag}
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
@@ -91,27 +94,28 @@ export function SceneCard({ scene, index, total, ring, isNew, canRemove, onPatch
           {ring}
         </span>
       </header>
-      <EditableText value={scene.intent} label={`Intent of ${scene.id}`} multiline onSave={(v) => onPatch(scene.id, { intent: v })} />
-      {scene.text !== undefined && <EditableText value={scene.text} label={`Text of ${scene.id}`} onSave={(v) => onPatch(scene.id, { text: v })} />}
+      <EditableText value={scene.intent} label={`Intent of ${scene.id}`} multiline readOnly={readOnly} onSave={(v) => onPatch(scene.id, { intent: v })} />
+      {scene.text !== undefined && <EditableText value={scene.text} label={`Text of ${scene.id}`} readOnly={readOnly} onSave={(v) => onPatch(scene.id, { text: v })} />}
       <div className="card-meta">
         <label>
           <span className="visually-hidden">Camera of {scene.id}</span>
-          <select aria-label={`Camera of ${scene.id}`} value={scene.camera} onChange={(e) => onPatch(scene.id, { camera: e.target.value as Scene['camera'] })}>
+          <select aria-label={`Camera of ${scene.id}`} disabled={readOnly} value={scene.camera} onChange={(e) => onPatch(scene.id, { camera: e.target.value as Scene['camera'] })}>
             {CAMERAS.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </select>
         </label>
         <label>
-          <select aria-label={`Duration of ${scene.id}`} value={scene.durationSec} onChange={(e) => onPatch(scene.id, { durationSec: Number(e.target.value) })}>
+          <select aria-label={`Duration of ${scene.id}`} disabled={readOnly} value={scene.durationSec} onChange={(e) => onPatch(scene.id, { durationSec: Number(e.target.value) })}>
             {[...new Set([...DURATIONS, scene.durationSec])].sort((a, b) => a - b).map((d) => (
               <option key={d} value={d}>{d} s</option>
             ))}
           </select>
         </label>
         <span className="tag shot">{scene.shotType}</span>
-        <span className={`tag mode-${scene.mode}`} title={scene.modeReason}>{scene.mode}</span>
+        <span className={`tag mode-${scene.mode}`} title={scene.modeReason}>{scene.mode === '3d' ? '3D' : scene.mode}</span>
       </div>
+      {!readOnly && (
       <footer className="card-actions">
         <button type="button" aria-label={`Move ${scene.id} up`} disabled={index === 0} onClick={() => onMove(scene.id, -1)}>↑</button>
         <button type="button" aria-label={`Move ${scene.id} down`} disabled={index === total - 1} onClick={() => onMove(scene.id, 1)}>↓</button>
@@ -119,6 +123,7 @@ export function SceneCard({ scene, index, total, ring, isNew, canRemove, onPatch
           Remove
         </button>
       </footer>
+      )}
     </article>
   );
 }

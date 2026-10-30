@@ -83,3 +83,11 @@ it('shows a hint before any storyboard exists', () => {
   render(<LiveStoryboard crew={foldCrew([])} onOps={vi.fn()} />);
   expect(screen.getByText(/sketching the plan/)).toBeInTheDocument();
 });
+
+it("shows the tag '3D' on the card of a 3d scene (S13b)", () => {
+  const crew = foldCrew(FIXTURE);
+  const sb = structuredClone(crew.storyboard!);
+  sb.scenes[0]!.mode = '3d';
+  render(<LiveStoryboard crew={{ ...crew, storyboard: sb }} now={0} onOps={() => undefined} />);
+  expect(screen.getByText('3D', { selector: '.tag' })).toBeInTheDocument();
+});

@@ -9,7 +9,8 @@ export type AuthoringCode =
   | 'invalid_role_kind'
   | 'bad_duration'
   | 'film_too_long'
-  | 'scene_limit';
+  | 'scene_limit'
+  | 'not_model3d';
 
 /** Thrown by the pure authoring functions. The message ends with a hint so a model can repair in one turn. */
 export class AuthoringError extends Error {

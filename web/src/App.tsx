@@ -10,6 +10,7 @@ import Review from './panels/Review';
 import Storyboard from './panels/Storyboard';
 import Player, { type PlayerHandle } from './player/Player';
 import { CrewStudio } from './crew/CrewStudio';
+import { ReplayPage } from './crew/replay/ReplayPage';
 import { Filmstrip, sceneStarts } from './shell/Filmstrip';
 import { StudioShell, type ShellTab } from './shell/StudioShell';
 import { STEPS, stepFor } from './shell/steps';
@@ -84,5 +85,7 @@ export function App() {
   }, []);
   const params = new URLSearchParams(search);
   if (params.get('fixture') === '1') return <FixturePage />;
+  const filmParam = params.get('film');
+  if (params.get('replay') === '1' && filmParam) return <ReplayPage key={filmParam} filmId={filmParam} />;
   return <Director filmId={params.get('film')} />;
 }

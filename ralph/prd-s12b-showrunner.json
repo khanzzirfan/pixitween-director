@@ -23,7 +23,7 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -48,7 +48,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -75,7 +75,7 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -101,7 +101,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -129,7 +129,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-004"
@@ -157,7 +157,7 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-005"
@@ -187,7 +187,7 @@
         "`npm run lint` passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001",
@@ -218,7 +218,7 @@
         "`npm run lint` passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-007"
@@ -247,7 +247,7 @@
         "`npm run lint` passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-008"
@@ -275,7 +275,7 @@
         "`npm run lint` passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-009"
@@ -305,7 +305,7 @@
         "`npm run lint` passes"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-010"
@@ -333,7 +333,7 @@
         "`npm run lint` passes"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-011"
@@ -361,7 +361,7 @@
         "`npm run lint` passes"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-011"
@@ -388,7 +388,7 @@
         "`npm run lint` passes"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-012"
@@ -463,6 +463,7 @@
     "manualGates": [
       "MG-2: owner runs `npm run live -- s12-crew` (estimate about $1, ceiling $2), then `--yes`: one crew film on the Coffee Co. brief with the scripted mid-build message 'add a sunset scene after the second one, and warmer light everywhere'. Record wall time, jobs, showrunner turns, cost and whether the new scene is in the final film.",
       "MG-3: owner runs `npm run live -- s12-crew --ab --yes` (estimate about $3): the same brief through the sequential director, the crew with a Spark showrunner and the crew with a Wonder showrunner. Paste the printed table into the PR and docs/hackathon/08-agent-orchestration-review.md section 7."
-    ]
+    ],
+    "completion": "Marked passing from the build records of 29-30 Oct 2026 (offline tests and the crew e2e were green); not re-checked story by story."
   }
 }

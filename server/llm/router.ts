@@ -19,7 +19,7 @@ export type ReviewImages = (images: Buffer[], prompt: string, schema?: object) =
 export type Reviewer = { id: 'spark' | 'glimmer'; reviewImages: ReviewImages };
 
 /** Tools a local edit never gets: they need new art, a generate approval or a review, and the small model guesses at them. */
-export const LOCAL_EDIT_DENYLIST = ['generatePlate', 'placeProduct', 'addSubject', 'replacePlate', 'proposeGenerate', 'reviewScene'];
+export const LOCAL_EDIT_DENYLIST = ['generatePlate', 'placeProduct', 'addSubject', 'replacePlate', 'proposeGenerate', 'reviewScene', 'placeProduct3D'];
 
 /** A reason to try Glimmer instead: the Meta API is out of credit or down, or the network failed. Other 4xx errors are our own mistakes. */
 export function shouldFallback(err: unknown): boolean {

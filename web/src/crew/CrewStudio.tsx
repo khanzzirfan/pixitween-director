@@ -1,5 +1,5 @@
 // Owned by S12d, laid out by S14. The studio for a crew film, inside the shell: plan and crew on the left, the player and filmstrip in the middle, the conversation on the right.
-import { useCallback, useState, type RefObject } from 'react';
+import { useCallback, useState, type ReactNode, type RefObject } from 'react';
 import type { FilmState } from '@shared/composition';
 import type { FilmEvent } from '@shared/events';
 import { api } from '../api/client';
@@ -18,14 +18,22 @@ import { useCaptureRequests } from './useCaptureRequests';
 import { useCrew, useNow } from './useCrew';
 import './crew.css';
 
-export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [] }: { film: FilmState; events: FilmEvent[]; playerRef: RefObject<PlayerHandle | null>; frozenNow?: number; extraTabs?: ShellTab[] }) {
+/** A replay: the studio shows the log played back, read-only. */
+export interface ReplayView {
+  bar: ReactNode;
+  /** the version on screen: the player is remounted when it changes */
+  version?: number;
+}
+
+export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [], replay }: { film: FilmState; events: FilmEvent[]; playerRef: RefObject<PlayerHandle | null>; frozenNow?: number; extraTabs?: ShellTab[]; replay?: ReplayView }) {
   const { crew, actions } = useCrew(film.id, events);
   const liveNow = useNow(1000, frozenNow !== undefined);
   const now = frozenNow ?? liveNow;
   const getPlayer = useCallback(() => playerRef.current, [playerRef]);
   const storyboard = crew.storyboard ?? film.storyboard;
   const [selected, setSelected] = useState<string>();
-  useCaptureRequests({ filmId: film.id, requests: crew.captureRequests, storyboard, getPlayer });
+  // a replay never answers the critic's frame requests: it would post frames to a finished film
+  useCaptureRequests({ filmId: film.id, requests: replay ? [] : crew.captureRequests, storyboard, getPlayer });
 
   const product = film.assets.find((a) => a.id === film.brief.productAssetId);
   const status = [...events].reverse().find((e) => e.type === 'film.status');
@@ -55,7 +63,7 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [] 
   };
 
   const tabs: ShellTab[] = [
-    { id: 'plan', label: 'Plan', icon: 'list', badge: scenes.length || undefined, content: <LiveStoryboard crew={crew} now={now} onOps={(ops) => actions!.postStoryboard(ops)} /> },
+    { id: 'plan', label: 'Plan', icon: 'list', badge: scenes.length || undefined, content: <LiveStoryboard crew={crew} now={now} onOps={replay ? undefined : (ops) => actions!.postStoryboard(ops)} /> },
     {
       id: 'crew',
       label: 'Crew',
@@ -63,8 +71,8 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [] 
       badge: busy || undefined,
       content: (
         <>
-          <CrewBoard crew={crew} now={now} onCancel={(id) => void actions!.cancelJob(id)} />
-          <TakesPicker crew={crew} onPick={(jobId, takeFilmId) => actions!.pickTake(jobId, takeFilmId)} />
+          <CrewBoard crew={crew} now={now} onCancel={replay ? undefined : (id) => void actions!.cancelJob(id)} />
+          <TakesPicker crew={crew} onPick={replay ? undefined : (jobId, takeFilmId) => actions!.pickTake(jobId, takeFilmId)} />
         </>
       ),
     },
@@ -83,7 +91,8 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [] 
       stage={
         <section className="slot stage" data-testid="slot-player">
           {/* a finished film is remounted per version: the engine does not rebuild a mounted composition when its source changes, so the picture would stay on the first build */}
-          <Player key={filmStatus === 'ready' ? `v${film.version}` : 'live'} ref={playerRef as RefObject<PlayerHandle>} composition={film.composition ?? null} />
+          <Player key={replay ? `r${replay.version ?? 0}` : filmStatus === 'ready' ? `v${film.version}` : 'live'} ref={playerRef as RefObject<PlayerHandle>} composition={film.composition ?? null} />
+          {replay?.bar}
         </section>
       }
       strip={<Filmstrip scenes={scenes} selected={selected} onSelect={jump} ringOf={(id) => ringFor(jobs, id)} />}
@@ -98,9 +107,10 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [] 
           onPlay={play}
           onSend={(message) => api.chat(film.id, { message })}
           onVoice={(blob) => actions!.postVoice(blob)}
+          readOnly={!!replay}
         />
       }
-      sideTitle="Talk to the showrunner"
+      sideTitle={replay ? 'What the showrunner said' : 'Talk to the showrunner'}
       headerRight={<BudgetMeter budget={crew.budget} credits={crew.credits} />}
       headerRightTab="crew"
       onTogglePlay={togglePlay}

@@ -4,7 +4,7 @@ import type { Comp, DirectorMeta, LayerMeta, SceneMeta } from './types';
 /** A copy of `meta.director`; empty maps when absent. */
 export function readDirector(c: Comp): DirectorMeta {
   const d = (c.meta as { director?: Partial<DirectorMeta> } | undefined)?.director;
-  return structuredClone({ ...(d?.productNoun !== undefined ? { productNoun: d.productNoun } : {}), scenes: d?.scenes ?? {}, layers: d?.layers ?? {} });
+  return structuredClone({ ...(d?.productNoun !== undefined ? { productNoun: d.productNoun } : {}), ...(d?.productShape !== undefined ? { productShape: d.productShape } : {}), scenes: d?.scenes ?? {}, layers: d?.layers ?? {} });
 }
 
 /** A clone of `c` whose `meta.director` is `meta`; other meta keys are kept. */

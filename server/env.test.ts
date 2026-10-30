@@ -66,6 +66,13 @@ it('parses CREW_ENABLED=false and 0 to false, and an empty value to the default'
   expect(loadEnv({ CREW_ENABLED: '0' }).CREW_ENABLED).toBe(false);
   expect(loadEnv({ CREW_ENABLED: '' }).CREW_ENABLED).toBe(true);
 });
+it('has PRODUCT_3D off unless it is set to 1 or true', () => {
+  expect(loadEnv({}).PRODUCT_3D).toBe(false);
+  expect(loadEnv({ PRODUCT_3D: '' }).PRODUCT_3D).toBe(false);
+  expect(loadEnv({ PRODUCT_3D: 'true' }).PRODUCT_3D).toBe(true);
+  expect(loadEnv({ PRODUCT_3D: '1' }).PRODUCT_3D).toBe(true);
+  expect(loadEnv({ PRODUCT_3D: '0' }).PRODUCT_3D).toBe(false);
+});
 it('names the crew variable that is out of range', () => {
   throwsNaming({ CREW_MAX_WORKERS: '9' }, 'CREW_MAX_WORKERS');
   throwsNaming({ CREW_TAKES_MAX: '1' }, 'CREW_TAKES_MAX');

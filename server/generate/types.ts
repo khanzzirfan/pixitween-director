@@ -1,7 +1,7 @@
 // Owned by S7a. Wire types for the generate routes; the web mirror is web/src/panels/generate-types.ts.
 import { z } from 'zod';
 
-export const modeRequestSchema = z.object({ mode: z.enum(['motion', 'generate']) });
+export const modeRequestSchema = z.object({ mode: z.enum(['motion', 'generate', '3d']) });
 export type ModeRequest = z.infer<typeof modeRequestSchema>;
 
 export const proposalSchema = z.object({

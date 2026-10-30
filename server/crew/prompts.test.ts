@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { StyleBible } from '@shared/crew';
-import { SHOWRUNNER_SYSTEM, renderBibleBlock, renderJobBlock } from './prompts';
+import { SHOWRUNNER_SYSTEM, renderBibleBlock, renderJobBlock, showrunnerSystem } from './prompts';
 
 const bible: StyleBible = {
   palette: ['#1f2937', '#f59e0b', '#fde68a'],
@@ -45,5 +45,36 @@ describe('builder prompt blocks', () => {
   it('renders the other type cases', () => {
     expect(renderBibleBlock({ ...bible, type: { ...bible.type, case: 'title' } })).toContain('Inter 800, Title');
     expect(renderBibleBlock({ ...bible, type: { ...bible.type, case: 'sentence' } })).toContain('Inter 800, Sentence');
+  });
+});
+
+describe('showrunnerSystem (S13b)', () => {
+  it("with PRODUCT_3D on, rule 3 is the three-way choice", () => {
+    const s = showrunnerSystem(true);
+    expect(s).toContain('Pick the cheapest technique that tells the shot');
+    expect(s).toContain('"3d"');
+    expect(s).not.toContain('3. A scene is motion unless');
+    // every other rule is the same text
+    expect(s.split('\n').filter((l) => /^[1-8]\. /.test(l) && !l.startsWith('3.'))).toEqual(SHOWRUNNER_SYSTEM.split('\n').filter((l) => /^[1-8]\. /.test(l) && !l.startsWith('3.')));
+  });
+
+  it('with PRODUCT_3D off, rule 3 is exactly the S12b text and the prompt is the old constant', () => {
+    const s = showrunnerSystem(false);
+    expect(s).toContain('3. A scene is motion unless it needs physical motion a still cannot fake (pouring, walking, fabric, hands using the product).\n   Then call proposeGenerate with the reason. At most 2 generate scenes.');
+    expect(s).toBe(SHOWRUNNER_SYSTEM);
+    expect(s).not.toMatch(/3d/i);
+  });
+
+  it('reads the switch when the caller does not say', () => {
+    const saved = process.env.PRODUCT_3D;
+    try {
+      process.env.PRODUCT_3D = 'true';
+      expect(showrunnerSystem()).toContain('Pick the cheapest technique');
+      delete process.env.PRODUCT_3D;
+      expect(showrunnerSystem()).toBe(SHOWRUNNER_SYSTEM);
+    } finally {
+      if (saved === undefined) delete process.env.PRODUCT_3D;
+      else process.env.PRODUCT_3D = saved;
+    }
   });
 });

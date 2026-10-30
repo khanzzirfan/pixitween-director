@@ -32,6 +32,12 @@ test('crew studio: four builders at once, a mid-build message adds a scene, the 
   await expect(page.locator('[data-node^="builder:"].is-lit')).toHaveCount(4, { timeout: 15_000 });
   await page.getByRole('tab', { name: 'Lanes' }).click();
 
+  // the hero scene is a 3D scene: its card says so, and the plan shows the reason on hover
+  await page.getByTestId('rail-plan').click();
+  await expect(page.locator('[data-scene="s1"] .tag.mode-3d')).toHaveText('3D');
+  await expect(page.locator('[data-scene="s2"] .tag.mode-motion')).toHaveText('motion');
+  await page.getByTestId('rail-crew').click();
+
   // a message while they work lands in the same thread; the plan grows
   await page.getByLabel('Message').fill('add a sunset scene after scene 2');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -61,4 +67,14 @@ test('crew studio: four builders at once, a mid-build message adds a scene, the 
   await expect.poll(painted, { timeout: 15_000 }).toBe(true);
 
   expect([...hosts].filter((h) => h !== 'localhost' && h !== '127.0.0.1')).toEqual([]);
+
+  // the film just made can be watched being made: the same log played back, read-only, from the gallery's address
+  const filmId = new URL(page.url()).searchParams.get('film')!;
+  await page.goto(`/?film=${filmId}&replay=1`);
+  await expect(page.getByRole('group', { name: 'Replay' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Watch again' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByLabel('Message')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Cancel/ })).toHaveCount(0);
+  await page.getByTestId('rail-crew').click();
+  await expect(page.locator('.lane-builder').first()).toBeVisible();
 });

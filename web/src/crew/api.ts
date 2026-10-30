@@ -8,6 +8,8 @@ export interface CrewSnapshot {
 }
 export interface CrewConfig {
   enabled: boolean;
+  /** Scenes may show the product as a turning 3D model. */
+  product3d?: boolean;
 }
 
 const enc = encodeURIComponent;

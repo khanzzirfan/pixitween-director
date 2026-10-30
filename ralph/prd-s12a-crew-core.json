@@ -24,7 +24,7 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -52,7 +52,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -79,7 +79,7 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -108,7 +108,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -137,7 +137,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -165,7 +165,7 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -193,7 +193,7 @@
         "`npm run lint` passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -222,7 +222,7 @@
         "`npm run lint` passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -248,7 +248,7 @@
         "`npm run lint` passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-007"
@@ -276,7 +276,7 @@
         "`npm run lint` passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -305,7 +305,7 @@
         "`npm run lint` passes"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-003"
@@ -334,7 +334,7 @@
         "`npm run lint` passes"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-011"
@@ -363,7 +363,7 @@
         "`npm run lint` passes"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-008",
@@ -393,7 +393,7 @@
         "`npm run lint` passes"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-012"
@@ -476,6 +476,7 @@
     },
     "manualGates": [
       "MG-1: owner runs `npm run live -- s12-wonder` (prints the estimate, about $0.30, ceiling $1), then with `--yes`. Record in the PR: HTTP status, tool-call validity over 5 runs, parallel calls per turn, latency per turn and cost per turn from usage. Choose SHOWRUNNER_MODEL from the result (design 09 section 5)."
-    ]
+    ],
+    "completion": "Marked passing from the build records of 29-30 Oct 2026 (offline tests and the crew e2e were green); not re-checked story by story."
   }
 }

@@ -2,6 +2,8 @@
 import type { AepCompositionJson } from 'reacthub-pixitweenjs';
 import type { FilmEvent } from '@shared/events';
 import type { FilmState } from '@shared/composition';
+import { useEffect, useState } from 'react';
+import { getCrewConfig } from '../crew/api';
 import ModeToggle from './ModeToggle';
 import { defaultGenerateApi, useGenerate, type GenerateApi, type SceneView } from './useGenerate';
 
@@ -14,6 +16,8 @@ export interface GenerateApprovalProps {
   comp?: AepCompositionJson | null;
   events: FilmEvent[];
   api?: GenerateApi;
+  /** Offer 3D as a mode; read from the server when not given. */
+  product3d?: boolean;
 }
 
 const ERROR_TEXT: Record<string, (e: NonNullable<SceneView['error']>) => string> = {
@@ -33,11 +37,13 @@ function SceneCard({
   api,
   generateCount,
   actions,
+  product3d,
 }: {
   s: SceneView;
   api: GenerateApi;
   generateCount: number;
   actions: ReturnType<typeof useGenerate>;
+  product3d: boolean;
 }) {
   void api;
   const expired = !!s.proposal && Date.parse(s.proposal.expiresAt) < Date.now();
@@ -50,10 +56,11 @@ function SceneCard({
       <h3 className="scene-number">{s.id}</h3>
       <ModeToggle
         sceneId={s.id}
-        mode={s.mode === 'generate' && s.phase !== 'motion' ? 'generate' : 'motion'}
+        mode={s.mode === 'generate' && s.phase !== 'motion' ? 'generate' : product3d && s.three ? '3d' : 'motion'}
+        product3d={product3d}
         busy={s.busy}
         disabledReason={capReached ? `A film can have at most ${MAX_GENERATE_SCENES} generated scenes` : undefined}
-        onChange={(m) => (m === 'generate' ? void actions.review(s.id) : void actions.keepMotion(s.id))}
+        onChange={(m) => (m === 'generate' ? void actions.review(s.id) : m === '3d' ? void actions.choose3D(s.id) : void actions.keepMotion(s.id))}
       />
 
       {s.phase === 'idle' && (
@@ -106,7 +113,22 @@ function SceneCard({
   );
 }
 
-export default function GenerateApproval({ film, filmId, comp, events, api = defaultGenerateApi }: GenerateApprovalProps) {
+/** Whether 3D is on: the prop when given, otherwise what the server says (asked once). */
+function useProduct3D(given: boolean | undefined): boolean {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (given !== undefined || typeof fetch !== 'function') return;
+    let live = true;
+    getCrewConfig().then((c) => live && setOn(c.product3d === true), () => undefined);
+    return () => {
+      live = false;
+    };
+  }, [given]);
+  return given ?? on;
+}
+
+export default function GenerateApproval({ film, filmId, comp, events, api = defaultGenerateApi, product3d }: GenerateApprovalProps) {
+  const three = useProduct3D(product3d);
   const id = filmId ?? film?.id;
   const composition = comp ?? film?.composition ?? null;
   const actions = useGenerate({ filmId: id, comp: composition, events, api });
@@ -127,14 +149,14 @@ export default function GenerateApproval({ film, filmId, comp, events, api = def
     <div>
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">MOTION OR REAL VIDEO</span>
+          <span className="eyebrow">{three ? 'MOTION, 3D OR REAL VIDEO' : 'MOTION OR REAL VIDEO'}</span>
           <h2>Generate</h2>
         </div>
         <span className="step-pill">UP TO 2 SCENES</span>
       </div>
       {actions.scenes.length === 0 ? <p>No scenes yet.</p> : <p className="gen-note">Real video costs about 25 credits a scene and needs your approval. Up to {MAX_GENERATE_SCENES} scenes.</p>}
       {actions.scenes.map((s) => (
-        <SceneCard key={s.id} s={s} api={api} generateCount={generateCount} actions={actions} />
+        <SceneCard key={s.id} s={s} api={api} generateCount={generateCount} actions={actions} product3d={three} />
       ))}
     </div>
   );
