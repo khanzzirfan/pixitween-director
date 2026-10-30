@@ -1,4 +1,5 @@
 // Owned by S8a. Finished films as a grid; opening one sets ?film=<id>.
+import { goHome } from '../shell/nav';
 import { useCallback, useEffect, useState } from 'react';
 import type { FilmState } from '@shared/composition';
 import { api } from '../api/client';
@@ -40,6 +41,7 @@ export default function Gallery({ fetchFilms = api.listFilms, onOpen = defaultOp
   return (
     <div>
       <h2>Gallery</h2>
+      <button type="button" className="gallery-new" onClick={goHome}>+ New film</button>
       {state.kind === 'loading' && <div className="gallery-grid" aria-busy="true">{[0, 1, 2].map((i) => <div key={i} className="gallery-skeleton" />)}</div>}
       {state.kind === 'error' && (
         <div>

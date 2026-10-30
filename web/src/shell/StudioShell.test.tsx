@@ -62,3 +62,14 @@ it('on a narrow screen there is no panel group and chat is one more tab', () => 
   const stage = document.querySelector('.sh-stage')!;
   expect(stage.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
+
+it('the brand goes home: it drops ?film= from the address', () => {
+  window.history.pushState({}, '', '/?film=abc');
+  const onPop = vi.fn();
+  window.addEventListener('popstate', onPop);
+  render(<StudioShell title="t" steps={STEPS} step={0} tabs={[{ id: 'a', label: 'A', icon: 'list', content: <p>a</p> }]} defaultTab="a" stage={<div />} side={<div />} sideTitle="Chat" />);
+  fireEvent.click(screen.getByRole('button', { name: /home/i }));
+  expect(window.location.search).toBe('');
+  expect(onPop).toHaveBeenCalled();
+  window.removeEventListener('popstate', onPop);
+});
