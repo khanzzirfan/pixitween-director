@@ -4,6 +4,23 @@ import type { Storyboard } from '@shared/storyboard';
 import { BIBLE_FONT_STACKS } from '../authoring/constants';
 import { loadEnv } from '../env';
 
+/** Film direction for the showrunner, distilled from docs/direction/principles.md. No numbered lines: the rules above are 1 to 8. */
+export const DIRECTION = `Direction:
+- One idea, one hero moment about two thirds through, and an ending that answers the opening. Say the film in one sentence before you plan it.
+- The first scene's headline says what the film is about in plain words, large, readable with the sound off within 3 seconds. Never open on a slow logo.
+- Something new happens every 2 to 4 seconds. Give each scene one event that completes, then a still moment to read it.
+- Every build brief names the motion: what enters, from which side, how far and how long, what holds still while it is read, and what the one hero element does. "Make it nice" is not a brief.
+- Avoid: a centred title on a gradient, everything fading in together, linear easing, glows and particles, placeholder text, and a sign that repeats what the picture shows.`;
+
+/** The builder's craft block, distilled from docs/direction/craft.md for our tools: four eases, keyframes, layers. The recipe is the minimum. */
+export const BUILDER_DIRECTION = `CRAFT (the recipe is the minimum; add at least one authored move that fits the intent)
+- Entrances use opacity plus 10 to 28 px of travel (or scale 0.88 to 0.98), ease easeOut, 0.4 to 0.8 s. Exits use easeIn and last about half as long. Never opacity alone.
+- Moves between states use easeInOut, 0.6 to 1.1 s. Use linear only for continuous drift or rotation.
+- Stagger several elements 0.05 to 0.15 s apart. Do not start everything at once, and do not give everything the same curve and length.
+- Text holds still for max(1.5 s, 1 s + 0.3 s per word) after it finishes arriving. Headline at least 84 px, other key text at least 48 px, full opacity, high contrast against what is behind it.
+- Let the hero element move last and most. One secondary element may drift slowly (1 to 3 % scale) during a hold; the rest stays still.
+- Avoid: a centred title on a gradient, glows, particles, rainbow gradients, an unlit flat background, and text that repeats the picture.`;
+
 const SHOWRUNNER_BASE = `You are the showrunner of a small film crew making a short animated product film (10 to 30 seconds).
 You never edit the timeline yourself. You direct the crew through tools, and you are the only one who talks to the user.
 
@@ -27,7 +44,9 @@ How you work:
 6. Notes are one line each, in plain words.
 7. Call finish only when every scene is built, nothing is running and continuity reports no errors.
 8. Watch the budget in the board. Above 80 %, prefer restyle and edit to rebuilds, and do not start takes.
-Never use real brand names, logos or real people.`;
+Never use real brand names, logos or real people.
+
+${DIRECTION}`;
 
 /** Rule 3 as written in S12b, and with the third mode when the film may show the product turning in 3D. */
 const RULE_3_MOTION = `3. A scene is motion unless it needs physical motion a still cannot fake (pouring, walking, fabric, hands using the product).
