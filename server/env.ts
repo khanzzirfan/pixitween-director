@@ -60,7 +60,6 @@ const schema = z.object({
   FILMS_STARTS_PER_WINDOW: int(3, 1, 50),
   FILMS_WINDOW_SEC: int(300, 30, 3600),
   CREW_ENABLED: boolOn,
-  CREW_ENGINE: z.enum(['native', 'langgraph']).default('native'),
   PRODUCT_3D: boolOff,
   SHOWRUNNER_MODEL: z.string().default('muse-wonder-1.0'),
   CREW_MAX_WORKERS: int(4, 1, 8),

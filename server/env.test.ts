@@ -52,7 +52,6 @@ it('treats empty values as unset, so a copied .env.example loads', () => {
 it('has crew defaults', () => {
   expect(loadEnv({})).toMatchObject({
     CREW_ENABLED: true,
-    CREW_ENGINE: 'native',
     SHOWRUNNER_MODEL: 'muse-wonder-1.0',
     CREW_MAX_WORKERS: 4,
     CREW_FILM_BUDGET_USD: 1.5,
@@ -61,12 +60,6 @@ it('has crew defaults', () => {
     CREW_CAPTURE_TIMEOUT_MS: 20000,
     CREW_IDLE_END_MS: 600000,
   });
-});
-it('has CREW_ENGINE native by default and rejects unknown engines', () => {
-  expect(loadEnv({}).CREW_ENGINE).toBe('native');
-  expect(loadEnv({ CREW_ENGINE: 'langgraph' }).CREW_ENGINE).toBe('langgraph');
-  expect(loadEnv({ CREW_ENGINE: '' }).CREW_ENGINE).toBe('native');
-  throwsNaming({ CREW_ENGINE: 'nope' }, 'CREW_ENGINE');
 });
 it('names hosted tracing variables so startup can warn without sending anything', () => {
   expect(hostedTracingVars({})).toEqual([]);

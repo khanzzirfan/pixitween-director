@@ -1,5 +1,5 @@
 // Owned by S12b. The showrunner's loop (design.md 3.1 and 5.6): wake on the inbox, take one turn, act through the board tools.
-// The turn machinery is shared by the native loop and the LangGraph engine (server/crew/engine/showrunner-graph.ts).
+// The turn machinery. The loop itself is the LangGraph engine (server/crew/engine/showrunner-graph.ts).
 import { loadEnv } from '../env';
 import type { InboxItem } from '@shared/crew';
 import type { FilmEvent } from '@shared/events';
@@ -87,18 +87,6 @@ export async function autoFinish(crew: CrewCtx): Promise<boolean> {
   if (!r.ok) return false;
   crew.emit({ type: 'showrunner.say', kind: 'note', text: WRAPPING });
   return true;
-}
-
-/** Native loop's idle step: decide, then apply. The graph does the same two steps on separate nodes. */
-export async function idleFinishStep(
-  crew: CrewCtx,
-  progress: IdleProgress,
-  o: { autoFinish: boolean; hadUser: boolean; finished: boolean },
-): Promise<IdleProgress & { finished: boolean }> {
-  const d = await idleDecision(crew, progress, o);
-  if (d.action === 'nudge') pushDoneNudge(crew);
-  if (d.action === 'finish' && !(await autoFinish(crew))) return { nudged: true, idleTurns: 0, finished: false };
-  return { nudged: d.nudged, idleTurns: d.idleTurns, finished: d.action === 'finish' || d.finished };
 }
 
 /** Dispatches an 'auto' job for every scene that needs a builder and got none from the showrunner this turn (design 5.4). */
@@ -237,63 +225,5 @@ export function createShowrunnerAgent(deps: ShowrunnerDeps, snapshot: Showrunner
     },
     turn,
     next,
-  };
-}
-
-export function createShowrunner(deps: ShowrunnerDeps) {
-  const maxTurns = deps.maxTurns ?? 40;
-  const agent = createShowrunnerAgent(deps);
-  const { crew } = deps;
-  const progress: IdleProgress = { nudged: false, idleTurns: 0 };
-
-  return {
-    isFinished: agent.isFinished,
-    turns: agent.turns,
-
-    /** Runs until the session is idle for CREW_IDLE_END_MS, the signal aborts, or maxTurns is reached. */
-    async run(signal: AbortSignal): Promise<void> {
-      while (!signal.aborted && agent.turns() < maxTurns) {
-        const batch = await agent.next(signal);
-        if (!batch) {
-          // idle, or aborted: a job still working may yet report, so only an idle crew ends the session
-          if (signal.aborted || crew.board.list().every((j) => TERMINAL.includes(j.status))) return;
-          continue;
-        }
-        if (!batch.length) return; // the inbox was closed
-        const hadUser = batch.some((i) => i.from === 'user');
-        agent.resetTurn(hadUser);
-        if (agent.isFinished() && hadUser) {
-          agent.setFinished(false);
-          await crew.films.update(crew.filmId, { status: 'building' });
-          crew.emit({ type: 'film.status', status: 'building' });
-        }
-        agent.agent('thinking');
-        try {
-          const text = await agent.view(batch);
-          const content = agent.compose(text);
-          let r = await agent.turn(content, signal);
-          // one repair turn, at once, when everything failed, or when some calls failed and no job is left to wake the inbox;
-          // a second failed turn waits for the inbox
-          const stalled = r.anyFailed && crew.board.list().every((j) => TERMINAL.includes(j.status));
-          if ((r.allFailed || stalled) && !signal.aborted) r = await agent.turn(r.allFailed ? REPAIR : REPAIR_STALLED, signal);
-          await autoDispatch(crew);
-          if (crew.budget.level() === 'stop') {
-            crew.emit({ type: 'error', where: 'showrunner', message: 'the film budget is spent; the crew stops here' });
-            return;
-          }
-          if (deps.wrapUp !== false) {
-            const idle = await idleFinishStep(crew, progress, { autoFinish: loadEnv().CREW_AUTO_FINISH, hadUser, finished: agent.isFinished() });
-            progress.nudged = idle.nudged;
-            progress.idleTurns = idle.idleTurns;
-            if (idle.finished && !agent.isFinished()) {
-              agent.setFinished(true);
-              return;
-            }
-          }
-        } finally {
-          agent.agent('idle');
-        }
-      }
-    },
   };
 }

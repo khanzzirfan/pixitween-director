@@ -2,8 +2,6 @@
 import { z } from 'zod';
 import { sceneSchema } from './storyboard';
 
-export const CREW_ENGINES = ['native', 'langgraph'] as const;
-export type CrewEngine = (typeof CREW_ENGINES)[number];
 
 export const LANES = ['showrunner', 'builder', 'critic', 'continuity', 'producer', 'listener', 'local'] as const;
 export const laneSchema = z.enum(LANES);

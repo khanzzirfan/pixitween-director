@@ -5,7 +5,11 @@ import type { Scene } from '@shared/storyboard';
 import { createJobChains } from './chains';
 import { createBoard, TERMINAL } from './board';
 import { createScheduler } from './scheduler';
-import { createShowrunner, autoDispatch } from './showrunner';
+import { MemorySaver } from '@langchain/langgraph';
+import { autoDispatch, type ShowrunnerDeps } from './showrunner';
+import { createShowrunnerGraph } from './engine/showrunner-graph';
+
+const createShowrunner = (d: ShowrunnerDeps) => createShowrunnerGraph({ ...d, checkpointer: new MemorySaver() });
 import { newTurn, reviseStoryboard } from './showrunner-tools';
 import { makeTestCrew, waitFor } from './test-helpers';
 
@@ -185,12 +189,10 @@ describe('the loop', () => {
     const sr = createShowrunner({ crew: t.crew, backend: scripted([[{ name: 'finish', args: { summary: 'done' } }], [{ name: 'say', args: { text: 'on it' } }]]), model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 150 });
     const run = sr.run(new AbortController().signal);
     t.inbox.push(item('system', 'go'));
-    await waitFor(() => sr.isFinished());
-    expect(sr.isFinished()).toBe(true);
+    await waitFor(async () => (await t.film.films.get(t.film.filmId)).status === 'ready');
     expect((await t.film.films.get(t.film.filmId)).status).toBe('ready');
     t.inbox.push(item('user', 'one more thing'));
     await run;
-    expect(sr.isFinished()).toBe(false);
     expect((await t.film.films.get(t.film.filmId)).status).toBe('building');
   });
 });

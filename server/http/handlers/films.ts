@@ -42,7 +42,6 @@ export function registerFilmsRoutes(app: Hono, deps: AppDeps): void {
       brief: { text, ...(input.audio ? { transcript: text } : {}), productAssetId: product.id },
       ...(input.title ? { title: input.title } : {}),
       ...(crewOn ? { crew: true } : {}),
-      crewEngine: env.CREW_ENGINE,
       assets: [product],
     });
     const ctx = deps.makeToolCtx(film.id);

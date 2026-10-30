@@ -144,7 +144,7 @@ describe('runCrew', () => {
         return { toolCalls: queue.shift() ?? [{ id: `say${seen.length}`, name: 'say', args: { text: 'on it' } }], ms: 1 };
       },
     };
-    const crew = createCrew(deps, { backend, idleEndMs: 200, engine: 'langgraph' });
+    const crew = createCrew(deps, { backend, idleEndMs: 200 });
     const session = await crew.start(deps.filmId);
     await waitFor(() => builderStarted);
     const pushedAt = Date.now();
@@ -165,7 +165,7 @@ describe('runCrew', () => {
       { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's1', brief: 'b', reason: 'r' } },
       { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's2', brief: 'b', reason: 'r' } },
     ]]);
-    await createCrew(deps, { backend, idleEndMs: 60, workers: {}, engine: 'langgraph' }).runCrew(deps.filmId);
+    await createCrew(deps, { backend, idleEndMs: 60, workers: {} }).runCrew(deps.filmId);
     await settle();
     const film = await deps.films.get(deps.filmId);
     expect(film.status).toBe('ready');
@@ -184,14 +184,14 @@ describe('runCrew', () => {
       { name: 'reviseStoryboard', args: { ops: [{ op: 'add', scene }, { op: 'add', scene }] } },
       { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's1', brief: 'b', reason: 'r' } },
     ]]);
-    const s1 = await createCrew(deps, { backend: first, idleEndMs: 200, engine: 'langgraph' }).start(deps.filmId);
+    const s1 = await createCrew(deps, { backend: first, idleEndMs: 200 }).start(deps.filmId);
     s1.push({ from: 'user', text: 'make two scenes' });
     await waitFor(() => started >= 1);
     s1.stop();
     await s1.done;
 
     const second = recording([[{ name: 'say', args: { text: 'picked up' } }]]);
-    const s2 = await createCrew(deps, { backend: second, idleEndMs: 200, engine: 'langgraph' }).start(deps.filmId, { resume: true });
+    const s2 = await createCrew(deps, { backend: second, idleEndMs: 200 }).start(deps.filmId, { resume: true });
     s2.push({ from: 'user', text: 'carry on' });
     await s2.done;
 
@@ -209,12 +209,12 @@ describe('runCrew', () => {
       { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's1', brief: 'b', reason: 'r' } },
       { name: 'dispatch', args: { kind: 'build-scene', sceneId: 's2', brief: 'b', reason: 'r' } },
     ]]);
-    await createCrew(deps, { backend: first, idleEndMs: 60, workers: {}, engine: 'langgraph' }).runCrew(deps.filmId);
+    await createCrew(deps, { backend: first, idleEndMs: 60, workers: {} }).runCrew(deps.filmId);
     await settle();
 
     const seen: string[] = [];
     const second: LlmBackend = { id: 'wonder', async chatWithTools(m) { seen.push(JSON.stringify(m)); return { toolCalls: [], content: 'still here', ms: 1 }; } };
-    const session = await createCrew(deps, { backend: second, idleEndMs: 40, engine: 'langgraph' }).start(deps.filmId, { resume: true });
+    const session = await createCrew(deps, { backend: second, idleEndMs: 40 }).start(deps.filmId, { resume: true });
     session.push({ from: 'user', text: 'one more thing' });
     await session.done;
     await settle();

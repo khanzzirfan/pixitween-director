@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import type { InboxItem } from '@shared/crew';
 import type { ChatMessage, LlmBackend, ToolCall } from '@shared/ports';
 import type { Scene } from '@shared/storyboard';
-import { createShowrunner } from '../showrunner';
 import { makeTestCrew, waitFor } from '../test-helpers';
 import { FileSaver } from './checkpointer';
 import { TERMINAL } from '../board';
@@ -55,32 +54,7 @@ function scripted(entries: Entry[]): LlmBackend & { sent: ChatMessage[][]; turns
   };
 }
 
-/** One engine over its own team; both are aborted as soon as the first turn has put four jobs on the board. */
-async function firstTurn(engine: 'native' | 'graph', entries: Entry[]) {
-  const t = await makeTestCrew({ runWorker: running });
-  const backend = scripted(entries);
-  const ac = new AbortController();
-  const common = { crew: t.crew, backend, model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 200 };
-  const showrunner = engine === 'graph' ? createShowrunnerGraph({ ...common, checkpointer: new MemorySaver() }) : createShowrunner(common);
-  const run = showrunner.run(ac.signal);
-  t.inbox.push(item('system', 'New film: a cold-brew can'));
-  await waitFor(() => t.board.list().length === 4);
-  ac.abort();
-  await run;
-  await settle();
-  return { t, backend };
-}
-
 describe('the showrunner graph', () => {
-  it('reaches the same board, events and turn price as the native loop', async () => {
-    const native = await firstTurn('native', [planning]);
-    const graph = await firstTurn('graph', [planning]);
-    expect(graph.backend.turns()).toBe(native.backend.turns());
-    expect(graph.t.board.list().map((j) => [j.kind, j.sceneId, j.status])).toEqual(native.t.board.list().map((j) => [j.kind, j.sceneId, j.status]));
-    expect(graph.t.events.map((e) => e.type)).toEqual(native.t.events.map((e) => e.type));
-    expect(graph.t.film.ledger.total(graph.t.film.filmId)).toBeCloseTo(native.t.film.ledger.total(native.t.film.filmId), 8);
-  });
-
   it('takes exactly one repair turn after every call fails', async () => {
     const t = await makeTestCrew();
     const bad: Entry = [{ name: 'dispatch', args: { kind: 'build-scene', sceneId: 's9', brief: 'b', reason: 'r' } }, { name: 'cancel', args: { jobId: 'j9' } }];

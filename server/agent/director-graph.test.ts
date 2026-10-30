@@ -6,7 +6,6 @@ import { createDirector } from './director';
 
 const saved = { ...process.env };
 beforeEach(() => {
-  process.env.CREW_ENGINE = 'langgraph';
   delete process.env.PRODUCT_3D;
 });
 afterEach(() => {
@@ -39,8 +38,7 @@ function shape(film: FilmState): Shape {
   };
 }
 
-async function run(engine: 'native' | 'langgraph') {
-  process.env.CREW_ENGINE = engine;
+async function run() {
   process.env.DIRECTOR_FAKE = '1';
   const t = await makeTestFilm();
   await createDirector(depsFor(t), { delayMs: 0 }).runDirector(t.filmId);
@@ -48,14 +46,13 @@ async function run(engine: 'native' | 'langgraph') {
   return { t, film: await t.films.get(t.filmId) };
 }
 
-describe('the sequential director on LangGraph', () => {
-  it('builds the same storyboard, events and composition as the native engine', async () => {
-    const native = await run('native');
-    const graph = await run('langgraph');
-    expect(graph.film.status).toBe('ready');
-    expect(graph.film.storyboard).toEqual(native.film.storyboard);
-    expect(graph.t.events.map((e) => e.type)).toEqual(native.t.events.map((e) => e.type));
-    expect(shape(graph.film)).toEqual(shape(native.film));
+describe('the sequential director', () => {
+  it('plans, builds every scene and ends ready', async () => {
+    const { t, film } = await run();
+    expect(film.status).toBe('ready');
+    expect(film.storyboard?.scenes.length).toBeGreaterThan(0);
+    expect(shape(film).precomps).not.toEqual({});
+    expect(t.events.some((e) => e.type === 'director.storyboard')).toBe(true);
   });
 
   it('marks the film failed and emits a director error when the storyboard cannot be parsed', async () => {
