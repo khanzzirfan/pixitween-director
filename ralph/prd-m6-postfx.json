@@ -1,7 +1,7 @@
 {
   "name": "Engine M6: 3D post-processing on three layers",
-  "branchName": "ralph/m6-postfx",
   "description": "Adds a pmndrs postprocessing chain (bloom, vignette, chromatic aberration, noise, depth of field, brightness/contrast, hue/saturation, ACES tone mapping last) to each three layer that asks for it, drawn through the shared offscreen renderer, with postfx:<id> tween targets. Verifies transparency is kept.",
+  "branchName": "ralph/m6-postfx",
   "userStories": [
     {
       "id": "US-001",
@@ -21,13 +21,14 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "postfx",
         "three"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-002",
@@ -49,7 +50,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -57,7 +58,8 @@
       "labels": [
         "postfx",
         "three"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-003",
@@ -78,8 +80,9 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "",
+      "completionNotes": "Completed by agent",
       "dependsOn": [
         "US-002"
       ],
@@ -108,8 +111,8 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Browser check on the owner's dev server (http://localhost:5173/motion-three-smoke.html), driven with Playwright/Chromium. Shared edit to engine/lab/three-smoke.tsx: added the three-postfx fixture to the select plus a readout, after every seek, of pixel (2,2) of the node's own 2D canvas (read as (node.display as Sprite).texture.source.resource). MEASURED CORNER ALPHA = 0: pixel (2,2) is rgba(0,0,0,0) at 1 s and 3 s with the transparent background, so STEP 4 BRANCH A was taken - transparency survives the composer (RenderPass clears to alpha 0, EffectComposer alpha:true); engine/src/schema/doc.ts was NOT changed and three-postfx.json keeps background 'transparent' with postFx enabled. For m7: motion-lab.spec.ts should assert layerPixel('hero', 2, 2)[3] === 0, not the opaque-background assertion. LOOK: bloom is clearly visible as a soft halo around the can's silhouette (the scratch no-postFx copy has none); the vignette darkens drawn pixels (the can's top edge measures rgb(238,240,241) without postFx vs rgb(233,236,238) with it) but cannot darken the fully transparent layer corners, so there is no visible corner darkening. Screenshots saved to debug/engine/: three-postfx-1.0.png, three-postfx-3.0.png, three-postfx-nofx-1.0.png, three-postfx-nofx-3.0.png (the -nofx pair came from a scratch copy of the fixture with postFx: []). DETERMINISM: the page's 2.0, 0, 2.0 compare reports the same 64x36 canvas hash both times at 2.0 s (159044155503). LIMITATION (pre-existing m4 smoke-page bug, NOT postFx): seeking 1 s vs 3 s is byte-identical for three-postfx and three-primitives because buildTimeline's timeline.set({}, {}, duration) sets the timeline end to duration and the unpositioned fromTo tweens are then appended after it, so the page's own camera-dolly/object-rotation tweens never play in 0..duration; only a glTF-mixer fixture (three-gltf) visibly moves on seek. Left as-is because the m6 shared edit is limited to the fixture + corner readout. GATES: npm run typecheck pass; npm run lint pass; npx vitest run engine/src/three engine/src/schema engine/fixtures = 157/157 pass; npm test is red with 43 failing files, all pre-existing and outside engine/ (38 web/** 'React.act is not a function' under React 19, plus fixtures/s08a seed, fixtures/s09 transcripts, scripts/preflight/docs.test.ts lockfile, server/http/client-ip.test.ts).",
       "dependsOn": [
         "US-003"
       ],
@@ -117,7 +120,8 @@
         "postfx",
         "three",
         "ui"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     }
   ],
   "metadata": {
@@ -171,6 +175,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": []
+    "manualGates": [],
+    "updatedAt": "2026-10-31T19:59:18.692Z"
   }
 }

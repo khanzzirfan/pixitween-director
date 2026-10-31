@@ -5,17 +5,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { gsap } from 'gsap';
-import { Application } from 'pixi.js';
+import { Application, type Sprite } from 'pixi.js';
 import { parseMotionDoc } from '../src/schema/doc';
 import { createThreeNode, type ThreeNode } from '../src/three';
 import type { TargetRef } from '../src/core/paths';
 import type { ThreeLayer } from '../src/schema/layer3d';
 import gltfFixture from '../fixtures/three-gltf.json';
 import primitivesFixture from '../fixtures/three-primitives.json';
+import postfxFixture from '../fixtures/three-postfx.json';
 
 const FIXTURES = {
   'three-gltf': gltfFixture,
   'three-primitives': primitivesFixture,
+  'three-postfx': postfxFixture,
 } as const;
 
 type FixtureName = keyof typeof FIXTURES;
@@ -42,6 +44,17 @@ async function hashCanvas(canvas: HTMLCanvasElement | null): Promise<string> {
   ctx.drawImage(canvas, 0, 0, 64, 36);
   const digest = await crypto.subtle.digest('SHA-256', ctx.getImageData(0, 0, 64, 36).data);
   return [...new Uint8Array(digest)].slice(0, 6).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** The RGBA of pixel (2, 2) of the node's own 2D canvas — the corner the m6 transparency check reads. */
+function cornerPixel(node: ThreeNode): string {
+  const sprite = node.display as Sprite;
+  const source = sprite.texture.source.resource;
+  const canvas = source instanceof HTMLCanvasElement ? source : null;
+  const ctx = canvas ? canvas.getContext('2d') : null;
+  if (!ctx) return 'no 2d';
+  const [r, g, b, a] = ctx.getImageData(2, 2, 1, 1).data;
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
 /** Two frames, so a draw that only uploaded the sprite texture this frame is on screen before we read it. */
@@ -109,6 +122,7 @@ function ThreeSmoke() {
   const [errors, setErrors] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [hashes, setHashes] = useState<string[]>([]);
+  const [corner, setCorner] = useState('');
 
   const draw = useCallback((t: number) => {
     const current = rig.current;
@@ -127,6 +141,7 @@ function ThreeSmoke() {
       if (current) {
         setErrors([...current.node.errors]);
         setWarnings([...current.node.warnings]);
+        setCorner(cornerPixel(current.node));
       }
     },
     [draw],
@@ -143,6 +158,7 @@ function ThreeSmoke() {
       setErrors([]);
       setWarnings([]);
       setHashes([]);
+      setCorner('');
 
       const parsed = parseMotionDoc(FIXTURES[fixture]);
       if (!parsed.ok) {
@@ -266,6 +282,7 @@ function ThreeSmoke() {
       <p data-testid="time">
         At {time.toFixed(2)} s of {duration.toFixed(2)} s
       </p>
+      {corner !== '' && <p data-testid="corner">pixel (2, 2): {corner}</p>}
       {warnings.length > 0 && <p data-testid="warnings">{warnings.join('; ')}</p>}
       {errors.length > 0 && <p data-testid="errors">{errors.join('; ')}</p>}
       {hashes.length > 0 && <p data-testid="hashes">{hashes.join(' · ')}</p>}

@@ -12,6 +12,7 @@ import {
   releaseOffscreenRenderer,
   type ThreeOffscreenRenderer,
 } from './offscreen';
+import { buildPostFxChain, type PostFxChain } from './postfx/chain';
 
 // A `three` layer as a MotionNode: the rig (camera, lights, objects, shadow) is drawn by the shared
 // offscreen renderer into a 2D canvas, which is the node's Pixi texture/sprite. Tweens move the Three
@@ -22,6 +23,7 @@ import {
 export interface ThreePostFx {
   draw(renderer: THREE.WebGLRenderer): void;
   resolveTarget(id: string, prop: string): TargetRef | null;
+  dispose(): void;
 }
 
 export interface ThreeNode extends MotionNode {
@@ -233,41 +235,17 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
     rejectReady(error);
   }
 
-  const buildRig = (assets?: PreloadedThreeAssets): void => {
-    if (assets) {
-      for (const failure of assets.errors) {
-        warnings.push(`three asset ${failure.assetId}: ${String(failure.error)}`);
-      }
+  // The chain is built once the rig exists (m6); null when the layer asks for no post-processing, so
+  // `update` takes the plain-render path and `resolveTarget('postfx:...')` stays null.
+  const buildChain = (built: ThreeRig): PostFxChain | null => {
+    if (!shared || layer.postFx.length === 0) return null;
+    try {
+      return buildPostFxChain(shared.renderer, built.scene, built.camera, layer.postFx, { width, height });
+    } catch (error) {
+      warnings.push(`three postFx: ${String(error)}`);
+      return null;
     }
-    const built = buildScene(layer, {
-      textures: assets?.textures,
-      gltfs: assets?.gltfs,
-      renderer: shared?.renderer,
-    });
-    warnings.push(...built.warnings);
-    rig = built;
   };
-
-  if (shared) {
-    if (needsAsyncAssets(layer)) {
-      preloadThreeAssets(layer, ctx.doc)
-        .then((assets) => {
-          if (destroyed) {
-            for (const loaded of assets.textures.values()) loaded.dispose();
-            for (const gltf of assets.gltfs.values()) disposeObject3D(gltf.scene);
-            return;
-          }
-          buildRig(assets);
-        })
-        .catch((error) => {
-          if (destroyed || readySettled) return;
-          readySettled = true;
-          rejectReady(error);
-        });
-    } else {
-      buildRig();
-    }
-  }
 
   const node: ThreeNode = {
     id: layer.id,
@@ -353,6 +331,8 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      node.postFx?.dispose();
+      node.postFx = null;
       rig?.dispose();
       rig = null;
       texture.destroy(true);
@@ -360,6 +340,43 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
       if (acquired) releaseOffscreenRenderer(ctx.app);
     },
   };
+
+  const buildRig = (assets?: PreloadedThreeAssets): void => {
+    if (assets) {
+      for (const failure of assets.errors) {
+        warnings.push(`three asset ${failure.assetId}: ${String(failure.error)}`);
+      }
+    }
+    const built = buildScene(layer, {
+      textures: assets?.textures,
+      gltfs: assets?.gltfs,
+      renderer: shared?.renderer,
+    });
+    warnings.push(...built.warnings);
+    rig = built;
+    node.postFx = buildChain(built);
+  };
+
+  if (shared) {
+    if (needsAsyncAssets(layer)) {
+      preloadThreeAssets(layer, ctx.doc)
+        .then((assets) => {
+          if (destroyed) {
+            for (const loaded of assets.textures.values()) loaded.dispose();
+            for (const gltf of assets.gltfs.values()) disposeObject3D(gltf.scene);
+            return;
+          }
+          buildRig(assets);
+        })
+        .catch((error) => {
+          if (destroyed || readySettled) return;
+          readySettled = true;
+          rejectReady(error);
+        });
+    } else {
+      buildRig();
+    }
+  }
 
   return node;
 }
