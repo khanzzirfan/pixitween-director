@@ -6,6 +6,7 @@
     "was": null,
     "look": "tabletop-hero",
     "why": "tall pack, \"coffee\" suits the tabletop-hero look",
+    "accent": "#402f27",
     "file": "cb-original.json"
   },
   {
@@ -15,6 +16,7 @@
     "was": null,
     "look": "tabletop-hero",
     "why": "tall pack, \"coffee\" suits the tabletop-hero look",
+    "accent": "#402f27",
     "file": "cb-vanilla.json"
   },
   {
@@ -24,6 +26,7 @@
     "was": 4.75,
     "look": "price-promo",
     "why": "on sale, so the price leads",
+    "accent": "#402f27",
     "file": "cb-mocha.json"
   },
   {
@@ -33,15 +36,51 @@
     "was": 24,
     "look": "price-promo",
     "why": "on sale, so the price leads",
+    "accent": "#8c623b",
     "file": "mug-stone.json"
   },
   {
+    "id": "mug-sage",
+    "title": "Sage Mug",
+    "price": 24,
+    "was": null,
+    "look": "lifestyle-room",
+    "why": "square pack, \"mug\" suits the lifestyle-room look",
+    "accent": "#8c623b",
+    "file": "mug-sage.json"
+  },
+  {
+    "id": "mug-night",
+    "title": "Night Mug",
+    "price": 26,
+    "was": null,
+    "look": "lifestyle-room",
+    "why": "square pack, \"mug\" suits the lifestyle-room look",
+    "accent": "#8c623b",
+    "file": "mug-night.json"
+  },
+  {
     "film": "drinks",
+    "brand": "Coffee Co.",
+    "tagline": "Pick your cold brew",
     "variants": [
       "Original",
       "Vanilla",
       "Mocha"
     ],
+    "accent": "#402f27",
     "file": "film-drinks.json"
+  },
+  {
+    "film": "home",
+    "brand": "Hearth",
+    "tagline": "Pick your mug",
+    "variants": [
+      "Stone",
+      "Sage",
+      "Night"
+    ],
+    "accent": "#8c623b",
+    "file": "film-home.json"
   }
 ]

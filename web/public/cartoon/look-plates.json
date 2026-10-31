@@ -38,5 +38,10 @@
     "height": 1280,
     "occasion": "summer",
     "prompt": "Vertical 9:16 seamless colour field in bright whites, sky blue and citrus yellow, gently graded from lighter at the centre to deeper at the edges. Soft bright light, no surface, no horizon. No objects, no text, no logos."
+  },
+  "lifestyle-room:mug": {
+    "id": "ast_e86d29b01156d41f1c1617bd3c25e46a",
+    "width": 720,
+    "height": 1280
   }
 }

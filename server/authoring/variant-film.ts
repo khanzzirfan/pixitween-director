@@ -269,3 +269,17 @@ export function variantNames(titles: string[]): string[] {
   const common = new Set(split[0]!.filter((w) => split.every((s) => s.includes(w))));
   return split.map((s) => s.filter((w) => !common.has(w)).join(' ') || 'Original');
 }
+
+/**
+ * What a product line is called, lowercased, from the words every title shares with the brand taken out:
+ * "Coffee Co. Cold Brew" with brand "Coffee Co." is "cold brew"; "Stone Mug" and "Sage Mug" are "mug". Empty when the titles share nothing.
+ */
+export function lineName(titles: string[], brand?: string): string {
+  const split = titles.map((t) => t.split(/\s+/).filter(Boolean));
+  const common = split[0]!.filter((w) => split.every((s) => s.includes(w)));
+  const own = new Set((brand ?? '').toLowerCase().split(/\s+/));
+  return common.filter((w) => !own.has(w.toLowerCase())).join(' ').toLowerCase();
+}
+
+/** The end-card line for a line of products: "Pick your cold brew", or "Pick your favourite" when there is no shared name. */
+export const taglineFor = (titles: string[], brand?: string): string => `Pick your ${lineName(titles, brand) || 'favourite'}`;

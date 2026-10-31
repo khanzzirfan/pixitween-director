@@ -14,6 +14,8 @@ export const productSchema = z.object({
   currency: z.string().length(3).default('USD'),
   imageUrl: z.string().min(1),
   category: z.string().min(1).max(60),
+  /** The brand's name, when the feed has one; clips show it in the corner mark and the lineup. */
+  brand: z.string().max(40).optional(),
   url: z.string().optional(),
 });
 export type Product = z.infer<typeof productSchema>;
@@ -78,7 +80,7 @@ export function parseFeed(csv: string): FeedResult {
   if (lines.length < 2) return { ok: false, errors: ['the feed needs a header row and at least one product'] };
   const head = splitRow(lines[0]!).map((h) => h.toLowerCase());
   const col = (...names: string[]) => head.findIndex((h) => names.includes(h));
-  const idx = { id: col('id'), title: col('title'), price: col('price'), sale: col('sale_price', 'saleprice'), cur: col('currency'), img: col('image_link', 'imageurl', 'image'), cat: col('category', 'product_type'), url: col('link', 'url') };
+  const idx = { id: col('id'), title: col('title'), price: col('price'), sale: col('sale_price', 'saleprice'), cur: col('currency'), img: col('image_link', 'imageurl', 'image'), cat: col('category', 'product_type'), url: col('link', 'url'), brand: col('brand') };
   const missing = (['id', 'title', 'price', 'img', 'cat'] as const).filter((k) => idx[k] < 0);
   if (missing.length) return { ok: false, errors: [`the feed header is missing: ${missing.join(', ')}`] };
   const errors: string[] = [];
@@ -93,7 +95,7 @@ export function parseFeed(csv: string): FeedResult {
     const parsed = productSchema.safeParse({
       id: c[idx.id], title: c[idx.title], price, ...(sale !== undefined ? { salePrice: sale } : {}),
       ...(idx.cur >= 0 && c[idx.cur] ? { currency: c[idx.cur] } : {}),
-      imageUrl: c[idx.img], category: c[idx.cat], ...(idx.url >= 0 && c[idx.url] ? { url: c[idx.url] } : {}),
+      imageUrl: c[idx.img], category: c[idx.cat], ...(idx.brand >= 0 && c[idx.brand] ? { brand: c[idx.brand] } : {}), ...(idx.url >= 0 && c[idx.url] ? { url: c[idx.url] } : {}),
     });
     if (!parsed.success) return void errors.push(`row ${row}: ${parsed.error.issues.map((x) => `${x.path.join('.')} ${x.message}`).join('; ')}`);
     if (seen.has(parsed.data.id)) return void errors.push(`row ${row}: duplicate id '${parsed.data.id}'`);

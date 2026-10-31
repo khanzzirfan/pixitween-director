@@ -131,3 +131,12 @@ describe('a sale in the lineup', () => {
     expect(y(was)).toBeLessThan(y(now));
   });
 });
+
+describe('tagline from the line name', () => {
+  it('names the line from the shared words, without the brand', async () => {
+    const { lineName, taglineFor } = await import('./variant-film');
+    expect(lineName(['Coffee Co. Cold Brew', 'Coffee Co. Vanilla Cold Brew'], 'Coffee Co.')).toBe('cold brew');
+    expect(taglineFor(['Stone Mug', 'Sage Mug'], 'Hearth')).toBe('Pick your mug');
+    expect(taglineFor(['Alpha', 'Beta'])).toBe('Pick your favourite');
+  });
+});

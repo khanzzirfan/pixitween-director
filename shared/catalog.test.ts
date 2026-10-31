@@ -12,6 +12,13 @@ describe('price helpers', () => {
   });
 });
 
+describe('parseFeed brand', () => {
+  it('reads an optional brand column', () => {
+    const r = parseFeed('id,title,price,image_link,category,brand\na,A,1,x.png,c,Hearth\nb,B,2,x.png,c,');
+    expect(r.ok && r.products.map((p) => p.brand)).toEqual(['Hearth', undefined]);
+  });
+});
+
 describe('parseFeed', () => {
   it('reads the 6-product fixture and shows the sale price when there is one', () => {
     const r = parseFeed(readFileSync(new URL('../fixtures/catalog/feed-6.csv', import.meta.url), 'utf8'));
