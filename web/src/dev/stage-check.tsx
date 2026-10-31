@@ -98,10 +98,13 @@ function StageCheck() {
 
   if (!film) return <main style={{ padding: 16, color: '#e5e7eb', background: '#0b0f19', minHeight: '100vh' }}>Loading the live film…</main>;
   return (
-    <main style={{ padding: 16, color: '#e5e7eb', background: '#0b0f19', minHeight: '100vh' }}>
-      <h1>3D stage check — {film.name}</h1>
-      <p data-testid="verdict">engine schema: {verdict.success ? 'ok' : `errors: ${JSON.stringify((verdict as { error?: unknown }).error).slice(0, 600)}`}</p>
-      <Player key={price} ref={player} composition={film} onError={(e) => console.error('player error', e)} onLayerError={(id, e) => setErrors((x) => [...x, `${id}: ${String(e)}`])} />
+    <main style={{ padding: 12, color: '#e5e7eb', background: '#0b0f19', minHeight: '100vh', fontSize: 13 }}>
+      <h1 style={{ fontSize: 16, margin: '0 0 4px' }}>3D stage check — {film.name}</h1>
+      <p data-testid="verdict" style={{ margin: '0 0 8px' }}>engine schema: {verdict.success ? 'ok' : `errors: ${JSON.stringify((verdict as { error?: unknown }).error).slice(0, 600)}`}</p>
+      {/* compact: the stage is at most 60% of the window high, so the controls stay in view */}
+      <div style={{ width: `min(100%, calc(60vh * ${film.width} / ${film.height}))` }}>
+        <Player key={price} ref={player} composition={film} onError={(e) => console.error('player error', e)} onLayerError={(id, e) => setErrors((x) => [...x, `${id}: ${String(e)}`])} />
+      </div>
       <p>
         {[0, 0.5, 1, 2, 3, 3.5, 6, 10, 14, 18, 22].map((t) => (
           <button key={t} type="button" onClick={() => void seek(t)} style={{ marginRight: 8 }}>

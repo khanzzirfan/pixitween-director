@@ -5,6 +5,8 @@ web/dist/
 .env.*
 !.env.example
 data/
+# per-run data dirs for paid live runs (DATA_DIR=./data-<name>)
+data-*/
 debug/
 .ralph-tui/iterations/
 .ralph-tui/session*.json

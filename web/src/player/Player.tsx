@@ -31,27 +31,34 @@ function Controls({ duration }: { duration: number }) {
   const gsap = useContext(GsapPixieContext);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
-  const raf = useRef(0);
+  /** What this button last asked for; used when the engine does not report its play state. */
+  const wanted = useRef(false);
 
+  // The engine's play state is the truth: at the end of the film it rewinds to the start and pauses itself, and a handle's play()
+  // starts it without this button. So the button follows the engine every frame instead of keeping its own state.
   useEffect(() => {
-    if (!playing) return;
+    let raf = 0;
     const tick = () => {
       const t = gsap.playerTimeRef.current;
-      setTime(clampSeek(t, duration));
-      if (t >= duration) {
+      let on = gsap.playStateRef ? gsap.playStateRef.current : wanted.current;
+      if (on && t >= duration) {
         gsap.handlePause();
-        setPlaying(false);
-        return;
+        on = false;
       }
-      raf.current = requestAnimationFrame(tick);
+      // while playing, and once on stopping (the engine may have rewound), the time shows where the engine is
+      if (on || wanted.current) setTime(clampSeek(gsap.playerTimeRef.current, duration));
+      wanted.current = on;
+      setPlaying(on);
+      raf = requestAnimationFrame(tick);
     };
-    raf.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf.current);
-  }, [playing, duration, gsap]);
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [duration, gsap]);
 
   const toggle = () => {
     if (playing) gsap.handlePause();
     else gsap.handlePlay();
+    wanted.current = !playing;
     setPlaying(!playing);
   };
   const seek = (value: number) => {

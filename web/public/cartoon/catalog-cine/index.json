@@ -1,0 +1,344 @@
+[
+  {
+    "id": "cb-original",
+    "title": "Coffee Co. Cold Brew",
+    "price": 4.5,
+    "was": null,
+    "concept": "Pale calm in a dark roast storm: the creamy minimal can holds perfectly still while dark coffee, ice and vapor rush around it.",
+    "mood": "dark, creamy, crisp cold",
+    "boardSource": "muse",
+    "elements": [
+      {
+        "id": "coffee-bean",
+        "name": "roasted coffee bean",
+        "drawn": true
+      },
+      {
+        "id": "ice",
+        "name": "ice cube",
+        "drawn": true
+      },
+      {
+        "id": "brew-splash",
+        "name": "cold brew splash",
+        "drawn": true
+      }
+    ],
+    "seconds": 7.7,
+    "sheet": {
+      "beats": [
+        {
+          "size": "wide",
+          "move": "push",
+          "seconds": 1,
+          "angle": "low",
+          "phase": "hook",
+          "product": "drop",
+          "ingredient": {
+            "kind": "coffee-bean",
+            "action": "burst"
+          },
+          "note": "hook: roasted beans burst toward the lens as the camera dives hard at the pale can dropping into the dark"
+        },
+        {
+          "size": "macro",
+          "move": "push",
+          "seconds": 0.6,
+          "angle": "eye",
+          "phase": "build",
+          "product": "still",
+          "note": "the label fills the frame as the camera pushes onto COLD BREW text"
+        },
+        {
+          "size": "close",
+          "move": "push",
+          "seconds": 1.2,
+          "angle": "low",
+          "phase": "build",
+          "product": "turn",
+          "cut": "wipe",
+          "ingredient": {
+            "kind": "ice",
+            "action": "orbit"
+          },
+          "note": "cold: ice cubes circle the turning can while the camera pushes low up its cream side"
+        },
+        {
+          "size": "medium",
+          "move": "push",
+          "seconds": 0.8,
+          "angle": "high",
+          "phase": "peak",
+          "product": "still",
+          "cut": "cloud",
+          "ingredient": {
+            "kind": "brew-splash",
+            "action": "splash"
+          },
+          "note": "the world changes material: dark brew splashes bloom high around the still can and wash the frame"
+        },
+        {
+          "size": "wide",
+          "move": "pull",
+          "seconds": 1.1,
+          "angle": "eye",
+          "phase": "build",
+          "product": "still",
+          "ingredient": {
+            "kind": "coffee-bean",
+            "action": "drift"
+          },
+          "note": "pull back so the cream can stands small in the dark while beans drift slowly past it"
+        },
+        {
+          "size": "medium",
+          "move": "dolly-zoom",
+          "seconds": 1,
+          "angle": "eye",
+          "phase": "reveal",
+          "product": "still",
+          "note": "reveal: the lens widens and the can holds its size against the dark"
+        },
+        {
+          "size": "medium",
+          "move": "hold",
+          "seconds": 2,
+          "phase": "close",
+          "product": "still",
+          "note": "end hold: the can rests centered in the dark for price and brand"
+        }
+      ]
+    },
+    "file": "cb-original.json"
+  },
+  {
+    "id": "cb-vanilla",
+    "title": "Coffee Co. Vanilla Cold Brew",
+    "price": 4.75,
+    "was": null,
+    "concept": "Tiny calm in a vast storm: the small cream can holds still while a huge dark-roast world rushes around it then clears to silk.",
+    "mood": "dark roast, silky, chilled",
+    "boardSource": "muse",
+    "elements": [
+      {
+        "id": "coffee-bean",
+        "name": "coffee bean",
+        "drawn": true
+      },
+      {
+        "id": "vanilla-blossom",
+        "name": "vanilla blossom",
+        "drawn": true
+      },
+      {
+        "id": "brew-splash",
+        "name": "cold brew splash",
+        "drawn": true
+      }
+    ],
+    "seconds": 8,
+    "sheet": {
+      "beats": [
+        {
+          "size": "wide",
+          "move": "push",
+          "seconds": 1,
+          "angle": "low",
+          "phase": "hook",
+          "product": "drop",
+          "ingredient": {
+            "kind": "coffee-bean",
+            "action": "burst"
+          },
+          "note": "hook: roasted beans burst toward the lens as the cream can drops in and the camera pushes hard"
+        },
+        {
+          "size": "medium",
+          "move": "push",
+          "seconds": 0.7,
+          "angle": "high",
+          "phase": "build",
+          "product": "turn",
+          "ingredient": {
+            "kind": "vanilla-blossom",
+            "action": "fall"
+          },
+          "note": "vanilla blossoms fall past the turning can while the camera pushes in"
+        },
+        {
+          "size": "macro",
+          "move": "push",
+          "seconds": 0.6,
+          "angle": "eye",
+          "phase": "build",
+          "product": "still",
+          "note": "the label fills the frame for a beat"
+        },
+        {
+          "size": "medium",
+          "move": "orbit",
+          "seconds": 1,
+          "angle": "low",
+          "phase": "build",
+          "product": "turn",
+          "cut": "wipe",
+          "ingredient": {
+            "kind": "coffee-bean",
+            "action": "orbit"
+          },
+          "note": "beans orbit the turning can as the camera swings round it low"
+        },
+        {
+          "size": "close",
+          "move": "push",
+          "seconds": 0.9,
+          "angle": "high",
+          "phase": "peak",
+          "product": "still",
+          "cut": "cloud",
+          "ingredient": {
+            "kind": "brew-splash",
+            "action": "splash"
+          },
+          "note": "cold brew splashes up around the still can in a chilled sensory peak seen from above"
+        },
+        {
+          "size": "medium",
+          "move": "dolly-zoom",
+          "seconds": 1,
+          "angle": "eye",
+          "phase": "reveal",
+          "product": "still",
+          "note": "reveal: the lens widens while the can holds its size in the clearing dark"
+        },
+        {
+          "size": "medium",
+          "move": "hold",
+          "seconds": 2.8,
+          "phase": "close",
+          "product": "still",
+          "note": "end hold: price and brand rest under the soft halo"
+        }
+      ]
+    },
+    "file": "cb-vanilla.json"
+  },
+  {
+    "id": "cb-mocha",
+    "title": "Coffee Co. Mocha Cold Brew",
+    "price": 3.99,
+    "was": 4.75,
+    "concept": "Pale calm in a roast storm: the cream can holds still while dark coffee chaos bursts, circles and splashes around it.",
+    "mood": "dark, roasted, creamy",
+    "boardSource": "muse",
+    "elements": [
+      {
+        "id": "bean",
+        "name": "roasted coffee bean",
+        "drawn": true
+      },
+      {
+        "id": "choc-shard",
+        "name": "dark chocolate shard",
+        "drawn": true
+      },
+      {
+        "id": "brew-splash",
+        "name": "cold brew splash",
+        "drawn": true
+      }
+    ],
+    "seconds": 8,
+    "sheet": {
+      "beats": [
+        {
+          "size": "wide",
+          "move": "push",
+          "seconds": 1,
+          "angle": "low",
+          "phase": "hook",
+          "product": "drop",
+          "cut": "hard",
+          "ingredient": {
+            "kind": "bean",
+            "action": "burst"
+          },
+          "note": "beans burst toward the lens as the can drops in and the camera pushes hard to the cream glow"
+        },
+        {
+          "size": "macro",
+          "move": "push",
+          "seconds": 0.7,
+          "angle": "eye",
+          "phase": "build",
+          "product": "still",
+          "cut": "hard",
+          "note": "the camera pushes to the label filling the frame with COLD BREW"
+        },
+        {
+          "size": "close",
+          "move": "orbit",
+          "seconds": 1.2,
+          "angle": "low",
+          "phase": "build",
+          "product": "turn",
+          "cut": "hard",
+          "ingredient": {
+            "kind": "choc-shard",
+            "action": "orbit"
+          },
+          "note": "chocolate shards orbit the turning can as the camera swings round it low"
+        },
+        {
+          "size": "medium",
+          "move": "push",
+          "seconds": 0.9,
+          "angle": "high",
+          "phase": "peak",
+          "product": "still",
+          "cut": "cloud",
+          "ingredient": {
+            "kind": "brew-splash",
+            "action": "splash"
+          },
+          "note": "looking down, dark brew splashes around the still can in a cold bloom of light"
+        },
+        {
+          "size": "wide",
+          "move": "pull",
+          "seconds": 1,
+          "angle": "low",
+          "phase": "build",
+          "product": "still",
+          "cut": "wipe",
+          "ingredient": {
+            "kind": "bean",
+            "action": "fall"
+          },
+          "note": "after a dip to dark the camera pulls back wide as beans fall past the small can"
+        },
+        {
+          "size": "medium",
+          "move": "dolly-zoom",
+          "seconds": 1,
+          "angle": "eye",
+          "phase": "reveal",
+          "product": "still",
+          "cut": "hard",
+          "note": "the lens widens while the can holds its size for the reveal"
+        },
+        {
+          "size": "medium",
+          "move": "hold",
+          "seconds": 2.2,
+          "angle": "eye",
+          "phase": "close",
+          "product": "still",
+          "cut": "hard",
+          "note": "hold still on the hero can where the price rests"
+        }
+      ]
+    },
+    "file": "cb-mocha.json"
+  }
+]

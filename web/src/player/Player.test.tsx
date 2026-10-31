@@ -75,6 +75,25 @@ describe('Player', () => {
     expect(h.ctx.handleSeek).toHaveBeenLastCalledWith(5);
   });
 
+  it('turns back to Play when the engine stops at the end of the film', async () => {
+    const playState = { current: false };
+    (h.ctx as Record<string, unknown>).playStateRef = playState;
+    h.ctx.handlePlay.mockImplementation(() => (playState.current = true));
+    try {
+      render(<Player composition={comp} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+      expect(await screen.findByRole('button', { name: 'Pause' })).toBeInTheDocument();
+      playState.current = false; // the engine's onComplete: rewind and pause
+      expect(await screen.findByRole('button', { name: 'Play' })).toBeInTheDocument();
+      // and a play started elsewhere (the handle) shows as playing
+      playState.current = true;
+      expect(await screen.findByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    } finally {
+      delete (h.ctx as Record<string, unknown>).playStateRef;
+      h.ctx.handlePlay.mockReset();
+    }
+  });
+
   it('sizes the stage with the longest side at 960 and preserves the drawing buffer by default', () => {
     const { rerender } = render(<Player composition={comp} />);
     expect(h.appProps[0]).toMatchObject({ width: 960, height: 540, preserveDrawingBuffer: true });
