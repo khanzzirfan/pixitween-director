@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 7,
+  "background": "#101418",
+  "assets": {
+    "plate": { "type": "image", "url": "/cartoon/backdrop.png" },
+    "product": { "type": "image", "url": "/dev/product.png" }
+  },
+  "layers": [
+    {
+      "id": "bg",
+      "type": "image",
+      "asset": "plate",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "end": 7
+    },
+    {
+      "id": "product",
+      "type": "image",
+      "asset": "product",
+      "x": 1500,
+      "y": 620,
+      "width": 620,
+      "tint": "#ffffff",
+      "enter": { "name": "fadeInUp" },
+      "end": 7
+    },
+    {
+      "id": "title",
+      "type": "text",
+      "text": "Fresh every morning",
+      "x": 960,
+      "y": 220,
+      "style": { "fontSize": 96, "fontWeight": "700", "align": "center", "fill": "#ffffff" },
+      "enter": { "name": "slideInUp" },
+      "exit": { "name": "fadeOut" },
+      "end": 7
+    },
+    {
+      "id": "badge",
+      "type": "shape",
+      "shape": "ellipse",
+      "width": 220,
+      "height": 220,
+      "fill": "#ffd27a",
+      "x": 300,
+      "y": 320,
+      "enter": { "name": "zoomIn" },
+      "loop": { "name": "pulse", "duration": 1.2 },
+      "end": 7
+    },
+    {
+      "id": "hero",
+      "type": "group",
+      "x": 960,
+      "y": 900,
+      "end": 7,
+      "children": [
+        {
+          "id": "chip",
+          "type": "shape",
+          "shape": "rect",
+          "width": 420,
+          "height": 120,
+          "fill": "#1d2733",
+          "radius": 28,
+          "enter": { "name": "fadeIn" }
+        },
+        {
+          "id": "chip-label",
+          "type": "text",
+          "text": "BREWED TODAY",
+          "style": { "fontSize": 52, "fontWeight": "600", "align": "center", "fill": "#ffd27a" },
+          "enter": { "name": "fadeIn" }
+        }
+      ]
+    }
+  ]
+}

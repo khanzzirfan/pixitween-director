@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 7,
+  "background": "transparent",
+  "assets": {
+    "plate": { "type": "image", "url": "/cartoon/backdrop.png" },
+    "can": { "type": "gltf", "url": "/cartoon/props/can.glb" }
+  },
+  "layers": [
+    {
+      "id": "bg",
+      "type": "image",
+      "asset": "plate",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "end": 7
+    },
+    {
+      "id": "hero",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1600,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": { "preset": "window" },
+      "shadow": { "enabled": true, "opacity": 0.45, "y": 0 },
+      "camera": { "position": [0, 1.1, 4.6], "lookAt": [0, 0.75, 0], "fov": 36 },
+      "objects": [
+        {
+          "id": "can",
+          "geometry": { "type": "gltf", "asset": "can", "height": 1.5 },
+          "position": [0, 0.75, 0]
+        }
+      ],
+      "postFx": [
+        { "id": "bloom", "type": "bloom", "params": { "intensity": 0.6, "threshold": 0.82, "smoothing": 0.12 } },
+        { "id": "vignette", "type": "vignette", "params": { "offset": 0.3, "darkness": 0.5 } }
+      ],
+      "end": 7,
+      "tweens": [
+        {
+          "target": "postfx:bloom",
+          "at": 0,
+          "duration": 7,
+          "ease": "sine.inOut",
+          "from": { "intensity": 0.4 },
+          "to": { "intensity": 1.4 }
+        },
+        {
+          "target": "postfx:vignette",
+          "at": 0,
+          "duration": 7,
+          "ease": "sine.inOut",
+          "from": { "darkness": 0.35 },
+          "to": { "darkness": 0.85 }
+        }
+      ]
+    }
+  ]
+}

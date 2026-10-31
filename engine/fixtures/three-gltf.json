@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 7,
+  "background": "#141a1f",
+  "assets": {
+    "plate": { "type": "image", "url": "/cartoon/backdrop.png" },
+    "robot": { "type": "gltf", "url": "/cartoon/characters/robot.glb" },
+    "can": { "type": "gltf", "url": "/cartoon/props/can.glb" }
+  },
+  "layers": [
+    {
+      "id": "bg",
+      "type": "image",
+      "asset": "plate",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "alpha": 0.5,
+      "end": 7
+    },
+    {
+      "id": "hero",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1600,
+      "height": 1040,
+      "background": "#141a1f",
+      "lighting": { "preset": "golden" },
+      "shadow": { "enabled": true, "opacity": 0.5, "y": 0 },
+      "camera": { "position": [0, 1.2, 5.6], "lookAt": [0, 0.9, 0], "fov": 34 },
+      "objects": [
+        {
+          "id": "robot",
+          "geometry": { "type": "gltf", "asset": "robot", "height": 2.4 },
+          "position": [-1.05, 0, 0],
+          "rotation": [0, 18, 0],
+          "animation": { "clip": "Wave", "speed": 1, "loop": true }
+        },
+        {
+          "id": "can",
+          "geometry": { "type": "gltf", "asset": "can", "height": 1.2 },
+          "position": [1.15, 0.6, 0]
+        }
+      ],
+      "loop": { "name": "spin", "target": "object:can", "params": { "turnsPerSecond": 0.25 } },
+      "end": 7
+    }
+  ]
+}
