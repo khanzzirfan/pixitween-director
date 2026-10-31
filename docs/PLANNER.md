@@ -16,13 +16,14 @@ the crew from one product photo, then fanned out to a catalog. Cartoon code stay
 | 1 | Crew builds a film live (Wonder, Spark, board, critic, fix jobs) | [x] | S12/S14 shipped |
 | 2 | Photoreal 9:16 look spike on the can photo | [x] | scored about 3.5 of 5 (gate 4) |
 | 3 | Product-photo fixes: cut-out guard, no generate mode without a token, text safe-area snap | [x] | tests pass |
-| 4 | Finish pass: shadow, grade, shot flash, ad type, music bed | [~] | wired into `finish`; not run in a live film; audio not heard in the player |
-| 5 | Re-run live spike with the finish pass, score again | [ ] | score 4 or more |
+| 4 | Finish pass: shadow, grade, shot flash, ad type, music bed | [~] | ran in two live films and shows in the frames; audio not heard in the player |
+| 5 | Re-run live spike with the finish pass, score again | [~] | two runs: 164 s / $0.27 (one stub shot), 583 s / $0.56 (no stub). Look about 3.5 to 4; price missing on the end card, hero headline overflows |
 | 6 | Second product (mug, bottle or sneaker), score again | [ ] | 4 or more on two products |
 | 7 | Product in the scene (Muse Image edit with the photo as reference) | [ ] | hero no longer reads as a sticker |
 | 8 | Catalog Crew core: import, master, variants, wall | [ ] | 6 to 12 variants from one master |
 | 9 | Price check on the wall (rule + vision) | [ ] | one wrong price flagged and fixed |
 | 10 | Live price edit, $0, tiles update | [ ] | about 2 s end to end |
+| 10b | Speed: film built in under 3 minutes (now 164 s to 583 s, fix loops decide) | [ ] | see DEMO-POLISH, "Speed" |
 | 11 | One generated clip (pour) via Clippy | [ ] | needs `CLIPPY_TOKEN`; first to cut |
 | 12 | Deploy with crew on, demo script runs twice in a row | [ ] | no manual steps |
 | 13 | Record, README, submission form, X clip | [ ] | submitted |

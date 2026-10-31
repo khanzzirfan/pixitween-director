@@ -8,7 +8,7 @@ import type { LiveScript } from './run';
 
 export const BRIEF =
   'A 16 second vertical (9:16) ad for Coffee Co. cold brew, shot like real product photography: soft morning window light, the can on a wooden counter with steam from a fresh pour beside it, a slow close look at the label, and an end card with the price $4.50. Four shots, slow camera moves, natural colours, no cartoon look.';
-const FILM_TIMEOUT_MS = 8 * 60_000;
+const FILM_TIMEOUT_MS = 15 * 60_000;
 
 export const describe: LiveScript['describe'] = () =>
   'S17 look spike: one real crew film (Wonder showrunner, Spark builders, Muse Image plates, SAM cut-outs, critic) on the can photo in 9:16. Estimate: about $1. Prints scenes, jobs, findings, fixes, cost and time; writes the film for /stage-check.html?film=spike.';
@@ -45,6 +45,12 @@ export const run: LiveScript['run'] = async ({ env, log }) => {
     const file = `debug/s17/spike-failed-${stamp}.json`;
     writeFileSync(file, JSON.stringify({ filmId: film.id, error: String(e), board: session?.crew.board.list() ?? [], events }, null, 2));
     log(`wrote ${file}`);
+    // keep what was built: a slow fix loop should not throw the film away
+    const partial = await deps.films.get(film.id).catch(() => undefined);
+    if (partial?.composition) {
+      writeFileSync('web/public/cartoon/spike-film.json', JSON.stringify(partial.composition, null, 2));
+      log(`saved the partial film (version ${partial.version}) to web/public/cartoon/spike-film.json`);
+    }
     throw e;
   } finally {
     session?.stop();
