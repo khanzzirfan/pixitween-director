@@ -6,6 +6,7 @@ import type { LlmBackend } from '@shared/ports';
 import type { ToolCtx, ToolDef, ToolResult } from '@shared/tools';
 import { buildScene } from '../agent/build-scene';
 import { layerIdsByRole } from '../authoring/api';
+import { BIBLE_FONT_STACKS } from '../authoring/constants';
 import { loadEnv } from '../env';
 import { pickBackend } from '../llm/router';
 import { renderBibleBlock, renderJobBlock } from '../crew/prompts';
@@ -13,6 +14,7 @@ import type { WorkerResult } from '../crew/scheduler';
 import type { CrewCtx } from '../crew/showrunner-tools';
 import { runTool } from '../tools/registry';
 import { scopedRunTool, type RunTool } from '../crew/workers/scope';
+import { resolveClip } from './characters';
 import { blockShotPrompt } from './prompts';
 
 export const BLOCK_TOOLS = ['addStage', 'placeActor', 'cueClip', 'moveActor', 'placeProp', 'placeStageProduct', 'setLightCue', 'setText', 'restyleText'];
@@ -29,6 +31,14 @@ export function clipGuard(clips: ReadonlyArray<{ id: string; name: string; asset
   if (!clips) return run;
   const names = clips.map((c) => c.name);
   return async (ctx, name, args): Promise<ToolResult> => {
+    if (name === 'cueClip' && args && typeof args === 'object') {
+      // a plain word ("shuffle") stands for the nearest clip the character has, when the film has that clip
+      const w = args as { clip?: unknown };
+      if (typeof w.clip === 'string' && !names.some((n) => n.toLowerCase() === (w.clip as string).toLowerCase())) {
+        const near = resolveClip(w.clip);
+        if (names.includes(near) && near !== 'Idle') args = { ...(args as object), clip: near };
+      }
+    }
     if (name === 'cueClip' && args && typeof args === 'object') {
       const a = args as { clip?: unknown; clipAssetId?: unknown };
       const byName = typeof a.clip === 'string' && clips.some((c) => c.name.toLowerCase() === a.clip!.toString().toLowerCase());
@@ -60,7 +70,7 @@ export async function ensureBasics(ctx: ToolCtx, sceneId: string, text: string |
   const comp = (await ctx.films.get(ctx.filmId)).composition;
   if (!comp) return;
   if (!layerIdsByRole(comp, 'bg', sceneId).length) await runTool(ctx, 'addLayer', { sceneId, role: 'bg', kind: 'shape', fill: palette[0] ?? '#f4ead5' });
-  if (text && !layerIdsByRole(comp, 'headline', sceneId).length) await runTool(ctx, 'addLayer', { sceneId, role: 'headline', kind: 'text', text, style: { color: darkest(palette), ...(bible ? { font: bible.type.font, weight: bible.type.weight } : {}) } });
+  if (text && !layerIdsByRole(comp, 'headline', sceneId).length) await runTool(ctx, 'addLayer', { sceneId, role: 'headline', kind: 'text', text, style: { color: darkest(palette), ...(bible ? { font: BIBLE_FONT_STACKS[bible.type.font], weight: bible.type.weight } : {}) } });
 }
 
 export async function runBlockJob(job: Job, signal: AbortSignal, crew: CrewCtx, o: BlockOptions = {}): Promise<WorkerResult> {

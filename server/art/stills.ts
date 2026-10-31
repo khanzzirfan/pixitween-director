@@ -2,6 +2,7 @@ import type { Buffer } from 'node:buffer';
 import sharp from 'sharp';
 import type { Aspect, AssetRef } from '@shared/composition';
 import type { ToolCtx } from '@shared/tools';
+import { lookPlatePrompt, type LookId, type OccasionId } from '../authoring/looks';
 import { imageSize } from '../media/image';
 import { MetaApiError } from '../meta/http';
 import { ArtError } from './errors';
@@ -36,11 +37,20 @@ export async function coverCrop(png: Buffer, aspect: Aspect): Promise<Buffer> {
     .png()
     .toBuffer();
 }
+/** A plate written from a look recipe (docs/direction/corpus/03-plate-prompts.md) instead of a free setting line. */
+export async function generateLookPlate(
+  ctx: ToolCtx,
+  o: { look: LookId; occasion: OccasionId; productClass: string; aspect: Aspect; sceneId: string },
+): Promise<AssetRef> {
+  const prompt = lookPlatePrompt(o.look, o);
+  if (!prompt) throw new ArtError('lint', `look '${o.look}' draws its own world and has no plate`);
+  return generatePlateImage(ctx, { ...o, setting: '', prompt });
+}
 export async function generatePlateImage(
   ctx: ToolCtx,
-  o: { setting: string; mood?: string; aspect: Aspect; sceneId: string },
+  o: { setting: string; mood?: string; aspect: Aspect; sceneId: string; prompt?: string },
 ): Promise<AssetRef> {
-  const prompt = platePrompt(o.setting, o.mood);
+  const prompt = o.prompt ?? platePrompt(o.setting, o.mood);
   const lint = lintPrompt(prompt);
   if (!lint.ok) throw new ArtError('lint', `prompt rejected: ${lint.violations.map((v) => `${v.rule} "${v.term}"`).join(', ')}`);
   let raw: Buffer;

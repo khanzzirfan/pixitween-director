@@ -22,6 +22,8 @@ docs/hackathon
 opencode.json
 docs/learn-improve
 docs/engine
+# Local reference material: kept on disk, not published
+docs/direction/upstream/
 
 # Local tool state
 .claude/

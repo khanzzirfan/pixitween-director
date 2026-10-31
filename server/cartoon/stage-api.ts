@@ -174,7 +174,7 @@ export function placeActor(c: Comp, sceneId: string, actorId: string, assetId: s
   share(out, sceneId, assetId);
   const layer: Obj = {
     id, name: actorId, kind: 'actor3d', stage: worldId(sceneId), inPoint: inFrame, outPoint: end, assetId,
-    ...(o.height !== undefined ? { height: o.height } : {}),
+    height: o.height ?? 1, // models come in any unit (the robot is 4.6 raw): normalise to a metre unless told
     marks: [round(mark[0]), round(mark[1]), mark[2]],
     clips: [{ name: o.idle ?? 'Idle', startFrame: inFrame, loop: true }],
   };

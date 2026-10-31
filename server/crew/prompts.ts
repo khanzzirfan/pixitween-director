@@ -5,7 +5,7 @@ import { BIBLE_FONT_STACKS } from '../authoring/constants';
 import { TOY_STUDIO_SECTION } from '../cartoon/prompts';
 import { loadEnv } from '../env';
 
-/** Film direction for the showrunner, distilled from docs/direction/principles.md. No numbered lines: the rules above are 1 to 8. */
+/** Film direction for the showrunner. No numbered lines: the rules above are 1 to 8. */
 export const DIRECTION = `Direction:
 - One idea, one hero moment about two thirds through, and an ending that answers the opening. Say the film in one sentence before you plan it.
 - The first scene's headline says what the film is about in plain words, large, readable with the sound off within 3 seconds. Never open on a slow logo.
@@ -13,7 +13,7 @@ export const DIRECTION = `Direction:
 - Every build brief names the motion: what enters, from which side, how far and how long, what holds still while it is read, and what the one hero element does. "Make it nice" is not a brief.
 - Avoid: a centred title on a gradient, everything fading in together, linear easing, glows and particles, placeholder text, and a sign that repeats what the picture shows.`;
 
-/** The builder's craft block, distilled from docs/direction/craft.md for our tools: four eases, keyframes, layers. The recipe is the minimum. */
+/** The builder's craft block, for our tools: four eases, keyframes, layers. The recipe is the minimum. */
 export const BUILDER_DIRECTION = `CRAFT (the recipe is the minimum; add at least one authored move that fits the intent)
 - Entrances use opacity plus 10 to 28 px of travel (or scale 0.88 to 0.98), ease easeOut, 0.4 to 0.8 s. Exits use easeIn and last about half as long. Never opacity alone.
 - Moves between states use easeInOut, 0.6 to 1.1 s. Use linear only for continuous drift or rotation.

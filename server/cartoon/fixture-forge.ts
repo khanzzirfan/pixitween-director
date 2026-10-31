@@ -10,14 +10,16 @@ import { PRICE } from '../art/prices';
 import sharp from 'sharp';
 import { propModel, propSrc } from './props';
 import { addClip, castAssetId, setMember } from './cast';
+import { CAST_CHARACTER, CHARACTER_SRC, resolveClip } from './characters';
+
+/** Library motions of the toy character: the ones that are their own files. */
+const MOTION_FILES: Record<string, string> = { walk: 'clip-walk', jump: 'clip-jump' };
 
 const FIXTURES = {
   character: { file: 'toy-character', kind: 'model' as const },
   prop: { file: 'prop-crate', kind: 'model' as const },
   set: { file: 'backdrop', kind: 'image' as const },
 };
-/** Library motions: the ones inside the toy character's own clips, and the ones that are their own files. */
-const MOTION_FILES: Record<string, string> = { walk: 'clip-walk', jump: 'clip-jump' };
 
 /** The film's composition, or a new empty one: the showrunner may start casting before it has planned the first scene. */
 const compOf = (f: { composition?: unknown; aspect: '16:9' | '9:16' | '1:1'; title?: string; storyboard?: { title?: string; palette?: string[] } }): Comp =>
@@ -67,7 +69,7 @@ export function createFixtureForge(o: { delayMs?: number; paint?: boolean } = {}
     const r = await crew.films.mutate(
       job.filmId,
       (f) => ({
-        next: registerAsset(compOf(f), { id: castAssetId(m.id), kind: fx.kind, src: painted?.src ?? (kind === 'prop' ? propSrc(propModel(`${m.name} ${m.description}`)) : `/cartoon/${fx.file}.${fx.kind === 'model' ? 'glb' : 'png'}`), ...(fx.kind === 'image' ? { width: painted?.width ?? 1024, height: painted?.height ?? 512 } : {}) }),
+        next: registerAsset(compOf(f), { id: castAssetId(m.id), kind: fx.kind, src: painted?.src ?? (kind === 'prop' ? propSrc(propModel(`${m.name} ${m.description}`)) : kind === 'character' ? CHARACTER_SRC : `/cartoon/${fx.file}.${fx.kind === 'model' ? 'glb' : 'png'}`), ...(fx.kind === 'image' ? { width: painted?.width ?? 1024, height: painted?.height ?? 512 } : {}) }),
         data: null,
       }),
       'director',
@@ -75,7 +77,7 @@ export function createFixtureForge(o: { delayMs?: number; paint?: boolean } = {}
     );
     if (!r.ok) throw new Error('the asset was refused');
     await setMember(crew.films, job.filmId, m.id, { status: 'ready', assetId: castAssetId(m.id), ...(painted ? { ground: painted.ground } : {}) });
-    return { summary: `${m.name}: ${painted ? 'painted backdrop' : `fixture ${kind === 'prop' ? propModel(`${m.name} ${m.description}`) : fx.file}`}`, version: r.version, costUsd: painted ? PRICE.museImageUsd : 0, model: 'fixture-forge' };
+    return { summary: `${m.name}: ${painted ? 'painted backdrop' : `fixture ${kind === 'prop' ? propModel(`${m.name} ${m.description}`) : kind === 'character' ? CAST_CHARACTER : fx.file}`}`, version: r.version, costUsd: painted ? PRICE.museImageUsd : 0, model: 'fixture-forge' };
   };
   return {
     'cast-character': making('character'),
@@ -85,17 +87,24 @@ export function createFixtureForge(o: { delayMs?: number; paint?: boolean } = {}
       const m = await memberOf(crew, job);
       await setMember(crew.films, job.filmId, m.id, { status: 'running' });
       await sleep(delay() / 2, signal);
-      const file = MOTION_FILES[m.name.toLowerCase()];
-      let version: number | undefined;
-      if (file) {
-        const r = await crew.films.mutate(job.filmId, (f) => ({ next: registerAsset(compOf(f), { id: castAssetId(m.id), kind: 'model', src: `/cartoon/${file}.glb` }), data: null }), 'director', `make-motion ${m.id}`);
-        if (!r.ok) throw new Error('the clip was refused');
-        version = r.version;
+      if (CAST_CHARACTER === 'toy') {
+        const file = MOTION_FILES[m.name.toLowerCase()];
+        let version: number | undefined;
+        if (file) {
+          const r = await crew.films.mutate(job.filmId, (f) => ({ next: registerAsset(compOf(f), { id: castAssetId(m.id), kind: 'model', src: `/cartoon/${file}.glb` }), data: null }), 'director', `make-motion ${m.id}`);
+          if (!r.ok) throw new Error('the clip was refused');
+          version = r.version;
+        }
+        await setMember(crew.films, job.filmId, m.id, { status: 'ready', ...(file ? { assetId: castAssetId(m.id) } : {}) });
+        // the clip list a cue is checked against
+        await addClip(crew.films, job.filmId, { id: m.id, name: m.name, ...(file ? { assetId: castAssetId(m.id) } : {}) });
+        return { summary: `${m.name}: ${file ? `clip ${file}` : 'library motion'}`, ...(version ? { version } : {}), costUsd: 0, model: 'fixture-forge' };
       }
-      await setMember(crew.films, job.filmId, m.id, { status: 'ready', ...(file ? { assetId: castAssetId(m.id) } : {}) });
-      // the clip list a cue is checked against
-      await addClip(crew.films, job.filmId, { id: m.id, name: m.name, ...(file ? { assetId: castAssetId(m.id) } : {}) });
-      return { summary: `${m.name}: ${file ? `clip ${file}` : 'library motion'}`, ...(version ? { version } : {}), costUsd: 0, model: 'fixture-forge' };
+      // robot: every motion is a clip inside the character model, cued by that clip's name
+      const clip = resolveClip(m.name);
+      await setMember(crew.films, job.filmId, m.id, { status: 'ready' });
+      await addClip(crew.films, job.filmId, { id: m.id, name: clip });
+      return { summary: `${m.name}: character clip ${clip}`, costUsd: 0, model: 'fixture-forge' };
     },
   };
 }

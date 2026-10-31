@@ -6,7 +6,8 @@ import { addScene, newFilmComposition, registerAsset } from '../authoring/api';
 import type { Comp, Obj } from '../authoring/types';
 import { makeTestCrew } from '../crew/test-helpers';
 import { createWorkerRegistry } from '../crew/workers/registry';
-import { runBlockJob } from './blocking';
+import { BIBLE_FONT_STACKS } from '../authoring/constants';
+import { ensureBasics, runBlockJob } from './blocking';
 
 const saved = { ...process.env };
 beforeEach(() => {
@@ -88,15 +89,33 @@ describe('runBlockJob', () => {
   it('refuses a cue for a clip the film does not have, shows the list, and succeeds after the retry', async () => {
     const t = await setup();
     const b = scripted([
-      [...shot, { name: 'cueClip', args: { sceneId: 's2', actorId: 'pip', clip: 'Moonwalk', atSec: 1 } }],
+      [...shot, { name: 'cueClip', args: { sceneId: 's2', actorId: 'pip', clip: 'Backflip', atSec: 1 } }],
       [{ name: 'cueClip', args: { sceneId: 's2', actorId: 'pip', clip: 'Wave', atSec: 1 } }],
     ]);
     const r = await runBlockJob(t.job(), ac(), t.crew, { backendFor: () => b });
     expect(r.summary).toBe('5 tool calls, 4 ok');
-    expect(b.seen[1]).toMatch(/no clip 'Moonwalk'/);
+    expect(b.seen[1]).toMatch(/no clip 'Backflip'/);
     expect(b.seen[1]).toMatch(/Wave, Walk/);
     const pip = layers(await t.comp(), 's2').find((l) => l.id === 's2:pip')!;
     expect(pip.clips.map((k: Obj) => k.name)).toContain('Wave');
+  });
+
+  it('takes a plain word for the nearest clip the film has', async () => {
+    const t = await setup();
+    const b = scripted([[...shot, { name: 'cueClip', args: { sceneId: 's2', actorId: 'pip', clip: 'shuffle over', atSec: 1 } }]]);
+    const r = await runBlockJob(t.job(), ac(), t.crew, { backendFor: () => b });
+    expect(r.summary).toBe('4 tool calls, 4 ok');
+    const pip = layers(await t.comp(), 's2').find((l) => l.id === 's2:pip')!;
+    expect(pip.clips.map((k: Obj) => k.clipAssetId)).toContain('walk'); // the walk clip is its own file
+  });
+
+  it("sets the headline in the style bible's font stack, so the continuity check agrees", async () => {
+    const t = await setup();
+    const bible = { palette: ['#f4ead5', '#1b1b1b'], type: { font: 'rounded', weight: 700 } } as never;
+    await ensureBasics({ ...t.crew.toolCtx, scope: { sceneId: 's2' } }, 's2', 'Hello', ['#f4ead5', '#1b1b1b'], bible);
+    const head = layers(await t.comp(), 's2').find((l) => l.id === 's2:headline')!;
+    expect(head.style.font).toBe(BIBLE_FONT_STACKS.rounded);
+    expect(head.style.weight).toBe(700);
   });
 
   it('refuses a call that reaches into another scene', async () => {

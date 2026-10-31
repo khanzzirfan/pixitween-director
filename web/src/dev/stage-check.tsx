@@ -12,14 +12,14 @@ const SHOT_SEC = 4;
 /** ?film=robot: one 8 s shot of the Quaternius robot (walk, jump, wave) among converted props, to check scale, colour and clips. */
 function robotFilm(): AepCompositionJson {
   const f = buildCartoonFilm() as { assets: Record<string, unknown>; durationInFrames: number; layers: unknown[]; precomps: Record<string, { assets: Record<string, unknown>; layers: Array<Record<string, unknown>> }> };
-  const assets = { ...f.assets, robot: { type: 'model', src: '/cartoon/characters/robot.glb' }, bed: { type: 'model', src: '/cartoon/props/q-bed-single.glb' }, can: { type: 'model', src: '/cartoon/props/q-sodacan.glb' }, plant: { type: 'model', src: '/cartoon/props/q-houseplant-1.glb' }, fridge: { type: 'model', src: '/cartoon/props/q-kitchen-fridge.glb' } };
+  const assets = { ...f.assets, robot: { type: 'model', src: '/cartoon/characters/robot.glb' }, bed: { type: 'model', src: '/cartoon/props/q-bed-single.glb' }, can: { type: 'model', src: '/cartoon/props/q-sodacan.glb' }, plant: { type: 'model', src: '/cartoon/props/q-houseplant-1.glb' }, fridge: { type: 'model', src: '/cartoon/props/q-kitchen-2drawers.glb' } };
   const s1 = f.precomps.s1!;
   s1.assets = assets;
   const keep = s1.layers.filter((l) => l.kind === 'shape' || l.kind === 'stage3d');
   const prop = (id: string, assetId: string, size: number, position: number[]) => ({ id, name: id, kind: 'prop3d', stage: 'world', inPoint: 0, outPoint: 120, source: { type: 'gltf', assetId }, size, position });
   s1.layers = [
     ...keep,
-    { id: 'hero', name: 'hero', kind: 'actor3d', stage: 'world', inPoint: 0, outPoint: 120, assetId: 'robot', height: 1, marks: [{ t: 0, v: [-1.2, 0, -90] }, { t: 15, v: [-1.2, 0, -90] }, { t: 60, v: [0.9, 0, -90] }, { t: 61, v: [0.9, 0, 0] }], clips: [{ name: 'Idle', startFrame: 0, loop: true }, { name: 'Walk', startFrame: 15, fadeFrames: 6, loop: true }, { name: 'Jump', startFrame: 62, fadeFrames: 4 }, { name: 'Wave', startFrame: 90, fadeFrames: 6 }] },
+    { id: 'hero', name: 'hero', kind: 'actor3d', stage: 'world', inPoint: 0, outPoint: 120, assetId: 'robot', height: 1, marks: [{ t: 0, v: [-1.2, 0, -90] }, { t: 15, v: [-1.2, 0, -90] }, { t: 60, v: [0.9, 0, -90] }, { t: 61, v: [0.9, 0, 0] }], clips: [{ name: 'Walk', startFrame: 0, loop: true }, { name: 'Idle', startFrame: 30, fadeFrames: 6, loop: true }, { name: 'Jump', startFrame: 62, fadeFrames: 4 }, { name: 'Wave', startFrame: 90, fadeFrames: 6 }] },
     prop('bed', 'bed', 0.9, [-1.8, 0, -0.8]),
     prop('can', 'can', 0.25, [1.5, 0, 0.3]),
     prop('plant', 'plant', 0.5, [1.9, 0, -0.6]),
@@ -103,7 +103,7 @@ function StageCheck() {
       <p data-testid="verdict">engine schema: {verdict.success ? 'ok' : `errors: ${JSON.stringify((verdict as { error?: unknown }).error).slice(0, 600)}`}</p>
       <Player key={price} ref={player} composition={film} onError={(e) => console.error('player error', e)} onLayerError={(id, e) => setErrors((x) => [...x, `${id}: ${String(e)}`])} />
       <p>
-        {[0, 2, 6, 10, 14, 18, 22].map((t) => (
+        {[0, 0.5, 1, 2, 3, 3.5, 6, 10, 14, 18, 22].map((t) => (
           <button key={t} type="button" onClick={() => void seek(t)} style={{ marginRight: 8 }}>
             Seek {t} s
           </button>

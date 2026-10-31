@@ -3,6 +3,16 @@
 Planner items 8 to 10. Full design: `docs/hackathon/catalog-crew-plan.md` and `catalog-crew-demo-plan.md` (local, git-ignored).
 Nothing is built yet (31 Oct). If C3 is not working by **Sun 1 midday**, ship the cheap version below.
 
+## Retail clip template (the unit of the catalog)
+A short clip per product, like a supermarket product spot: themed plate, pack easing in, price badge that pops then pulses, name fading in, brand badge. Deterministic, $0 per clip apart from the plate.
+- [x] `server/authoring/retail-clip.ts` `buildRetailClip`: any aspect, any pack shape, badge in free space beside the pack (never over it), any price length, 2.5 s minimum, tested (14 tests); `scripts/retail-demo.ts` writes a sample film
+- [ ] Note: do not run `finishComposition` on a retail clip (its price bump to 168 px would overflow the badge); give it its own grade and music
+- [ ] Plate per category from Muse Image (one plate shared by its products), cut-out per product from the feed photo (SAM)
+- [ ] Sale price variant: struck-through old price beside the badge
+- [ ] Badge shapes: circle (now), starburst, ribbon; accent colour from the brand
+- [ ] Hear and tune the timing at 4 s; add a "ding" sound on the price pop
+- [ ] Clip to wall: render posters from frame 2 s
+
 ## Cheap version (the fallback, and the first target)
 Six products from one master by the deterministic path. No per-product crew run.
 - [~] 6 fixture products: `fixtures/catalog/feed-6.csv` (reuses the can and mug photos; a clean photo per product still needed)
