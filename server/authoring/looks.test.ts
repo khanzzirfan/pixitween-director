@@ -21,6 +21,13 @@ describe('pickLook', () => {
     expect(pick.look).toBe(look);
     expect(pick.why.length).toBeGreaterThan(5);
   });
+  it('gives a tall round pack the 3D hero, but a sale still leads with the price and a short or flat pack stays 2D', () => {
+    const can = { title: 'Cold Brew 330ml', category: 'beverage', width: 256, height: 752 };
+    expect(pickLook({ ...can, round: true }).look).toBe('hero-3d');
+    expect(pickLook({ ...can, round: true, onSale: true }).look).toBe('price-promo');
+    expect(pickLook({ ...can, round: false }).look).toBe('tabletop-hero');
+    expect(pickLook({ title: 'Stone Mug', category: 'homeware', width: 800, height: 800, round: true }).look).toBe('lifestyle-room');
+  });
   it('finds the occasion in the words, everyday otherwise', () => {
     expect(pickLook({ title: 'Christmas Pudding', width: 800, height: 800 }).occasion).toBe('festive');
     expect(pickLook({ title: 'Iced Lemon Tea', width: 256, height: 752 }).occasion).toBe('summer');

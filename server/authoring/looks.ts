@@ -4,6 +4,8 @@ import type { Aspect } from './types';
 // how things move, the grade and the type; the director picks one per product and everything after that is deterministic.
 
 export type LookId = 'tabletop-hero' | 'flat-lay' | 'studio-pedestal' | 'lifestyle-room' | 'ingredient-orbit' | 'price-promo';
+/** A look a clip can have: one of the 2D recipes below, or hero-3d, where the product is a 3D model (hero3d-clip.ts) and has no recipe here. */
+export type ClipLook = LookId | 'hero-3d';
 export type OccasionId = 'everyday' | 'summer' | 'party' | 'festive' | 'wellness' | 'premium';
 export type ProductShape = 'tall' | 'square' | 'wide';
 /** Where the key light comes from; the product's shadows fall the other way. */
@@ -183,23 +185,25 @@ const mentions = (text: string, terms: string[]) => {
 };
 
 export interface LookPick {
-  look: LookId;
+  look: ClipLook;
   occasion: OccasionId;
   /** One line a person can read: why this look. */
   why: string;
 }
 
 /**
- * The default director's pick for one product: a sale gets the promo look; otherwise the look whose category words the product
- * mentions most and whose shapes include the pack's shape; tabletop hero when nothing matches. A model (or the user) may
- * override it; this is the floor, so a catalog never ships without a considered look.
+ * The default director's pick for one product: a sale gets the promo look; a tall round pack whose label could be unwrapped
+ * (`round`, from prepareProduct3D) gets the 3D hero; otherwise the look whose category words the product mentions most and whose
+ * shapes include the pack's shape; tabletop hero when nothing matches. A model (or the user) may override it; this is the floor,
+ * so a catalog never ships without a considered look.
  */
-export function pickLook(p: { title: string; category?: string; width: number; height: number; onSale?: boolean; occasion?: OccasionId }): LookPick {
+export function pickLook(p: { title: string; category?: string; width: number; height: number; onSale?: boolean; occasion?: OccasionId; round?: boolean }): LookPick {
   const text = `${p.category ?? ''} ${p.title}`;
   const occasion: OccasionId =
     p.occasion ?? ((Object.keys(OCCASION_WORDS) as OccasionId[]).find((o) => mentions(text, OCCASION_WORDS[o]).length > 0) ?? 'everyday');
   if (p.onSale) return { look: 'price-promo', occasion, why: 'on sale, so the price leads' };
   const shape = productShape(p.width, p.height);
+  if (p.round && shape === 'tall') return { look: 'hero-3d', occasion, why: 'tall round pack with a label to wrap, so it turns in 3D' };
   let best: { id: LookId; hits: string[] } | undefined;
   for (const l of Object.values(LOOKS)) {
     if (l.id === 'price-promo' || !l.shapes.includes(shape)) continue;

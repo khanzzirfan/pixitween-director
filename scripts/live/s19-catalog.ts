@@ -1,5 +1,5 @@
 // S19 live: the catalogue path end to end on a small CSV feed. Reads the feed, cuts out each distinct product photo once (SAM),
-// picks a look per product, builds a retail clip per product and one variant film per product line, and writes them to
+// picks a look per product (tall round packs whose label unwraps get the 3D hero), builds a clip per product and one variant film per product line, and writes them to
 // web/public/cartoon/catalog/ with an index. Colour comes from the photo (the cut-out's brand-like colour, or the plate's when the
 // product is white), the brand from the feed's brand column, and the tagline from the words the line's titles share.
 // Paid (SAM about $0.0025 a photo, plus a Muse plate at $0.01 for each look and product class without one), so it prints an
@@ -9,8 +9,9 @@ import { shownPrice, parseFeed, type Product } from '../../shared/catalog';
 import { cutout } from '../../server/art/cutout';
 import { dominantAccent } from '../../server/art/palette';
 import { generateLookPlate } from '../../server/art/stills';
-import { LOOKS, pickLook, type LookId } from '../../server/authoring/looks';
-import { buildRetailClip } from '../../server/authoring/retail-clip';
+import { buildCatalogClip, prepareRound } from '../../server/authoring/catalog-clip';
+import { LOOKS, pickLook } from '../../server/authoring/looks';
+import { newPrepareCache } from '../../server/product3d/prepare';
 import { buildVariantFilm, colorFor, taglineFor, variantNames } from '../../server/authoring/variant-film';
 import { buildDeps } from '../../server/main';
 import type { LiveScript } from './run';
@@ -75,13 +76,25 @@ export const run: LiveScript['run'] = async ({ env, log, args }) => {
     log(`cut-out ${photo} (${noun}): ${r.cutout.id} ${r.cutout.width}x${r.cutout.height}, confidence ${r.confidence ?? 'n/a'}, photo colour ${acc.hex} (chroma ${acc.chroma.toFixed(2)})`);
   }
 
-  // a look per product; a plate for each look and product class that has none yet
+  // the wrapped label for each tall round pack (free, offline), so its products may get the 3D hero
+  const prep3d = newPrepareCache();
+  const round = new Map<string, Awaited<ReturnType<typeof prepareRound>>>();
+  for (const photo of cuts.keys()) {
+    const p = products.find((x) => x.imageUrl === photo)!;
+    const r = await prepareRound(deps.assets, cuts.get(photo)!, NOUN[p.category] ?? 'product', prep3d);
+    round.set(photo, r);
+    if (r) log(`3D label ${photo}: ${r.texture.id} (${r.shape}, side ${r.side})`);
+  }
+
+  // a look per product; a plate for each 2D look and product class that has none yet
   const picks = products.map((p) => {
     const cut = cuts.get(p.imageUrl)!;
-    return { p, cut, noun: NOUN[p.category] ?? 'product', pick: pickLook({ title: p.title, category: p.category, width: cut.width, height: cut.height, onSale: p.salePrice !== undefined }) };
+    const prepared = round.get(p.imageUrl);
+    const pick = pickLook({ title: p.title, category: p.category, width: cut.width, height: cut.height, onSale: p.salePrice !== undefined, round: prepared !== undefined });
+    return { p, cut, prepared, noun: NOUN[p.category] ?? 'product', pick };
   });
   for (const x of picks) {
-    if (LOOKS[x.pick.look].plate === null || findPlate(plates, x.pick.look, x.noun)) continue;
+    if (x.pick.look === 'hero-3d' || LOOKS[x.pick.look].plate === null || findPlate(plates, x.pick.look, x.noun)) continue;
     const a = await generateLookPlate(ctx, { look: x.pick.look, occasion: x.pick.occasion, productClass: `${x.noun}s`, aspect: '9:16', sceneId: x.pick.look });
     plates[plateKey(x.pick.look, x.noun)] = { id: a.id, width: a.width ?? 720, height: a.height ?? 1280 };
     cost += 0.01;
@@ -92,22 +105,23 @@ export const run: LiveScript['run'] = async ({ env, log, args }) => {
   // the accent: the photo's own colour; a white product takes its plate's colour; failing that, slate
   const accentOf = async (x: (typeof picks)[number]): Promise<string> => {
     if (x.cut.chroma > 0.05) return x.cut.accent;
-    // a look that draws its own world (promo) has no plate: use any plate made for this product class
-    const plate = findPlate(plates, x.pick.look, x.noun) ?? Object.entries(plates).find(([k]) => k.endsWith(`:${x.noun}`))?.[1];
+    // a look that draws its own world (promo, 3D hero) has no plate: use any plate made for this product class
+    const plate = (x.pick.look === 'hero-3d' ? undefined : findPlate(plates, x.pick.look, x.noun)) ?? Object.entries(plates).find(([k]) => k.endsWith(`:${x.noun}`))?.[1];
     const bytes = plate ? assetBytes(env.DATA_DIR, plate.id) : undefined;
     const fromPlate = bytes ? await dominantAccent(bytes) : undefined;
     return fromPlate && fromPlate.chroma > 0 ? fromPlate.hex : FALLBACK_ACCENT;
   };
 
-  // a retail clip per product
+  // a clip per product: the 3D hero or the 2D retail clip, by its look
   const index: Array<Record<string, unknown>> = [];
   for (const x of picks) {
     const { p, cut, pick } = x;
-    const plate = findPlate(plates, pick.look, x.noun);
+    const plate = pick.look === 'hero-3d' ? undefined : findPlate(plates, pick.look, x.noun);
     const accent = await accentOf(x);
-    const clip = buildRetailClip({
+    const clip = buildCatalogClip({
       aspect: '9:16',
-      look: pick.look as LookId,
+      look: pick.look,
+      ...(x.prepared ? { prepared: x.prepared } : {}),
       ...(plate ? { plate: { id: plate.id, src: `/api/assets/${plate.id}`, width: plate.width, height: plate.height } } : {}),
       product: { id: cut.id, src: `/api/assets/${cut.id}`, width: cut.width, height: cut.height },
       title: p.title,
