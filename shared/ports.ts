@@ -73,7 +73,7 @@ export interface FilmStore {
     source: FilmVersion['source'],
     note?: string,
   ): Promise<{ ok: true; version: number; data: T } | { ok: false; issues: unknown }>;
-  update(id: FilmId, patch: Partial<Pick<FilmState, 'status' | 'storyboard' | 'title' | 'styleBible' | 'storyboardRev'>>): Promise<void>;
+  update(id: FilmId, patch: Partial<Pick<FilmState, 'status' | 'storyboard' | 'title' | 'styleBible' | 'storyboardRev' | 'clips' | 'cast'>>): Promise<void>;
   undo(id: FilmId): Promise<number>;
   redo(id: FilmId): Promise<number>;
   versions(id: FilmId): Promise<FilmVersion[]>;

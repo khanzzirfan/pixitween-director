@@ -1,0 +1,1017 @@
+{
+  "version": "1.9.0",
+  "id": "film",
+  "name": "Coffee Co. cold brew",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "durationInFrames": 480,
+  "bgColor": "#F4EAD8",
+  "assets": {
+    "ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae": {
+      "type": "image",
+      "src": "/api/assets/ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae",
+      "width": 768,
+      "height": 1152
+    },
+    "ast_0099884626256ecd8db68865ca83e6b0": {
+      "type": "image",
+      "src": "/api/assets/ast_0099884626256ecd8db68865ca83e6b0",
+      "width": 720,
+      "height": 1280
+    },
+    "ast_a2f07621e4968be7b7b1005289b907a8": {
+      "type": "image",
+      "src": "/api/assets/ast_a2f07621e4968be7b7b1005289b907a8",
+      "width": 720,
+      "height": 1280
+    },
+    "ast_553e05712c84d7c92e203440ea4fabd9": {
+      "type": "image",
+      "src": "/api/assets/ast_553e05712c84d7c92e203440ea4fabd9",
+      "width": 720,
+      "height": 1280
+    },
+    "ast_7ba3579f98034abc17363545d211ea72": {
+      "type": "image",
+      "src": "/api/assets/ast_7ba3579f98034abc17363545d211ea72",
+      "width": 256,
+      "height": 752
+    },
+    "ast_929ff009f229a62b629b2eeb460f4d1e": {
+      "type": "image",
+      "src": "/api/assets/ast_929ff009f229a62b629b2eeb460f4d1e",
+      "width": 256,
+      "height": 752
+    },
+    "ast_a0e6dfeca6d884e717ce00b72a5a58f9": {
+      "type": "image",
+      "src": "/api/assets/ast_a0e6dfeca6d884e717ce00b72a5a58f9",
+      "width": 720,
+      "height": 1280
+    },
+    "ast_509fc4b1ba661220cb1fc5fd4a17742b": {
+      "type": "image",
+      "src": "/api/assets/ast_509fc4b1ba661220cb1fc5fd4a17742b",
+      "width": 255,
+      "height": 751
+    },
+    "ast_eb3fb6a4e46544c8107ab5fc1ce700e3": {
+      "type": "image",
+      "src": "/api/assets/ast_eb3fb6a4e46544c8107ab5fc1ce700e3",
+      "width": 255,
+      "height": 751
+    },
+    "ast_bdcd7c23eae6c523db2bd61930ce9256": {
+      "type": "image",
+      "src": "/api/assets/ast_bdcd7c23eae6c523db2bd61930ce9256",
+      "width": 720,
+      "height": 1280
+    },
+    "ast_955ce0c7e63912bffed8487bc7ef23b6": {
+      "type": "image",
+      "src": "/api/assets/ast_955ce0c7e63912bffed8487bc7ef23b6",
+      "width": 256,
+      "height": 752
+    },
+    "ast_22bb0fe7a1d6388ff305d5a8d17ddcc7": {
+      "type": "image",
+      "src": "/api/assets/ast_22bb0fe7a1d6388ff305d5a8d17ddcc7",
+      "width": 256,
+      "height": 752
+    }
+  },
+  "layers": [
+    {
+      "kind": "precomp",
+      "id": "hero",
+      "name": "hero",
+      "inPoint": 0,
+      "outPoint": 120,
+      "compId": "hero",
+      "width": 1080,
+      "height": 1920,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "pour-steam",
+      "name": "pour-steam",
+      "inPoint": 120,
+      "outPoint": 240,
+      "compId": "pour-steam",
+      "width": 1080,
+      "height": 1920,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "label",
+      "name": "label",
+      "inPoint": 240,
+      "outPoint": 360,
+      "compId": "label",
+      "width": 1080,
+      "height": 1920,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "endcard",
+      "name": "endcard",
+      "inPoint": 360,
+      "outPoint": 480,
+      "compId": "endcard",
+      "width": 1080,
+      "height": 1920,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    }
+  ],
+  "precomps": {
+    "hero": {
+      "version": "1.9.0",
+      "id": "hero",
+      "name": "hero",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "ast_0099884626256ecd8db68865ca83e6b0": {
+          "type": "image",
+          "src": "/api/assets/ast_0099884626256ecd8db68865ca83e6b0",
+          "width": 720,
+          "height": 1280
+        },
+        "ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae": {
+          "type": "image",
+          "src": "/api/assets/ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae",
+          "width": 768,
+          "height": 1152
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "hero:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_0099884626256ecd8db68865ca83e6b0",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              360,
+              640
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.725,
+                  1.725
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.7648076923076923,
+                  1.7648076923076923
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "image",
+          "id": "hero:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  998.4
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  540,
+                  1002.24
+                ]
+              }
+            ],
+            "anchor": [
+              384,
+              576
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.9844,
+                  0.9844
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.0828400000000002,
+                  1.0828400000000002
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "text",
+          "id": "hero:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Coffee Co. Cold Brew",
+          "style": {
+            "font": "Inter",
+            "size": 64,
+            "fill": "#3B2417",
+            "weight": 600,
+            "align": "center",
+            "boxWidth": 750
+          },
+          "transform": {
+            "position": [
+              261.67999999999995,
+              280
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              0.59,
+              0.59
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "pour-steam": {
+      "version": "1.9.0",
+      "id": "pour-steam",
+      "name": "pour-steam",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "ast_553e05712c84d7c92e203440ea4fabd9": {
+          "type": "image",
+          "src": "/api/assets/ast_553e05712c84d7c92e203440ea4fabd9",
+          "width": 720,
+          "height": 1280
+        },
+        "ast_7ba3579f98034abc17363545d211ea72": {
+          "type": "image",
+          "src": "/api/assets/ast_7ba3579f98034abc17363545d211ea72",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "pour-steam:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_553e05712c84d7c92e203440ea4fabd9",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  543.3230769230769,
+                  960
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  536.6769230769231,
+                  960
+                ]
+              }
+            ],
+            "anchor": [
+              360,
+              640
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.725,
+                  1.725
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.7409230769230768,
+                  1.7409230769230768
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "image",
+          "id": "pour-steam:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_7ba3579f98034abc17363545d211ea72",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  543.3256351039261,
+                  998.4
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  536.6743648960739,
+                  998.4
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.5319,
+                  1.5319
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.5460515011547347,
+                  1.5460515011547347
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "text",
+          "id": "pour-steam:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Fresh Pour, Smooth Taste",
+          "style": {
+            "font": "Inter, clean sans-serif",
+            "size": 72,
+            "fill": "#3B2417",
+            "weight": 600,
+            "align": "center",
+            "boxWidth": 900
+          },
+          "transform": {
+            "position": [
+              540,
+              240
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "label": {
+      "version": "1.9.0",
+      "id": "label",
+      "name": "label",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "ast_bdcd7c23eae6c523db2bd61930ce9256": {
+          "type": "image",
+          "src": "/api/assets/ast_bdcd7c23eae6c523db2bd61930ce9256",
+          "width": 720,
+          "height": 1280
+        },
+        "ast_955ce0c7e63912bffed8487bc7ef23b6": {
+          "type": "image",
+          "src": "/api/assets/ast_955ce0c7e63912bffed8487bc7ef23b6",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "label:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_bdcd7c23eae6c523db2bd61930ce9256",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              360,
+              640
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.725,
+                  1.725
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.7619907076483203,
+                  1.7619907076483203
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "image",
+          "id": "label:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_955ce0c7e63912bffed8487bc7ef23b6",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  998.4
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  540,
+                  999.2240343347639
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.5319,
+                  1.5319
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.56477339055794,
+                  1.56477339055794
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "text",
+          "id": "label:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Cold Brew",
+          "style": {
+            "font": "Inter, clean sans-serif",
+            "size": 134,
+            "fill": "#3b2417",
+            "weight": 600,
+            "align": "center",
+            "boxWidth": 864
+          },
+          "transform": {
+            "position": [
+              540,
+              307.2
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 1
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "endcard": {
+      "version": "1.9.0",
+      "id": "endcard",
+      "name": "endcard",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "ast_a2f07621e4968be7b7b1005289b907a8": {
+          "type": "image",
+          "src": "/api/assets/ast_a2f07621e4968be7b7b1005289b907a8",
+          "width": 720,
+          "height": 1280
+        },
+        "ast_7ba3579f98034abc17363545d211ea72": {
+          "type": "image",
+          "src": "/api/assets/ast_7ba3579f98034abc17363545d211ea72",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "endcard:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_a2f07621e4968be7b7b1005289b907a8",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              360,
+              640
+            ],
+            "scale": [
+              1.5,
+              1.5
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "image",
+          "id": "endcard:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_7ba3579f98034abc17363545d211ea72",
+          "transform": {
+            "position": [
+              540,
+              998.4
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              1.5319,
+              1.5319
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "text",
+          "id": "endcard:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Cold Brew — $4.50",
+          "style": {
+            "font": "Inter",
+            "size": 72,
+            "fill": "#3B2417",
+            "weight": 600,
+            "align": "center",
+            "boxWidth": 860
+          },
+          "transform": {
+            "position": [
+              540,
+              1640
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "meta": {
+    "director": {
+      "productNoun": "product",
+      "productShape": "can",
+      "scenes": {
+        "hero": {
+          "precompId": "hero",
+          "startFrame": 0,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Open on the cold brew can on a wooden counter in soft morning window light, establishing a calm realistic breakfast scene",
+          "camera": {
+            "move": "dolly-in",
+            "strength": 0.5
+          }
+        },
+        "pour-steam": {
+          "precompId": "pour-steam",
+          "startFrame": 120,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Can beside a fresh pour in a glass/cup with gentle steam, suggesting freshly served cold brew moment on the counter",
+          "camera": {
+            "move": "parallax",
+            "strength": 0.5
+          }
+        },
+        "label": {
+          "precompId": "label",
+          "startFrame": 240,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Slow close look at the label and dark brown coffee-bean band so packaging is clearly readable",
+          "camera": {
+            "move": "dolly-in",
+            "strength": 0.5
+          }
+        },
+        "endcard": {
+          "precompId": "endcard",
+          "startFrame": 360,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Clean end card with the can, brand line and price $4.50 to close the sale",
+          "camera": {
+            "move": "static",
+            "strength": 0.5
+          }
+        }
+      },
+      "layers": {
+        "hero:bg": {
+          "sceneId": "hero",
+          "role": "bg",
+          "assetId": "ast_0099884626256ecd8db68865ca83e6b0",
+          "z": 11,
+          "base": {
+            "x": 540,
+            "y": 960,
+            "scale": 1.725
+          }
+        },
+        "endcard:bg": {
+          "sceneId": "endcard",
+          "role": "bg",
+          "assetId": "ast_a2f07621e4968be7b7b1005289b907a8",
+          "z": 11,
+          "base": {
+            "x": 540,
+            "y": 960,
+            "scale": 1.5
+          }
+        },
+        "pour-steam:bg": {
+          "sceneId": "pour-steam",
+          "role": "bg",
+          "assetId": "ast_553e05712c84d7c92e203440ea4fabd9",
+          "z": 11,
+          "base": {
+            "x": 540,
+            "y": 960,
+            "scale": 1.725
+          }
+        },
+        "pour-steam:product": {
+          "sceneId": "pour-steam",
+          "role": "product",
+          "assetId": "ast_7ba3579f98034abc17363545d211ea72",
+          "z": 10.99,
+          "base": {
+            "x": 540,
+            "y": 998.4,
+            "scale": 1.5319
+          },
+          "maskAssetId": "ast_929ff009f229a62b629b2eeb460f4d1e"
+        },
+        "hero:headline": {
+          "sceneId": "hero",
+          "role": "headline",
+          "z": 0
+        },
+        "endcard:headline": {
+          "sceneId": "endcard",
+          "role": "headline",
+          "z": 0
+        },
+        "pour-steam:headline": {
+          "sceneId": "pour-steam",
+          "role": "headline",
+          "z": 0
+        },
+        "hero:product": {
+          "sceneId": "hero",
+          "role": "product",
+          "assetId": "ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae",
+          "z": 1,
+          "base": {
+            "x": 540,
+            "y": 998.4,
+            "scale": 0.9844
+          }
+        },
+        "label:headline": {
+          "sceneId": "label",
+          "role": "headline",
+          "z": 0
+        },
+        "endcard:product": {
+          "sceneId": "endcard",
+          "role": "product",
+          "assetId": "ast_7ba3579f98034abc17363545d211ea72",
+          "z": 10.99,
+          "base": {
+            "x": 540,
+            "y": 998.4,
+            "scale": 1.5319
+          },
+          "maskAssetId": "ast_929ff009f229a62b629b2eeb460f4d1e"
+        },
+        "label:bg": {
+          "sceneId": "label",
+          "role": "bg",
+          "assetId": "ast_bdcd7c23eae6c523db2bd61930ce9256",
+          "z": 11.99,
+          "base": {
+            "x": 540,
+            "y": 960,
+            "scale": 1.725
+          }
+        },
+        "label:product": {
+          "sceneId": "label",
+          "role": "product",
+          "assetId": "ast_955ce0c7e63912bffed8487bc7ef23b6",
+          "z": 11.98,
+          "base": {
+            "x": 540,
+            "y": 998.4,
+            "scale": 1.5319
+          },
+          "maskAssetId": "ast_22bb0fe7a1d6388ff305d5a8d17ddcc7"
+        }
+      }
+    }
+  }
+}

@@ -11,11 +11,11 @@ export interface Readiness {
   readonly errors: ReadonlyArray<{ layerId: string; message: string }>;
 }
 
-/** Whether a composition (the root or any scene) holds a model3d layer. */
+/** Whether a composition (the root or any scene) holds a model3d or stage3d layer. */
 export function hasModel3D(comp: { layers?: Array<{ kind?: string }>; precomps?: Record<string, { layers?: Array<{ kind?: string }> }> } | null | undefined): boolean {
   if (!comp) return false;
-  if (comp.layers?.some((l) => l.kind === 'model3d')) return true;
-  return Object.values(comp.precomps ?? {}).some((p) => p.layers?.some((l) => l.kind === 'model3d'));
+  if (comp.layers?.some((l) => l.kind === 'model3d' || l.kind === 'stage3d')) return true;
+  return Object.values(comp.precomps ?? {}).some((p) => p.layers?.some((l) => l.kind === 'model3d' || l.kind === 'stage3d'));
 }
 
 /** The first engine version whose AepComposition reports `onRenderReady` and `onLayerError`. */

@@ -10,13 +10,16 @@ export const ROLE_KINDS: Record<LayerRole, string[]> = {
   subject: ['image'],
   product: ['image'],
   product3d: [], // written by placeProduct3D, never by addLayer
+  stage3d: [], // written by the cartoon stage tools (server/cartoon/stage-api.ts), never by addLayer
+  actor3d: [],
+  prop3d: [],
   headline: ['text'],
   caption: ['text'],
   camera: [],
 };
 
 /** z = distance from the camera; larger is farther. */
-export const DEFAULT_Z: Record<string, number> = { bg: 10, clip: 10, subject: 3, product: 1, product3d: 1, headline: 0, caption: 0 };
+export const DEFAULT_Z: Record<string, number> = { bg: 10, clip: 10, subject: 3, product: 1, product3d: 1, stage3d: 5, actor3d: 5, prop3d: 5, headline: 0, caption: 0 };
 
 export const EASE_HANDLES: Record<Ease, [number, number, number, number] | undefined> = {
   linear: undefined,

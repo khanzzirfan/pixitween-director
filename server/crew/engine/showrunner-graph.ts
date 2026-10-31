@@ -11,8 +11,7 @@ import {
   REPAIR,
   REPAIR_PLAN,
   REPAIR_STALLED,
-  PLAN_NUDGE,
-  BUILD_NUDGE,
+  planNudgeText,
   autoDispatch,
   createShowrunnerAgent,
   autoFinish,
@@ -165,7 +164,7 @@ export function createShowrunnerGraph(opts: ShowrunnerGraphOptions) {
   /** Nothing is planned or built and nothing runs: prompt the director through the inbox, as the done nudge does. */
   async function plan(): Promise<Partial<State>> {
     const film = await crew.films.get(crew.filmId);
-    crew.inbox.push({ id: createId('i'), at: new Date().toISOString(), from: 'system', text: film.storyboard?.scenes.length ? BUILD_NUDGE : PLAN_NUDGE });
+    crew.inbox.push({ id: createId('i'), at: new Date().toISOString(), from: 'system', text: planNudgeText(film) });
     return {};
   }
 

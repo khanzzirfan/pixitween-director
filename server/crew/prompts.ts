@@ -2,6 +2,7 @@
 import type { Job, StyleBible } from '@shared/crew';
 import type { Storyboard } from '@shared/storyboard';
 import { BIBLE_FONT_STACKS } from '../authoring/constants';
+import { TOY_STUDIO_SECTION } from '../cartoon/prompts';
 import { loadEnv } from '../env';
 
 /** Film direction for the showrunner, distilled from docs/direction/principles.md. No numbered lines: the rules above are 1 to 8. */
@@ -58,11 +59,15 @@ const RULE_3_THREE_WAY = `3. Pick the cheapest technique that tells the shot. Mo
    The storyboard's productShape says what shape the product is; set it with reviseStoryboard if the film has none.`;
 
 /** The showrunner's system prompt. With PRODUCT_3D on, rule 3 is the three-way choice; off, it is exactly the S12b text. */
-export function showrunnerSystem(product3d: boolean = loadEnv().PRODUCT_3D): string {
-  return product3d ? SHOWRUNNER_BASE.replace(RULE_3_MOTION, RULE_3_THREE_WAY) : SHOWRUNNER_BASE;
+export function showrunnerSystem(product3d: boolean = loadEnv().PRODUCT_3D, cartoon: boolean = loadEnv().CARTOON_MODE, noGenerate = false): string {
+  const base = product3d ? SHOWRUNNER_BASE.replace(RULE_3_MOTION, RULE_3_THREE_WAY) : SHOWRUNNER_BASE;
+  const withToy = cartoon ? `${base}\n\n${TOY_STUDIO_SECTION}` : base;
+  return noGenerate ? `${withToy}\n\n${NO_GENERATE}` : withToy;
 }
+/** Without a Clippy token a generate scene can never get its clip: it would stay a dimmed photo with a caption. */
+const NO_GENERATE = 'Generated video is NOT available in this session. Never call proposeGenerate and never use generate mode: every scene is motion. Show motion in a shot with a slow camera move, a cut-out product and a light plate, and set the mood with the plate (a steam or pour look is a painted plate, not a clip).';
 /** The prompt with 3D off, as S12b wrote it. */
-export const SHOWRUNNER_SYSTEM = showrunnerSystem(false);
+export const SHOWRUNNER_SYSTEM = showrunnerSystem(false, false);
 
 const CASE_LABEL: Record<StyleBible['type']['case'], string> = { upper: 'UPPER', title: 'Title', sentence: 'Sentence' };
 

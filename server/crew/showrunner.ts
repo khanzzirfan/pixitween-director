@@ -1,5 +1,10 @@
 // Owned by S12b. The showrunner's loop (design.md 3.1 and 5.6): wake on the inbox, take one turn, act through the board tools.
 // The turn machinery. The loop itself is the LangGraph engine (server/crew/engine/showrunner-graph.ts).
+import { blockers } from '../cartoon/cast';
+import { sceneHasStage } from '../cartoon/checks';
+import type { FilmState } from '@shared/composition';
+import type { Comp } from '../authoring/types';
+import { createCartoonTools } from '../cartoon/showrunner-tools';
 import { loadEnv } from '../env';
 import type { InboxItem } from '@shared/crew';
 import type { FilmEvent } from '@shared/events';
@@ -39,6 +44,8 @@ export const REPAIR_STALLED = 'Some tool calls in your last turn failed and no j
 export const REPAIR_PLAN = 'Some of your planning calls failed (the storyboard or a dispatch), so the film is not what you meant. Read the errors, fix the arguments and call those tools again.';
 export const PLAN_NUDGE = 'You have not planned any scenes yet. Call reviseStoryboard with the scenes, then dispatch a builder for each.';
 export const BUILD_NUDGE = 'The storyboard has scenes but nothing is built and no job is running. Dispatch a builder for each scene.';
+export const CAST_NUDGE = 'The scenes are planned but nothing is cast or dressed yet, and nothing will wake you. In one turn call castCharacter for every character, dressSet once per place, and requestMotion for every clip the cues use.';
+export const BLOCK_NUDGE = 'The cast is ready but some scenes are not staged yet. Call blockShot for each scene that is not blocked.';
 export const DONE_NUDGE = 'Everything is built and checked. Call finish with a one-line summary now, unless a director\'s request is not done yet.';
 export const WRAPPING = 'Wrapping up: everything is built.';
 
@@ -69,7 +76,7 @@ export async function idleDecision(
   const film = await crew.films.get(crew.filmId);
   // An idle crew with nothing planned or built has nothing to wrap up, and nothing would wake it. Prompt it to plan, twice,
   // then fail fast instead of waiting out the idle end.
-  if (!film.composition || !film.storyboard?.scenes.length) {
+  if (!film.composition || !film.storyboard?.scenes.length || cartoonNeed(film)) {
     const attempts = turn.idleTurns + 1;
     if (attempts > MAX_PLAN_NUDGES) return { nudged: false, idleTurns: attempts, finished: false, action: 'fail' };
     return { nudged: false, idleTurns: attempts, finished: false, action: 'plan' };
@@ -84,6 +91,22 @@ export async function idleDecision(
   if (!o.autoFinish) return { nudged: true, idleTurns, finished: false, action: 'none' };
   if (idleTurns < 2) return { nudged: true, idleTurns, finished: false, action: 'nudge' };
   return { nudged: true, idleTurns, finished: false, action: 'finish' };
+}
+
+/** What a toy-studio film still needs from the director when nothing runs: its cast, or its shots. Undefined when it is not a cartoon or has both. */
+export function cartoonNeed(film: FilmState): 'cast' | 'block' | undefined {
+  if (!loadEnv().CARTOON_MODE || !film.storyboard?.scenes.length) return undefined;
+  const cast = film.cast ?? [];
+  if (!cast.some((m) => m.kind === 'character') || !cast.some((m) => m.kind === 'set')) return 'cast';
+  const comp = film.composition as Comp | undefined;
+  return film.storyboard.scenes.some((s) => !comp || !sceneHasStage(comp, s.id)) ? 'block' : undefined;
+}
+
+/** The nudge text for an idle crew that needs to plan, cast or block. */
+export function planNudgeText(film: FilmState): string {
+  if (!film.storyboard?.scenes.length) return PLAN_NUDGE;
+  const need = cartoonNeed(film);
+  return need === 'cast' ? CAST_NUDGE : need === 'block' ? BLOCK_NUDGE : BUILD_NUDGE;
 }
 
 /** The done nudge: one system item in the inbox. */
@@ -104,6 +127,15 @@ export async function autoFinish(crew: CrewCtx): Promise<boolean> {
 export async function autoDispatch(crew: CrewCtx, origin: 'auto' | 'user' = 'auto'): Promise<string[]> {
   const film = await crew.films.get(crew.filmId);
   const made: string[] = [];
+  // a toy-studio shot is blocked, not built: it starts as soon as its cast, set and motions are ready, otherwise the showrunner is woken when they finish and calls blockShot
+  if (loadEnv().CARTOON_MODE) {
+    for (const id of crew.turn.needsBuilder) {
+      if (crew.turn.dispatched.has(id) || blockers(film, id).length) continue;
+      const scene = film.storyboard?.scenes.find((s) => s.id === id);
+      if (scene) made.push((await crew.scheduler.dispatch({ kind: 'block-shot', sceneId: id, origin, brief: scene.beats ?? scene.intent, reason: 'the cast is ready' })).id);
+    }
+    return made;
+  }
   for (const id of crew.turn.needsBuilder) {
     if (crew.turn.dispatched.has(id)) continue;
     const scene = film.storyboard?.scenes.find((s) => s.id === id);
@@ -150,7 +182,7 @@ export interface ShowrunnerAgent {
 
 export function createShowrunnerAgent(deps: ShowrunnerDeps, snapshot: ShowrunnerSnapshot = {}): ShowrunnerAgent {
   const { crew, backend } = deps;
-  const tools = deps.tools ?? createBoardTools(crew);
+  const tools = deps.tools ?? [...createBoardTools(crew), ...(loadEnv().CARTOON_MODE ? createCartoonTools(crew) : [])];
   // loaded on first use: the registry pulls in every tool module, which a route registration does not need
   let registry: Registry | undefined;
   const getRegistry = async (): Promise<Registry> => (registry ??= (await import('../tools/registry')).createRegistry([tools]));

@@ -61,6 +61,8 @@ const schema = z.object({
   FILMS_WINDOW_SEC: int(300, 30, 3600),
   CREW_ENABLED: boolOn,
   PRODUCT_3D: boolOff,
+  CARTOON_MODE: boolOff,
+  CARTOON_PAINT: boolOff,
   SHOWRUNNER_MODEL: z.string().default('muse-wonder-1.0'),
   CREW_MAX_WORKERS: int(4, 1, 8),
   CREW_FILM_BUDGET_USD: z.coerce.number().min(0.1).max(20).default(1.5),

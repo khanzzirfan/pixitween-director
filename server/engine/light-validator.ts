@@ -8,9 +8,12 @@ export interface CompositionIssue {
 }
 export type ValidationResult = { ok: true; data: unknown } | { ok: false; issues: CompositionIssue[] };
 
-const KINDS = ['image', 'video', 'audio', 'gif', 'lottie', 'svg', 'text', 'shape', 'null', 'precomp', 'camera', 'light', 'model3d'];
+const KINDS = ['image', 'video', 'audio', 'gif', 'lottie', 'svg', 'text', 'shape', 'null', 'precomp', 'camera', 'light', 'model3d', 'stage3d', 'actor3d', 'prop3d'];
 /** The engine rejects a model3d layer in a composition declaring an older schema. */
 const MODEL3D_MIN_VERSION = [1, 4, 0] as const;
+/** stage3d and its actor3d / prop3d members arrived with schema 1.11.0 (engine aep-31). */
+const STAGE3D_MIN_VERSION = [1, 11, 0] as const;
+const STAGE_LIMITS = { actor3d: 3, prop3d: 6 } as const;
 const versionAtLeast = (v: string, min: readonly number[]): boolean => {
   const p = v.split('.').map(Number);
   for (let i = 0; i < 3; i++) if ((p[i] ?? 0) !== min[i]) return (p[i] ?? 0) > min[i]!;
@@ -86,7 +89,8 @@ function validateComp(c: unknown, path: string, issues: CompositionIssue[]): voi
     }
     if (typeof l.kind !== 'string' || !KINDS.includes(l.kind)) return void issues.push({ path: `${lp}.kind`, message: `unknown layer kind '${String(l.kind)}'` });
     if (!finite(l.inPoint) || !finite(l.outPoint)) issues.push({ path: lp, message: 'inPoint and outPoint must be finite numbers (frames)' });
-    if (l.kind !== 'camera' && l.kind !== 'light') checkTransform(l.transform, `${lp}.transform`, issues);
+    const isMember = l.kind === 'actor3d' || l.kind === 'prop3d';
+    if (l.kind !== 'camera' && l.kind !== 'light' && !isMember) checkTransform(l.transform, `${lp}.transform`, issues);
     if (l.kind === 'precomp') {
       if (typeof l.compId !== 'string' || !l.compId) issues.push({ path: `${lp}.compId`, message: 'precomp needs compId' });
       if (!positive(l.width) || !positive(l.height)) issues.push({ path: lp, message: 'precomp needs positive width and height' });
@@ -98,6 +102,20 @@ function validateComp(c: unknown, path: string, issues: CompositionIssue[]): voi
           issues.push({ path: `${lp}.compId`, message: `precomp compId '${l.compId}' is not an asset or an inline precomp` });
         }
       }
+    }
+    if (l.kind === 'stage3d' || isMember) {
+      if (typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version) && !versionAtLeast(version, STAGE3D_MIN_VERSION)) {
+        issues.push({ path: at('version'), message: `${l.kind} layers require schema >= 1.11.0 (got ${version})` });
+      }
+    }
+    if (l.kind === 'stage3d') {
+      const cam = isObj(l.camera) ? l.camera : undefined;
+      const vec3 = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every(finite);
+      if (!cam || !vec3(cam.position) || !vec3(cam.target)) issues.push({ path: `${lp}.camera`, message: 'stage3d camera is locked: position and target must be a static [x, y, z] (no keyframes)' });
+    }
+    if (isMember) {
+      if (typeof l.stage !== 'string' || !l.stage) issues.push({ path: `${lp}.stage`, message: `${l.kind} needs stage, the id of its stage3d layer` });
+      if (l.kind === 'actor3d' && (typeof l.assetId !== 'string' || !(l.assetId in assets))) issues.push({ path: `${lp}.assetId`, message: `actor3d '${String(l.id)}' references unknown assetId '${String(l.assetId)}' in this composition's assets` });
     }
     if (l.kind === 'model3d') {
       if (typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version) && !versionAtLeast(version, MODEL3D_MIN_VERSION)) {
@@ -121,6 +139,18 @@ function validateComp(c: unknown, path: string, issues: CompositionIssue[]): voi
         issues.push({ path: `${lp}.assetId`, message: `layer '${String(l.id)}' references unknown assetId '${String(l.assetId)}' in this composition's assets` });
       }
     }
+  });
+
+  const worlds = new Map<string, { actor3d: number; prop3d: number; products: number }>();
+  for (const l of layers) if (isObj(l) && l.kind === 'stage3d' && typeof l.id === 'string') worlds.set(l.id, { actor3d: 0, prop3d: 0, products: 0 });
+  layers.forEach((l, i) => {
+    if (!isObj(l) || (l.kind !== 'actor3d' && l.kind !== 'prop3d') || typeof l.stage !== 'string') return;
+    const w = worlds.get(l.stage);
+    if (!w) return void issues.push({ path: at(`layers[${i}].stage`), message: `${l.kind} '${String(l.id)}' names stage '${l.stage}', which is not a stage3d layer in this composition` });
+    w[l.kind]++;
+    if (l.kind === 'prop3d' && l.role === 'product') w.products++;
+    if (w[l.kind] > STAGE_LIMITS[l.kind]) issues.push({ path: at(`layers[${i}]`), message: `stage '${l.stage}' holds at most ${STAGE_LIMITS[l.kind]} ${l.kind === 'actor3d' ? 'actors' : 'props'}` });
+    if (w.products > 1) issues.push({ path: at(`layers[${i}]`), message: `stage '${l.stage}' holds one product` });
   });
 
   layers.forEach((l, i) => {

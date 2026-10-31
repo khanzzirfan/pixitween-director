@@ -22,6 +22,8 @@ Muse Spark workers while you keep directing it (step S12). Specs: `docs/hackatho
        Pass = access 200, valid tool calls in ≥ 4 of 5 runs, parallel dispatch in ≥ 3 of 5. Record latency and cost per turn.
        Then set `SHOWRUNNER_MODEL` (`muse-wonder-1.0`, or `muse-spark-1.3-contributor` if it fails).
 
+- [ ] **3D stage (aep-31):** engine build in progress (`reacthub-pixitweenjs`, branch `feat/aep-31-stage3d`). When it ships as `0.3.0-alpha.6`, follow `docs/stage3d.md` (update the S16b stories first, then the free checks, then `s16-cartoon`).
+
 ## Fri 30
 - [ ] Merge S12a. Start **wave 7** in four worktrees: `s12b-showrunner`, `s12c-crew-workers`, `s12d-crew-ui`, `s13a-product-3d-core`.
 - [ ] **Engine 3D:** the engine side is shipped in `0.3.0-alpha.5`; install it, bump `ralph/ENGINE_SPEC`, and run the S13 browser checks.
