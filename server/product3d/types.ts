@@ -82,7 +82,7 @@ export const model3dLayerSchema = z
       .optional(),
     shadow: z.object({ opacity: animatable(z.number().min(0).max(1)), softness: z.number().min(0).max(1).optional(), offsetY: z.number().optional() }).strict().optional(),
     bounds: z.object({ center: vec3.optional(), size: z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]) }).strict().optional(),
-    camera: z.object({ fov: z.number().min(10).max(90).optional(), fit: z.number().min(0.5).max(3).optional() }).strict().optional(),
+    camera: z.object({ fov: animatable(z.number().min(10).max(90)).optional(), fit: z.number().min(0.5).max(3).optional() }).strict().optional(),
   })
   .strict();
 

@@ -47,7 +47,9 @@ To fake it, scale the plate about the product's centre by +20–35 % over 0.3–
 
 ## Build list (layer-only, $0)
 
-Status (31 Oct 2026): R1, R2, R3, R4, R5 and R6 are built in `server/authoring/variant-film.ts`. R5 is a 4-frame slide only, because the player does not implement `directional-blur`. R7 and R8 are not built. Demo: `npx tsx scripts/variant-demo.ts [aspect] [out.json]`.
+Status (31 Oct 2026): R1, R2, R3, R4, R5 and R6 are built in `server/authoring/variant-film.ts`. R5 is a 4-frame slide only, because the player does not implement `directional-blur`. R7 is not built. Demo: `npx tsx scripts/variant-demo.ts [aspect] [out.json]`.
+
+R8 and a real 3D R1 are built in `server/authoring/hero3d-clip.ts` (the `hero-3d` clip): the product is a `model3d` can wearing the label unwrapped from the cut-out, so it can spin and turn. The dolly zoom is the engine's animated `camera.fov` (20 to 80 degrees over 1 s, engine 0.3.4): the camera re-frames the can at every fov, so it holds its size while the perspective deepens and the halo and bokeh grow by 1.35x. The light sweep is the key light running round the can (`lighting.key.azimuth`). Demo: `npx tsx scripts/hero3d-demo.ts [cutoutAssetId] [aspect] [out.json] [--sale]` (free, offline).
 
 | # | Feature | From |
 |---|---|---|

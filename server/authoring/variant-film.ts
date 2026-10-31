@@ -94,7 +94,7 @@ function shape(c: Comp, sceneId: string, box: Rect, fill: string, z: number, pat
  * Words laid out on one line, centred on cx, each its own text layer so they can arrive one after another. Returns the ids in
  * reading order. Widths are estimated (about 0.56 em per character, 0.6 when bold), the same estimate the retail clip uses.
  */
-function words(c: Comp, sceneId: string, text: string, o: { cx: number; cy: number; maxW: number; size: number; color: string; boldLast?: boolean; z: number }): { c: Comp; ids: string[] } {
+export function words(c: Comp, sceneId: string, text: string, o: { cx: number; cy: number; maxW: number; size: number; color: string; boldLast?: boolean; z: number }): { c: Comp; ids: string[] } {
   const ws = text.split(/\s+/).filter(Boolean);
   const em = (w: string, bold: boolean) => w.length * (bold ? 0.6 : 0.56);
   const total = (s: number) => ws.reduce((a, w, n) => a + em(w, !!o.boldLast && n === ws.length - 1) * s, 0) + (ws.length - 1) * 0.3 * s;
@@ -113,7 +113,7 @@ function words(c: Comp, sceneId: string, text: string, o: { cx: number; cy: numb
 }
 
 /** Staggered arrival for words: each rises 14 px and fades in, 0.12 s apart; with `outAt`, all fade out together from then. */
-function typeIn(c: Comp, ids: string[], at: number, cy: number, outAt?: number): Comp {
+export function typeIn(c: Comp, ids: string[], at: number, cy: number, outAt?: number): Comp {
   ids.forEach((id, n) => {
     const t = at + n * 0.12;
     const fade: Array<[number, number]> = [[0, 0], [r(t), 0], [r(t + 0.25), 1]];

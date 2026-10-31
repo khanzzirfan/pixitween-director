@@ -17,3 +17,13 @@
 - [x] Catalogue test findings, all fixed 31 Oct 2026 (second run on all 6 rows, $0.015 + $0.005): the accent now comes from the product photo (`server/art/palette.ts`, a white product takes its plate's colour); the brand comes from a new optional `brand` feed column; the tagline from the words the line's titles share (`taglineFor`: "Pick your cold brew", "Pick your mug"); a mug-specific lifestyle plate was generated and `mug-sage` ran on it; the 267x223 mug cut-out is correct (the photo has a coaster under the mug, SAM left it out).
 - [ ] Brand falls back to the first two title words when the feed has no brand column; a feed without one should ask the showrunner.
 - [ ] A newly added image shows empty on the viewer's first load; seek again. A preload wait is needed before any capture or review frames are taken.
+
+## 3D hero clip (31 Oct)
+
+- [x] `hero-3d` clip built (`server/authoring/hero3d-clip.ts`, tests in `hero3d-clip.test.ts`): a real `model3d` can tumbles in, turns under a moving key light, dolly zoom, price disc on the beat. Checked in the viewer at 0.5, 1.8, 3.0 and 4.6 s.
+- [x] The engine's `model3d` shadow ended in a hard-edged dark slab beside the can. Fixed in the engine source: the shadow plane now fades radially to nothing at its edge (`shadowFade.ts`, same rebuilt dist as the fov change, needs the 0.3.4 release). The clip still turns the 3D shadow off and draws a 2D contact shadow, which reads better at this camera angle; the engine's soft shadow is there when wanted.
+- [x] Strong dolly zoom: engine `model3d` `camera.fov` is now animatable (reacthub-pixitweenjs source, schema unchanged at 1.11.0; needs a release, 0.3.4). The camera re-frames at every fov, so the can holds its size while the lens goes 20 to 80 degrees. `hero3d-clip.ts` uses it. Until the engine is released, our node_modules copy of 0.3.3 has the rebuilt dist (original kept in `node_modules/reacthub-pixitweenjs/dist.orig`); a fresh `npm install` brings back 0.3.3 and the clip fails the engine schema check.
+- [ ] The label is the photo's front arc only: past about 70 degrees either side it is the side colour. The fast spin on entry hides this; a slow full turn would show it.
+- [ ] Not wired into `pickLook` or `s19-catalog` yet: needs a round pack (`prepareProduct3D` finds a straight body) and is free (no plate).
+- [ ] No liquid splash, pour or droplets: the engine has no particle or fluid system. Options: a crown of 20-40 `prop3d` droplets on ballistic keys, or an emitter member for `stage3d` (engine work).
+- [ ] R7 with 3D props (ingredient GLBs orbiting in a `stage3d`) not built.
