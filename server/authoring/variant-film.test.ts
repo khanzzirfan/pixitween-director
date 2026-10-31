@@ -104,3 +104,30 @@ describe('colour helpers', () => {
     expect(inkOn('#3b2314')).toBe('#ffffff');
   });
 });
+
+describe('variant naming and colour', () => {
+  it('names each variant by the words only it has', async () => {
+    const { variantNames } = await import('./variant-film');
+    expect(variantNames(['Coffee Co. Cold Brew', 'Coffee Co. Vanilla Cold Brew', 'Coffee Co. Mocha Cold Brew'])).toEqual(['Original', 'Vanilla', 'Mocha']);
+    expect(variantNames(['Stone Mug', 'Sage Mug'])).toEqual(['Stone', 'Sage']);
+  });
+  it('colours by name, then by position', async () => {
+    const { colorFor } = await import('./variant-film');
+    expect(colorFor('Vanilla', 0)).toBe('#e8c872');
+    expect(colorFor('Mocha', 1)).toBe('#6b3e26');
+    expect(colorFor('Zesty', 0)).not.toBe(colorFor('Zesty', 1));
+  });
+});
+
+describe('a sale in the lineup', () => {
+  it('shows the old price struck through above the new one', () => {
+    const c = buildVariantFilm(input({ variants: [{ product: can, name: 'Mocha', color: '#6b3e26', price: 3.99, wasPrice: 4.75 }, { product: can, name: 'Original', color: '#3b2314', price: 4.5 }] })) as any;
+    const ls = scene(c, 'end');
+    const was = ls.find((l) => l.source === '$4.75')!;
+    const now = ls.find((l) => l.source === '$3.99')!;
+    expect(was).toBeTruthy();
+    expect(ls.filter((l) => l.source === '$4.50')).toHaveLength(1);
+    const y = (l: Obj) => (Array.isArray(l.transform.position[0]) || typeof l.transform.position[0] === 'object' ? l.transform.position[0].v[1] : l.transform.position[1]);
+    expect(y(was)).toBeLessThan(y(now));
+  });
+});

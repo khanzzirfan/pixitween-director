@@ -24,6 +24,8 @@ export interface Variant {
   /** The act's colour; the field is this colour and the halo a lighter tint of it. */
   color: string;
   price: number;
+  /** The price before a sale: shown struck through above the price in the lineup. */
+  wasPrice?: number;
   currency?: string;
 }
 
@@ -208,6 +210,17 @@ export function buildVariantFilm(i: VariantFilmInput): Comp {
     const py = floorY + (H - floorY) * 0.3;
     const pr = add(c, eid, { role: 'caption', kind: 'text', text: formatPrice(v.price, v.currency), z: 0.2, style: { size: priceSize, weight: 800, color: inkOn(i.accent), align: 'center' }, box: { x: cx - slot / 2, y: py - priceSize * 0.6, w: slot, h: priceSize * 1.2 } });
     c = setKeyframes(pr.c, pr.id, 'opacity', [[0, 0], [r(t0 + 0.5), 0], [r(t0 + 0.75), 1]], 'easeOut');
+    if (v.wasPrice !== undefined && v.wasPrice > v.price) {
+      // the old price above the new one, struck through in red, so a sale reads as a sale
+      const was = formatPrice(v.wasPrice, v.currency);
+      const ws = Math.round(priceSize * 0.62);
+      const wy = py - priceSize * 0.95;
+      const old = add(c, eid, { role: 'caption', kind: 'text', text: was, z: 0.2, style: { size: ws, weight: 500, color: inkOn(i.accent), align: 'center' }, box: { x: cx - slot / 2, y: wy - ws * 0.6, w: slot, h: ws * 1.2 } });
+      c = setKeyframes(old.c, old.id, 'opacity', [[0, 0], [r(t0 + 0.5), 0], [r(t0 + 0.75), 0.8]], 'easeOut');
+      const lw = was.length * ws * 0.56;
+      const line = shape(c, eid, { x: cx - lw / 2, y: wy - Math.max(2, ws * 0.05), w: lw, h: Math.max(3, ws * 0.1) }, '#ff5a6e', 0.15);
+      c = setKeyframes(line.c, line.id, 'opacity', [[0, 0], [r(t0 + 0.75), 0], [r(t0 + 0.95), 1]], 'easeOut');
+    }
     c = setKeyframes(c, pr.id, 'scale', [[0, 0.6], [r(t0 + 0.5), 0.6], [r(t0 + 0.75), 1.1], [r(t0 + 0.9), 1]], 'easeOut');
   });
   const tagCy = H * (portrait ? 0.2 : 0.16);
@@ -225,4 +238,34 @@ export function buildVariantFilm(i: VariantFilmInput): Comp {
     });
   }
   return c;
+}
+
+const NAMED_COLOURS: Array<[RegExp, string]> = [
+  [/vanilla|cream|coconut|milk/i, '#e8c872'],
+  [/mocha|chocolate|cocoa|espresso|coffee/i, '#6b3e26'],
+  [/caramel|toffee|honey/i, '#c47a2c'],
+  [/strawberry|cherry|raspberry|red/i, '#d7263d'],
+  [/blueberry|blue|night|navy/i, '#2b3a67'],
+  [/mint|sage|matcha|green|lime/i, '#6f9a6a'],
+  [/lemon|yellow|mango|banana/i, '#f2c14e'],
+  [/orange|peach|apricot/i, '#f08a4b'],
+  [/grape|plum|lavender|purple/i, '#6c4a8b'],
+  [/stone|grey|gray|ash|charcoal/i, '#7d7a75'],
+  [/original|classic/i, '#3b2314'],
+];
+const SPREAD = ['#2f5d62', '#a0522d', '#5b4b8a', '#c06c84', '#3d7ea6', '#8a9a5b'];
+
+/** A field colour for a variant from its name (vanilla is cream, mocha is brown); otherwise a spread colour by position. */
+export function colorFor(name: string, index: number): string {
+  return NAMED_COLOURS.find(([re]) => re.test(name))?.[1] ?? SPREAD[index % SPREAD.length]!;
+}
+
+/**
+ * The short variant names for products that share a line: the words a title has that not every title in the group has
+ * ("Coffee Co. Vanilla Cold Brew" → "Vanilla"); a title with nothing of its own is the line's "Original".
+ */
+export function variantNames(titles: string[]): string[] {
+  const split = titles.map((t) => t.split(/\s+/).filter(Boolean));
+  const common = new Set(split[0]!.filter((w) => split.every((s) => s.includes(w))));
+  return split.map((s) => s.filter((w) => !common.has(w)).join(' ') || 'Original');
 }

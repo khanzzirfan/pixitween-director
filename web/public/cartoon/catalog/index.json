@@ -1,0 +1,47 @@
+[
+  {
+    "id": "cb-original",
+    "title": "Coffee Co. Cold Brew",
+    "price": 4.5,
+    "was": null,
+    "look": "tabletop-hero",
+    "why": "tall pack, \"coffee\" suits the tabletop-hero look",
+    "file": "cb-original.json"
+  },
+  {
+    "id": "cb-vanilla",
+    "title": "Coffee Co. Vanilla Cold Brew",
+    "price": 4.75,
+    "was": null,
+    "look": "tabletop-hero",
+    "why": "tall pack, \"coffee\" suits the tabletop-hero look",
+    "file": "cb-vanilla.json"
+  },
+  {
+    "id": "cb-mocha",
+    "title": "Coffee Co. Mocha Cold Brew",
+    "price": 3.99,
+    "was": 4.75,
+    "look": "price-promo",
+    "why": "on sale, so the price leads",
+    "file": "cb-mocha.json"
+  },
+  {
+    "id": "mug-stone",
+    "title": "Stone Mug",
+    "price": 19,
+    "was": 24,
+    "look": "price-promo",
+    "why": "on sale, so the price leads",
+    "file": "mug-stone.json"
+  },
+  {
+    "film": "drinks",
+    "variants": [
+      "Original",
+      "Vanilla",
+      "Mocha"
+    ],
+    "file": "film-drinks.json"
+  }
+]

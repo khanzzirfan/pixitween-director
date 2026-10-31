@@ -396,7 +396,7 @@ export function buildRetailClip(i: RetailClipInput): Comp {
     c = price.c;
     badgeIds.push(price.id);
     if (was) {
-      const ws = Math.round(priceSize * 0.42);
+      const ws = Math.round(priceSize * 0.55);
       const wy = by - face.h * 0.24;
       const old = add(c, { role: 'caption', kind: 'text', text: was, z: 0.5, style: { size: ws, weight: 500, color: '#666666', align: 'center' }, box: { x: bx - face.w * 0.4, y: wy - ws * 0.6, w: face.w * 0.8, h: ws * 1.2 } });
       c = old.c;
