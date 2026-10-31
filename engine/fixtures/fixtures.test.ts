@@ -46,9 +46,10 @@ describe.each(fixtures)('%s', (path, raw) => {
 });
 
 describe('fixture contents', () => {
-  it('ships the four m1 fixtures', () => {
+  it('ships the m1 fixtures plus the m5 filter fixture', () => {
     expect(fixtures.map(([path]) => path).sort()).toEqual([
       './basic-2d.json',
+      './filters-2d.json',
       './three-gltf.json',
       './three-postfx.json',
       './three-primitives.json',

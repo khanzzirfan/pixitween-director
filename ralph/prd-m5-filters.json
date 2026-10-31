@@ -1,7 +1,7 @@
 {
   "name": "Engine M5: 2D filter registry",
-  "branchName": "ralph/m5-filters",
   "description": "A registry of 15 pixi-filters / pixi.js filters with defaults, tweenable params and deterministic time-driven filters, and buildFilters, which turns a layer's filter specs into Pixi filters plus filter:<id> tween targets. Adds the filters-2d fixture.",
+  "branchName": "ralph/m5-filters",
   "userStories": [
     {
       "id": "US-001",
@@ -20,12 +20,13 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "filters"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-002",
@@ -45,12 +46,13 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "filters"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-003",
@@ -70,14 +72,15 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002"
       ],
       "labels": [
         "filters"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-004",
@@ -98,7 +101,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001",
@@ -106,7 +109,8 @@
       ],
       "labels": [
         "filters"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-005",
@@ -128,14 +132,15 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-004"
       ],
       "labels": [
         "filters"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-006",
@@ -154,7 +159,7 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-005"
@@ -162,7 +167,8 @@
       "labels": [
         "filters",
         "fixtures"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     }
   ],
   "metadata": {
@@ -210,6 +216,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": []
+    "manualGates": [],
+    "updatedAt": "2026-10-31T19:03:56.253Z"
   }
 }

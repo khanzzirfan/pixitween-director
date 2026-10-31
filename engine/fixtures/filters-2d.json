@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 6,
+  "background": "#0b0f14",
+  "filters": [
+    {
+      "id": "stage-grade",
+      "type": "adjustment",
+      "params": { "saturation": 1.15, "brightness": 1.05 }
+    }
+  ],
+  "layers": [
+    {
+      "id": "cell-blur",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#3a4a63",
+      "radius": 24,
+      "x": 192,
+      "y": 180,
+      "end": 6,
+      "filters": [{ "id": "blur-f", "type": "blur", "params": { "strength": 2 } }],
+      "tweens": [
+        { "target": "filter:blur-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "strength": 18 } }
+      ]
+    },
+    {
+      "id": "cell-glow",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#2b6cb0",
+      "radius": 24,
+      "x": 576,
+      "y": 180,
+      "end": 6,
+      "filters": [{ "id": "glow-f", "type": "glow", "params": { "outerStrength": 0, "color": "#63b3ed" } }],
+      "tweens": [
+        { "target": "filter:glow-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "outerStrength": 6 } }
+      ]
+    },
+    {
+      "id": "cell-bloom",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#6b46c1",
+      "radius": 24,
+      "x": 960,
+      "y": 180,
+      "end": 6,
+      "filters": [{ "id": "bloom-f", "type": "bloom", "params": { "brightness": 0.6 } }],
+      "tweens": [
+        { "target": "filter:bloom-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "brightness": 1.6 } }
+      ]
+    },
+    {
+      "id": "cell-dropshadow",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#2f855a",
+      "radius": 24,
+      "x": 1344,
+      "y": 180,
+      "end": 6,
+      "filters": [{ "id": "dropshadow-f", "type": "dropShadow", "params": { "offsetX": 0, "color": "#01161e" } }],
+      "tweens": [
+        { "target": "filter:dropshadow-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "offsetX": 32 } }
+      ]
+    },
+    {
+      "id": "cell-adjustment",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#b7791f",
+      "radius": 24,
+      "x": 1728,
+      "y": 180,
+      "end": 6,
+      "filters": [{ "id": "adjustment-f", "type": "adjustment", "params": { "saturation": 0.4 } }],
+      "tweens": [
+        { "target": "filter:adjustment-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "saturation": 1.8 } }
+      ]
+    },
+    {
+      "id": "cell-outline",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#1a202c",
+      "radius": 24,
+      "x": 192,
+      "y": 540,
+      "end": 6,
+      "filters": [{ "id": "outline-f", "type": "outline", "params": { "thickness": 1, "color": "#f6e05e" } }],
+      "tweens": [
+        { "target": "filter:outline-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "thickness": 12 } }
+      ]
+    },
+    {
+      "id": "cell-colormatrix",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#c05621",
+      "radius": 24,
+      "x": 576,
+      "y": 540,
+      "end": 6,
+      "filters": [{ "id": "colormatrix-f", "type": "colorMatrix", "params": { "preset": "sepia", "amount": 0 } }],
+      "tweens": [
+        { "target": "filter:colormatrix-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "amount": 1 } }
+      ]
+    },
+    {
+      "id": "cell-noise",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#4a5568",
+      "radius": 24,
+      "x": 960,
+      "y": 540,
+      "end": 6,
+      "filters": [{ "id": "noise-f", "type": "noise", "params": { "noise": 0.05 } }],
+      "tweens": [
+        { "target": "filter:noise-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "noise": 0.6 } }
+      ]
+    },
+    {
+      "id": "cell-rgbsplit",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#9b2c2c",
+      "radius": 24,
+      "x": 1344,
+      "y": 540,
+      "end": 6,
+      "filters": [{ "id": "rgbsplit-f", "type": "rgbSplit", "params": { "redX": 0 } }],
+      "tweens": [
+        { "target": "filter:rgbsplit-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "redX": -16 } }
+      ]
+    },
+    {
+      "id": "cell-pixelate",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#2c5282",
+      "radius": 24,
+      "x": 1728,
+      "y": 540,
+      "end": 6,
+      "filters": [{ "id": "pixelate-f", "type": "pixelate", "params": { "size": 2 } }],
+      "tweens": [
+        { "target": "filter:pixelate-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "size": 24 } }
+      ]
+    },
+    {
+      "id": "cell-zoomblur",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#276749",
+      "radius": 24,
+      "x": 192,
+      "y": 900,
+      "end": 6,
+      "filters": [{ "id": "zoomblur-f", "type": "zoomBlur", "params": { "strength": 0.02, "centerX": 192, "centerY": 900 } }],
+      "tweens": [
+        { "target": "filter:zoomblur-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "strength": 0.4 } }
+      ]
+    },
+    {
+      "id": "cell-crt",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#553c9a",
+      "radius": 24,
+      "x": 576,
+      "y": 900,
+      "end": 6,
+      "filters": [{ "id": "crt-f", "type": "crt", "params": { "vignetting": 0.1 } }],
+      "tweens": [
+        { "target": "filter:crt-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "vignetting": 0.8 } }
+      ]
+    },
+    {
+      "id": "cell-oldfilm",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#702459",
+      "radius": 24,
+      "x": 960,
+      "y": 900,
+      "end": 6,
+      "filters": [{ "id": "oldfilm-f", "type": "oldFilm", "params": { "scratch": 0 } }],
+      "tweens": [
+        { "target": "filter:oldfilm-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "scratch": 1 } }
+      ]
+    },
+    {
+      "id": "cell-godray",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#975a16",
+      "radius": 24,
+      "x": 1344,
+      "y": 900,
+      "end": 6,
+      "filters": [{ "id": "godray-f", "type": "godray", "params": { "gain": 0.2 } }],
+      "tweens": [
+        { "target": "filter:godray-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "gain": 1.2 } }
+      ]
+    },
+    {
+      "id": "cell-glitch",
+      "type": "shape",
+      "shape": "rect",
+      "width": 320,
+      "height": 240,
+      "fill": "#22543d",
+      "radius": 24,
+      "x": 1728,
+      "y": 900,
+      "end": 6,
+      "filters": [{ "id": "glitch-f", "type": "glitch", "params": { "offset": 10 } }],
+      "tweens": [
+        { "target": "filter:glitch-f", "at": 0.5, "duration": 4, "ease": "power1.inOut", "to": { "offset": 80 } }
+      ]
+    }
+  ]
+}

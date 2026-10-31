@@ -73,9 +73,10 @@ describe('validateTargets', () => {
     expect(validateTargets(doc)).toEqual([]);
   });
 
-  it('validates all four m1 fixtures with zero errors', () => {
+  it('validates every fixture with zero errors', () => {
     expect(fixtures.map(([path]) => path).sort()).toEqual([
       '../../fixtures/basic-2d.json',
+      '../../fixtures/filters-2d.json',
       '../../fixtures/three-gltf.json',
       '../../fixtures/three-postfx.json',
       '../../fixtures/three-primitives.json',
