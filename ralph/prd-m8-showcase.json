@@ -1,0 +1,144 @@
+{
+  "name": "Engine M8: showcase fixtures, authoring guide, JSON Schema export",
+  "branchName": "ralph/m8-showcase",
+  "description": "Makes the engine usable by people and models: a JSON Schema export for tool calling, an authoring guide with recipes, and three showcase docs (product turntable, title card, robot dance) that run through the lab page and the e2e spec.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Export the MotionDoc JSON Schema for tool calling",
+      "description": "As a future agent tool author, I want the MotionDoc as JSON Schema so that a model can be given the exact shape to write.",
+      "steps": [
+        "Read engine/src/schema/doc.ts and how zod-to-json-schema is used elsewhere in the repo (grep server/ for zodToJsonSchema) without importing from server/.",
+        "Create engine/src/schema/jsonSchema.ts exporting motionDocJsonSchema() using zod-to-json-schema on the input schema (target 'jsonSchema7', $refStrategy 'none' or 'root' so group recursion works) and add a description string to the top level that names the five layer types.",
+        "Create engine/src/schema/jsonSchema.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "motionDocJsonSchema() returns an object with type 'object' and required containing version, width, height, duration and layers",
+        "The schema's layer definition lists the five type values image, text, shape, group and three",
+        "JSON.stringify of the schema is under 200 KB",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "schema",
+        "docs"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Authoring guide with recipes",
+      "description": "As a person or model writing a MotionDoc, I want a short guide with copyable recipes so that good-looking docs are easy and wrong ones are rare.",
+      "steps": [
+        "Read engine/docs/01-schema.md, 02-timeline.md (presets, target paths), 05-filters-postfx.md and the fixtures.",
+        "Write engine/docs/authoring.md: units and coordinates (seconds, pixels, degrees, metres in 3D, anchor), layer order, the 8 cross-field rules in plain words, the preset list with one line each, the target path table, and six recipes as JSON snippets (title in and out, product turntable over a plate, glow pulse via a filter tween, camera dolly, glTF clip with a spin loop, bloom swell via postfx tween).",
+        "Validate every complete doc snippet in the guide by pasting it into a scratch test that runs parseMotionDoc, then delete the scratch test (keep the guide only)."
+      ],
+      "acceptanceCriteria": [
+        "engine/docs/authoring.md contains six recipes and each complete doc in it parses with parseMotionDoc (recorded in notes)",
+        "Every preset name and every filter and postFx type in the guide exists in engine/src/schema/enums.ts",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "docs"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Three showcase docs",
+      "description": "As a project owner, I want three polished docs that show what Motion can do so that I can judge it and show it.",
+      "steps": [
+        "Read engine/docs/authoring.md (US-002) and the existing fixtures.",
+        "Create engine/fixtures/showcase-product-turntable.json (8 s, 1920x1080): blurred backdrop plate, the can glTF turning slowly in golden light with shadow, bloom swelling at 3 s, a headline with slideInUp and a glow that fades, a price shape-and-text card with popIn.",
+        "Create engine/fixtures/showcase-title-card.json (5 s): layered shapes and text using enter, loop and exit presets and three 2D filters (adjustment on the stage, rgbSplit tweened to 0, dropShadow).",
+        "Create engine/fixtures/showcase-robot-dance.json (8 s, 1080x1080): the robot playing 'Dance' with a camera move (position and lookAt tweens), dof focused on the robot, vignette, and a title text.",
+        "Run the fixtures test and `npm run engine:e2e` (the spec picks the new files up automatically) and view each on http://localhost:5173/motion-lab.html; save screenshots to debug/engine/."
+      ],
+      "acceptanceCriteria": [
+        "All three showcase files parse with parseMotionDoc and validateTargets returns no errors",
+        "`npm run engine:e2e` passes including the three showcase docs",
+        "notes describes what each showcase looks like at 25 %, 50 % and 75 % of its duration",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "fixtures",
+        "ui"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/01-schema.md",
+      "engine/docs/02-timeline.md",
+      "engine/docs/05-filters-postfx.md"
+    ],
+    "readFirst": [
+      "engine/docs/README.md",
+      "engine/docs/01-schema.md, 02-timeline.md, 05-filters-postfx.md",
+      "engine/src/schema/index.ts and engine/fixtures/*.json",
+      "engine/e2e/motion-lab.spec.ts (from M7)"
+    ],
+    "requires": [
+      "prd-m6-postfx",
+      "prd-m7-runtime"
+    ],
+    "owns": [
+      "engine/src/schema/jsonSchema.ts",
+      "engine/src/schema/jsonSchema.test.ts",
+      "engine/docs/authoring.md",
+      "engine/fixtures/showcase-product-turntable.json",
+      "engine/fixtures/showcase-title-card.json",
+      "engine/fixtures/showcase-robot-dance.json"
+    ],
+    "sharedEdits": [],
+    "profile": "motion",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; browser checks load assets from web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
+      "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
+      "engine/ must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `@pixi/react` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+      "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
+      "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
+      "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic and object construction; check drawing in the browser. Never weaken a test to make it pass.",
+      "Do not add a dependency the spec does not name (`postprocessing` and `@types/three` are already declared).",
+      "Debug output and screenshots go to debug/engine/ (gitignored). For a browser check use the dev server the owner runs on http://localhost:5173 (do not start another on a different port); if it is not running, run `npm run engine:e2e` instead.",
+      "Record only real results. Never invent measurements or test output."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner watches the three showcase docs on http://localhost:5173/motion-lab.html and judges whether they look good enough to show."
+    ]
+  }
+}

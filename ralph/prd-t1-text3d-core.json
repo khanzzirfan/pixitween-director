@@ -1,0 +1,320 @@
+{
+  "name": "Engine T1: 3D text core (schema, layout, glyph meshes, targets, stagger, presets)",
+  "branchName": "ralph/t1-text3d-core",
+  "description": "Extends the finished engine with text3d objects in the three layer: one extruded Mesh per glyph from Three's TextGeometry, a tiny typeface layout, glyph/word/line tween targets with deterministic stagger and five text presets. Run only after prd-m1 to prd-m8 have fully passed.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Schema: font asset, text3d geometry, tween stagger, text preset names",
+      "description": "As an author, I want the document format to describe 3D text and staggered tweens so that a title can be written as JSON and validated with clear paths.",
+      "steps": [
+        "Read engine/docs/07-text3d.md sections 'Schema additions' and 'Text presets', then engine/src/schema/scalars.ts, enums.ts, parts.ts, layer3d.ts and doc.ts.",
+        "Add the asset type 'font' (a root-relative or http(s) url) to the asset schema, and make the existing cross-field rule 2 require a font asset for text3d.font and keep image/gltf checks unchanged.",
+        "Add the text3d member to the Object3D geometry discriminated union in layer3d.ts with every default and limit from the doc (text 1 to 200 chars, size > 0, depth >= 0, curveSegments 2 to 24, optional bevel, align, lineHeight, letterSpacing).",
+        "Add optional stagger { each >= 0, from: start|end|center|edges (default start) } to the Tween schema; add glyphRise, glyphPop, glyphFlip, glyphFadeOut (exit) and glyphWave (loop) to PRESET_NAMES with their kinds.",
+        "Extend cross-field rule 8: PresetRef.target also accepts glyphs:<id>, words:<id>, lines:<id> on enter, exit and loop of a three layer when <id> is a text3d object; a stagger on a tween whose target is not a multi-unit target is an error. Add tests for every new field and rule in the existing schema test files."
+      ],
+      "acceptanceCriteria": [
+        "An object { id: 't', geometry: { type: 'text3d', font: 'f', text: 'Hi' } } parses with size 0.5, depth 0.1, curveSegments 8, align 'center', lineHeight 1.2, letterSpacing 0",
+        "text3d with an empty text, with text of 201 characters, or with font pointing at an image asset fails with a path ending in the offending field",
+        "A tween with stagger { each: 0.05 } and target 'glyphs:t' parses with from 'start'; the same stagger on a tween with no target fails",
+        "A loop preset glyphWave with target 'glyphs:t' on a three layer that has text3d object 't' passes; with target 'glyphs:nope' it fails",
+        "All existing engine/src/schema tests and the engine fixtures test still pass unchanged",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "schema",
+        "text3d"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Typeface metrics and pure text layout (glyphs, words, lines)",
+      "description": "As an engine developer, I want a small pure layout from a typeface's advance widths so that every glyph, word and line has a deterministic position without any shaping engine.",
+      "steps": [
+        "Read engine/docs/07-text3d.md sections 'Why this design' and 'Units and targets', web/public/fonts/helvetiker_bold.typeface.json (fields resolution, ascender, descender, glyphs[ch].ha) and tmp/reacthub-pixitweenjs/src/utils/textLayout/typefaceMetricsProvider.ts.",
+        "Create engine/src/three/text/typeface.ts exporting parseTypeface(json) returning { resolution, ascender, descender, has(ch), advance(ch, size) } where advance is glyph.ha / resolution * size, and a fallback for space using the font's space glyph (or 0.3 * size when absent).",
+        "Create engine/src/three/text/layout.ts exporting layoutText3D(text, metrics, { size, align, lineHeight, letterSpacing }) returning { glyphs, words, lines, bounds, skipped } where each glyph has { char, index, lineIndex, wordIndex, x, y, advance } with the block centred on the origin as the doc defines, and countUnits(text) returning { glyphs, words, lines } without needing metrics.",
+        "Create engine/src/three/text/layout.test.ts reading the real helvetiker_bold typeface JSON from web/public/fonts with node:fs."
+      ],
+      "acceptanceCriteria": [
+        "advance('H', 1) for helvetiker_bold equals 0.953 (within 1e-9) and advance('H', 2) equals 1.906",
+        "layoutText3D('Hi', ...) with letterSpacing 0 puts the glyph centres at x positions whose midpoint is 0 (block centred) and the total width equals advance('H') + advance('i') within 1e-9",
+        "'ab\\ncd e' gives 2 lines, 3 words and 5 glyphs; countUnits('ab\\ncd e') returns { glyphs: 5, words: 3, lines: 2 }; lines are lineHeight * size apart with y decreasing downwards",
+        "align 'left' keeps every line's left edge equal and 'right' keeps every right edge equal; a character missing from the font is listed in skipped and given no glyph",
+        "layoutText3D returns identical output for identical input (deep equal on two calls)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "layout",
+        "text3d"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "buildText3D: shared glyph geometries, per-glyph meshes, unit groups, dispose",
+      "description": "As an engine developer, I want the glyph meshes built into a line, word and glyph group hierarchy so that each level can be animated about its own centre.",
+      "steps": [
+        "Read engine/docs/07-text3d.md section 'Units and targets' (hierarchy and pivots), engine/src/three/build/object.ts and materials.ts, and tmp/reacthub-pixitweenjs/src/components/AepComposition/Aep3DTextMesh.tsx (per-glyph structure).",
+        "Create engine/src/three/text/build.ts exporting buildText3D(spec, font, material) that lays out with layoutText3D using parseTypeface(font.data), builds one TextGeometry per distinct character (size, depth as height, curveSegments, bevel options), centres each geometry on its glyph box, and creates Mesh instances sharing the geometry with a cloned material per glyph.",
+        "Build the hierarchy root -> line groups -> word groups -> glyph groups -> mesh, each group positioned at its own centre with children positioned relative to it, and return { root, glyphs, words, lines, warnings, stats: { glyphCount, uniqueGeometries, triangles, buildMs }, dispose() } where dispose disposes geometries and materials once each.",
+        "Create engine/src/three/text/build.test.ts using the real helvetiker_bold JSON parsed with FontLoader (no WebGL needed)."
+      ],
+      "acceptanceCriteria": [
+        "buildText3D for 'Hello' gives glyphs.length 5, words.length 1, lines.length 1 and stats.uniqueGeometries 4 (the two l share one geometry)",
+        "Two glyph meshes for the same character have the same geometry object and different material objects",
+        "For 'AB CD' the world-space bounding box of root has its centre within 1e-6 of the origin on x and y",
+        "glyph group positions plus their mesh offsets reproduce layoutText3D's glyph x and y within 1e-6 when summed through the hierarchy",
+        "dispose() calls dispose on each unique geometry exactly once and on every material (spied); a second dispose() call does nothing",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "three",
+        "text3d"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Font loading and text3d support in buildObject and scene preload",
+      "description": "As an author, I want a text3d object in a three layer to load its font and appear in the scene so that a title renders next to the product.",
+      "steps": [
+        "Read engine/src/three/build/object.ts and scene.ts (buildObject, buildScene, preloadThreeAssets) and engine/docs/04-three.md rules 'Rotations' and the object wrapper description.",
+        "Create engine/src/three/text/typeface.ts addition loadFont(url, loader?) that fetches JSON, parses with FontLoader and caches by url, with an injectable fetch for tests, and a clearFontCache().",
+        "Extend preloadThreeAssets to load every font used by a layer's text3d objects in parallel with textures and glTFs; extend buildObject so geometry type 'text3d' calls buildText3D, applies the object's position, rotation (degrees) and scale on the wrapper, castShadow on every glyph mesh, and returns the text result on the object record (field text) for the node to use.",
+        "Add engine/src/three/text/integration.test.ts building a scene from a three layer with one text3d object and one box, using an injected loader that returns the parsed helvetiker font."
+      ],
+      "acceptanceCriteria": [
+        "loadFont called twice with the same url calls the injected fetch once; clearFontCache() makes the next call fetch again",
+        "buildScene for a layer with a text3d object 't' returns objects.get('t') whose wrapper contains 'Hello'.length glyph meshes, and the box object is unchanged",
+        "A text3d object with rotation [0, 90, 0] has its wrapper rotation.y equal to Math.PI / 2",
+        "A character missing from the font adds a warning containing the character and the object id to the rig's warnings; the scene still builds",
+        "rig.dispose() disposes the text geometries and materials (spied) and existing buildScene tests still pass",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-003"
+      ],
+      "labels": [
+        "three",
+        "text3d"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Unit tween targets: glyphs, words, lines with offset, rotation, scale, alpha",
+      "description": "As an author, I want to tween every glyph, word or line of a text object so that letters can rise, pop and fade.",
+      "steps": [
+        "Read engine/docs/07-text3d.md section 'Units and targets' (property table), engine/src/core/paths.ts (TargetRef) and engine/src/three/threeNode.ts (resolveTarget).",
+        "Create engine/src/three/text/targets.ts exporting resolveUnitTargets(text, kind, prop) returning TargetRef[] (one per unit): offset.x/y/z via accessor properties that write rest position + offset, rotation.x/y/z as 'deg', scale and scale.x/y/z about the unit centre, and for glyphs only alpha (material.opacity, transparent true when below 1), material.color (colour kind) and material.emissiveIntensity; unsupported properties return null.",
+        "In threeNode.ts add resolveTargets(target, prop) that parses 'glyphs:<id>', 'words:<id>', 'lines:<id>' and returns the refs (null when the object is not a text3d), keeping resolveTarget unchanged.",
+        "Create engine/src/three/text/targets.test.ts on a built 'Hi there' text."
+      ],
+      "acceptanceCriteria": [
+        "resolveUnitTargets for kind 'glyphs' and prop 'offset.y' returns 7 refs (glyphs of 'Hi there'); writing 0.5 to the third sets that glyph group's position.y to its rest y + 0.5 and writing 0 restores it",
+        "'words' returns 2 refs and 'lines' returns 1 ref; 'alpha' on 'words' returns null and 'alpha' on 'glyphs' returns refs whose write of 0.4 sets material.opacity 0.4 and transparent true",
+        "rotation.z ref has kind 'deg'; writing 90 through a GSAP tween ends at Math.PI / 2 on the glyph group",
+        "ThreeNode.resolveTargets('glyphs:nope', 'alpha') returns null and resolveTarget behaviour for existing targets is unchanged (existing tests pass)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ],
+      "labels": [
+        "three",
+        "text3d",
+        "timeline"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Compiler: stagger across multi-unit targets",
+      "description": "As an author, I want a stagger option on tweens so that units start one after another in a chosen order, identically on every seek.",
+      "steps": [
+        "Read engine/docs/07-text3d.md section 'Stagger in the compiler' and engine/src/timeline/compile.ts with its tests.",
+        "Extend compileTweens options with resolveMany(target, prop) returning TargetRef[] | null; when a tween has a target that resolveMany answers, compile one set of tweens per ref with start time at + each * order(i, n, from) using the order table in the doc; without stagger every ref starts at the same time.",
+        "Create engine/src/timeline/stagger.ts exporting staggerOrder(i, n, from) and staggerSpan(n, each, from, duration, repeat) and use them in the compiler; unknown or null resolveMany results add an error string and skip the tween.",
+        "Add engine/src/timeline/stagger.test.ts and extend compile.test.ts with plain-object refs."
+      ],
+      "acceptanceCriteria": [
+        "staggerOrder for n = 5 gives [0,1,2,3,4] for start, [4,3,2,1,0] for end, [2,1,0,1,2] for center and [0,1,2,1,0] for edges",
+        "Five plain objects tweened x 0 -> 10 over 1 s at 0 with stagger { each: 0.1 } and ease none: at seek 0.2 the values are [2, 1, 0, 0, 0] and at seek 0.5 they are [5, 4, 3, 2, 1] (within 1e-9)",
+        "Seeking 0.35, then 0, then 0.35 again gives identical values on all five objects",
+        "staggerSpan(5, 0.1, 'start', 1, 0) equals 1.4; with repeat 1 it equals 2.4",
+        "A tween without stagger on a multi-ref target moves all refs together; all existing compile tests pass",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "timeline",
+        "text3d"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "validateTargets and assemble wiring for unit targets and stagger spans",
+      "description": "As an author, I want wrong unit targets and tweens that run past the layer's end reported at load time so that a bad title is found before playback.",
+      "steps": [
+        "Read engine/src/timeline/targets.ts, engine/src/runtime/assemble.ts (the resolve function and compile calls) and engine/docs/07-text3d.md 'Units and targets'.",
+        "Extend validateTargets: accept 'glyphs:', 'words:', 'lines:' targets on three layers only when the id is a text3d object; check the property against the unit allowlist (alpha and material.* refused on words and lines); compute countUnits from the object's text and warn when at + staggerSpan(...) exceeds the layer length.",
+        "In assemble.ts pass resolveMany to compileTweens: it asks the node's resolveTargets for 'glyphs:', 'words:' and 'lines:' targets and returns null for anything else.",
+        "Add tests to targets.test.ts and assemble.test.ts using a fake three node that implements resolveTargets with plain objects."
+      ],
+      "acceptanceCriteria": [
+        "A tween with target 'glyphs:t' on a text layer or an image layer gives one error with path 'layers[0].tweens[0].target'",
+        "'words:t' with property 'alpha' gives an error naming 'alpha'; 'glyphs:t' with 'offset.y' and 'alpha' gives none",
+        "A 12-glyph text with stagger each 0.1, duration 1, at 0 on a layer of length 2 gives a span warning (2.1 > 2); with each 0.05 it gives none",
+        "assemble on a doc whose fake three node returns 3 refs for 'glyphs:t' compiles the staggered tween with start offsets 0, each and 2*each (checked via clock.seek)",
+        "Existing validateTargets and assemble tests still pass",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005",
+        "US-006"
+      ],
+      "labels": [
+        "timeline",
+        "runtime",
+        "text3d"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Five text presets with stagger-aware placement",
+      "description": "As an author, I want glyphRise, glyphPop, glyphFlip, glyphFadeOut and glyphWave so that a title can enter, leave and idle with one line of JSON each.",
+      "steps": [
+        "Read engine/docs/07-text3d.md section 'Text presets' and engine/src/timeline/presets.ts (PresetDef, expandPresets, loop placement rules).",
+        "Add the five presets to PRESETS building Tween objects with a multi-unit target (explicit ref.target, or glyphs:<only text3d id> when the layer has exactly one) and a stagger from params.stagger or the table default; per-unit duration from ref.duration or the default.",
+        "Make expandPresets stagger-aware: enter at 0; exit placed so that the last unit finishes at the layer end (start = length - staggerSpan); glyphWave subtracts the staggered tail from the loop span before counting whole periods; return an error when enter plus exit staggered spans exceed the layer length. PresetContext gains unitCount(target) so presets can compute spans (the runtime fills it from countUnits).",
+        "Add tests to presets.test.ts compiling each preset on plain-object refs."
+      ],
+      "acceptanceCriteria": [
+        "glyphRise on 5 plain units ends with offset.y 0 and alpha 1 on every unit at 0 + 0.5 + 4 * 0.04, and starts with offset.y -0.3 and alpha 0 on the last unit at time 0",
+        "glyphPop starts at scale 0 and ends at scale 1 for every unit; glyphFlip ends with rotation.x 0",
+        "glyphFadeOut on a layer of length 5 with 5 units (each 0.03, duration 0.4, from 'end') finishes its last-finishing unit at exactly 5 and every unit ends with alpha 0",
+        "glyphWave with 5 units over a 10 s loop span leaves every unit at offset.y 0 at the end of the span and produces no tweens when the span is shorter than one period plus the tail",
+        "A layer with two text3d objects and a text preset without a target gives an error asking for a target; all existing preset tests pass",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-007"
+      ],
+      "labels": [
+        "timeline",
+        "presets",
+        "text3d"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/07-text3d.md"
+    ],
+    "readFirst": [
+      "engine/docs/07-text3d.md (the whole design, schema additions, targets, stagger, presets, experiments)",
+      "engine/docs/README.md and engine/docs/04-three.md (the three layer this extends) and 02-timeline.md (compiler, presets, determinism rules)",
+      "engine/src/three/build/object.ts, scene.ts, engine/src/three/threeNode.ts, engine/src/timeline/compile.ts, presets.ts, targets.ts, engine/src/schema/*.ts, engine/src/runtime/assemble.ts (all built by the eight engine PRDs)",
+      "tmp/reacthub-pixitweenjs/src/components/AepComposition/Aep3DTextMesh.tsx and utils/textLayout/typefaceMetricsProvider.ts (idea only: one Text3D per glyph, layout from typeface advances)",
+      "web/public/fonts/ (helvetiker_regular and helvetiker_bold typeface JSON, kenpixel.ttf, LICENSE)"
+    ],
+    "requires": [
+      "prd-m7-runtime",
+      "prd-m8-showcase"
+    ],
+    "owns": [
+      "engine/src/three/text/*"
+    ],
+    "sharedEdits": [
+      "engine/src/schema/scalars.ts",
+      "engine/src/schema/enums.ts",
+      "engine/src/schema/parts.ts",
+      "engine/src/schema/layer3d.ts",
+      "engine/src/schema/doc.ts",
+      "engine/src/timeline/compile.ts",
+      "engine/src/timeline/targets.ts",
+      "engine/src/timeline/presets.ts",
+      "engine/src/three/build/object.ts",
+      "engine/src/three/build/scene.ts",
+      "engine/src/three/threeNode.ts",
+      "engine/src/runtime/assemble.ts"
+    ],
+    "profile": "motion",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; browser checks load assets from web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
+      "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
+      "engine/ must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `@pixi/react` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+      "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
+      "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
+      "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic and object construction; check drawing in the browser. Never weaken a test to make it pass.",
+      "Do not add a dependency the spec does not name (`postprocessing` and `@types/three` are already declared).",
+      "Debug output and screenshots go to debug/engine/ (gitignored). For a browser check use the dev server the owner runs on http://localhost:5173 (do not start another on a different port); if it is not running, run `npm run engine:e2e` instead.",
+      "Record only real results. Never invent measurements or test output.",
+      "Before starting, confirm every story of the eight engine PRDs (ralph/prd-m1-foundation.json to prd-m8-showcase.json) has passes true and `npm run typecheck && npm test` pass; if not, set notes to 'blocked: engine PRDs not finished' and stop.",
+      "These stories edit files built by the engine PRDs (metadata.sharedEdits). Keep every existing test green and every edit additive: no existing export, field, default or behaviour changes.",
+      "No new dependency. Fonts are Three typeface JSON loaded with three/examples/jsm/loaders/FontLoader.js and TextGeometry from three/examples/jsm/geometries/TextGeometry.js."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": []
+  }
+}

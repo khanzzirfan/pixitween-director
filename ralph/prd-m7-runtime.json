@@ -1,0 +1,242 @@
+{
+  "name": "Engine M7: runtime, MotionPlayer, lab page and e2e",
+  "branchName": "ralph/m7-runtime",
+  "description": "Wires schema, assets, 2D nodes, three nodes, filters, presets and tweens into MotionRuntime on a Pixi Application, wraps it in <MotionPlayer>, adds the /motion-lab.html page and a Playwright spec (npm run engine:e2e) that checks every fixture for readiness, determinism and motion.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "assemble(): nodes, filters, presets and tweens on one clock",
+      "description": "As an engine developer, I want the whole build pipeline in one testable function without WebGL so that wiring bugs are caught by unit tests.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section 'MotionRuntime' (the load steps 2 to 9 and the assemble split).",
+        "Create engine/src/runtime/assemble.ts exporting assemble(doc, { app, textures, factories }) that builds nodes with createNode (walking group children too), builds each node's filters with buildFilters and sets display.filters, runs validateTargets, creates a MotionClock, expands presets with each node's size(), compiles presets and tweens with a resolve that sends 'filter:<id>' to the node's filter set and everything else to node.resolveTarget, applies stage filters to the root, primes the timeline, and returns { root, nodes (flat list), clock, renderAt, warnings, destroy }.",
+        "Asset load errors are passed in by the caller as layer errors; compile and validation errors become warnings with paths.",
+        "Create engine/src/runtime/assemble.test.ts using a shapes-only doc (no text, no image, no three) and a doc with a three layer served by a fake factory."
+      ],
+      "acceptanceCriteria": [
+        "assemble on a doc with two shapes and one group (with one child shape) returns 4 nodes and root has 3 children in layer order",
+        "A shape with enter fadeIn has alpha 0 at t = start and its base alpha after the preset's duration (via clock.seek)",
+        "A tween on filter:g (glow outerStrength 2 -> 0 over [0, 2], ease none) gives outerStrength 1 at clock.seek(1)",
+        "A tween with an unknown property becomes one warning whose text contains the layer id; assembly still succeeds",
+        "destroy() destroys every node and the clock (spied)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "runtime"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "renderAt(t): visibility, node updates, filter ticks",
+      "description": "As an engine developer, I want each clock update to show exactly the layers that are on and to drive 3D and time-based filters so that every frame is a function of time.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md (renderAt) and engine/docs/03-stage-2d.md (Visibility).",
+        "Implement renderAt(t) in engine/src/runtime/assemble.ts: display.visible = isVisible(...) for every node (group children too), node.update?.(t) and its filter set's tick(t, frame) for visible nodes only, stage filter tick; subscribe it with clock.onUpdate and call it once after priming.",
+        "Add tests to engine/src/runtime/assemble.test.ts with a fake three node whose update is a spy and a crt filter on a shape."
+      ],
+      "acceptanceCriteria": [
+        "A layer from 1 to 2 is invisible at seek 0.5, visible at 1.5, invisible at 2",
+        "A fake three node from 0 to 3 has update called with 1 on seek(1) and not called on seek(4)",
+        "A crt filter's time equals the clock time after a seek while its layer is visible",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "runtime"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "MotionRuntime: Pixi Application, load, play, seek, whenReady, renderFrame",
+      "description": "As a page author, I want one object that owns the canvas and plays a doc so that pages and the player component stay thin.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md (MotionRuntime interface, app.init options, load steps 1 to 10).",
+        "Create engine/src/runtime/MotionRuntime.ts implementing the class: static create (Application.init with the listed options, ticker stopped, canvas appended to mount and sized by displayWidth via CSS), load (parse, keep the previous doc on failure, unload previous, loadImageAssets, preload three assets per three layer, assemble with factories { three: createThreeNode }, add app.render() to every update), play/pause/seek/getTime/getDuration/getCanvas, whenReady(timeoutSec) over every node's ready, renderFrame(frame), layerErrors(), destroy (destroy app and nodes, unload assets).",
+        "Create engine/src/runtime/index.ts re-exporting MotionRuntime, assemble and their types.",
+        "Create engine/src/runtime/MotionRuntime.test.ts with vi.mock('pixi.js') limited to Application (a fake with init, render, canvas, stage, destroy) to test load failure handling, whenReady timeout and destroy."
+      ],
+      "acceptanceCriteria": [
+        "load of an invalid doc returns ok false with errors and leaves the previously loaded doc's clock in place",
+        "whenReady(0.05) resolves false when a node's ready never settles, and true when all settle (fake timers)",
+        "Each clock update calls app.render once (spied)",
+        "destroy() destroys the application and unsubscribes from the clock",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "runtime"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "<MotionPlayer> component and MotionHandle",
+      "description": "As a React author, I want a drop-in player with controls and a handle like the director's PlayerHandle so that a later swap is mechanical.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section '<MotionPlayer>' and web/src/player/PlayerBridge.tsx and web/src/player/Player.tsx (controls).",
+        "Create engine/src/react/MotionPlayer.tsx: create the runtime in an effect (StrictMode safe), load on doc change, report doc errors and layer errors through props, expose MotionHandle via useImperativeHandle, render controls (play/pause button, seek range with step 1/fps, time readout, frame step back and forward) when controls is not false, and call onTime once per animation frame while playing.",
+        "Create engine/src/react/index.ts and engine/src/react/MotionPlayer.test.tsx with vi.mock('../runtime/MotionRuntime') (a fake runtime) using @testing-library/react."
+      ],
+      "acceptanceCriteria": [
+        "Mounting and unmounting under StrictMode creates runtimes and destroys every one it created (fake runtime counts)",
+        "Changing the doc prop calls load once with the new doc; an invalid doc calls onDocErrors with the errors",
+        "Clicking the frame-forward button at 30 fps seeks to the current time + 1/30",
+        "The handle's seek(2) calls runtime.seek(2) and getDuration() returns the runtime's duration",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "runtime",
+        "react"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Lab page /motion-lab.html with JSON editing and test hooks",
+      "description": "As a project owner, I want a page to pick a fixture, edit its JSON live and see it play so that I can author and debug docs by hand.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section 'Lab page' and web/three-check.html plus web/src/dev/three-check.tsx (hashCanvas, the double-rAF frame helper).",
+        "Create engine/lab/motion-lab.tsx (all page code): fixture picker from import.meta.glob('../fixtures/*.json', { eager: true }), JSON textarea with a 400 ms debounce, schema errors with paths, MotionPlayer, layer errors list, hash readout; ?doc=<name>&t=<sec> support; window.__motion hooks exactly as specified (layerPixel reads the three node's own canvas via a small debug accessor exported from engine/src/runtime). Also create an HTML stub web/motion-lab.html (copy the shape of web/three-check.html; its script src is /src/dev/motion-lab.tsx) and a one-line stub web/src/dev/motion-lab.tsx that only does `import '../../../engine/lab/motion-lab';` (stubs exist because Vite serves HTML only from the web/ root; all real code lives in engine/lab).",
+        "Create engine/src/index.ts as the public entry: re-export schema, core, timeline, runtime and react public APIs (not the internals of pixi, three or filters beyond their factories).",
+        "Open http://localhost:5173/motion-lab.html and check every fixture plays; save a screenshot per fixture to debug/engine/."
+      ],
+      "acceptanceCriteria": [
+        "Every fixture in engine/fixtures loads on the lab page with no schema errors, no layer errors and no console errors",
+        "Changing a tween's 'to' value in the textarea updates the picture after the debounce without a page reload",
+        "Typing invalid JSON or an invalid doc shows the errors and keeps the last good doc playing",
+        "window.__motion.ready() resolves true and window.__motion.hash() returns a 12-character hex string",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ],
+      "labels": [
+        "runtime",
+        "ui"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Playwright spec: readiness, determinism and motion for every fixture",
+      "description": "As a project owner, I want an automated browser check of every fixture so that a regression in any part shows up as a red test.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section 'End-to-end' and playwright.config.ts (copy its web server block; the engine needs no API server).",
+        "Create engine/playwright.config.ts: testDir 'e2e' (relative to engine/), workers 1, chromium only, outputDir '../test-results', and one webServer `npx vite --config web/vite.config.ts` with DIRECTOR_WEB_PORT 5290, port 5290, reuseExistingServer false, baseURL http://localhost:5290 (the director e2e uses ports 5197 to 5199, so there is no clash).",
+        "Create engine/e2e/motion-lab.spec.ts implementing steps 1 to 5 for each fixture file (list them with node:fs at test time), plus the three-postfx corner-pixel check or the opaque-background assertion depending on what the post-processing phase recorded (read the fixture: if hero.background is 'transparent' do the pixel check).",
+        "Run `npm run engine:e2e` and fix failures in engine/; if a failure is caused by an earlier phase's code, fix it there (it is all engine/ code) and say so in notes."
+      ],
+      "acceptanceCriteria": [
+        "`npm run engine:e2e` passes for every fixture in engine/fixtures",
+        "For each fixture the spec asserts equal hashes for two seeks to 40 % and a different hash at 80 %",
+        "Screenshots exist in debug/engine/ for each fixture after the run",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "runtime",
+        "ui",
+        "e2e"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/06-runtime-player.md"
+    ],
+    "readFirst": [
+      "engine/docs/README.md (decisions D1, D4, D5, D11)",
+      "engine/docs/06-runtime-player.md (all of it)",
+      "engine/src/core, schema, timeline, pixi, three, filters index files",
+      "web/src/player/PlayerBridge.tsx and web/src/dev/three-check.tsx",
+      "playwright.config.ts"
+    ],
+    "requires": [
+      "prd-m2-timeline",
+      "prd-m3-stage-2d",
+      "prd-m4-three",
+      "prd-m5-filters"
+    ],
+    "owns": [
+      "engine/src/runtime/*",
+      "engine/src/react/*",
+      "engine/src/index.ts",
+      "engine/lab/motion-lab.tsx",
+      "engine/playwright.config.ts",
+      "engine/e2e/motion-lab.spec.ts"
+    ],
+    "sharedEdits": [
+      "web/motion-lab.html",
+      "web/src/dev/motion-lab.tsx"
+    ],
+    "profile": "motion",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; browser checks load assets from web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
+      "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
+      "engine/ must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `@pixi/react` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+      "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
+      "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
+      "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic and object construction; check drawing in the browser. Never weaken a test to make it pass.",
+      "Do not add a dependency the spec does not name (`postprocessing` and `@types/three` are already declared).",
+      "Debug output and screenshots go to debug/engine/ (gitignored). For a browser check use the dev server the owner runs on http://localhost:5173 (do not start another on a different port); if it is not running, run `npm run engine:e2e` instead.",
+      "Record only real results. Never invent measurements or test output."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner opens http://localhost:5173/motion-lab.html, plays every fixture end to end, edits a tween in the JSON box and sees it apply, and records anything that looks wrong."
+    ]
+  }
+}

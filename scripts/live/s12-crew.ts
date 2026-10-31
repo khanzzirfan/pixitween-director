@@ -145,17 +145,27 @@ export const run: LiveScript['run'] = async ({ env, log, args = [] }) => {
   const columns: Array<{ name: string; metrics: Metrics }> = [];
   const dump: Record<string, FilmEvent[]> = {};
 
+  // One arm failing must not lose the others: keep the events and tabulate what ran.
+  const arm = async (key: string, name: string, go: () => Promise<FilmEvent[]>) => {
+    try {
+      dump[key] = await go();
+      columns.push({ name, metrics: computeMetrics(dump[key]) });
+    } catch (e) {
+      log(`${name} did not finish: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
   if (ab) {
-    log('A: the sequential director...');
-    dump.A = await sequentialFilm(deps);
-    columns.push({ name: 'A sequential', metrics: computeMetrics(dump.A) });
-    log('B: the crew with a Spark showrunner...');
-    dump.B = await crewFilm(deps, log, 'muse-spark-1.3-contributor');
-    columns.push({ name: 'B crew + Spark', metrics: computeMetrics(dump.B) });
+    if (!args.includes('--skip-a')) {
+      log('A: the sequential director...');
+      await arm('A', 'A sequential', () => sequentialFilm(deps));
+    }
+    const sparkLead = process.env.SPARK_ARM_MODEL ?? 'muse-spark-1.3-contributor';
+    log(`B: the crew with a Spark showrunner (${sparkLead})...`);
+    await arm('B', 'B crew + Spark', () => crewFilm(deps, log, sparkLead));
   }
   log(`${ab ? 'C' : 'The'} crew with a Wonder showrunner...`);
-  dump.C = await crewFilm(deps, log, process.env.WONDER_MODEL ?? 'muse-wonder-1.0');
-  columns.push({ name: ab ? 'C crew + Wonder' : 'Crew + Wonder', metrics: computeMetrics(dump.C) });
+  await arm('C', ab ? 'C crew + Wonder' : 'Crew + Wonder', () => crewFilm(deps, log, process.env.WONDER_MODEL ?? 'muse-wonder-1.0'));
 
   log('');
   log(renderTable(columns));

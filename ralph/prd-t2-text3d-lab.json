@@ -1,0 +1,190 @@
+{
+  "name": "Engine T2: 3D text fixture, lab page and experiments",
+  "branchName": "ralph/t2-text3d-lab",
+  "description": "Adds the three-text fixture, an experiment lab page for 3D text, measured experiments (cost, sharing, disposal, shadows, 2D comparison) written to engine/docs/07-text3d-findings.md, and a .ttf experiment. Run after prd-t1-text3d-core.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "three-text fixture and its tests; e2e picks it up",
+      "description": "As a project owner, I want a showcase document for 3D text so that the lab page and the end-to-end check exercise every preset.",
+      "steps": [
+        "Read engine/fixtures/three-gltf.json and three-postfx.json for shape, engine/docs/07-text3d.md, and engine/e2e/motion-lab.spec.ts.",
+        "Create engine/fixtures/three-text.json (1920x1080, 30 fps, 8 s): a plate image behind, one three layer 1400x700 with golden light and shadow, the font asset '/fonts/helvetiker_bold.typeface.json', a text3d 'Fresh every morning' with depth 0.2 and a small bevel, enter glyphPop, loop glyphWave, exit glyphFadeOut, a second line object 'Since 1987' using words: and lines: tweens with stagger, and a camera tween.",
+        "Create engine/fixtures/text3d.test.ts: the fixture parses, validateTargets returns no errors, and expandPresets plus compileTweens on a fake rig built from the real layout produce no errors.",
+        "Run `npm run engine:e2e` and confirm the generic fixture checks (ready, determinism, motion) pass for three-text; if the spec needs a text-specific assertion add it: after ready at 50 % the layer's canvas is not blank (some pixel with alpha > 0)."
+      ],
+      "acceptanceCriteria": [
+        "three-text.json parses with parseMotionDoc, validateTargets returns zero errors, and expandPresets returns zero errors",
+        "`npm run engine:e2e` passes including the three-text fixture (equal hashes for two seeks to 40 %, a different hash at 80 %)",
+        "The fixture uses glyphPop, glyphWave and glyphFadeOut and at least one words: or lines: tween with a stagger",
+        "A screenshot of the fixture at 25 %, 50 % and 90 % exists in debug/engine/ and notes describes what each shows",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "fixtures",
+        "text3d",
+        "ui"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Experiment lab page: live text controls, presets, stats, determinism hash",
+      "description": "As a project owner, I want a page to try 3D text interactively so that I can judge the look and the cost before relying on it.",
+      "steps": [
+        "Read engine/lab/motion-lab.tsx (page structure, hashCanvas, MotionPlayer usage) and web/motion-lab.html plus web/src/dev/motion-lab.tsx (the stub pattern).",
+        "Create engine/lab/text3d-lab.tsx: controls for the text (textarea), font (bold or regular), size, depth, bevel on/off, curveSegments, align, enter preset, loop preset, exit preset, stagger each, lighting preset and shadow on/off; each change builds a MotionDoc in memory and loads it into a MotionPlayer.",
+        "Show readouts for glyphCount, uniqueGeometries, triangles and the build time reported by buildText3D stats (read through a small debug accessor exported from engine/src/three/text), the frame time while playing (average of the last 60 requestAnimationFrame deltas), and the canvas hash after seeks; add a 'check determinism' button that seeks 40 %, 0, 40 % and prints whether both hashes match.",
+        "Create the stubs web/motion-text3d-lab.html and web/src/dev/motion-text3d-lab.tsx (one line importing ../../../engine/lab/text3d-lab) following the existing stub pattern.",
+        "Open http://localhost:5173/motion-text3d-lab.html, try every control once, and save screenshots to debug/engine/."
+      ],
+      "acceptanceCriteria": [
+        "The page loads with no console errors and the default text renders as extruded 3D letters that animate in",
+        "Changing text to 'ab' updates glyphCount to 2 and uniqueGeometries to 2 without a page reload",
+        "The determinism button reports a match for glyphPop, glyphRise, glyphFlip and glyphWave each",
+        "The page shows build time and average frame time as numbers (not placeholders)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "text3d",
+        "ui",
+        "experiment"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Experiment: measure cost, sharing, disposal, shadows and the 2D comparison",
+      "description": "As a project owner, I want measured answers on cost and quality so that we know when 3D text is worth using.",
+      "steps": [
+        "Read engine/docs/07-text3d.md section 'Experiments' (questions 1 to 4, 6 and 7) and use the lab page from US-010.",
+        "Measure on the lab page, three runs each, and record medians: build time and triangle count for 20, 80 and 200 characters, flat (depth 0) versus depth 0.2 with bevel and curveSegments 8 versus 16; frame time while playing glyphPop and glyphWave at 20, 80 and 200 glyphs.",
+        "Measure disposal: note renderer.info.memory.geometries and textures before loading, while loaded and after destroying the player (use a temporary console readout through the lab page); check geometry sharing against stats.uniqueGeometries.",
+        "Look at shadows with the studio and golden presets, at depth 0 and 0.2, and compare the same sentence with a 2D Pixi text layer (screenshots to debug/engine/); read tmp/reacthub-pixitweenjs/src/components/AepComposition/AepMsdfTextMesh.tsx and utils/msdf/ to answer what MSDF would add.",
+        "Write engine/docs/07-text3d-findings.md with: machine and browser, a table of every measurement with its three runs and median, a disposal result, the shadow and comparison observations with screenshot names, what is not supported (kerning, ligatures, RTL and complex scripts, automatic wrap), and a recommendation of when to use 3D text, the 2D text layer, or MSDF later. Record only numbers you measured."
+      ],
+      "acceptanceCriteria": [
+        "engine/docs/07-text3d-findings.md contains a measurements table with build time, triangles and frame time for 20, 80 and 200 characters, each with three runs and a median",
+        "The findings state the renderer.info.memory.geometries value before, during and after, and say whether it returned to the starting value",
+        "The findings include a recommendation section and a list of unsupported features, and every screenshot it names exists in debug/engine/",
+        "notes lists any measurement that could not be taken and why (none are invented)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "text3d",
+        "experiment",
+        "docs"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Experiment: .ttf fonts through TTFLoader, kept only if it works",
+      "description": "As a project owner, I want to know whether a plain .ttf can be used as a font asset so that we are not limited to typeface.json files.",
+      "steps": [
+        "Read node_modules/three/examples/jsm/loaders/TTFLoader.js, node_modules/three/examples/jsm/libs/opentype.module.js (imports only) and engine/src/three/text/typeface.ts (loadFont).",
+        "Write a throwaway Node script in debug/engine/ttf-spike.mjs that fetches nothing: it reads web/public/fonts/kenpixel.ttf with node:fs, parses with TTFLoader.parse, passes the result to FontLoader.parse and builds a TextGeometry for 'Hello'; record whether it works, the glyph count and the time.",
+        "If the spike works: extend loadFont so a url ending in .ttf is parsed with TTFLoader, add a test with an injected fetch returning the file bytes, and add a kenpixel text3d object to the lab page's font select. If it does not work: change nothing in engine/src and write the exact error.",
+        "Add the result (works or not, evidence, cost, and what scale of kenpixel units mean for size) as a section 'TTF experiment' to engine/docs/07-text3d-findings.md."
+      ],
+      "acceptanceCriteria": [
+        "debug/engine/ttf-spike.mjs ran and its output (success with glyph count and time, or the exact error) is quoted in engine/docs/07-text3d-findings.md",
+        "If the spike worked, loadFont('x.ttf') with an injected fetch returns a font whose data has glyphs, and loadFont for a .typeface.json url still parses as before; if it did not, git diff shows no change under engine/src for this story",
+        "The findings section states whether .ttf support was kept and why",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "text3d",
+        "experiment"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/07-text3d.md"
+    ],
+    "readFirst": [
+      "engine/docs/07-text3d.md (the whole design, schema additions, targets, stagger, presets, experiments)",
+      "engine/docs/README.md and engine/docs/04-three.md (the three layer this extends) and 02-timeline.md (compiler, presets, determinism rules)",
+      "engine/src/three/build/object.ts, scene.ts, engine/src/three/threeNode.ts, engine/src/timeline/compile.ts, presets.ts, targets.ts, engine/src/schema/*.ts, engine/src/runtime/assemble.ts (all built by the eight engine PRDs)",
+      "tmp/reacthub-pixitweenjs/src/components/AepComposition/Aep3DTextMesh.tsx and utils/textLayout/typefaceMetricsProvider.ts (idea only: one Text3D per glyph, layout from typeface advances)",
+      "web/public/fonts/ (helvetiker_regular and helvetiker_bold typeface JSON, kenpixel.ttf, LICENSE)"
+    ],
+    "requires": [
+      "prd-t1-text3d-core"
+    ],
+    "owns": [
+      "engine/fixtures/three-text.json",
+      "engine/fixtures/text3d.test.ts",
+      "engine/lab/text3d-lab.tsx",
+      "engine/docs/07-text3d-findings.md"
+    ],
+    "sharedEdits": [
+      "engine/e2e/motion-lab.spec.ts",
+      "engine/src/three/text/typeface.ts",
+      "web/motion-text3d-lab.html",
+      "web/src/dev/motion-text3d-lab.tsx"
+    ],
+    "profile": "motion",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; browser checks load assets from web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
+      "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
+      "engine/ must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `@pixi/react` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+      "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
+      "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
+      "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic and object construction; check drawing in the browser. Never weaken a test to make it pass.",
+      "Do not add a dependency the spec does not name (`postprocessing` and `@types/three` are already declared).",
+      "Debug output and screenshots go to debug/engine/ (gitignored). For a browser check use the dev server the owner runs on http://localhost:5173 (do not start another on a different port); if it is not running, run `npm run engine:e2e` instead.",
+      "Record only real results. Never invent measurements or test output.",
+      "Before starting, confirm every story of ralph/prd-t1-text3d-core.json has passes true and `npm run typecheck && npm test` pass; if not, set notes to 'blocked: engine PRDs not finished' and stop.",
+      "Experiment stories (US-010 to US-012) record only real measurements, with the machine and browser noted. performance.now is allowed in lab and measurement code only, never in code that decides pixels."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner opens http://localhost:5173/motion-text3d-lab.html and http://localhost:5173/motion-lab.html?doc=three-text and judges the look of the five presets and the depth/bevel/shadow quality."
+    ]
+  }
+}

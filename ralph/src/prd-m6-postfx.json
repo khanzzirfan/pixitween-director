@@ -1,0 +1,127 @@
+{
+  "name": "Engine M6: 3D post-processing on three layers",
+  "branchName": "ralph/m6-postfx",
+  "description": "Adds a pmndrs postprocessing chain (bloom, vignette, chromatic aberration, noise, depth of field, brightness/contrast, hue/saturation, ACES tone mapping last) to each three layer that asks for it, drawn through the shared offscreen renderer, with postfx:<id> tween targets. Verifies transparency is kept.",
+  "metadata": {
+    "profile": "motion",
+    "specs": [
+      "engine/docs/05-filters-postfx.md",
+      "engine/docs/04-three.md"
+    ],
+    "readFirst": [
+      "engine/docs/05-filters-postfx.md sections '3D post-processing chain' and 'Hooking post-processing into ThreeNode'",
+      "engine/docs/04-three.md",
+      "engine/src/three/threeNode.ts and offscreen.ts (from M4)",
+      "tmp/reacthub-pixitweenjs/src/components/AepComposition/Aep3DPostFx.tsx and stage3d/dof.ts",
+      "node_modules/postprocessing/build/types/index.d.ts"
+    ],
+    "requires": [
+      "prd-m4-three"
+    ],
+    "owns": [
+      "engine/src/three/postfx/*"
+    ],
+    "sharedEdits": [
+      "engine/src/three/threeNode.ts",
+      "engine/lab/three-smoke.tsx",
+      "engine/src/schema/doc.ts"
+    ],
+    "extraGuardrails": [
+      "The shared edit to engine/src/three/threeNode.ts is limited to building, routing and disposing the chain. The shared edit to engine/src/schema/doc.ts is allowed only if the transparency check fails (US-004)."
+    ],
+    "manualGates": []
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Effect table: create each postFx effect with defaults and tweenable fields",
+      "description": "As an engine developer, I want one table from postFx type to effect constructor and tweenable fields so that adding an effect is one entry.",
+      "steps": [
+        "Read engine/docs/05-filters-postfx.md (the effect table) and check every field name in node_modules/postprocessing/build/types/index.d.ts.",
+        "Create engine/src/three/postfx/effects.ts exporting POSTFX_DEFS: Record<PostFxType, { defaults; create(params, camera): Effect; tweenable: Record<string, { kind: 'number' | 'deg'; get(e): number; set(e, v): void }> }> for the 7 types.",
+        "Create engine/src/three/postfx/effects.test.ts constructing each effect in jsdom (if a constructor needs WebGL and fails in jsdom, test its def with vi.mock of that class and note which in notes)."
+      ],
+      "acceptance": [
+        "POSTFX_DEFS.bloom.create({ intensity: 2 }, camera) gives an effect whose intensity is 2 and luminanceMaterial.threshold 0.85",
+        "Every tweenable key of every type round-trips through set and get (or, for mocked classes, writes the documented field)",
+        "hueSaturation's hue is declared kind 'deg'"
+      ],
+      "labels": [
+        "postfx",
+        "three"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "buildPostFxChain: composer, passes, tone mapping swap, draw, dispose",
+      "description": "As an engine developer, I want a chain that renders a scene through effects on the shared renderer and leaves the renderer as it found it so that layers without post-processing are not affected.",
+      "steps": [
+        "Read engine/docs/05-filters-postfx.md '3D post-processing chain' (composer options, RenderPass clearing to transparent, one EffectPass with ToneMappingEffect last, NoToneMapping during draw then restore, setSize once, render(0)).",
+        "Create engine/src/three/postfx/chain.ts exporting PostFxChain and buildPostFxChain(renderer, scene, camera, specs, size) returning null when no spec is enabled.",
+        "resolveTarget(id, prop) returns a TargetRef on a proxy that calls the def's set ('deg' kind for hue).",
+        "Create engine/src/three/postfx/chain.test.ts with vi.mock('postprocessing') recording constructor calls and passes, and a fake renderer object with a toneMapping field."
+      ],
+      "acceptance": [
+        "With specs [bloom, vignette (enabled false)] the chain makes one EffectPass whose effects are [BloomEffect, ToneMappingEffect] in that order",
+        "During draw the fake renderer's toneMapping is NoToneMapping and after draw it is back to ACESFilmicToneMapping, also when composer.render throws",
+        "buildPostFxChain with only disabled specs returns null",
+        "dispose() calls composer.dispose() once"
+      ],
+      "labels": [
+        "postfx",
+        "three"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Hook the chain into ThreeNode and route postfx:<id> targets",
+      "description": "As an author, I want postFx on a three layer to draw and to be tweenable from the doc so that bloom can swell on the hero moment.",
+      "steps": [
+        "Read engine/docs/05-filters-postfx.md 'Hooking post-processing into ThreeNode' and engine/src/three/threeNode.ts.",
+        "In engine/src/three/threeNode.ts: after the rig is built, set this.postFx = buildPostFxChain(shared.renderer, rig.scene, rig.camera, layer.postFx, { width, height }); pass draw: postFx?.draw to shared.render; route resolveTarget('postfx:<id>', prop) to postFx.resolveTarget; dispose it in destroy().",
+        "Create engine/src/three/postfx/index.ts re-exporting the chain and effect table.",
+        "Add engine/src/three/postfx/threeNode-postfx.test.ts using setOffscreenRendererFactoryForTests and vi.mock('postprocessing')."
+      ],
+      "acceptance": [
+        "A three layer with postFx [{ id: 'glow', type: 'bloom' }] gives resolveTarget('postfx:glow', 'intensity') non-null; 'postfx:none' gives null",
+        "update(t) passes a draw function to the fake renderer's render request when postFx is set and none when the layer has no postFx",
+        "destroy() disposes the chain"
+      ],
+      "labels": [
+        "postfx",
+        "three"
+      ],
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Browser check: post-processing look, determinism and transparency",
+      "description": "As a project owner, I want to see bloom and vignette on the can over the plate, and know whether transparency survives, before the runtime ships.",
+      "steps": [
+        "Read engine/lab/three-smoke.tsx (from m4) and engine/fixtures/three-postfx.json.",
+        "Add the three-postfx fixture to the smoke page's select, and a readout of the RGBA of pixel (2, 2) of the node's own 2D canvas after each seek (shared edit).",
+        "Open http://localhost:5173/motion-three-smoke.html, pick three-postfx, seek to 1 s and 3 s, compare to the same fixture with postFx removed in a scratch copy, save screenshots to debug/engine/.",
+        "If the corner alpha is not 0 with a transparent background: add the cross-field rule to engine/src/schema/doc.ts (a three layer with enabled postFx needs an opaque background), set background in three-postfx.json, add a test for the rule, and record the finding in notes. If it is 0, record that in notes."
+      ],
+      "acceptance": [
+        "Bloom is visible on the can's highlights and the vignette darkens the corners of the layer (screenshots saved, described in notes)",
+        "Seeking to 2 s, 0, then 2 s gives the same canvas hash both times at 2 s",
+        "notes states the measured corner alpha and which branch of step 4 was taken"
+      ],
+      "labels": [
+        "postfx",
+        "three",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    }
+  ]
+}

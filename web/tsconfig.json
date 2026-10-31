@@ -1,5 +1,5 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": { "lib": ["ES2023", "DOM", "DOM.Iterable"], "jsx": "react-jsx" },
-  "include": ["./src", "../shared"]
+  "include": ["./src", "../shared", "../engine/src", "../engine/lab"]
 }

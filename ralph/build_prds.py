@@ -50,6 +50,35 @@ STANDING_RULE = (
     "metadata.manualGates and run by the owner."
 )
 
+# The engine PRD (engine/docs/README.md) builds our own engine in engine/, so it may port library
+# source and must leave the director app alone. Selected with "profile": "motion" in a PRD's metadata.
+MOTION_GUARDRAILS = [
+    "Work offline. The only network use allowed is `npm install`. Tests never fetch; browser checks load assets from web/public.",
+    "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+    "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+    "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
+    "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
+    "engine/ must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `@pixi/react` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+    "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
+    "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
+    "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",
+    "jsdom has no 2D canvas context and no WebGL: unit-test pure logic and object construction; check drawing in the browser. Never weaken a test to make it pass.",
+    "Do not add a dependency the spec does not name (`postprocessing` and `@types/three` are already declared).",
+    "Debug output and screenshots go to debug/engine/ (gitignored). For a browser check use the dev server the owner runs on http://localhost:5173 (do not start another on a different port); if it is not running, run `npm run engine:e2e` instead.",
+    "Record only real results. Never invent measurements or test output.",
+]
+
+MOTION_STANDING_RULE = (
+    "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks "
+    "on the engine lab pages. The director app is not changed."
+)
+
+MOTION_BROWSER_GATE = (
+    "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` "
+    "once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, "
+    "and record what you saw in `notes`"
+)
+
 VAGUE = re.compile(r"(works? correctly|handles? edge cases|good ux|user[- ]friendly|as expected\b|properly\b|robust(ly)?\b)", re.I)
 LIVE_RUN = re.compile(r"(?i)\b(run|execute|invoke|call)\b[^.;\n]{0,60}(npm run live|api\.meta\.ai|ollama|animate_image)")
 CURL = re.compile(r"(?i)\bcurl\s+https?://")
@@ -92,6 +121,11 @@ def build(src_path: Path) -> dict | None:
         err(f, "metadata.readFirst must not be empty")
     if not md.get("owns"):
         err(f, "metadata.owns must list the paths this PRD owns")
+
+    profile = md.get("profile", "director")
+    if profile not in ("director", "motion"):
+        err(f, f"metadata.profile must be 'director' or 'motion', not {profile!r}")
+    motion = profile == "motion"
 
     stories_out = []
     seen: dict[str, int] = {}
@@ -141,7 +175,7 @@ def build(src_path: Path) -> dict | None:
 
         criteria = list(acc) + UNIVERSAL_GATES
         if "ui" in labels:
-            criteria.append(BROWSER_GATE)
+            criteria.append(MOTION_BROWSER_GATE if motion else BROWSER_GATE)
         stories_out.append(
             {
                 "id": sid,
@@ -173,9 +207,10 @@ def build(src_path: Path) -> dict | None:
             "requires": md.get("requires", []),
             "owns": md.get("owns", []),
             "sharedEdits": md.get("sharedEdits", []),
-            "standingRule": STANDING_RULE,
-            "guardrails": STANDARD_GUARDRAILS + md.get("extraGuardrails", []),
-            "qualityGates": {"universal": UNIVERSAL_GATES, "ui": [BROWSER_GATE]},
+            **({"profile": profile} if motion else {}),
+            "standingRule": MOTION_STANDING_RULE if motion else STANDING_RULE,
+            "guardrails": (MOTION_GUARDRAILS if motion else STANDARD_GUARDRAILS) + md.get("extraGuardrails", []),
+            "qualityGates": {"universal": UNIVERSAL_GATES, "ui": [MOTION_BROWSER_GATE if motion else BROWSER_GATE]},
             "manualGates": md.get("manualGates", []),
         },
     }

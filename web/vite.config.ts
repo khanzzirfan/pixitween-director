@@ -5,13 +5,14 @@ import tailwindcss from '@tailwindcss/vite';
 
 const webRoot = fileURLToPath(new URL('.', import.meta.url));
 const sharedDir = fileURLToPath(new URL('../shared', import.meta.url));
+const engineDir = fileURLToPath(new URL('../engine/src', import.meta.url));
 
 export default defineConfig({
   root: webRoot,
   plugins: [react(), tailwindcss()],
   resolve: {
     dedupe: ['react', 'react-dom', 'pixi.js', '@pixi/react', 'gsap', 'three'],
-    alias: { '@shared': sharedDir },
+    alias: { '@shared': sharedDir, '@engine': engineDir },
   },
   server: {
     port: Number(process.env.DIRECTOR_WEB_PORT ?? 5173),

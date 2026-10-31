@@ -33,3 +33,6 @@ docs/submission-answers.md
 docs/x-post.md
 docs/s1-evidence.md
 docs/studio-ui-redesign-spec.md
+
+## Read-only reference copies for agents (engine/ port source)
+tmp/

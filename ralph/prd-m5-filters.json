@@ -1,0 +1,215 @@
+{
+  "name": "Engine M5: 2D filter registry",
+  "branchName": "ralph/m5-filters",
+  "description": "A registry of 15 pixi-filters / pixi.js filters with defaults, tweenable params and deterministic time-driven filters, and buildFilters, which turns a layer's filter specs into Pixi filters plus filter:<id> tween targets. Adds the filters-2d fixture.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "withSeededRandom: run a function with a seeded Math.random",
+      "description": "As an engine developer, I want to run library code that calls Math.random under a fixed seed so that glitch-like filters give the same picture for the same frame.",
+      "steps": [
+        "Read engine/docs/05-filters-postfx.md paragraph 'Seeds and glitch' and engine/src/core/seed.ts.",
+        "Create engine/src/filters/seeded.ts exporting mulberry32(seed) and withSeededRandom<T>(seed01, fn: () => T): T, which swaps Math.random for mulberry32 seeded from seed01 and always restores the original in finally.",
+        "Create engine/src/filters/seeded.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "Two calls of withSeededRandom(0.25, () => [Math.random(), Math.random()]) return identical arrays",
+        "Math.random is the original function after a call whose fn throws",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "filters"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Registry part 1: blur, glow, bloom, dropShadow, adjustment, outline",
+      "description": "As an author, I want the common look filters with tweenable strengths so that I can soften, glow and grade any layer.",
+      "steps": [
+        "Read engine/docs/05-filters-postfx.md (FilterDef interface and the table rows for these six types) and the matching constructor code in tmp/reacthub-pixitweenjs/src/hooks/withFiltersHook.tsx and withEffectsHook.tsx; check option names in node_modules/pixi-filters/lib/<filter>/*.d.ts.",
+        "Create engine/src/filters/registry.ts exporting FilterDef and FILTERS, with entries for blur (pixi.js BlurFilter), glow, bloom (AdvancedBloomFilter), dropShadow (offsetX/offsetY map to the offset point), adjustment and outline: defaults, create(params), tweenable get/set (colours as hex strings in and out).",
+        "Create engine/src/filters/registry.test.ts constructing each filter in jsdom with defaults and with overrides, and exercising every tweenable get/set round trip."
+      ],
+      "acceptanceCriteria": [
+        "FILTERS.glow.create({ ...FILTERS.glow.defaults, outerStrength: 3 }) returns a GlowFilter whose outerStrength is 3",
+        "For each of the six types every tweenable key round-trips: set(f, v) then get(f) returns v (colours compared case-insensitively as #rrggbb)",
+        "dropShadow with offsetX 6, offsetY -2 gives offset { x: 6, y: -2 }",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "filters"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Registry part 2: colorMatrix presets, noise, rgbSplit, pixelate, zoomBlur",
+      "description": "As an author, I want grading presets and stylised filters so that a layer can be sepia, split or pixelated with one entry.",
+      "steps": [
+        "Read the table rows for these five types in engine/docs/05-filters-postfx.md and the colour-matrix preset code in tmp/reacthub-pixitweenjs/src/hooks/withEffectsHook.tsx.",
+        "Add colorMatrix (ColorMatrixFilter; preset none, grayscale, sepia, vintage, polaroid, kodachrome, technicolor, browni, negative, lsd; amount and hue rebuild the matrix with reset() then the preset then hue), noise (NoiseFilter), rgbSplit (six numbers mapped to the red, green, blue offset points), pixelate and zoomBlur (centerX/centerY in stage pixels mapped to the center point) to FILTERS.",
+        "Extend engine/src/filters/registry.test.ts for the five types."
+      ],
+      "acceptanceCriteria": [
+        "colorMatrix with preset 'grayscale' and amount 1 gives a different matrix from preset 'none'; setting amount via tweenable rebuilds the matrix (the matrix array changes)",
+        "rgbSplit with redX -4, redY 0 gives red offset { x: -4, y: 0 }",
+        "Every tweenable key of the five types round-trips through set and get",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "filters"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Registry part 3: time-driven crt, oldFilm, godray, glitch (+ noise seed)",
+      "description": "As an author, I want animated retro filters that follow the playhead so that playback, seeking and export show the same frames.",
+      "steps": [
+        "Read engine/docs/05-filters-postfx.md (the Time-driven column and 'Seeds and glitch') and the time-listener approach in tmp/reacthub-pixitweenjs/src/hooks/useSpriteFilters.ts.",
+        "Add crt, oldFilm, godray and glitch to FILTERS with tick(f, timeSec, frame): crt.time = timeSec and crt.seed = seedFor(frame, salt); oldFilm.seed = seedFor(frame, salt); godray.time = timeSec; glitch: direction/offset from params and f.refresh() inside withSeededRandom(seedFor(frame, salt)). Give noise a tick that sets its seed the same way.",
+        "The salt is passed in by buildFilters (hashString of the filter id); define tick(f, timeSec, frame, salt).",
+        "Extend engine/src/filters/registry.test.ts: same frame -> same uniforms/seed, next frame -> different."
+      ],
+      "acceptanceCriteria": [
+        "crt tick at frame 10 twice gives the same seed and time; at frame 11 the seed differs",
+        "glitch tick at frame 5 twice produces identical slice offsets (compare the filter's offsets/sizes arrays); frame 6 produces different ones",
+        "Math.random is not called outside withSeededRandom during a glitch tick (spy on Math.random before and after)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-003"
+      ],
+      "labels": [
+        "filters"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "buildFilters: specs to filters, filter:<id> targets, tick, errors",
+      "description": "As a runtime author, I want one call that builds a layer's filters and exposes them as tween targets so that a glow can fade out on the timeline like any property.",
+      "steps": [
+        "Read engine/docs/05-filters-postfx.md (buildFilters signature, Unknown params, Disabled) and engine/src/core/paths.ts.",
+        "Create engine/src/filters/build.ts exporting buildFilters(specs) as specified: merges defaults, skips disabled, reports unknown params in errors, resolveTarget(id, prop) returns a TargetRef on a proxy object whose property setter calls the def's tweenable set (kind number or color, with setColor/getColor for colours), tick(timeSec, frame) calls each def's tick with its salt, destroy destroys the filters.",
+        "Create engine/src/filters/index.ts re-exporting FILTERS, FilterDef, buildFilters, withSeededRandom.",
+        "Create engine/src/filters/build.test.ts that compiles a GSAP fromTo on a resolved proxy and checks the live filter value changes."
+      ],
+      "acceptanceCriteria": [
+        "buildFilters([{ id: 'g', type: 'glow', params: { outerStrength: 2 } }, { id: 'b', type: 'blur', enabled: false }]) returns one filter, a byId map with 'g' only, and no errors",
+        "An unknown param { foo: 1 } on blur gives one error naming 'foo' and the filter is still created",
+        "gsap.to(ref.obj, { [ref.key]: 0, duration: 1 }) on resolveTarget('g', 'outerStrength'), progressed to 0.5, sets the GlowFilter's outerStrength to 1",
+        "resolveTarget('g', 'nope') and resolveTarget('zz', 'outerStrength') return null",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ],
+      "labels": [
+        "filters"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "filters-2d fixture: one layer per filter type with one tweened param",
+      "description": "As a project owner, I want one fixture that shows every 2D filter moving so that the lab page and e2e check them all.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section 'Fixtures' and engine/fixtures/basic-2d.json for shape.",
+        "Create engine/fixtures/filters-2d.json (1920x1080, 30 fps, 6 s): a 5x3 grid of shape or text layers, one per filter type, each with a tween on one tweenable param via filter:<id>, plus one stage-level filter (adjustment).",
+        "Run the existing fixtures test (engine/fixtures/fixtures.test.ts from m1) and add engine/src/filters/fixture.test.ts that builds every layer's filters with buildFilters and asserts no errors and that each tweened param is tweenable."
+      ],
+      "acceptanceCriteria": [
+        "filters-2d.json parses with parseMotionDoc and uses all 15 filter types",
+        "buildFilters on every layer of filters-2d.json returns zero errors, and every key in every filter tween's to is in that type's tweenable map",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "filters",
+        "fixtures"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/05-filters-postfx.md"
+    ],
+    "readFirst": [
+      "engine/docs/README.md (decision D10)",
+      "engine/docs/05-filters-postfx.md section '2D filter registry'",
+      "engine/src/core/paths.ts, seed.ts, engine/src/schema/parts.ts, enums.ts (from M1)",
+      "tmp/reacthub-pixitweenjs/src/hooks/useSpriteFilters.ts, withFiltersHook.tsx, withEffectsHook.tsx"
+    ],
+    "requires": [
+      "prd-m1-foundation"
+    ],
+    "owns": [
+      "engine/src/filters/*",
+      "engine/fixtures/filters-2d.json"
+    ],
+    "sharedEdits": [],
+    "profile": "motion",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; browser checks load assets from web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
+      "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
+      "engine/ must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `@pixi/react` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+      "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
+      "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
+      "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic and object construction; check drawing in the browser. Never weaken a test to make it pass.",
+      "Do not add a dependency the spec does not name (`postprocessing` and `@types/three` are already declared).",
+      "Debug output and screenshots go to debug/engine/ (gitignored). For a browser check use the dev server the owner runs on http://localhost:5173 (do not start another on a different port); if it is not running, run `npm run engine:e2e` instead.",
+      "Record only real results. Never invent measurements or test output."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": []
+  }
+}

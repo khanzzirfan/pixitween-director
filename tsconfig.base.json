@@ -9,6 +9,6 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "noEmit": true,
-    "paths": { "@shared/*": ["./shared/*"] }
+    "paths": { "@shared/*": ["./shared/*"], "@engine/*": ["./engine/src/*"] }
   }
 }

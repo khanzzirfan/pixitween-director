@@ -1,0 +1,317 @@
+{
+  "name": "Engine M1: foundation (folder, schema, fixtures, clock, core contracts)",
+  "description": "Creates engine/ (own package.json and tsconfig, @engine alias, lint fence), the MotionDoc zod schema with cross-field rules, four fixtures, the GSAP MotionClock and the core contracts (MotionNode, TargetRef, pathRef, seedFor, base 2D transform) the other PRDs build against. No rendering yet.",
+  "branchName": "ralph/m1-foundation",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Scaffold engine/ as its own folder: package.json, tsconfig, @engine alias, lint fence",
+      "description": "As an engine developer, I want a engine/ folder that typechecks, tests and lints with the rest of the repo so that every later story has a place to land.",
+      "steps": [
+        "Read engine/docs/README.md (Folder layout, Architecture, Quality bar), tsconfig.base.json, web/tsconfig.json, web/vite.config.ts, vitest.config.ts, eslint.config.js, package.json and playwright.config.ts. Confirm tmp/reacthub-pixitweenjs/src exists (the read-only reference copy the owner made); if it is missing set notes to 'blocked: reference copy missing' and stop.",
+        "Create engine/package.json (private, name '@pixitween/engine', type module, no dependencies: the folder uses the root node_modules, do NOT add npm workspaces) and engine/tsconfig.json extending ../tsconfig.base.json with lib ES2023, DOM, DOM.Iterable, jsx react-jsx, types ['node'] and include ['src', 'lab', 'e2e', 'fixtures'].",
+        "Add the path alias \"@engine/*\": [\"./engine/src/*\"] next to @shared in tsconfig.base.json; add '../engine/src' and '../engine/lab' to the include list of web/tsconfig.json; add the alias '@engine' -> engine/src to web/vite.config.ts and to both projects in vitest.config.ts; add 'engine/**/*.test.{ts,tsx}' to the include list of the 'web' (jsdom) vitest project.",
+        "In package.json: append `&& tsc -p engine/tsconfig.json --noEmit` to the typecheck script, add the script \"engine:e2e\": \"playwright test -c engine/playwright.config.ts\". The packages `postprocessing` (dependencies) and `@types/three` (devDependencies) are already declared by the owner; do not install anything.",
+        "In eslint.config.js add 'tmp' to the ignores list and add a block for files ['engine/**'] that forbids imports of 'reacthub-pixitweenjs', '@pixi/react', '@react-three/*' and relative or aliased paths into web/, server/ and shared/ (no-restricted-imports with patterns), with a message pointing to engine/docs/README.md.",
+        "Create engine/README.md: three lines saying what the folder is and linking to engine/docs/README.md.",
+        "Create engine/src/core/smoke.test.ts that imports gsap, three and pixi.js and asserts each exports something, importing a tiny helper through the '@engine/core/version' alias to prove the alias works (create engine/src/core/version.ts exporting MOTION_SCHEMA_VERSION = 1)."
+      ],
+      "acceptanceCriteria": [
+        "engine/src/core/smoke.test.ts runs in the 'web' vitest project and passes, importing MOTION_SCHEMA_VERSION via '@engine/core/version'",
+        "package.json (already lists postprocessing ^6.39 and @types/three ^0.184) has the engine:e2e script, and its typecheck script runs `tsc -p engine/tsconfig.json --noEmit`",
+        "eslint.config.js ignores 'tmp' and has a block for 'engine/**' that restricts reacthub-pixitweenjs, @pixi/react and @react-three/* imports",
+        "No existing setting in the config files is removed or changed (git diff shows additions only), and no 'workspaces' key is added to package.json",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "setup"
+      ],
+      "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "US-002",
+      "title": "Schema building blocks: scalars, tween, preset ref, filter, postFx",
+      "description": "As an engine developer, I want the shared zod pieces of the MotionDoc schema so that layers and the engine use one definition of ids, colours, eases and tweens.",
+      "steps": [
+        "Read engine/docs/01-schema.md sections 'Shared scalars', 'PresetRef', 'Tween', 'Filter2D and PostFx', and engine/docs/02-timeline.md (preset names) and engine/docs/05-filters-postfx.md (filter and postFx type names).",
+        "Create engine/src/schema/scalars.ts exporting IdSchema, ColorSchema, SecondsSchema, Vec3Schema, EaseSchema (default 'power2.inOut') and ParamValueSchema exactly as specified.",
+        "Create engine/src/schema/enums.ts exporting PRESET_NAMES (every name in the presets table of 02-timeline.md, with its kind: enter, exit or loop), FILTER_2D_TYPES (the 15 types in 05) and POSTFX_TYPES (the 7 types in 05), each as a readonly tuple plus a zod enum and a TypeScript union type.",
+        "Create engine/src/schema/parts.ts exporting TweenSchema, PresetRefSchema, Filter2DSchema and PostFxSchema, all .strict(), with the defaults and limits from 01-schema.md.",
+        "Create engine/src/schema/parts.test.ts covering valid and invalid examples for each schema."
+      ],
+      "acceptanceCriteria": [
+        "ColorSchema accepts '#a1B2c3' and '#a1b2c3ff' and rejects 'red', '#abc' and '#a1b2c3f'",
+        "EaseSchema accepts 'power2.inOut', 'back.out(1.7)', 'none' and 'sine' and rejects 'superBounce'",
+        "TweenSchema.parse({ at: 0, duration: 1, to: { x: 5 } }) returns ease 'power2.inOut', repeat 0 and yoyo false; a tween with repeat 101 or an extra key 'foo' fails",
+        "PRESET_NAMES contains fadeIn, slideInUp, popIn, fadeOut, zoomOut, spin, float, pulse and sway, and each entry has a kind",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "schema"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Layer schemas: base, image, text, shape, group",
+      "description": "As an engine developer, I want the 2D layer schemas so that a doc with images, text, shapes and groups validates with every default filled in.",
+      "steps": [
+        "Read engine/docs/01-schema.md sections 'Layer base' and 'Layer types' (image, text, shape, group).",
+        "Create engine/src/schema/layers2d.ts with LayerBaseShape (a plain zod shape object reused by every layer type), ImageLayerSchema, TextLayerSchema (with the full style object and its defaults), ShapeLayerSchema and GroupLayerSchema; group children use z.lazy over the full LayerSchema, which is declared in engine/src/schema/layer.ts.",
+        "Create engine/src/schema/layer.ts exporting LayerSchema as a discriminated union on 'type' (image, text, shape, group, and a placeholder for three that US-004 fills in by importing ThreeLayerSchema) plus the Layer type (z.output).",
+        "Create engine/src/schema/layers2d.test.ts covering defaults and failures for each type."
+      ],
+      "acceptanceCriteria": [
+        "ImageLayerSchema.parse({ id: 'a', type: 'image', asset: 'p' }) gives start 0, x 0, y 0, anchor [0.5, 0.5], scale 1, rotation 0, alpha 1, blendMode 'normal', filters [], tweens [], tint '#ffffff'",
+        "TextLayerSchema fills style.fontSize 64, style.fill '#ffffff', style.align 'left' when style is {} and rejects fontSize 3",
+        "A group with an empty children array fails; a group with one shape child parses and the child gets its defaults",
+        "An unknown key on any layer fails because the schemas are strict",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "schema"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Three layer schema: camera, lighting, lights, shadow, objects, postFx",
+      "description": "As an engine developer, I want the three layer schema so that 3D scenes are described in the same document as 2D layers.",
+      "steps": [
+        "Read engine/docs/01-schema.md section 'three' (and Light3D, Object3D, material) and engine/docs/04-three.md section 'Building the scene'.",
+        "Create engine/src/schema/layer3d.ts exporting Light3DSchema, Object3DSchema (geometry as a discriminated union on type: box, sphere, cylinder, torus, plane, gltf), MaterialSchema and ThreeLayerSchema with every default from 01-schema.md.",
+        "Wire ThreeLayerSchema into the LayerSchema union in engine/src/schema/layer.ts.",
+        "Create engine/src/schema/layer3d.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "ThreeLayerSchema.parse of { id: 'h', type: 'three', width: 512, height: 512, objects: [{ id: 'b', geometry: { type: 'box', size: [1, 1, 1] } }] } gives camera.position [0, 1.2, 6], camera.fov 35, lighting.preset 'studio', shadow.enabled true, background 'transparent', and the object gets material.color '#cccccc' and castShadow true",
+        "A light with id 'key' fails (reserved for the preset rig); a three layer with 0 objects or width 4096 fails",
+        "An object with animation set on a box geometry fails; on a gltf geometry it parses with speed 1, loop true, offset 0",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "schema"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "MotionDoc schema, cross-field rules and parseMotionDoc with error paths",
+      "description": "As an author (human or model), I want one parse call that fills defaults and returns every problem with a readable path so that I can fix a doc without reading engine code.",
+      "steps": [
+        "Read engine/docs/01-schema.md sections 'MotionDoc' and 'Cross-field rules', and the parseMotionDoc signature at the top of that doc.",
+        "Create engine/src/schema/doc.ts exporting MotionDocSchema (with a superRefine implementing the 8 cross-field rules, applied after defaults so a default end equals the doc duration or the parent's length), the MotionDoc (output) and MotionDocInput (input) types, and parseMotionDoc(input).",
+        "Format zod issue paths as strings like 'layers[2].tweens[0].to' (numbers in brackets, keys joined with dots).",
+        "Create engine/src/schema/index.ts re-exporting everything public from scalars, enums, parts, layer, layer3d, doc.",
+        "Create engine/src/schema/doc.test.ts with one passing doc and one failing case per cross-field rule."
+      ],
+      "acceptanceCriteria": [
+        "Two layers with id 'a' give ok false with an error whose path is 'layers[1].id'",
+        "An image layer pointing at a gltf asset fails with path 'layers[0].asset'; a gltf object pointing at an image asset fails",
+        "A top-level layer with end 7 in a doc of duration 6 fails with path 'layers[0].end'; with no end it parses and end equals 6",
+        "A tween with at 4, duration 1, repeat 1 on a layer from 0 to 5 fails (4 + 1 x 2 > 5); with repeat 0 it passes",
+        "A loop preset with target 'object:can' on an image layer fails; on a three layer that has an object 'can' it passes",
+        "parseMotionDoc never throws: given null, a string or an array it returns ok false with at least one error",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ],
+      "labels": [
+        "schema"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Four fixtures that exercise 2D, primitives, glTF and post-processing",
+      "description": "As an engine developer, I want realistic fixture docs so that every later PRD tests and views the same scenes.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section 'Fixtures' (what each must exercise and the asset URLs) and engine/docs/01-schema.md section 'Example'.",
+        "Check the asset files exist under web/public (dev/product.png, cartoon/backdrop.png, cartoon/characters/robot.glb, cartoon/props/can.glb).",
+        "Create engine/fixtures/basic-2d.json, three-primitives.json, three-gltf.json and three-postfx.json (1920x1080, 30 fps, 6 to 8 seconds) covering everything listed for each; use only presets, filters and postFx names from engine/src/schema/enums.ts; robot.glb uses clip 'Wave'.",
+        "Create engine/fixtures/fixtures.test.ts that globs engine/fixtures/*.json (import.meta.glob with eager) and asserts each parses with parseMotionDoc, and that every asset url starting with '/' exists under web/public (node:fs in the test)."
+      ],
+      "acceptanceCriteria": [
+        "All four fixtures parse with ok true",
+        "three-gltf.json has a gltf object using asset url '/cartoon/characters/robot.glb' with animation.clip 'Wave', and a loop preset with target 'object:can'",
+        "three-postfx.json has a three layer with id 'hero', background 'transparent', and postFx bloom and vignette, each with at least one tween targeting postfx:<id>",
+        "fixtures.test.ts fails if a fixture references a '/…' asset that is not in web/public (checked by temporarily changing one url while writing the test, then restoring it)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "schema",
+        "fixtures"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "MotionClock: paused GSAP master timeline with fixed duration",
+      "description": "As an engine developer, I want one clock that owns time so that play, pause and seek behave the same for every layer.",
+      "steps": [
+        "Read engine/docs/02-timeline.md section 'MotionClock' and tmp/reacthub-pixitweenjs/src/providers/GsapPixieContextProvider.tsx for the idea (do not copy its events or hacks).",
+        "Create engine/src/core/clock.ts implementing the MotionClock class exactly as specified (pinned duration via an empty set at duration, seek clamps and emits synchronously, onUpdate and onComplete return unsubscribe functions, listener errors are caught and console.warn'd, loop wraps to 0).",
+        "Create engine/src/core/clock.test.ts using vitest fake timers or gsap.ticker control where needed; at least test seek, clamp, duration, listeners, unsubscribe, seekFrame, frameAt, and complete behaviour (drive the timeline with timeline.time(...) or totalTime to reach the end without waiting real time)."
+      ],
+      "acceptanceCriteria": [
+        "new MotionClock({ duration: 6, fps: 30 }).timeline.duration() is 6 with no tweens added",
+        "seek(-1) gives time 0, seek(99) gives time 6, and each seek calls onUpdate listeners once with the clamped time",
+        "seekFrame(45) at 30 fps gives time 1.5 and frameAt(1.5) returns 45",
+        "A listener that throws does not stop a second listener from being called",
+        "Reaching the end without loop pauses at 6 and calls onComplete once; with loop true the time wraps to 0 and playing stays true",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "timeline"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Core contracts: MotionNode types, pathRef, seedFor, base 2D transform",
+      "description": "As a later-phase agent, I want the shared contracts and helpers to exist so that the timeline, 2D, 3D and filter PRDs can be built in parallel without waiting on each other.",
+      "steps": [
+        "Read engine/docs/03-stage-2d.md sections 'The MotionNode contract' and 'Base transform', and engine/docs/02-timeline.md sections 'Target paths' and 'Determinism rules'.",
+        "Create engine/src/core/types.ts with MotionNode, NodeContext and NodeFactory exactly as in 03-stage-2d.md (type-only imports from pixi.js and the schema).",
+        "Create engine/src/core/paths.ts with PropKind, TargetRef and pathRef(root, path, kind), throwing Error('motion: no property \"<path>\"') when a segment is missing.",
+        "Create engine/src/core/seed.ts with seedFor(frame, salt) returning a number in [0, 1) and hashString(s) returning a 32-bit unsigned integer salt.",
+        "Create engine/src/core/transform.ts with applyBaseTransform(display, layer, size) and resolveBaseTarget(display, prop) as specified (pivot = anchor x size, degrees to radians, scale proxy, 4 blend modes; port the blend mode mapping idea from tmp/reacthub-pixitweenjs/src/utils/blendMode.ts).",
+        "Create engine/src/core/index.ts re-exporting clock, paths, seed, transform and types, and tests paths.test.ts, seed.test.ts and transform.test.ts (transform tests use a real pixi.js Container)."
+      ],
+      "acceptanceCriteria": [
+        "pathRef({ rotation: { y: 0 } }, 'rotation.y', 'deg') returns obj === the rotation object, key 'y', kind 'deg'; pathRef({}, 'a.b', 'number') throws an error naming 'a.b'",
+        "seedFor(10, 3) returns the same value on two calls, a value in [0, 1), and differs from seedFor(11, 3)",
+        "applyBaseTransform on a Container with layer { x: 100, y: 50, rotation: 90, scale: [2, 3], anchor: [0.5, 1], alpha: 0.5 } and size 40x20 gives position (100, 50), rotation Math.PI / 2, scale (2, 3), pivot (20, 20), alpha 0.5",
+        "resolveBaseTarget(container, 'scale') returns a ref whose writes set both scale.x and scale.y; resolveBaseTarget(container, 'width') returns null",
+        "engine/src/core/types.ts has no runtime imports (only `import type`)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005",
+        "US-007"
+      ],
+      "labels": [
+        "core"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/README.md",
+      "engine/docs/01-schema.md",
+      "engine/docs/02-timeline.md",
+      "engine/docs/03-stage-2d.md"
+    ],
+    "readFirst": [
+      "engine/docs/README.md (goals, folder layout, decisions D1-D11)",
+      "engine/docs/01-schema.md",
+      "engine/docs/02-timeline.md (MotionClock, target paths, determinism rules)",
+      "engine/docs/03-stage-2d.md (MotionNode contract, base transform)",
+      "engine/docs/port-map.md",
+      "tmp/reacthub-pixitweenjs (read-only copy of the library)"
+    ],
+    "requires": [],
+    "owns": [
+      "engine/README.md",
+      "engine/package.json",
+      "engine/tsconfig.json",
+      "engine/src/core/*",
+      "engine/src/schema/*",
+      "engine/fixtures/basic-2d.json",
+      "engine/fixtures/three-primitives.json",
+      "engine/fixtures/three-gltf.json",
+      "engine/fixtures/three-postfx.json",
+      "engine/fixtures/fixtures.test.ts"
+    ],
+    "sharedEdits": [
+      "package.json",
+      "package-lock.json",
+      "tsconfig.base.json",
+      "web/tsconfig.json",
+      "web/vite.config.ts",
+      "vitest.config.ts",
+      "eslint.config.js"
+    ],
+    "profile": "motion",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; browser checks load assets from web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
+      "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
+      "engine/ must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `@pixi/react` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+      "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
+      "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
+      "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic and object construction; check drawing in the browser. Never weaken a test to make it pass.",
+      "Do not add a dependency the spec does not name (`postprocessing` and `@types/three` are already declared).",
+      "Debug output and screenshots go to debug/engine/ (gitignored). For a browser check use the dev server the owner runs on http://localhost:5173 (do not start another on a different port); if it is not running, run `npm run engine:e2e` instead.",
+      "Record only real results. Never invent measurements or test output.",
+      "Config edits are additive only: add the @engine alias, include paths, scripts, lint block and ignores; change nothing existing. The packages postprocessing and @types/three are already declared."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [],
+    "updatedAt": "2026-10-31T12:33:47.908Z"
+  }
+}
