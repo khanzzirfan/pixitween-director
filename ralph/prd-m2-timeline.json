@@ -1,7 +1,7 @@
 {
   "name": "Engine M2: tween compiler and presets",
-  "branchName": "ralph/m2-timeline",
   "description": "Compiles a layer's tweens and its enter, exit and loop presets onto the MotionClock's GSAP timeline, deterministically, through the TargetRef contract from M1. Tested on plain objects; no Pixi or Three needed.",
+  "branchName": "ralph/m2-timeline",
   "userStories": [
     {
       "id": "US-001",
@@ -25,12 +25,13 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "timeline"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-002",
@@ -51,14 +52,15 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
       ],
       "labels": [
         "timeline"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-003",
@@ -80,12 +82,13 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "timeline"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-004",
@@ -106,7 +109,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -114,7 +117,8 @@
       "labels": [
         "timeline",
         "presets"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-005",
@@ -134,7 +138,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-004"
@@ -142,7 +146,8 @@
       "labels": [
         "timeline",
         "presets"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-006",
@@ -165,7 +170,7 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-005"
@@ -173,7 +178,8 @@
       "labels": [
         "timeline",
         "presets"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-007",
@@ -193,7 +199,7 @@
         "`npm run lint` passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002",
@@ -202,7 +208,8 @@
       ],
       "labels": [
         "timeline"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     }
   ],
   "metadata": {
@@ -250,6 +257,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": []
+    "manualGates": [],
+    "updatedAt": "2026-10-31T14:52:16.134Z"
   }
 }
