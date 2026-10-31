@@ -3,6 +3,7 @@
 import { WRITING_KINDS, type Job, type StyleBible } from '@shared/crew';
 import { ASPECT_SIZES } from '@shared/composition';
 import type { LlmBackend } from '@shared/ports';
+import type { Storyboard } from '@shared/storyboard';
 import type { ToolCtx, ToolDef } from '@shared/tools';
 import { EDIT_ONLY_TOOLS, buildScene } from '../../agent/build-scene';
 import { ensureSceneBasics } from '../../agent/scene-basics';
@@ -17,6 +18,7 @@ import { applyTextLane, fitTextToSafeArea } from '../text-lane';
 import { restoreScene } from '../scene-snapshot';
 import { timedOut, type WorkerResult } from '../scheduler';
 import type { CrewCtx } from '../showrunner-tools';
+import { layerBoxAt, listScenes, runRules, suggestFix } from '../../review/rules';
 import { scopedRunTool } from './scope';
 
 export class SceneGoneError extends Error {
@@ -83,6 +85,32 @@ async function revert(crew: CrewCtx, job: Job, sceneId: string): Promise<WorkerR
   return { summary: `back to before ${previous.id}`, version: r.version };
 }
 
+/** Text the model left outside the safe area, or over the product, is moved by exactly the overflow (the review loop's own fixes), so the result does not depend on the model getting the arithmetic right. */
+export async function snapText(ctx: ToolCtx, sceneId: string, storyboard: Storyboard | undefined): Promise<number> {
+  const run = scopedRunTool(sceneId);
+  let moved = 0;
+  for (let pass = 0; pass < 3; pass++) {
+    const comp = (await ctx.films.get(ctx.filmId)).composition;
+    if (!comp) return moved;
+    const { findings } = await runRules(comp, { read: (id: string) => ctx.assets.read(id) }, { sceneIds: [sceneId], storyboard });
+    const fps = listScenes(comp).find((x) => x.sceneId === sceneId)?.fps ?? 30;
+    const fixes = [];
+    for (const f of findings.filter((x) => x.layerId && ((x.rule === 'R2' && x.kind === 'outside-safe-area') || (x.rule === 'R1' && x.kind === 'text-over-product')))) {
+      let boxes;
+      try {
+        boxes = { [f.layerId!]: layerBoxAt(comp, f.layerId!, Math.round((f.atSec ?? 0) * fps)).box };
+      } catch {
+        continue;
+      }
+      const fix = suggestFix(f, { comp, sceneId, boxes, storyboard });
+      if (fix?.tool === 'setTransform') fixes.push(fix);
+    }
+    if (!fixes.length) return moved;
+    for (const fix of fixes) if ((await run(ctx, fix.tool, fix.args)).ok) moved++;
+  }
+  return moved;
+}
+
 export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx, o: BuilderOptions = {}): Promise<WorkerResult> {
   const sceneId = job.sceneId;
   if (!sceneId) throw new Error(`${job.kind} needs a scene`);
@@ -129,6 +157,7 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
     if ((r.aborted || signal.aborted) && !late) throw abortError();
     const basicsCtx: ToolCtx = late ? { ...ctx, signal: undefined } : ctx;
     if (building) await ensureSceneBasics({ ctx: basicsCtx, scene, product: { assetId: film.brief.productAssetId }, palette });
+    if (!late && r.calls && !r.stalled) await snapText(ctx, sceneId, film.storyboard).catch(() => 0);
     if (!late && (!r.calls || r.stalled)) throw new Error(r.failures.at(-1) ? `builder stalled: ${r.failures.at(-1)}`.slice(0, 280) : 'builder made no progress');
     await runTextLane(crew, job, sceneId, film.styleBible);
     const after = await crew.films.get(job.filmId);

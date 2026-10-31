@@ -29,6 +29,21 @@ export interface FilmVersion {
   at: string;
 }
 
+/** One thing the toy studio makes before a shot can be blocked (S16b): a character, a prop, the set, or a motion clip. */
+export interface CastMember {
+  id: string;
+  kind: 'character' | 'prop' | 'set' | 'motion';
+  name: string;
+  description: string;
+  status: 'queued' | 'running' | 'ready' | 'failed';
+  jobId?: string;
+  /** The model or image asset once it is made (a motion from the library has none: it lives inside the character). */
+  assetId?: string;
+  /** A painted set's floor colour (hex), so the stage's ground matches the plate. */
+  ground?: string;
+  error?: string;
+}
+
 export interface FilmState {
   id: FilmId;
   title?: string;
@@ -46,6 +61,9 @@ export interface FilmState {
   parentId?: FilmId; // set on a take's child film
   styleBible?: StyleBible;
   storyboardRev?: number;
+  /** Motion the cast can play (S16b): `name` is what a cue says; `assetId` is set when the clip is its own file, absent when it is inside the character's model. */
+  clips?: Array<{ id: string; name: string; assetId?: string }>;
+  cast?: CastMember[];
 }
 
 export const FILM_FPS = 30;

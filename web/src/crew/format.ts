@@ -15,6 +15,11 @@ export const KIND_ICON: Record<Job['kind'], string> = {
   critique: '👁',
   continuity: '🔗',
   revert: '↩',
+  'cast-character': '🎭',
+  'make-prop': '🧸',
+  'make-set': '🎬',
+  'make-motion': '🕺',
+  'block-shot': '📐',
 };
 
 export const STATUS_LABEL: Record<Job['status'], string> = {

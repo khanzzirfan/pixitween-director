@@ -5,7 +5,7 @@ import type { ToolDef, ToolResult } from '@shared/tools';
 import { addLayer, setTransform } from '../authoring/api';
 import { readDirector, sceneIds } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
-import { createBoardTools } from './showrunner-tools';
+import { createBoardTools, withoutGenerate } from './showrunner-tools';
 import { makeTestCrew } from './test-helpers';
 
 const settle = () => new Promise<void>((r) => setTimeout(r, 15)); // the bus appends events asynchronously
@@ -267,5 +267,23 @@ describe('say, ask, finish', () => {
     expect((await t.film.films.get(t.film.filmId)).status).toBe('ready');
     await settle();
     expect(t.events.find((e) => e.type === 'film.status')).toMatchObject({ status: 'ready' });
+  });
+
+  it('finish commits the polish: a grade on each scene and the music bed', async () => {
+    const t = await setup();
+    await t.run('reviseStoryboard', { ops: add(2) });
+    expect((await t.run('finish', { summary: 'done' })).ok).toBe(true);
+    const c = (await t.film.films.get(t.film.filmId)).composition as Comp;
+    expect(JSON.stringify(c.precomps)).toContain('finish:s1:grade');
+    expect(JSON.stringify(c.layers)).toContain('finish:music');
+  });
+
+  it('withoutGenerate turns a generate request into a motion scene (no Clippy token)', () => {
+    const ops = withoutGenerate([
+      { op: 'update', sceneId: 's2', patch: { mode: 'generate' } },
+      { op: 'update', sceneId: 's3', patch: { durationSec: 3 } },
+    ] as StoryboardOp[]);
+    expect(ops[0]).toMatchObject({ patch: { mode: 'motion' } });
+    expect(ops[1]).toMatchObject({ patch: { durationSec: 3 } });
   });
 });

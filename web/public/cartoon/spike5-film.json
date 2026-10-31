@@ -1,0 +1,1437 @@
+{
+  "version": "1.9.0",
+  "id": "film",
+  "name": "Coffee Co. cold brew",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "durationInFrames": 480,
+  "bgColor": "#F3E9D7",
+  "assets": {
+    "ast_40a77aa40b0f09dc77cc8603b48bea7f": {
+      "type": "image",
+      "src": "/api/assets/ast_40a77aa40b0f09dc77cc8603b48bea7f",
+      "width": 768,
+      "height": 1152
+    },
+    "ast_5b9364c681324fae1d4950c349c189b2": {
+      "type": "image",
+      "src": "/api/assets/ast_5b9364c681324fae1d4950c349c189b2",
+      "width": 720,
+      "height": 1280
+    },
+    "ast_01954282cd2077aaa269ad1f5bf12dd8": {
+      "type": "image",
+      "src": "/api/assets/ast_01954282cd2077aaa269ad1f5bf12dd8",
+      "width": 720,
+      "height": 1280
+    },
+    "ast_aee1b67d351a422c24c12d127d86e1ea": {
+      "type": "image",
+      "src": "/api/assets/ast_aee1b67d351a422c24c12d127d86e1ea",
+      "width": 256,
+      "height": 752
+    },
+    "ast_a12a592fb1745869795cee4aef81527e": {
+      "type": "image",
+      "src": "/api/assets/ast_a12a592fb1745869795cee4aef81527e",
+      "width": 256,
+      "height": 752
+    },
+    "ast_1a0222d12cb6f0787ade97f6e769707e": {
+      "type": "image",
+      "src": "/api/assets/ast_1a0222d12cb6f0787ade97f6e769707e",
+      "width": 256,
+      "height": 752
+    },
+    "ast_0c6146e6f3c1570db07c202715dcff39": {
+      "type": "image",
+      "src": "/api/assets/ast_0c6146e6f3c1570db07c202715dcff39",
+      "width": 256,
+      "height": 752
+    },
+    "ast_39ae7034f8bc7ef8278535cb9369b8cc": {
+      "type": "image",
+      "src": "/api/assets/ast_39ae7034f8bc7ef8278535cb9369b8cc",
+      "width": 720,
+      "height": 1280
+    },
+    "ast_ea878b28e34f7dd17ba5d0a17b9633ad": {
+      "type": "audio",
+      "src": "/api/assets/ast_ea878b28e34f7dd17ba5d0a17b9633ad",
+      "duration": 480
+    }
+  },
+  "layers": [
+    {
+      "kind": "audio",
+      "id": "finish:music",
+      "name": "music",
+      "inPoint": 0,
+      "outPoint": 480,
+      "assetId": "ast_ea878b28e34f7dd17ba5d0a17b9633ad",
+      "level": 0.7,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "opening",
+      "name": "opening",
+      "inPoint": 0,
+      "outPoint": 120,
+      "compId": "opening",
+      "width": 1080,
+      "height": 1920,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "pour",
+      "name": "pour",
+      "inPoint": 120,
+      "outPoint": 240,
+      "compId": "pour",
+      "width": 1080,
+      "height": 1920,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "label",
+      "name": "label",
+      "inPoint": 240,
+      "outPoint": 360,
+      "compId": "label",
+      "width": 1080,
+      "height": 1920,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "endcard",
+      "name": "endcard",
+      "inPoint": 360,
+      "outPoint": 480,
+      "compId": "endcard",
+      "width": 1080,
+      "height": 1920,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    }
+  ],
+  "precomps": {
+    "opening": {
+      "version": "1.9.0",
+      "id": "opening",
+      "name": "opening",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "ast_39ae7034f8bc7ef8278535cb9369b8cc": {
+          "type": "image",
+          "src": "/api/assets/ast_39ae7034f8bc7ef8278535cb9369b8cc",
+          "width": 720,
+          "height": 1280
+        },
+        "ast_1a0222d12cb6f0787ade97f6e769707e": {
+          "type": "image",
+          "src": "/api/assets/ast_1a0222d12cb6f0787ade97f6e769707e",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "opening:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_39ae7034f8bc7ef8278535cb9369b8cc",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              360,
+              640
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.65,
+                  1.65
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.676653846153846,
+                  1.676653846153846
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "image",
+          "id": "opening:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_1a0222d12cb6f0787ade97f6e769707e",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  648,
+                  1094.4
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  649.7459584295613,
+                  1096.5727482678985
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.2766,
+                  1.2766
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.2972378752886837,
+                  1.2972378752886837
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 4,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 22,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 26,
+                "direction": 180,
+                "softness": 30,
+                "opacity": 0.5,
+                "color": "#1a0f08"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "finish:opening:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:opening:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "opening:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Cold Brew For Slow Mornings",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 96,
+            "fill": "#4A2C1A",
+            "weight": 700,
+            "align": "left",
+            "boxWidth": 920
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  384,
+                  460
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  408,
+                  460
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "pour": {
+      "version": "1.9.0",
+      "id": "pour",
+      "name": "pour",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {},
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "finish:pour:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:pour:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "pour:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Fresh And Ready To Drink",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 90,
+            "fill": "#4A2C1A",
+            "weight": 700,
+            "align": "center",
+            "boxWidth": 900
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  243.2
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  540,
+                  223.2
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "id": "pour:caption",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Clip Pending Approval",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 52,
+            "fill": "#ffffff",
+            "weight": 600,
+            "align": "center",
+            "boxWidth": 864,
+            "letterSpacing": 6
+          },
+          "transform": {
+            "position": [
+              540,
+              1708.8
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "label": {
+      "version": "1.9.0",
+      "id": "label",
+      "name": "label",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "ast_5b9364c681324fae1d4950c349c189b2": {
+          "type": "image",
+          "src": "/api/assets/ast_5b9364c681324fae1d4950c349c189b2",
+          "width": 720,
+          "height": 1280
+        },
+        "ast_1a0222d12cb6f0787ade97f6e769707e": {
+          "type": "image",
+          "src": "/api/assets/ast_1a0222d12cb6f0787ade97f6e769707e",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "label:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_5b9364c681324fae1d4950c349c189b2",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              360,
+              640
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.8,
+                  1.8
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.8332307692307694,
+                  1.8332307692307694
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 15,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "image",
+          "id": "label:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_1a0222d12cb6f0787ade97f6e769707e",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  979.2
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  540,
+                  979.5547344110855
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.7872,
+                  1.7872
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.8202198614318705,
+                  1.8202198614318705
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 3,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 21,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 26,
+                "direction": 180,
+                "softness": 30,
+                "opacity": 0.5,
+                "color": "#1a0f08"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "finish:label:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:label:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "endcard": {
+      "version": "1.9.0",
+      "id": "endcard",
+      "name": "endcard",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "ast_01954282cd2077aaa269ad1f5bf12dd8": {
+          "type": "image",
+          "src": "/api/assets/ast_01954282cd2077aaa269ad1f5bf12dd8",
+          "width": 720,
+          "height": 1280
+        },
+        "ast_aee1b67d351a422c24c12d127d86e1ea": {
+          "type": "image",
+          "src": "/api/assets/ast_aee1b67d351a422c24c12d127d86e1ea",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "endcard:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_01954282cd2077aaa269ad1f5bf12dd8",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              360,
+              640
+            ],
+            "scale": [
+              1.5,
+              1.5
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "image",
+          "id": "endcard:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_aee1b67d351a422c24c12d127d86e1ea",
+          "transform": {
+            "position": [
+              540,
+              758.4
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              1.1489,
+              1.1489
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 26,
+                "direction": 180,
+                "softness": 30,
+                "opacity": 0.5,
+                "color": "#1a0f08"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "finish:endcard:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:endcard:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "endcard:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Cold Brew $4.50",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 110,
+            "fill": "#4a2c1a",
+            "weight": 700,
+            "align": "center",
+            "boxWidth": 972
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  1274
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  540,
+                  1250
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "id": "endcard:caption",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Slow Mornings, Made Fresh Daily",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 52,
+            "fill": "#4a2c1a",
+            "weight": 600,
+            "align": "center",
+            "boxWidth": 972,
+            "letterSpacing": 6
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 4,
+                "v": [
+                  540,
+                  1464
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 19,
+                "v": [
+                  540,
+                  1440
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 4,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 19,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "meta": {
+    "director": {
+      "productNoun": "can",
+      "productShape": "can",
+      "scenes": {
+        "opening": {
+          "precompId": "opening",
+          "startFrame": 0,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Open sound-off clear in 3 seconds: the cold brew can on a wooden counter in morning window light, with a plain headline saying what this is.",
+          "camera": {
+            "move": "dolly-in",
+            "strength": 0.35
+          }
+        },
+        "pour": {
+          "precompId": "pour",
+          "startFrame": 120,
+          "durationFrames": 120,
+          "mode": "generate",
+          "intent": "Show freshness beside the can: a fresh pour in a glass next to the can with gentle steam rising in window light.",
+          "camera": {
+            "move": "static",
+            "strength": 0.5
+          }
+        },
+        "label": {
+          "precompId": "label",
+          "startFrame": 240,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Hero moment about two-thirds through: a slow close look at the can label, its lettering and coffee-bean band filling the vertical frame.",
+          "camera": {
+            "move": "dolly-in",
+            "strength": 0.4
+          }
+        },
+        "endcard": {
+          "precompId": "endcard",
+          "startFrame": 360,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "End card answering the opening slow-morning promise with the clear price.",
+          "camera": {
+            "move": "static",
+            "strength": 0.5
+          }
+        }
+      },
+      "layers": {
+        "label:bg": {
+          "sceneId": "label",
+          "role": "bg",
+          "assetId": "ast_5b9364c681324fae1d4950c349c189b2",
+          "z": 11,
+          "base": {
+            "x": 540,
+            "y": 960,
+            "scale": 1.8
+          }
+        },
+        "endcard:bg": {
+          "sceneId": "endcard",
+          "role": "bg",
+          "assetId": "ast_01954282cd2077aaa269ad1f5bf12dd8",
+          "z": 11,
+          "base": {
+            "x": 540,
+            "y": 960,
+            "scale": 1.5
+          }
+        },
+        "endcard:product": {
+          "sceneId": "endcard",
+          "role": "product",
+          "assetId": "ast_aee1b67d351a422c24c12d127d86e1ea",
+          "z": 10.99,
+          "base": {
+            "x": 540,
+            "y": 758.4,
+            "scale": 1.1489
+          },
+          "maskAssetId": "ast_a12a592fb1745869795cee4aef81527e"
+        },
+        "endcard:headline": {
+          "sceneId": "endcard",
+          "role": "headline",
+          "z": 0
+        },
+        "endcard:caption": {
+          "sceneId": "endcard",
+          "role": "caption",
+          "z": 0
+        },
+        "label:product": {
+          "sceneId": "label",
+          "role": "product",
+          "assetId": "ast_1a0222d12cb6f0787ade97f6e769707e",
+          "z": 10.99,
+          "base": {
+            "x": 540,
+            "y": 979.2,
+            "scale": 1.7872
+          },
+          "maskAssetId": "ast_0c6146e6f3c1570db07c202715dcff39"
+        },
+        "pour:headline": {
+          "sceneId": "pour",
+          "role": "headline",
+          "z": 0
+        },
+        "opening:bg": {
+          "sceneId": "opening",
+          "role": "bg",
+          "assetId": "ast_39ae7034f8bc7ef8278535cb9369b8cc",
+          "z": 11,
+          "base": {
+            "x": 540,
+            "y": 960,
+            "scale": 1.65
+          }
+        },
+        "opening:product": {
+          "sceneId": "opening",
+          "role": "product",
+          "assetId": "ast_1a0222d12cb6f0787ade97f6e769707e",
+          "z": 10.99,
+          "base": {
+            "x": 648,
+            "y": 1094.4,
+            "scale": 1.2766
+          },
+          "maskAssetId": "ast_0c6146e6f3c1570db07c202715dcff39"
+        },
+        "opening:headline": {
+          "sceneId": "opening",
+          "role": "headline",
+          "z": 0
+        },
+        "pour:caption": {
+          "sceneId": "pour",
+          "role": "caption",
+          "z": 0,
+          "placeholder": true
+        }
+      }
+    }
+  }
+}

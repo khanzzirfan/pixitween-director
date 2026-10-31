@@ -18,6 +18,8 @@ export interface BuildSceneOptions {
   palette: string[];
   product: { assetId: string; width: number; height: number };
   maxTurns?: number;
+  /** Replaces the generated system prompt (the toy-studio blocker has its own rules). */
+  systemPrompt?: string;
   /** Appended to the system prompt: the crew's style bible and job brief. */
   extraSystem?: string;
   /** Replaces the default tool list filter (which drops the edit-only tools). */
@@ -45,13 +47,14 @@ export async function buildScene(o: BuildSceneOptions): Promise<BuildSceneResult
     {
       role: 'system',
       content:
-        buildScenePrompt({
-          canvas: o.canvas,
-          scene: o.scene,
-          palette: o.palette,
-          product: o.product,
-          toolNames: tools.map((t) => t.name),
-        }) + (o.extraSystem ? `\n\n${o.extraSystem}` : ''),
+        (o.systemPrompt ??
+          buildScenePrompt({
+            canvas: o.canvas,
+            scene: o.scene,
+            palette: o.palette,
+            product: o.product,
+            toolNames: tools.map((t) => t.name),
+          })) + (o.extraSystem ? `\n\n${o.extraSystem}` : ''),
     },
     { role: 'user', content: JSON.stringify(o.scene) },
   ];

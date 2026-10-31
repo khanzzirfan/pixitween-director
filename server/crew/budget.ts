@@ -16,6 +16,11 @@ export const JOB_ESTIMATE_USD: Record<JobKind, number> = {
   critique: 0.01,
   continuity: 0,
   revert: 0,
+  'cast-character': 0,
+  'make-prop': 0,
+  'make-set': 0,
+  'make-motion': 0,
+  'block-shot': 0.03,
 };
 export const SHOWRUNNER_TURN_USD = 0.06;
 export const WARN_FRACTION = 0.8;

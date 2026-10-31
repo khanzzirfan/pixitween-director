@@ -6,6 +6,8 @@ import { addLayer, removeLayer } from '../authoring/api';
 import { readDirector } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
 import { loadEnv } from '../env';
+import { createCartoonFakeShowrunner, createFakeBlocker } from '../cartoon/fake';
+import { createFixtureForge } from '../cartoon/fixture-forge';
 import type { CrewCtx } from './showrunner-tools';
 import type { WorkerFn } from './workers';
 
@@ -50,6 +52,7 @@ function readBoard(text: string) {
 }
 
 export function createFakeShowrunner(o: { delayMs?: number } = {}): LlmBackend {
+  if (loadEnv().CARTOON_MODE) return createCartoonFakeShowrunner();
   const delay = () => o.delayMs ?? Number(process.env.DIRECTOR_FAKE_DELAY_MS ?? 400);
   let planned = false;
   let warmer = false;
@@ -204,6 +207,7 @@ export function createFakeWorkers(o: { delayMs?: number } = {}): Partial<Record<
   };
 
   return {
+    ...(loadEnv().CARTOON_MODE ? { ...createFixtureForge(o), 'block-shot': createFakeBlocker(o) } : {}),
     'build-scene': change('build-scene'),
     'rebuild-scene': change('rebuild-scene'),
     'restyle-scene': change('restyle-scene'),

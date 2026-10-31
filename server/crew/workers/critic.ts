@@ -7,6 +7,7 @@ import { measuredForRules, type MeasuredBoxes } from '../../review/compare';
 import { runRules } from '../../review/rules';
 import { ReviewError, visualReview, type Reviewer, type VisualFrame } from '../../review/visual';
 import type { Comp } from '../../authoring/types';
+import { sceneHasStage, stageFindings, STAGE_VISION_QUESTIONS } from '../../cartoon/checks';
 import { createId } from '../ids';
 import type { WorkerResult } from '../scheduler';
 import type { CrewCtx } from '../showrunner-tools';
@@ -109,6 +110,15 @@ export async function runCriticJob(job: Job, signal: AbortSignal, crew: CrewCtx,
       lines.push(lineOf(sceneId, f.atSec, f.kind, f.evidence));
     }
 
+    // a toy-studio shot: the stage rules, computed from the stage JSON at the captured times
+    const staged = sceneHasStage(comp, sceneId);
+    if (staged) {
+      for (const f of stageFindings(comp, sceneId, timesSec)) {
+        crew.emit({ type: 'review.finding', sceneId, kind: f.kind, atSec: f.atSec, evidence: f.evidence, deterministic: true });
+        lines.push(lineOf(sceneId, f.atSec, f.kind, f.evidence));
+      }
+    }
+
     let summary = captured ? '' : 'no browser connected; rules only';
     if (captured) {
       try {
@@ -121,6 +131,7 @@ export async function runCriticJob(job: Job, signal: AbortSignal, crew: CrewCtx,
           layerIds: [],
           tools: [],
           blind: true,
+          ...(staged ? { questions: STAGE_VISION_QUESTIONS } : {}),
           measured: measured ? Object.entries(measured).map(([id, b]) => `${id}: left ${Math.round(b.left)}, top ${Math.round(b.top)}, right ${Math.round(b.right)}, bottom ${Math.round(b.bottom)}`) : [],
           ...(o.reviewer ? { reviewer: o.reviewer } : {}),
         });

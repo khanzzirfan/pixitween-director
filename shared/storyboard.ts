@@ -17,6 +17,13 @@ export const sceneSchema = z.object({
   estCredits: z.number().min(0).optional(),
   /** Set when the director asked for this scene; the showrunner may not remove it without a user turn. */
   requestedBy: z.literal('user').optional(),
+  /** Toy-studio films (S16b): the shot's story beats, who is in it and what each does when. */
+  beats: z.string().max(300).optional(),
+  castIds: z.array(z.string().min(1)).optional(),
+  cues: z
+    .array(z.object({ atSec: z.number().min(0), actorId: z.string().min(1), clip: z.string().min(1), mark: z.tuple([z.number(), z.number(), z.number()]).optional() }))
+    .optional(),
+  lightCue: z.enum(['dawn', 'studio', 'spotlight', 'night']).optional(),
 });
 
 export const PRODUCT_SHAPES = ['can', 'bottle', 'box', 'jar', 'tube', 'pouch', 'other'] as const;

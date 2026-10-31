@@ -1,0 +1,2468 @@
+{
+  "version": "1.11.0",
+  "id": "film",
+  "name": "Pip & the Cold Brew",
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "durationInFrames": 720,
+  "bgColor": "#F2E6CC",
+  "assets": {
+    "ast_ed9cd5c59fa7be223b7b33c876c4bcb2": {
+      "type": "image",
+      "src": "/api/assets/ast_ed9cd5c59fa7be223b7b33c876c4bcb2",
+      "width": 768,
+      "height": 1152
+    },
+    "cast-pip": {
+      "type": "model",
+      "src": "/cartoon/toy-character.glb"
+    },
+    "cast-small-toy-bed-with-cream-beddi": {
+      "type": "model",
+      "src": "/cartoon/props/bed.glb"
+    },
+    "cast-woven-floor-rug": {
+      "type": "model",
+      "src": "/cartoon/props/rug.glb"
+    },
+    "cast-bedside-lamp": {
+      "type": "model",
+      "src": "/cartoon/props/lamp.glb"
+    },
+    "cast-painted-bedroom-window": {
+      "type": "model",
+      "src": "/cartoon/props/window.glb"
+    },
+    "cast-walk": {
+      "type": "model",
+      "src": "/cartoon/clip-walk.glb"
+    },
+    "cast-jump": {
+      "type": "model",
+      "src": "/cartoon/clip-jump.glb"
+    },
+    "cast-low-toy-counter": {
+      "type": "model",
+      "src": "/cartoon/props/counter.glb"
+    },
+    "cast-cream-cold-brew-can": {
+      "type": "model",
+      "src": "/cartoon/props/can.glb"
+    },
+    "cast-small-wooden-stool": {
+      "type": "model",
+      "src": "/cartoon/props/chair.glb"
+    },
+    "cast-sunny-window": {
+      "type": "model",
+      "src": "/cartoon/props/window.glb"
+    },
+    "cast-sunny-toy-kitchen": {
+      "type": "image",
+      "src": "/api/assets/ast_7145c340515eac1bd461d5c233c78ec4",
+      "width": 1536,
+      "height": 1024
+    },
+    "cast-cosy-toy-bedroom-at-dawn": {
+      "type": "image",
+      "src": "/api/assets/ast_c402c34d9ec6c968718a0097b0955c52",
+      "width": 1536,
+      "height": 1024
+    },
+    "ast_12759fd30207ba14a4835cad7e1715d7": {
+      "type": "audio",
+      "src": "/api/assets/ast_12759fd30207ba14a4835cad7e1715d7",
+      "duration": 720
+    }
+  },
+  "layers": [
+    {
+      "kind": "audio",
+      "id": "finish:music",
+      "name": "music",
+      "inPoint": 0,
+      "outPoint": 720,
+      "assetId": "ast_12759fd30207ba14a4835cad7e1715d7",
+      "level": 0.7,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "wake",
+      "name": "wake",
+      "inPoint": 0,
+      "outPoint": 120,
+      "compId": "wake",
+      "width": 1920,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "shuffle",
+      "name": "shuffle",
+      "inPoint": 120,
+      "outPoint": 240,
+      "compId": "shuffle",
+      "width": 1920,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "discover",
+      "name": "discover",
+      "inPoint": 240,
+      "outPoint": 360,
+      "compId": "discover",
+      "width": 1920,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "drink",
+      "name": "drink",
+      "inPoint": 360,
+      "outPoint": 480,
+      "compId": "drink",
+      "width": 1920,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "leap",
+      "name": "leap",
+      "inPoint": 480,
+      "outPoint": 600,
+      "compId": "leap",
+      "width": 1920,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "finale",
+      "name": "finale",
+      "inPoint": 600,
+      "outPoint": 720,
+      "compId": "finale",
+      "width": 1920,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    }
+  ],
+  "precomps": {
+    "wake": {
+      "version": "1.11.0",
+      "id": "wake",
+      "name": "wake",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "cast-cosy-toy-bedroom-at-dawn": {
+          "type": "image",
+          "src": "/api/assets/ast_c402c34d9ec6c968718a0097b0955c52",
+          "width": 1536,
+          "height": 1024
+        },
+        "cast-pip": {
+          "type": "model",
+          "src": "/cartoon/toy-character.glb"
+        },
+        "cast-small-toy-bed-with-cream-beddi": {
+          "type": "model",
+          "src": "/cartoon/props/bed.glb"
+        },
+        "cast-woven-floor-rug": {
+          "type": "model",
+          "src": "/cartoon/props/rug.glb"
+        },
+        "cast-painted-bedroom-window": {
+          "type": "model",
+          "src": "/cartoon/props/window.glb"
+        },
+        "cast-bedside-lamp": {
+          "type": "model",
+          "src": "/cartoon/props/lamp.glb"
+        }
+      },
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "wake:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#F2E6CC",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "wake:world",
+          "name": "World",
+          "kind": "stage3d",
+          "inPoint": 0,
+          "outPoint": 120,
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "viewport": {
+            "width": 1920,
+            "height": 1080
+          },
+          "camera": {
+            "position": [
+              0,
+              1.7,
+              7.4
+            ],
+            "target": [
+              0,
+              0.9,
+              0
+            ],
+            "fov": 35
+          },
+          "set": {
+            "backdrop": "cast-cosy-toy-bedroom-at-dawn",
+            "wall": {
+              "distance": 3,
+              "height": 3.2,
+              "curve": 0.4
+            },
+            "groundSize": [
+              16,
+              8
+            ],
+            "ground": "#dbcebb"
+          },
+          "lights": {
+            "preset": "golden",
+            "key": {
+              "elevation": 12,
+              "intensity": [
+                {
+                  "t": 0,
+                  "v": 0
+                },
+                {
+                  "t": 30,
+                  "v": 2.2
+                }
+              ],
+              "color": "#ffd9a8"
+            },
+            "fill": {
+              "intensity": 0.5
+            },
+            "rim": {
+              "intensity": 0.8
+            }
+          },
+          "style": {
+            "shading": "toon",
+            "toonSteps": 3,
+            "outline": {
+              "width": 0.012
+            }
+          }
+        },
+        {
+          "id": "wake:pip",
+          "name": "pip",
+          "kind": "actor3d",
+          "stage": "wake:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "cast-pip",
+          "marks": [
+            -1.5,
+            0,
+            0
+          ],
+          "clips": [
+            {
+              "name": "Idle",
+              "startFrame": 0,
+              "loop": true
+            },
+            {
+              "name": "yawn",
+              "startFrame": 15,
+              "fadeFrames": 6
+            }
+          ]
+        },
+        {
+          "id": "wake:bed",
+          "name": "bed",
+          "kind": "prop3d",
+          "stage": "wake:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-small-toy-bed-with-cream-beddi"
+          },
+          "size": 1,
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "wake:rug",
+          "name": "rug",
+          "kind": "prop3d",
+          "stage": "wake:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-woven-floor-rug"
+          },
+          "size": 0.9,
+          "position": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "id": "wake:window",
+          "name": "window",
+          "kind": "prop3d",
+          "stage": "wake:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-painted-bedroom-window"
+          },
+          "size": 0.8,
+          "position": [
+            0,
+            0,
+            -1
+          ]
+        },
+        {
+          "id": "wake:lamp",
+          "name": "lamp",
+          "kind": "prop3d",
+          "stage": "wake:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-bedside-lamp"
+          },
+          "size": 0.3,
+          "position": [
+            1.5,
+            0,
+            -1
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "finish:wake:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:wake:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "wake:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "TIRED MORNING?",
+          "style": {
+            "font": "ui-rounded, \"SF Pro Rounded\", system-ui, sans-serif",
+            "size": 76,
+            "fill": "#3B2A22",
+            "weight": 700,
+            "align": "center",
+            "boxWidth": 1536
+          },
+          "transform": {
+            "position": [
+              960,
+              172.8
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "shuffle": {
+      "version": "1.11.0",
+      "id": "shuffle",
+      "name": "shuffle",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "cast-cosy-toy-bedroom-at-dawn": {
+          "type": "image",
+          "src": "/api/assets/ast_c402c34d9ec6c968718a0097b0955c52",
+          "width": 1536,
+          "height": 1024
+        },
+        "cast-pip": {
+          "type": "model",
+          "src": "/cartoon/toy-character.glb"
+        },
+        "cast-small-toy-bed-with-cream-beddi": {
+          "type": "model",
+          "src": "/cartoon/props/bed.glb"
+        },
+        "cast-woven-floor-rug": {
+          "type": "model",
+          "src": "/cartoon/props/rug.glb"
+        },
+        "cast-painted-bedroom-window": {
+          "type": "model",
+          "src": "/cartoon/props/window.glb"
+        },
+        "cast-walk": {
+          "type": "model",
+          "src": "/cartoon/clip-walk.glb"
+        }
+      },
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "shuffle:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#F2E6CC",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "shuffle:world",
+          "name": "World",
+          "kind": "stage3d",
+          "inPoint": 0,
+          "outPoint": 120,
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "viewport": {
+            "width": 1920,
+            "height": 1080
+          },
+          "camera": {
+            "position": [
+              0,
+              1.4,
+              6
+            ],
+            "target": [
+              0,
+              0.9,
+              0
+            ],
+            "fov": 35
+          },
+          "set": {
+            "backdrop": "cast-cosy-toy-bedroom-at-dawn",
+            "wall": {
+              "distance": 3,
+              "height": 3.2,
+              "curve": 0.4
+            },
+            "groundSize": [
+              16,
+              8
+            ],
+            "ground": "#dbcebb"
+          },
+          "lights": {
+            "preset": "golden",
+            "key": {
+              "elevation": 12,
+              "intensity": [
+                {
+                  "t": 0,
+                  "v": 0
+                },
+                {
+                  "t": 30,
+                  "v": 2.2
+                }
+              ],
+              "color": "#ffd9a8"
+            },
+            "fill": {
+              "intensity": 0.5
+            },
+            "rim": {
+              "intensity": 0.8
+            }
+          },
+          "style": {
+            "shading": "toon",
+            "toonSteps": 3,
+            "outline": {
+              "width": 0.012
+            }
+          }
+        },
+        {
+          "id": "shuffle:pip",
+          "name": "pip",
+          "kind": "actor3d",
+          "stage": "shuffle:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "cast-pip",
+          "marks": [
+            {
+              "t": 0,
+              "v": [
+                -1.5,
+                0,
+                270
+              ],
+              "easeOut": [
+                0.42,
+                0,
+                0.58,
+                1
+              ]
+            },
+            {
+              "t": 96,
+              "v": [
+                1.5,
+                0,
+                270
+              ]
+            }
+          ],
+          "clips": [
+            {
+              "clipAssetId": "cast-walk",
+              "startFrame": 0,
+              "speed": 0.6,
+              "fadeFrames": 6
+            },
+            {
+              "name": "yawn",
+              "startFrame": 102,
+              "fadeFrames": 6
+            }
+          ]
+        },
+        {
+          "id": "shuffle:bed",
+          "name": "bed",
+          "kind": "prop3d",
+          "stage": "shuffle:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-small-toy-bed-with-cream-beddi"
+          },
+          "size": 1,
+          "position": [
+            -1.5,
+            0,
+            -1
+          ]
+        },
+        {
+          "id": "shuffle:rug",
+          "name": "rug",
+          "kind": "prop3d",
+          "stage": "shuffle:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-woven-floor-rug"
+          },
+          "size": 0.9,
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "shuffle:window",
+          "name": "window",
+          "kind": "prop3d",
+          "stage": "shuffle:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-painted-bedroom-window"
+          },
+          "size": 0.9,
+          "position": [
+            0,
+            0.5,
+            -1
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "finish:shuffle:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:shuffle:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "discover": {
+      "version": "1.11.0",
+      "id": "discover",
+      "name": "discover",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "cast-sunny-toy-kitchen": {
+          "type": "image",
+          "src": "/api/assets/ast_7145c340515eac1bd461d5c233c78ec4",
+          "width": 1536,
+          "height": 1024
+        },
+        "cast-pip": {
+          "type": "model",
+          "src": "/cartoon/toy-character.glb"
+        },
+        "cast-low-toy-counter": {
+          "type": "model",
+          "src": "/cartoon/props/counter.glb"
+        },
+        "cast-sunny-window": {
+          "type": "model",
+          "src": "/cartoon/props/window.glb"
+        },
+        "cast-walk": {
+          "type": "model",
+          "src": "/cartoon/clip-walk.glb"
+        },
+        "cast-cream-cold-brew-can": {
+          "type": "model",
+          "src": "/cartoon/props/can.glb"
+        }
+      },
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "discover:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#F2E6CC",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "discover:world",
+          "name": "World",
+          "kind": "stage3d",
+          "inPoint": 0,
+          "outPoint": 120,
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "viewport": {
+            "width": 1920,
+            "height": 1080
+          },
+          "camera": {
+            "position": [
+              0,
+              1.7,
+              7.4
+            ],
+            "target": [
+              0,
+              0.9,
+              0
+            ],
+            "fov": 35
+          },
+          "set": {
+            "backdrop": "cast-sunny-toy-kitchen",
+            "wall": {
+              "distance": 3,
+              "height": 3.2,
+              "curve": 0.4
+            },
+            "groundSize": [
+              16,
+              8
+            ],
+            "ground": "#d5d4c5"
+          },
+          "lights": {
+            "preset": "studio",
+            "key": {
+              "elevation": 30,
+              "intensity": 2.2
+            },
+            "fill": {
+              "intensity": 0.6
+            },
+            "rim": {
+              "intensity": 0.5
+            }
+          },
+          "style": {
+            "shading": "toon",
+            "toonSteps": 3,
+            "outline": {
+              "width": 0.012
+            }
+          }
+        },
+        {
+          "id": "discover:pip",
+          "name": "pip",
+          "kind": "actor3d",
+          "stage": "discover:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "cast-pip",
+          "marks": [
+            {
+              "t": 0,
+              "v": [
+                -1.5,
+                0,
+                -90
+              ],
+              "easeOut": [
+                0.42,
+                0,
+                0.58,
+                1
+              ]
+            },
+            {
+              "t": 60,
+              "v": [
+                0,
+                0,
+                -45
+              ]
+            }
+          ],
+          "clips": [
+            {
+              "clipAssetId": "cast-walk",
+              "startFrame": 0,
+              "fadeFrames": 6
+            },
+            {
+              "name": "point",
+              "startFrame": 66,
+              "fadeFrames": 6
+            }
+          ]
+        },
+        {
+          "id": "discover:counter",
+          "name": "counter",
+          "kind": "prop3d",
+          "stage": "discover:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-low-toy-counter"
+          },
+          "size": 0.9,
+          "position": [
+            1.5,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "discover:window",
+          "name": "window",
+          "kind": "prop3d",
+          "stage": "discover:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-sunny-window"
+          },
+          "size": 0.9,
+          "position": [
+            1.5,
+            1.2,
+            1
+          ]
+        },
+        {
+          "id": "discover:can",
+          "name": "can",
+          "kind": "prop3d",
+          "stage": "discover:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "role": "product",
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-cream-cold-brew-can"
+          },
+          "size": 0.3,
+          "position": [
+            1.5,
+            1,
+            0
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "finish:discover:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:discover:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "drink": {
+      "version": "1.11.0",
+      "id": "drink",
+      "name": "drink",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "cast-sunny-toy-kitchen": {
+          "type": "image",
+          "src": "/api/assets/ast_7145c340515eac1bd461d5c233c78ec4",
+          "width": 1536,
+          "height": 1024
+        },
+        "cast-pip": {
+          "type": "model",
+          "src": "/cartoon/toy-character.glb"
+        },
+        "cast-low-toy-counter": {
+          "type": "model",
+          "src": "/cartoon/props/counter.glb"
+        },
+        "cast-cream-cold-brew-can": {
+          "type": "model",
+          "src": "/cartoon/props/can.glb"
+        }
+      },
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "drink:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#F2E6CC",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "drink:world",
+          "name": "World",
+          "kind": "stage3d",
+          "inPoint": 0,
+          "outPoint": 120,
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "viewport": {
+            "width": 1920,
+            "height": 1080
+          },
+          "camera": {
+            "position": [
+              0,
+              1.1,
+              3.6
+            ],
+            "target": [
+              0,
+              0.9,
+              0
+            ],
+            "fov": 35
+          },
+          "set": {
+            "backdrop": "cast-sunny-toy-kitchen",
+            "wall": {
+              "distance": 3,
+              "height": 3.2,
+              "curve": 0.4
+            },
+            "groundSize": [
+              16,
+              8
+            ],
+            "ground": "#d5d4c5"
+          },
+          "lights": {
+            "preset": "studio",
+            "key": {
+              "elevation": 30,
+              "intensity": 2.2
+            },
+            "fill": {
+              "intensity": 0.6
+            },
+            "rim": {
+              "intensity": 0.5
+            }
+          },
+          "style": {
+            "shading": "toon",
+            "toonSteps": 3,
+            "outline": {
+              "width": 0.012
+            }
+          }
+        },
+        {
+          "id": "drink:pip",
+          "name": "pip",
+          "kind": "actor3d",
+          "stage": "drink:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "cast-pip",
+          "marks": [
+            0,
+            0,
+            0
+          ],
+          "clips": [
+            {
+              "name": "Idle",
+              "startFrame": 0,
+              "loop": true
+            },
+            {
+              "name": "reach",
+              "startFrame": 9,
+              "fadeFrames": 6
+            },
+            {
+              "name": "drink",
+              "startFrame": 36,
+              "fadeFrames": 6
+            },
+            {
+              "name": "celebrate",
+              "startFrame": 84,
+              "fadeFrames": 6
+            }
+          ]
+        },
+        {
+          "id": "drink:counter",
+          "name": "counter",
+          "kind": "prop3d",
+          "stage": "drink:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-low-toy-counter"
+          },
+          "size": 0.9,
+          "position": [
+            1.5,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "drink:coldbrew",
+          "name": "coldbrew",
+          "kind": "prop3d",
+          "stage": "drink:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "role": "product",
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-cream-cold-brew-can"
+          },
+          "size": 0.3,
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "attach": {
+            "actor": "drink:pip",
+            "bone": "RightHand"
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:drink:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:drink:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "leap": {
+      "version": "1.11.0",
+      "id": "leap",
+      "name": "leap",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "cast-sunny-toy-kitchen": {
+          "type": "image",
+          "src": "/api/assets/ast_7145c340515eac1bd461d5c233c78ec4",
+          "width": 1536,
+          "height": 1024
+        },
+        "cast-pip": {
+          "type": "model",
+          "src": "/cartoon/toy-character.glb"
+        },
+        "cast-low-toy-counter": {
+          "type": "model",
+          "src": "/cartoon/props/counter.glb"
+        },
+        "cast-cream-cold-brew-can": {
+          "type": "model",
+          "src": "/cartoon/props/can.glb"
+        },
+        "cast-jump": {
+          "type": "model",
+          "src": "/cartoon/clip-jump.glb"
+        }
+      },
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "leap:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#F2E6CC",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "leap:world",
+          "name": "World",
+          "kind": "stage3d",
+          "inPoint": 0,
+          "outPoint": 120,
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "viewport": {
+            "width": 1920,
+            "height": 1080
+          },
+          "camera": {
+            "position": [
+              0,
+              0.35,
+              5
+            ],
+            "target": [
+              0,
+              1.1,
+              0
+            ],
+            "fov": 40
+          },
+          "set": {
+            "backdrop": "cast-sunny-toy-kitchen",
+            "wall": {
+              "distance": 3,
+              "height": 3.2,
+              "curve": 0.4
+            },
+            "groundSize": [
+              16,
+              8
+            ],
+            "ground": "#d5d4c5"
+          },
+          "lights": {
+            "preset": "studio",
+            "key": {
+              "elevation": 55,
+              "intensity": 3.2
+            },
+            "fill": {
+              "intensity": 0.15
+            },
+            "rim": {
+              "intensity": 0.3
+            }
+          },
+          "style": {
+            "shading": "toon",
+            "toonSteps": 3,
+            "outline": {
+              "width": 0.012
+            }
+          }
+        },
+        {
+          "id": "leap:pip",
+          "name": "pip",
+          "kind": "actor3d",
+          "stage": "leap:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "cast-pip",
+          "marks": [
+            -1.5,
+            0,
+            0
+          ],
+          "clips": [
+            {
+              "name": "Idle",
+              "startFrame": 0,
+              "loop": true
+            },
+            {
+              "clipAssetId": "cast-jump",
+              "startFrame": 24,
+              "fadeFrames": 6
+            },
+            {
+              "name": "celebrate",
+              "startFrame": 72,
+              "fadeFrames": 6
+            }
+          ]
+        },
+        {
+          "id": "leap:counter",
+          "name": "counter",
+          "kind": "prop3d",
+          "stage": "leap:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-low-toy-counter"
+          },
+          "size": 0.9,
+          "position": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": "leap:can",
+          "name": "can",
+          "kind": "prop3d",
+          "stage": "leap:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "role": "product",
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-cream-cold-brew-can"
+          },
+          "size": 0.3,
+          "position": [
+            0,
+            0.8,
+            0
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "finish:leap:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:leap:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "finale": {
+      "version": "1.11.0",
+      "id": "finale",
+      "name": "finale",
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "cast-sunny-toy-kitchen": {
+          "type": "image",
+          "src": "/api/assets/ast_7145c340515eac1bd461d5c233c78ec4",
+          "width": 1536,
+          "height": 1024
+        },
+        "cast-pip": {
+          "type": "model",
+          "src": "/cartoon/toy-character.glb"
+        },
+        "cast-cream-cold-brew-can": {
+          "type": "model",
+          "src": "/cartoon/props/can.glb"
+        }
+      },
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "finale:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#F2E6CC",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "id": "finale:world",
+          "name": "World",
+          "kind": "stage3d",
+          "inPoint": 0,
+          "outPoint": 120,
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "viewport": {
+            "width": 1920,
+            "height": 1080
+          },
+          "camera": {
+            "position": [
+              0,
+              1.1,
+              3.6
+            ],
+            "target": [
+              0,
+              0.9,
+              0
+            ],
+            "fov": 35
+          },
+          "set": {
+            "backdrop": "cast-sunny-toy-kitchen",
+            "wall": {
+              "distance": 3,
+              "height": 3.2,
+              "curve": 0.4
+            },
+            "groundSize": [
+              16,
+              8
+            ],
+            "ground": "#d5d4c5"
+          },
+          "lights": {
+            "preset": "studio",
+            "key": {
+              "elevation": 30,
+              "intensity": 2.2
+            },
+            "fill": {
+              "intensity": 0.6
+            },
+            "rim": {
+              "intensity": 0.5
+            }
+          },
+          "style": {
+            "shading": "toon",
+            "toonSteps": 3,
+            "outline": {
+              "width": 0.012
+            }
+          }
+        },
+        {
+          "id": "finale:pip",
+          "name": "pip",
+          "kind": "actor3d",
+          "stage": "finale:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "cast-pip",
+          "marks": [
+            0,
+            -1,
+            0
+          ],
+          "clips": [
+            {
+              "name": "Idle",
+              "startFrame": 0,
+              "loop": true
+            },
+            {
+              "name": "celebrate",
+              "startFrame": 15,
+              "fadeFrames": 6
+            }
+          ]
+        },
+        {
+          "id": "finale:can",
+          "name": "can",
+          "kind": "prop3d",
+          "stage": "finale:world",
+          "inPoint": 0,
+          "outPoint": 120,
+          "role": "product",
+          "source": {
+            "type": "gltf",
+            "assetId": "cast-cream-cold-brew-can"
+          },
+          "size": 0.4,
+          "position": [
+            1.5,
+            0.2,
+            1
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "finish:finale:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:finale:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1920,
+              1080
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              960,
+              540
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "finale:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "WAKE UP HAPPY.",
+          "style": {
+            "font": "ui-rounded, \"SF Pro Rounded\", system-ui, sans-serif",
+            "size": 76,
+            "fill": "#3B2A22",
+            "weight": 700,
+            "align": "center",
+            "boxWidth": 1536
+          },
+          "transform": {
+            "position": [
+              960,
+              172.8
+            ],
+            "anchor": [
+              960,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "meta": {
+    "director": {
+      "scenes": {
+        "wake": {
+          "precompId": "wake",
+          "startFrame": 0,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Wide opening in cosy toy bedroom at dawn; Pip wakes tired, readable mute in 3 seconds",
+          "camera": {
+            "move": "static",
+            "strength": 0.5
+          }
+        },
+        "shuffle": {
+          "precompId": "shuffle",
+          "startFrame": 120,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Closer bedroom shot; tired Pip shuffles toward the door, building toward the kitchen",
+          "camera": {
+            "move": "static",
+            "strength": 0.5
+          }
+        },
+        "discover": {
+          "precompId": "discover",
+          "startFrame": 240,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "New place, sunny toy kitchen wide; Pip enters and first sees the cold brew can on the counter",
+          "camera": {
+            "move": "static",
+            "strength": 0.5
+          }
+        },
+        "drink": {
+          "precompId": "drink",
+          "startFrame": 360,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Closer kitchen detail; Pip reaches for the can and drinks, the turning point",
+          "camera": {
+            "move": "static",
+            "strength": 0.5
+          }
+        },
+        "leap": {
+          "precompId": "leap",
+          "startFrame": 480,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Hero moment at two-thirds: low heroic locked angle as energised Pip leaps for joy in kitchen",
+          "camera": {
+            "move": "static",
+            "strength": 0.5
+          }
+        },
+        "finale": {
+          "precompId": "finale",
+          "startFrame": 600,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Ending answers the opening: close on the cold brew can, happy Pip behind it",
+          "camera": {
+            "move": "static",
+            "strength": 0.5
+          }
+        }
+      },
+      "layers": {
+        "wake:bg": {
+          "sceneId": "wake",
+          "role": "bg",
+          "z": 10,
+          "base": {
+            "x": 960,
+            "y": 540,
+            "scale": 1
+          }
+        },
+        "shuffle:bg": {
+          "sceneId": "shuffle",
+          "role": "bg",
+          "z": 10,
+          "base": {
+            "x": 960,
+            "y": 540,
+            "scale": 1
+          }
+        },
+        "wake:headline": {
+          "sceneId": "wake",
+          "role": "headline",
+          "z": 0
+        },
+        "discover:bg": {
+          "sceneId": "discover",
+          "role": "bg",
+          "z": 10,
+          "base": {
+            "x": 960,
+            "y": 540,
+            "scale": 1
+          }
+        },
+        "drink:bg": {
+          "sceneId": "drink",
+          "role": "bg",
+          "z": 10,
+          "base": {
+            "x": 960,
+            "y": 540,
+            "scale": 1
+          }
+        },
+        "wake:world": {
+          "sceneId": "wake",
+          "role": "stage3d",
+          "z": 5
+        },
+        "wake:pip": {
+          "sceneId": "wake",
+          "role": "actor3d",
+          "assetId": "cast-pip",
+          "z": 5
+        },
+        "wake:bed": {
+          "sceneId": "wake",
+          "role": "prop3d",
+          "assetId": "cast-small-toy-bed-with-cream-beddi",
+          "z": 5
+        },
+        "wake:rug": {
+          "sceneId": "wake",
+          "role": "prop3d",
+          "assetId": "cast-woven-floor-rug",
+          "z": 5
+        },
+        "wake:window": {
+          "sceneId": "wake",
+          "role": "prop3d",
+          "assetId": "cast-painted-bedroom-window",
+          "z": 5
+        },
+        "wake:lamp": {
+          "sceneId": "wake",
+          "role": "prop3d",
+          "assetId": "cast-bedside-lamp",
+          "z": 5
+        },
+        "shuffle:world": {
+          "sceneId": "shuffle",
+          "role": "stage3d",
+          "z": 5
+        },
+        "drink:world": {
+          "sceneId": "drink",
+          "role": "stage3d",
+          "z": 5
+        },
+        "discover:world": {
+          "sceneId": "discover",
+          "role": "stage3d",
+          "z": 5
+        },
+        "drink:pip": {
+          "sceneId": "drink",
+          "role": "actor3d",
+          "assetId": "cast-pip",
+          "z": 5
+        },
+        "drink:counter": {
+          "sceneId": "drink",
+          "role": "prop3d",
+          "assetId": "cast-low-toy-counter",
+          "z": 5
+        },
+        "drink:coldbrew": {
+          "sceneId": "drink",
+          "role": "prop3d",
+          "assetId": "cast-cream-cold-brew-can",
+          "z": 5
+        },
+        "leap:bg": {
+          "sceneId": "leap",
+          "role": "bg",
+          "z": 10,
+          "base": {
+            "x": 960,
+            "y": 540,
+            "scale": 1
+          }
+        },
+        "shuffle:pip": {
+          "sceneId": "shuffle",
+          "role": "actor3d",
+          "assetId": "cast-pip",
+          "z": 5
+        },
+        "shuffle:bed": {
+          "sceneId": "shuffle",
+          "role": "prop3d",
+          "assetId": "cast-small-toy-bed-with-cream-beddi",
+          "z": 5
+        },
+        "shuffle:rug": {
+          "sceneId": "shuffle",
+          "role": "prop3d",
+          "assetId": "cast-woven-floor-rug",
+          "z": 5
+        },
+        "shuffle:window": {
+          "sceneId": "shuffle",
+          "role": "prop3d",
+          "assetId": "cast-painted-bedroom-window",
+          "z": 5
+        },
+        "leap:world": {
+          "sceneId": "leap",
+          "role": "stage3d",
+          "z": 5
+        },
+        "discover:pip": {
+          "sceneId": "discover",
+          "role": "actor3d",
+          "assetId": "cast-pip",
+          "z": 5
+        },
+        "discover:counter": {
+          "sceneId": "discover",
+          "role": "prop3d",
+          "assetId": "cast-low-toy-counter",
+          "z": 5
+        },
+        "discover:window": {
+          "sceneId": "discover",
+          "role": "prop3d",
+          "assetId": "cast-sunny-window",
+          "z": 5
+        },
+        "leap:pip": {
+          "sceneId": "leap",
+          "role": "actor3d",
+          "assetId": "cast-pip",
+          "z": 5
+        },
+        "leap:counter": {
+          "sceneId": "leap",
+          "role": "prop3d",
+          "assetId": "cast-low-toy-counter",
+          "z": 5
+        },
+        "leap:can": {
+          "sceneId": "leap",
+          "role": "prop3d",
+          "assetId": "cast-cream-cold-brew-can",
+          "z": 5
+        },
+        "discover:can": {
+          "sceneId": "discover",
+          "role": "prop3d",
+          "assetId": "cast-cream-cold-brew-can",
+          "z": 5
+        },
+        "finale:bg": {
+          "sceneId": "finale",
+          "role": "bg",
+          "z": 10,
+          "base": {
+            "x": 960,
+            "y": 540,
+            "scale": 1
+          }
+        },
+        "finale:headline": {
+          "sceneId": "finale",
+          "role": "headline",
+          "z": 0
+        },
+        "finale:world": {
+          "sceneId": "finale",
+          "role": "stage3d",
+          "z": 5
+        },
+        "finale:pip": {
+          "sceneId": "finale",
+          "role": "actor3d",
+          "assetId": "cast-pip",
+          "z": 5
+        },
+        "finale:can": {
+          "sceneId": "finale",
+          "role": "prop3d",
+          "assetId": "cast-cream-cold-brew-can",
+          "z": 5
+        }
+      }
+    }
+  }
+}

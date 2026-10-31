@@ -2,17 +2,16 @@
 import { z } from 'zod';
 import { sceneSchema } from './storyboard';
 
-
-export const LANES = ['showrunner', 'builder', 'critic', 'continuity', 'producer', 'listener', 'local'] as const;
+export const LANES = ['showrunner', 'builder', 'critic', 'continuity', 'producer', 'listener', 'local', 'forge'] as const;
 export const laneSchema = z.enum(LANES);
 export type Lane = z.infer<typeof laneSchema>;
 
-export const JOB_KINDS = ['build-scene', 'rebuild-scene', 'restyle-scene', 'edit', 'fix', 'take', 'critique', 'continuity', 'revert'] as const;
+export const JOB_KINDS = ['build-scene', 'rebuild-scene', 'restyle-scene', 'edit', 'fix', 'take', 'critique', 'continuity', 'revert', 'cast-character', 'make-prop', 'make-set', 'make-motion', 'block-shot'] as const;
 export const jobKindSchema = z.enum(JOB_KINDS);
 export type JobKind = z.infer<typeof jobKindSchema>;
 
 /** Kinds that change a scene's layers: at most one of them runs per scene at a time. */
-export const WRITING_KINDS: readonly JobKind[] = ['build-scene', 'rebuild-scene', 'restyle-scene', 'edit', 'fix', 'revert'];
+export const WRITING_KINDS: readonly JobKind[] = ['build-scene', 'rebuild-scene', 'restyle-scene', 'edit', 'fix', 'revert', 'block-shot'];
 
 export const jobStatusSchema = z.enum(['queued', 'running', 'awaiting-frames', 'done', 'failed', 'cancelled', 'superseded']);
 export type JobStatus = z.infer<typeof jobStatusSchema>;
