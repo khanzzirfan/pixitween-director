@@ -1,0 +1,201 @@
+{
+  "name": "Engine R3: effects for 2D layers and the stage (glow, drop shadow, outline, isolation)",
+  "branchName": "ralph/r3-effects",
+  "description": "Gives 2D layers the looks the Pixi filters gave, on Three: custom glow, drop shadow and outline effects for postprocessing, layer isolation (render one layer into its own target through the chain and show it on a plane), doc-level stage effects, and the effects-2d fixture.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "GlowEffect: outer glow from the alpha around each pixel",
+      "description": "As an author, I want a glow on a title or a cut-out so that it lifts off the background like the library's glow filter.",
+      "steps": [
+        "Read engine/docs/05-effects.md ('Effect types' rows glow, dropShadow, outline and the paragraph on custom effects), node_modules/pixi-filters/lib/glow (shader source, read only) and the Effect class in node_modules/postprocessing/build/types/index.d.ts.",
+        "Create engine/src/effects/custom/glow.ts exporting class GlowEffect extends Effect with uniforms color, strength, distance (px) and texel size; the fragment shader samples the input alpha at 16 directions times 2 radii up to distance, builds a glow mask, and composites color x mask x strength behind the input (keeps the input pixel where alpha is 1).",
+        "Expose setters/getters for color (hex string), strength and distance, and update the texel size in setSize.",
+        "Create engine/src/effects/custom/glow.test.ts (construction in jsdom, uniforms, setters)."
+      ],
+      "acceptanceCriteria": [
+        "new GlowEffect({ color: '#ffd27a', strength: 2, distance: 10 }) has uniform strength 2, distance 10, and color equal to new THREE.Color('#ffd27a') (within 1e-6 per channel)",
+        "Setting color to '#000000' updates the uniform; getting color returns '#000000'",
+        "setSize(400, 200) sets the texel uniform to (1/400, 1/200)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "effects"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "DropShadowEffect and OutlineEffect2D",
+      "description": "As an author, I want drop shadows and outlines on 2D layers so that text and cut-outs read on busy backgrounds.",
+      "steps": [
+        "Read engine/docs/05-effects.md (dropShadow and outline rows), engine/src/effects/custom/glow.ts and node_modules/pixi-filters/lib/drop-shadow and outline shader sources (read only).",
+        "Create engine/src/effects/custom/dropShadow.ts (offset = distance in the direction of angle degrees, soft edge by averaging alpha over a disc of radius blur with 16 taps, colour x alpha composited behind the input) and engine/src/effects/custom/outline.ts (outline of thickness px from 16 alpha taps, colour x alpha behind the input), each with getters and setters for their params.",
+        "Create tests dropShadow.test.ts and outline.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "DropShadowEffect({ distance: 6, angle: 45 }) has an offset uniform of (6 cos 45°, -6 sin 45°) in pixels (y down in the doc becomes y up in UV) within 1e-6",
+        "Setting angle to 90 updates the offset uniform to (0, -6); alpha and color setters update their uniforms",
+        "OutlineEffect2D({ thickness: 3, color: '#ff0000' }) exposes thickness 3 and the red colour, and its setters update the uniforms",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "effects"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Register custom effects in the table; effectReach for padding",
+      "description": "As a runtime author, I want glow, dropShadow and outline in the same effect table with tweenable params and a reach for padding so that isolation can size its target.",
+      "steps": [
+        "Read engine/src/effects/table.ts (R1) and engine/docs/05-effects.md ('The effect table', 'Layer isolation' padding rule).",
+        "Add glow, dropShadow and outline to EFFECTS with scope '2d', the defaults of the table, and tweenables (colour kind for colours, deg for angle).",
+        "Add effectReach(spec) to engine/src/effects/table.ts: glow distance, dropShadow distance + blur, outline thickness, blur 32, others 0; and export padding(effects) = ceil(max reach).",
+        "Extend engine/src/effects/table.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "EFFECTS.glow.scope is '2d' and every tweenable key of glow, dropShadow and outline round-trips through set and get",
+        "padding([{ type: 'glow', params: { distance: 10 } }, { type: 'dropShadow', params: { distance: 6, blur: 4 } }]) is 10; with blur present it is 32; with only vignette it is 0",
+        "Existing table tests still pass",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "effects"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "isolateNode: render one layer through its effects into a target shown on a plane",
+      "description": "As an author, I want effects on a single 2D layer that move, rotate and fade with it so that a glowing title behaves like the library's filtered sprite.",
+      "steps": [
+        "Read engine/docs/05-effects.md section 'Layer isolation', engine/docs/03-stage-2d.md 'Base transform' and engine/src/effects/chain.ts (output target, test factory).",
+        "Create engine/src/effects/isolate.ts exporting isolateNode(node, effects, renderer) and IsolatedNode as specified: padding from padding(effects); a private Scene that receives the node's content group; an OrthographicCamera covering [-padding, width + padding] x [padding, -(height + padding)]; a WebGLRenderTarget of (width + 2 padding) x (height + 2 padding); a chain with output that target and toneMapping false; a plane with the target texture (configure2DMaterial, toneMapped false) added to node.display at the content offset minus padding; update renders only the chain; dispose releases target, plane and chain and puts the content back.",
+        "renderer null uses the chain test factory.",
+        "Create engine/src/effects/isolate.test.ts with a fake node (display and content groups, size 200x100) and a fake chain."
+      ],
+      "acceptanceCriteria": [
+        "With a glow of distance 10 on a 200x100 node, the target is 220x120 and the camera has left -10, right 210, top 10, bottom -110",
+        "After isolateNode, the node's content is no longer a child of node.display and the plane is; after dispose the content is back under display and the plane is removed",
+        "update(1, 30) calls the fake chain's render once; resolveTarget('g', 'strength') returns the chain's ref",
+        "dispose() disposes the render target and the plane material (spied)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "effects"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Stage effects and the effects-2d fixture",
+      "description": "As a project owner, I want whole-frame effects and one fixture that uses every 2D-capable effect so that the lab page and e2e check them all.",
+      "steps": [
+        "Read engine/docs/05-effects.md 'Stage effects' and engine/docs/06-runtime-player.md 'Fixtures'.",
+        "Create engine/src/effects/stage.ts exporting buildStageChain(renderer, stage, camera, effects, size) returning a chain with output null and toneMapping false, or null when no effect is enabled; test it in stage.test.ts with the chain test factory.",
+        "Create engine/fixtures/effects-2d.json (1920x1080, 30 fps, 6 s): a grid of image, text and shape layers, one per effect type of scope 'any' or '2d' (glow, dropShadow and outline on text), each with one tween on a tweenable param via effect:<id>, plus one doc-level effect (vignette).",
+        "Export the new API from engine/src/effects/index.ts; run the fixtures test (engine/fixtures/fixtures.test.ts) and validateTargets on the new fixture."
+      ],
+      "acceptanceCriteria": [
+        "buildStageChain with effects [] or only disabled effects returns null; with a vignette it returns a chain built with output null and toneMapping false",
+        "effects-2d.json parses, validateTargets returns no errors, and it uses every effect type whose scope is 'any' or '2d' (checked by a test against EFFECT_SCOPES)",
+        "Every effect tween's to keys in effects-2d.json are tweenable for that effect type (checked by a test)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ],
+      "labels": [
+        "effects",
+        "fixtures"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/05-effects.md"
+    ],
+    "readFirst": [
+      "engine/docs/README.md (decision D9)",
+      "engine/docs/05-effects.md (all of it)",
+      "engine/src/effects/table.ts, chain.ts, engine/src/core/types.ts, stage.ts (from R1)",
+      "node_modules/pixi-filters/lib/glow, drop-shadow and outline shader sources (read only, for the approach) and node_modules/postprocessing/build/types/index.d.ts (Effect base class)"
+    ],
+    "requires": [
+      "prd-r1-three-core"
+    ],
+    "owns": [
+      "engine/src/effects/custom/*",
+      "engine/src/effects/isolate.ts",
+      "engine/src/effects/isolate.test.ts",
+      "engine/src/effects/stage.ts",
+      "engine/src/effects/stage.test.ts",
+      "engine/fixtures/effects-2d.json"
+    ],
+    "sharedEdits": [
+      "engine/src/effects/table.ts",
+      "engine/src/effects/index.ts"
+    ],
+    "profile": "motion",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; browser checks load assets from web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
+      "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
+      "engine/ is Three.js + GSAP only: it must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `pixi.js`, `pixi-filters`, `@pixi/*` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+      "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
+      "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
+      "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic and object construction; check drawing in the browser. Never weaken a test to make it pass.",
+      "Do not add a dependency the spec does not name (`postprocessing` and `@types/three` are already declared).",
+      "Debug output and screenshots go to debug/engine/ (gitignored). For a browser check use the dev server the owner runs on http://localhost:5173 (do not start another on a different port); if it is not running, run `npm run engine:e2e` instead.",
+      "Record only real results. Never invent measurements or test output.",
+      "Three.js only: the custom effects subclass postprocessing's Effect with their own GLSL. Reading pixi-filters shader files for ideas is fine; importing pixi-filters is not (lint enforces it)."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": []
+  }
+}

@@ -1,142 +1,104 @@
 # 06. Runtime, player, lab page, end-to-end checks
 
-Files: `engine/src/runtime/*`, `engine/src/react/*`, `engine/src/index.ts` (m7); `web/motion-lab.html`,
-`engine/lab/motion-lab.tsx`, `engine/playwright.config.ts` and `engine/e2e/motion-lab.spec.ts` (m7).
-`web/motion-lab.html` and `web/src/dev/motion-lab.tsx` are stubs that only load `engine/lab/motion-lab.tsx`
-(Vite serves HTML only from `web/`).
+Files: `engine/src/runtime/*`, `engine/src/react/*`, `engine/src/index.ts`, `engine/lab/motion-lab.tsx`,
+`engine/playwright.config.ts`, `engine/e2e/motion-lab.spec.ts` (R4). `web/motion-lab.html` and
+`web/src/dev/motion-lab.tsx` are stubs that only import `engine/lab/motion-lab.tsx`.
 
-## MotionRuntime (m7: `engine/src/runtime/*`)
+## assemble (R4: `engine/src/runtime/assemble.ts`)
 
-The one place that knows every part. Everything else is a part. It is split in two so the wiring can be unit
-tested without WebGL:
-
-- `engine/src/runtime/assemble.ts`: `assemble(doc, { app, textures, factories })` runs steps 2 to 9 below on a
-  fresh root `Container` and returns `{ root, nodes, clock, renderAt(t), warnings, destroy() }`, where
-  `renderAt` does everything except `app.render()`. Works with `app: null` and a fake `three` factory.
-- `engine/src/runtime/MotionRuntime.ts`: owns the Pixi `Application`, calls `parseMotionDoc`, `loadImageAssets`,
-  `assemble`, and adds `app.render()` to every update.
+Testable without WebGL (`renderer: null`, fake three factory, fake chains):
 
 ```ts
-export interface RuntimeOptions {
-  /** Element the canvas is appended to. */
-  mount: HTMLElement;
-  /** CSS width of the canvas; height follows the doc's aspect. Default: doc width. */
-  displayWidth?: number;
-  loop?: boolean;
-  onError?(e: { layerId?: string; message: string }): void;
-}
+export function assemble(doc: MotionDoc, ctx: { renderer: THREE.WebGLRenderer | null; textures: Map<string, THREE.Texture>;
+  factories: { three: NodeFactory } }): {
+  stage: THREE.Scene; camera: THREE.OrthographicCamera; nodes: MotionNode[] /* flat, depth-first */;
+  clock: MotionClock; renderAt(t: number): void; warnings: string[]; destroy(): void;
+};
+```
 
+Steps:
+
+1. `stage = new Scene()` (background: the doc's colour unless `transparent`), `camera = createStageCamera(w, h)`.
+2. Build nodes with `createNode(layer, ctx, 0, factories)` in layer order; add each `display` to the stage; give every
+   mesh `renderOrder` = the node's depth-first index (`traverse`).
+3. For each 2D node with enabled `effects`: `isolateNode(node, effects, renderer)`; route `effect:<id>` targets to it.
+   (`three` nodes handle their own `effects`.)
+4. `validateTargets(doc)` → warnings.
+5. `clock = new MotionClock({ duration, fps, loop })`; for each node: `expandPresets(layer, ctx)` + `layer.tweens`,
+   `compileTweens(clock.timeline, tweens, { layerStart: node.start, resolve, layerId })` where `resolve` sends
+   `effect:<id>` to the node's isolation (2D) or chain (three), everything else to `node.resolveTarget`.
+6. Stage effects: `buildStageChain(renderer, stage, camera, doc.effects, size)` (null when none).
+7. `primeTimeline(clock.timeline, 0)`; `clock.onUpdate(renderAt)`; `renderAt(0)`.
+
+`renderAt(t)`: `display.visible = isVisible(...)` for every node; `applyOpacityTree(rootNodes)`; for visible nodes
+`update?.(t, frame)` and isolated `update`; then `stageChain ? stageChain.render(renderer) : renderer.render(stage, camera)`
+(skipped when `renderer` is null).
+
+## MotionRuntime (R4: `engine/src/runtime/MotionRuntime.ts`)
+
+```ts
 export class MotionRuntime {
-  static async create(opts: RuntimeOptions): Promise<MotionRuntime>;   // new Application(); await app.init(...)
-  load(doc: unknown): Promise<LoadResult>;   // { ok: true, warnings } | { ok: false, errors }; replaces any loaded doc
-  readonly clock: MotionClock | null;
-  play(): void; pause(): void; seek(sec: number): void;
-  getTime(): number; getDuration(): number;
+  static create(opts: { mount: HTMLElement; displayWidth?: number; loop?: boolean; onError?(e): void }): MotionRuntime;
+  load(doc: unknown): Promise<{ ok: true; warnings: string[] } | { ok: false; errors: Array<{ path: string; message: string }> }>;
+  play(): void; pause(): void; seek(sec: number): void; getTime(): number; getDuration(): number;
   getCanvas(): HTMLCanvasElement;
-  whenReady(timeoutSec: number): Promise<boolean>;   // true when every node's `ready` settled without error
-  renderFrame(frame: number): Promise<HTMLCanvasElement>;   // seek(frame / fps), await whenReady(10), render, return canvas
+  whenReady(timeoutSec: number): Promise<boolean>;
+  renderFrame(frame: number): Promise<HTMLCanvasElement>;
+  readPixel(x: number, y: number): [number, number, number, number];   // doc pixels, from the canvas
   layerErrors(): Array<{ layerId: string; message: string }>;
   destroy(): void;
 }
 ```
 
-`app.init({ width: doc.width, height: doc.height, background, backgroundAlpha: 0 when "transparent",
-antialias: true, preserveDrawingBuffer: true, autoStart: false, resolution: 1 })`. The ticker stays stopped.
+- `new WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })`, `setPixelRatio(1)`,
+  `setSize(doc.width, doc.height, false)`, CSS width `displayWidth`, `outputColorSpace = SRGBColorSpace`,
+  `toneMapping = NoToneMapping`, `shadowMap.enabled = true`, `PCFShadowMap`. Created once; resized on load.
+- `load`: `parseMotionDoc` (keep the previous doc on failure) → destroy the previous assembly → `loadImageTextures`
+  and `preloadThreeAssets` per three layer → `assemble`.
+- `whenReady` waits on every node's `ready`; true when all settle without error, false on error or timeout.
+- `destroy` disposes the assembly, textures, and the renderer (`dispose()` + `forceContextLoss()`).
 
-`load(doc)`:
+## `<MotionPlayer>` (R4: `engine/src/react/MotionPlayer.tsx`)
 
-1. `parseMotionDoc(doc)`; on failure return the errors and keep the previous doc playing.
-2. Destroy the previous clock, nodes, filters and stage children.
-3. `loadImageAssets(doc)`; asset errors become layer errors for the layers that use them.
-4. Build nodes with `createNode(layer, ctx, 0, { three: createThreeNode })` in layer order; add each
-   `display` to the root container.
-5. For each node (including group children): `buildFilters(layer.filters)`, set `display.filters`; keep the
-   filter set to route `filter:<id>` targets and to `tick`.
-6. `validateTargets(doc)` → warnings.
-7. New `MotionClock({ duration, fps, loop })`. For every node: `expandPresets(layer, ctx)` + `layer.tweens`,
-   then `compileTweens(clock.timeline, tweens, { layerStart: node.start, resolve, layerId })`, where `resolve`
-   tries `filter:` targets first, then `node.resolveTarget`. Compile errors become warnings.
-8. Stage filters on the root container.
-9. `primeTimeline(clock.timeline, 0)`.
-10. `clock.onUpdate(t => this.renderAt(t))` and one `renderAt(0)`.
+Same API as before: props `doc`, `displayWidth`, `controls` (play/pause, seek, time, frame step), `autoplay`, `loop`,
+`onDocErrors`, `onLayerError`, `onTime`; a `MotionHandle` (`play`, `pause`, `seek`, `getTime`, `getDuration`,
+`getCanvas`, `whenReady`, `renderFrame`) that mirrors the director's `PlayerHandle` (`web/src/player/PlayerBridge.tsx`).
+StrictMode safe: create in an effect, destroy in its cleanup.
 
-`renderAt(t)`: for every node set `display.visible = isVisible(...)`; for visible nodes call `node.update?.(t)`
-and their filter set's `tick(t, frame)`; tick stage filters; `app.render()`.
+## Lab page (R4: `/motion-lab.html`)
 
-## `<MotionPlayer>` (m7: `engine/src/react/MotionPlayer.tsx`)
-
-```tsx
-export interface MotionHandle {
-  play(): void; pause(): void; seek(sec: number): void;
-  getTime(): number; getDuration(): number;
-  getCanvas(): HTMLCanvasElement | null;
-  whenReady(timeoutSec: number): Promise<boolean>;
-  renderFrame(frame: number): Promise<HTMLCanvasElement | null>;
-}
-export interface MotionPlayerProps {
-  doc: unknown;                     // validated inside; errors go to onDocErrors
-  displayWidth?: number;
-  controls?: boolean;               // default true: play/pause, seek slider, time, frame step ◀ ▶
-  autoplay?: boolean; loop?: boolean;
-  onDocErrors?(errors: Array<{ path: string; message: string }>): void;
-  onLayerError?(e: { layerId?: string; message: string }): void;
-  onTime?(sec: number): void;       // throttled to animation frames
-}
-export const MotionPlayer: React.ForwardRefExoticComponent<MotionPlayerProps & React.RefAttributes<MotionHandle>>;
-```
-
-The handle mirrors the director's `PlayerHandle` (`web/src/player/PlayerBridge.tsx`) on purpose, so a later
-swap is mechanical. One runtime per mounted player; a new `doc` prop calls `runtime.load(doc)` (StrictMode
-safe: create in an effect, destroy in its cleanup, ignore a `create` that resolves after cleanup).
-
-## Lab page (m7: `/motion-lab.html`)
-
-A dev page like `web/three-check.html`, not linked from the app. Layout: left, a fixture picker and a JSON
-textarea (edits apply 400 ms after typing stops; schema errors listed under it with their paths); right, the
-player, a layer error list and a "hash" readout (SHA-256 of a 64×36 downscale of the canvas, first 12 hex
-chars; port `hashCanvas` from `web/src/dev/three-check.tsx`).
-
-Fixtures are `engine/fixtures/*.json`, loaded with `import.meta.glob('../fixtures/*.json', { eager: true })`.
-
-Query: `?doc=<fixture name>&t=<seconds>` loads that fixture and seeks there after `whenReady`.
-
-Test hooks on `window.__motion` (dev page only):
+Fixture picker (`import.meta.glob('../fixtures/*.json', { eager: true })`), JSON textarea (400 ms debounce, schema
+errors with paths, keeps the last good doc playing), the player, layer errors, a hash readout (SHA-256 of a 64×36
+downscale of the canvas, first 12 hex chars; `hashCanvas` from `web/src/dev/three-check.tsx`).
+Query `?doc=<name>&t=<sec>`. Test hooks on `window.__motion`:
 
 ```ts
-{
-  handle: MotionHandle;
-  ready(): Promise<boolean>;                         // handle.whenReady(15)
-  hash(): Promise<string>;
-  layerPixel(layerId: string, x: number, y: number): [number, number, number, number] | null;   // RGBA of a three layer's own canvas
-  errors(): string[];                                // doc + layer errors
-}
+{ handle: MotionHandle; ready(): Promise<boolean>; hash(): Promise<string>;
+  pixel(x: number, y: number): [number, number, number, number]; errors(): string[] }
 ```
 
-## End-to-end (m7: `engine/e2e/motion-lab.spec.ts`)
+## End-to-end (R4: `npm run engine:e2e`)
 
-Runs with `npm run engine:e2e` (`engine/playwright.config.ts`: its own Vite server on port 5290, no API server; it never uses 5173 or the director e2e ports).
+`engine/playwright.config.ts`: its own Vite server on port 5290 (`npx vite --config web/vite.config.ts`,
+`DIRECTOR_WEB_PORT=5290`), chromium, workers 1. For each fixture in `engine/fixtures/`:
 
-For each fixture in `engine/fixtures/`:
+1. open `/motion-lab.html?doc=<name>`; `ready()` is true; `errors()` is empty; no `console.error`;
+2. seek 40 %, hash; seek 0; seek 40 %, hash again: equal;
+3. seek 80 %: hash differs;
+4. screenshot to `debug/engine/<name>-40.png`.
 
-1. open `/motion-lab.html?doc=<name>`, `await __motion.ready()` is true, `__motion.errors()` is empty;
-2. seek to 40 % of the duration, hash; seek to 0, seek back to 40 %, hash again: equal;
-3. seek to 80 %: hash differs from the 40 % one (something moves);
-4. no `console.error` during the run;
-5. save a screenshot of the player to `debug/engine/<name>-40.png`.
+Plus: `basic-2d` has a `#ff0000` shape; `pixel()` at its centre is (255, 0, 0) ± 1. `three-postfx` has its `hero` layer
+over a plate; `pixel()` at a corner of the hero layer (where nothing 3D is drawn) equals the plate colour ± 2.
 
-For `three-postfx`, also `layerPixel("hero", 2, 2)[3] === 0` (transparent corner), unless m6 recorded the
-opaque-background rule, in which case the test asserts the doc has a background and skips the pixel check.
+## Fixtures
 
-## Fixtures (m1 creates the first four, m8 adds showcase ones)
+| Name | Exercises | Updated by |
+|------|-----------|------------|
+| `basic-2d` | image, shapes (one `#ff0000`), text with presets, a group | R1 (schema rename) |
+| `three-primitives` | box, sphere, torus, studio light, shadow, camera and object tweens | R1 |
+| `three-gltf` | robot `Wave` clip, can with `spin` loop, golden light | R1 |
+| `three-postfx` | can over the plate, `bloom` + `vignette` tweened via `effect:<id>` | R1 |
+| `effects-2d` | one layer per 2D-capable effect, glow/dropShadow/outline on text, one doc-level effect | R3 |
 
-| Name | What it exercises |
-|------|-------------------|
-| `basic-2d` | image plate, shape, text with `slideInUp` / `fadeOut`, a `pulse` loop, a group with two children |
-| `three-primitives` | a `three` layer with a box, a sphere and a torus, studio light, shadow, camera dolly tween, object rotation tweens, a colour tween |
-| `three-gltf` | `robot.glb` playing `Wave` then a `can.glb` with a `spin` loop on `object:can`, golden light |
-| `three-postfx` | the can over the backdrop plate, `bloom` + `vignette` tweened, transparent background |
-| `filters-2d` (m5 adds) | one text or shape per filter type, each with one tweened param |
-
-Asset URLs: `/dev/product.png`, `/dev/can-label.png`, `/cartoon/backdrop.png`, `/cartoon/characters/robot.glb`
-(clips: Idle, Wave, Dance, Walk, Run, Jump, …), `/cartoon/props/can.glb`, `/cartoon/props/mug.glb`. All are
-already in `web/public`.
+Assets already in `web/public`: `/dev/product.png`, `/dev/can-label.png`, `/cartoon/backdrop.png`,
+`/cartoon/characters/robot.glb`, `/cartoon/props/can.glb`, `/cartoon/props/mug.glb`, `/fonts/*`.

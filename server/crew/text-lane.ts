@@ -1,5 +1,4 @@
 // Deterministic text lane (S12f): the crew's one owner for where text rests and how it is set.
-import type { AepCompositionJson } from 'reacthub-pixitweenjs';
 import type { StyleBible } from '@shared/crew';
 import { BIBLE_FONT_STACKS } from '../authoring/constants';
 import type { Comp, Obj } from '../authoring/types';

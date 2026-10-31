@@ -1,7 +1,7 @@
 {
   "name": "Engine M7: runtime, MotionPlayer, lab page and e2e",
-  "branchName": "ralph/m7-runtime",
   "description": "Wires schema, assets, 2D nodes, three nodes, filters, presets and tweens into MotionRuntime on a Pixi Application, wraps it in <MotionPlayer>, adds the /motion-lab.html page and a Playwright spec (npm run engine:e2e) that checks every fixture for readiness, determinism and motion.",
+  "branchName": "ralph/m7-runtime",
   "userStories": [
     {
       "id": "US-001",
@@ -237,6 +237,7 @@
     },
     "manualGates": [
       "MG-1: owner opens http://localhost:5173/motion-lab.html, plays every fixture end to end, edits a tween in the JSON box and sees it apply, and records anything that looks wrong."
-    ]
+    ],
+    "updatedAt": "2026-10-31T20:28:05.813Z"
   }
 }

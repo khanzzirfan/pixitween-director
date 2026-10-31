@@ -1,7 +1,7 @@
 # 02. Timeline: clock, target paths, tweens, presets
 
 Files: `engine/src/core/clock.ts`, `engine/src/core/paths.ts` (m1); `engine/src/timeline/*` (m2). All of it runs in
-Node and jsdom: the only runtime import is `gsap` (no `PixiPlugin`, no `CustomEase` plugin registration
+Node and jsdom: the only runtime import is `gsap` (no `PixiPlugin`, no Pixi at all, no `CustomEase` plugin registration
 side effects at import time; register `CustomEase` lazily inside `engine/src/timeline/eases.ts` if a preset needs it).
 
 ## MotionClock (m1)
@@ -57,15 +57,14 @@ These are all the tweenable properties:
 
 | Target | Properties | Units |
 |--------|------------|-------|
-| layer (no `target`) | `x`, `y`, `alpha`, `rotation`, `scale`, `scaleX`, `scaleY`, `skewX`, `skewY` | px, 0…1, degrees, factor |
+| layer (no `target`) | `x`, `y`, `alpha`, `rotation`, `scale`, `scaleX`, `scaleY` (no skew in Three) | px, 0…1, degrees, factor |
 | image layer | also `tint` | colour |
 | text layer | also `fill` | colour |
 | shape layer | also `fill` | colour |
-| `filter:<id>` | the numeric and colour params the filter type declares tweenable | [05](05-filters-postfx.md) |
+| `effect:<id>` | the params the effect type declares tweenable (any layer, and the doc's stage effects are not tweenable) | [05](05-effects.md) |
 | `camera` | `position.x/y/z`, `lookAt.x/y/z`, `fov` | world units, degrees |
 | `object:<id>` | `position.x/y/z`, `rotation.x/y/z`, `scale` (uniform), `scale.x/y/z`, `material.color`, `material.emissive`, `material.emissiveIntensity`, `material.roughness`, `material.metalness`, `material.opacity` | world units, degrees, factor, colour |
 | `light:<id>` | `intensity`, `color`, `position.x/y/z` | |
-| `postfx:<id>` | the params the effect type declares tweenable | [05](05-filters-postfx.md) |
 
 `scale` on a 2D layer writes both `scale.x` and `scale.y`; on an object it writes all three. The node handles
 that by returning a small proxy object with a `scale` setter.
@@ -87,7 +86,7 @@ For each tween:
 1. Resolve every key in `to` (and `from`). An unknown target or property is an error string
    (`layers.<layerId>.tweens[i]: unknown property "rotation.w" on object:can`) and the tween is skipped.
 2. Group keys by `TargetRef.obj`, one GSAP tween per object.
-3. Units: `deg` values multiply by `Math.PI / 180` (Pixi and Three both store radians).
+3. Units: `deg` values multiply by `Math.PI / 180` (Three stores radians; the 2D stage's proxies also flip the sign for clockwise rotation).
    `color` values tween a proxy `{ v: fromHex }` to `{ v: toHex }` (GSAP interpolates hex strings) and
    `onUpdate` calls `setColor(proxy.v)`. The proxy tween sits at the same time as the others.
 4. Missing `from` keys take the value read at compile time (`getColor()` for colours).
@@ -104,7 +103,7 @@ export function primeTimeline(tl: gsap.core.Timeline, timeSec = 0): void {
 }
 ```
 
-### Determinism tests the compiler must pass (plain objects, no Pixi)
+### Determinism tests the compiler must pass (plain objects)
 
 - `{ x: 0 }` with a tween `at 1, duration 2, to { x: 100 }`, layer start 0: seek 0 → 0, seek 2 → 50,
   seek 3 → 100, seek 0.5 → 0, seek 2 → 50 again.

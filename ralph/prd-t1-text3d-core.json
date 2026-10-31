@@ -1,7 +1,7 @@
 {
   "name": "Engine T1: 3D text core (schema, layout, glyph meshes, targets, stagger, presets)",
   "branchName": "ralph/t1-text3d-core",
-  "description": "Extends the finished engine with text3d objects in the three layer: one extruded Mesh per glyph from Three's TextGeometry, a tiny typeface layout, glyph/word/line tween targets with deterministic stagger and five text presets. Run only after prd-m1 to prd-m8 have fully passed.",
+  "description": "Extends the finished engine with text3d objects in the three layer: one extruded Mesh per glyph from Three's TextGeometry, a tiny typeface layout, glyph/word/line tween targets with deterministic stagger and five text presets. Run only after prd-r4-runtime and prd-m8-showcase have fully passed.",
   "userStories": [
     {
       "id": "US-001",
@@ -260,12 +260,12 @@
     "readFirst": [
       "engine/docs/07-text3d.md (the whole design, schema additions, targets, stagger, presets, experiments)",
       "engine/docs/README.md and engine/docs/04-three.md (the three layer this extends) and 02-timeline.md (compiler, presets, determinism rules)",
-      "engine/src/three/build/object.ts, scene.ts, engine/src/three/threeNode.ts, engine/src/timeline/compile.ts, presets.ts, targets.ts, engine/src/schema/*.ts, engine/src/runtime/assemble.ts (all built by the eight engine PRDs)",
+      "engine/src/three/build/object.ts, scene.ts, engine/src/three/threeNode.ts, engine/src/timeline/compile.ts, presets.ts, targets.ts, engine/src/schema/*.ts, engine/src/runtime/assemble.ts (all built by the engine PRDs M1, M2, M4, M6 and R1 to R4)",
       "tmp/reacthub-pixitweenjs/src/components/AepComposition/Aep3DTextMesh.tsx and utils/textLayout/typefaceMetricsProvider.ts (idea only: one Text3D per glyph, layout from typeface advances)",
       "web/public/fonts/ (helvetiker_regular and helvetiker_bold typeface JSON, kenpixel.ttf, LICENSE)"
     ],
     "requires": [
-      "prd-m7-runtime",
+      "prd-r4-runtime",
       "prd-m8-showcase"
     ],
     "owns": [
@@ -293,7 +293,7 @@
       "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
       "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
       "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
-      "engine/ must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `@pixi/react` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+      "engine/ is Three.js + GSAP only: it must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `pixi.js`, `pixi-filters`, `@pixi/*` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
       "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
       "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
       "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",
@@ -301,7 +301,7 @@
       "Do not add a dependency the spec does not name (`postprocessing` and `@types/three` are already declared).",
       "Debug output and screenshots go to debug/engine/ (gitignored). For a browser check use the dev server the owner runs on http://localhost:5173 (do not start another on a different port); if it is not running, run `npm run engine:e2e` instead.",
       "Record only real results. Never invent measurements or test output.",
-      "Before starting, confirm every story of the eight engine PRDs (ralph/prd-m1-foundation.json to prd-m8-showcase.json) has passes true and `npm run typecheck && npm test` pass; if not, set notes to 'blocked: engine PRDs not finished' and stop.",
+      "Before starting, confirm every story of ralph/prd-r4-runtime.json and ralph/prd-m8-showcase.json has passes true and `npm run typecheck && npm test` pass; if not, set notes to 'blocked: engine PRDs not finished' and stop.",
       "These stories edit files built by the engine PRDs (metadata.sharedEdits). Keep every existing test green and every edit additive: no existing export, field, default or behaviour changes.",
       "No new dependency. Fonts are Three typeface JSON loaded with three/examples/jsm/loaders/FontLoader.js and TextGeometry from three/examples/jsm/geometries/TextGeometry.js."
     ],

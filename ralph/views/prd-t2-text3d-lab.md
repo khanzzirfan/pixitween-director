@@ -76,7 +76,7 @@ As a project owner, I want measured answers on cost and quality so that we know 
 1. Read engine/docs/07-text3d.md section 'Experiments' (questions 1 to 4, 6 and 7) and use the lab page from US-010.
 2. Measure on the lab page, three runs each, and record medians: build time and triangle count for 20, 80 and 200 characters, flat (depth 0) versus depth 0.2 with bevel and curveSegments 8 versus 16; frame time while playing glyphPop and glyphWave at 20, 80 and 200 glyphs.
 3. Measure disposal: note renderer.info.memory.geometries and textures before loading, while loaded and after destroying the player (use a temporary console readout through the lab page); check geometry sharing against stats.uniqueGeometries.
-4. Look at shadows with the studio and golden presets, at depth 0 and 0.2, and compare the same sentence with a 2D Pixi text layer (screenshots to debug/engine/); read tmp/reacthub-pixitweenjs/src/components/AepComposition/AepMsdfTextMesh.tsx and utils/msdf/ to answer what MSDF would add.
+4. Look at shadows with the studio and golden presets, at depth 0 and 0.2, and compare the same sentence with the 2D text layer (screenshots to debug/engine/); read tmp/reacthub-pixitweenjs/src/components/AepComposition/AepMsdfTextMesh.tsx and utils/msdf/ to answer what MSDF would add.
 5. Write engine/docs/07-text3d-findings.md with: machine and browser, a table of every measurement with its three runs and median, a disposal result, the shadow and comparison observations with screenshot names, what is not supported (kerning, ligatures, RTL and complex scripts, automatic wrap), and a recommendation of when to use 3D text, the 2D text layer, or MSDF later. Record only numbers you measured.
 
 **Acceptance criteria**

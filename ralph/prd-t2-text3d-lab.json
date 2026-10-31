@@ -74,7 +74,7 @@
         "Read engine/docs/07-text3d.md section 'Experiments' (questions 1 to 4, 6 and 7) and use the lab page from US-010.",
         "Measure on the lab page, three runs each, and record medians: build time and triangle count for 20, 80 and 200 characters, flat (depth 0) versus depth 0.2 with bevel and curveSegments 8 versus 16; frame time while playing glyphPop and glyphWave at 20, 80 and 200 glyphs.",
         "Measure disposal: note renderer.info.memory.geometries and textures before loading, while loaded and after destroying the player (use a temporary console readout through the lab page); check geometry sharing against stats.uniqueGeometries.",
-        "Look at shadows with the studio and golden presets, at depth 0 and 0.2, and compare the same sentence with a 2D Pixi text layer (screenshots to debug/engine/); read tmp/reacthub-pixitweenjs/src/components/AepComposition/AepMsdfTextMesh.tsx and utils/msdf/ to answer what MSDF would add.",
+        "Look at shadows with the studio and golden presets, at depth 0 and 0.2, and compare the same sentence with the 2D text layer (screenshots to debug/engine/); read tmp/reacthub-pixitweenjs/src/components/AepComposition/AepMsdfTextMesh.tsx and utils/msdf/ to answer what MSDF would add.",
         "Write engine/docs/07-text3d-findings.md with: machine and browser, a table of every measurement with its three runs and median, a disposal result, the shadow and comparison observations with screenshot names, what is not supported (kerning, ligatures, RTL and complex scripts, automatic wrap), and a recommendation of when to use 3D text, the 2D text layer, or MSDF later. Record only numbers you measured."
       ],
       "acceptanceCriteria": [
@@ -135,7 +135,7 @@
     "readFirst": [
       "engine/docs/07-text3d.md (the whole design, schema additions, targets, stagger, presets, experiments)",
       "engine/docs/README.md and engine/docs/04-three.md (the three layer this extends) and 02-timeline.md (compiler, presets, determinism rules)",
-      "engine/src/three/build/object.ts, scene.ts, engine/src/three/threeNode.ts, engine/src/timeline/compile.ts, presets.ts, targets.ts, engine/src/schema/*.ts, engine/src/runtime/assemble.ts (all built by the eight engine PRDs)",
+      "engine/src/three/build/object.ts, scene.ts, engine/src/three/threeNode.ts, engine/src/timeline/compile.ts, presets.ts, targets.ts, engine/src/schema/*.ts, engine/src/runtime/assemble.ts (all built by the engine PRDs M1, M2, M4, M6 and R1 to R4)",
       "tmp/reacthub-pixitweenjs/src/components/AepComposition/Aep3DTextMesh.tsx and utils/textLayout/typefaceMetricsProvider.ts (idea only: one Text3D per glyph, layout from typeface advances)",
       "web/public/fonts/ (helvetiker_regular and helvetiker_bold typeface JSON, kenpixel.ttf, LICENSE)"
     ],
@@ -162,7 +162,7 @@
       "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
       "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
       "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
-      "engine/ must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `@pixi/react` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+      "engine/ is Three.js + GSAP only: it must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `pixi.js`, `pixi-filters`, `@pixi/*` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
       "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
       "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
       "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",

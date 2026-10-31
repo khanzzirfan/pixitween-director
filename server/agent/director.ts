@@ -1,16 +1,6 @@
-import type { FilmState } from '@shared/composition';
-import { ASPECT_SIZES } from '@shared/composition';
 import type { LlmBackend } from '@shared/ports';
-import type { ToolCtx } from '@shared/tools';
-import { loadEnv } from '../env';
 import type { AppDeps } from '../http/deps';
-import { pickBackend } from '../llm/router';
-import { resizeFit } from '../media/image';
-import { buildScene } from './build-scene';
-import { createFakeParts, isFakeDirector } from './fake-director';
-import { initFilmComposition } from './init-composition';
-import { ensureSceneBasics } from './scene-basics';
-import { planStoryboard, StoryboardError } from './storyboard';
+import { StoryboardError } from './storyboard';
 
 export const STUB_OWNER = 'S3b' as const;
 let bound: ReturnType<typeof createDirector> | undefined;

@@ -1,7 +1,7 @@
 # 07. 3D text with per-glyph animation (extension, phase T)
 
-An extension to the engine, built by two PRDs (`ralph/prd-t1-text3d-core.json`, then `ralph/prd-t2-text3d-lab.json`) **after** the eight engine PRDs
-(`prd-m1` to `prd-m8`) have fully passed. It only adds: it changes no behaviour of existing docs. Where it edits an existing file, the PRD
+An extension to the engine, built by two PRDs (`ralph/prd-t1-text3d-core.json`, then `ralph/prd-t2-text3d-lab.json`) **after** the Three-only engine is done
+(R1 to R4 and M8 passed). It only adds: it changes no behaviour of existing docs. Where it edits an existing file, the PRD
 lists it under `sharedEdits`.
 
 ## Why this design (reasoning)
@@ -25,7 +25,7 @@ fine for titles (up to 200 characters is the schema cap).
 Layout is deliberately tiny: advance widths from the typeface JSON, explicit `\n` line breaks, alignment,
 `letterSpacing`, `lineHeight`. **Not supported** (and recorded as such): kerning pairs, ligatures, right-to-left
 and complex scripts (Devanagari, Arabic), automatic word wrap. The library's 1000-line `textLayout/` engine is
-what would add those; it is out of scope. For rich 2D text keep using the Pixi `text` layer.
+what would add those; it is out of scope. For rich flat 2D text keep using the `text` layer (canvas-drawn).
 
 ## Schema additions (applied to `engine/src/schema`)
 
@@ -138,5 +138,5 @@ Placement follows `02-timeline.md`: enter at 0, exit so that the **last** unit f
    200 glyphs (frame time while playing)?
 4. Is the same time still the same pixels (hash) with staggered presets, forwards and backwards?
 5. Does `TTFLoader` (with `kenpixel.ttf`) work, in the browser and in Node, and what does it cost?
-6. Side by side with the 2D Pixi `text` layer: where is 3D text worth it, and where not?
+6. Side by side with the 2D `text` layer: where is 3D text worth it, and where not?
 7. What would MSDF or troika add that this does not? (Answer from reading, no new dependency.)

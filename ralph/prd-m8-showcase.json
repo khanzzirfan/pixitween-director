@@ -34,13 +34,13 @@
       "title": "Authoring guide with recipes",
       "description": "As a person or model writing a MotionDoc, I want a short guide with copyable recipes so that good-looking docs are easy and wrong ones are rare.",
       "steps": [
-        "Read engine/docs/01-schema.md, 02-timeline.md (presets, target paths), 05-filters-postfx.md and the fixtures.",
-        "Write engine/docs/authoring.md: units and coordinates (seconds, pixels, degrees, metres in 3D, anchor), layer order, the 8 cross-field rules in plain words, the preset list with one line each, the target path table, and six recipes as JSON snippets (title in and out, product turntable over a plate, glow pulse via a filter tween, camera dolly, glTF clip with a spin loop, bloom swell via postfx tween).",
+        "Read engine/docs/01-schema.md, 02-timeline.md (presets, target paths), 05-effects.md and the fixtures.",
+        "Write engine/docs/authoring.md: units and coordinates (seconds, pixels, degrees, metres in 3D, anchor), layer order, the 8 cross-field rules in plain words, the preset list with one line each, the target path table, and six recipes as JSON snippets (title in and out, product turntable over a plate, glow pulse via an effect:<id> tween on text, camera dolly, glTF clip with a spin loop, bloom swell via an effect:<id> tween on a three layer).",
         "Validate every complete doc snippet in the guide by pasting it into a scratch test that runs parseMotionDoc, then delete the scratch test (keep the guide only)."
       ],
       "acceptanceCriteria": [
         "engine/docs/authoring.md contains six recipes and each complete doc in it parses with parseMotionDoc (recorded in notes)",
-        "Every preset name and every filter and postFx type in the guide exists in engine/src/schema/enums.ts",
+        "Every preset name and every effect type in the guide exists in engine/src/schema/enums.ts",
         "`npm run typecheck` passes",
         "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
@@ -60,7 +60,7 @@
       "steps": [
         "Read engine/docs/authoring.md (US-002) and the existing fixtures.",
         "Create engine/fixtures/showcase-product-turntable.json (8 s, 1920x1080): blurred backdrop plate, the can glTF turning slowly in golden light with shadow, bloom swelling at 3 s, a headline with slideInUp and a glow that fades, a price shape-and-text card with popIn.",
-        "Create engine/fixtures/showcase-title-card.json (5 s): layered shapes and text using enter, loop and exit presets and three 2D filters (adjustment on the stage, rgbSplit tweened to 0, dropShadow).",
+        "Create engine/fixtures/showcase-title-card.json (5 s): layered shapes and text using enter, loop and exit presets and three effects (brightnessContrast on the stage, chromaticAberration tweened to 0, dropShadow).",
         "Create engine/fixtures/showcase-robot-dance.json (8 s, 1080x1080): the robot playing 'Dance' with a camera move (position and lookAt tweens), dof focused on the robot, vignette, and a title text.",
         "Run the fixtures test and `npm run engine:e2e` (the spec picks the new files up automatically) and view each on http://localhost:5173/motion-lab.html; save screenshots to debug/engine/."
       ],
@@ -89,17 +89,16 @@
     "specs": [
       "engine/docs/01-schema.md",
       "engine/docs/02-timeline.md",
-      "engine/docs/05-filters-postfx.md"
+      "engine/docs/05-effects.md"
     ],
     "readFirst": [
       "engine/docs/README.md",
-      "engine/docs/01-schema.md, 02-timeline.md, 05-filters-postfx.md",
+      "engine/docs/01-schema.md, 02-timeline.md, 05-effects.md",
       "engine/src/schema/index.ts and engine/fixtures/*.json",
-      "engine/e2e/motion-lab.spec.ts (from M7)"
+      "engine/e2e/motion-lab.spec.ts (from R4)"
     ],
     "requires": [
-      "prd-m6-postfx",
-      "prd-m7-runtime"
+      "prd-r4-runtime"
     ],
     "owns": [
       "engine/src/schema/jsonSchema.ts",
@@ -118,7 +117,7 @@
       "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
       "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
       "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
-      "engine/ must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `@pixi/react` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+      "engine/ is Three.js + GSAP only: it must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `pixi.js`, `pixi-filters`, `@pixi/*` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
       "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
       "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
       "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",

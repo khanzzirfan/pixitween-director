@@ -34,7 +34,7 @@ export function parseMotionDoc(input: unknown):
 | `background` | Color or `"transparent"` | `"#000000"` | |
 | `assets` | `Record<Id, Asset>` | `{}` | |
 | `layers` | `Layer[]` | – | 1 … 200 layers in total, counting group children; draw order is array order, first at the back |
-| `filters` | `Filter2D[]` | `[]` | applied to the whole stage, ≤ 8 |
+| `effects` | `Effect[]` | `[]` | applied to the whole frame (stage effects), ≤ 8; `dof`, `glow`, `dropShadow`, `outline` not allowed here |
 
 `Asset = { type: "image" | "gltf"; url: string }`. `url` is `http(s)://…`, a root-relative path (`/dev/product.png`)
 or a `data:` URL.
@@ -54,7 +54,7 @@ or a `data:` URL.
 | `rotation` | number (degrees) | 0 | clockwise |
 | `alpha` | 0 … 1 | 1 | |
 | `blendMode` | `normal \| add \| multiply \| screen` | `normal` | |
-| `filters` | `Filter2D[]` | `[]` | ≤ 8 per layer |
+| `effects` | `Effect[]` | `[]` | ≤ 8 per layer; `dof` only on `three` layers, `glow`/`dropShadow`/`outline` only on 2D layers ([05-effects.md](05-effects.md)) |
 | `enter` | PresetRef | – | entrance, placed at the layer's `start` |
 | `exit` | PresetRef | – | exit, placed to end at the layer's `end` |
 | `loop` | PresetRef | – | continuous motion between the end of `enter` and the start of `exit` |
@@ -98,7 +98,6 @@ given the other keeps the aspect ratio; when neither, the natural size), `tint` 
 | `lights` | `Light3D[]` (≤ 6) | `[]` extra lights |
 | `shadow` | `{ enabled: boolean = true, opacity: 0…1 = 0.35, y: number = 0 }` | ground shadow catcher at height `y` |
 | `objects` | `Object3D[]` | 1 … 50 |
-| `postFx` | `PostFx[]` (≤ 8) | `[]` |
 
 `Light3D = { id, type: "ambient" | "directional" | "point" | "spot", color = "#ffffff", intensity ≥ 0 = 1,
 position: Vec3 = [3, 5, 4], target: Vec3 = [0, 0, 0], castShadow = false }`.
@@ -131,7 +130,7 @@ Preset names and their defaults are in [02-timeline.md](02-timeline.md#presets).
 
 | Field | Type | Default | Meaning |
 |-------|------|---------|---------|
-| `target` | string | the layer | `filter:<id>`; on `three` layers also `camera`, `object:<id>`, `light:<id>`, `postfx:<id>` |
+| `target` | string | the layer | `effect:<id>` (any layer); on `three` layers also `camera`, `object:<id>`, `light:<id>` |
 | `at` | Seconds | – | start, relative to the layer's `start` |
 | `duration` | Seconds | – | 0 means a `set` |
 | `ease` | Ease | `"power2.inOut"` | |
@@ -144,16 +143,16 @@ The properties a target accepts are listed in [02-timeline.md](02-timeline.md#ta
 checks shapes; `validateTargets(doc)` (in `engine/src/timeline`) checks names and is run by the runtime before a
 build.
 
-## Filter2D and PostFx
+## Effect
 
-`Filter2D = { id, type: Filter2DType, enabled = true, params: Record<string, ParamValue> = {} }`, ids unique
-within their list. Types and params: [05-filters-postfx.md](05-filters-postfx.md).
+`Effect = { id, type: EffectType, enabled = true, params: Record<string, number | string> = {} }`, ids unique
+within their list. Types, params and where each is allowed: [05-effects.md](05-effects.md). One list replaces the
+old `filters` (Pixi) and `postFx` fields.
 
-`PostFx = { id, type: PostFxType, enabled = true, params: Record<string, number> = {} }`.
 
 ## Cross-field rules (`superRefine`)
 
-1. Layer ids unique across the doc; object, light, filter and postFx ids unique within their layer or list.
+1. Layer ids unique across the doc; object, light and effect ids unique within their layer or list.
 2. Every `asset` reference exists and has the right `type` (image vs gltf).
 3. `end > start` for every layer; a child's `end` (after defaults) is ≤ its group's `end - start`.
 4. Top-level `end` ≤ `duration` (a default `end` is `duration`).
@@ -175,17 +174,17 @@ Each rule failing gives one error whose `path` points at the field (for example 
     "can":   { "type": "gltf",  "url": "/cartoon/props/can.glb" }
   },
   "layers": [
-    { "id": "bg", "type": "image", "asset": "plate", "x": 960, "y": 540, "width": 1920, "filters": [{ "id": "soft", "type": "blur", "params": { "strength": 4 } }] },
+    { "id": "bg", "type": "image", "asset": "plate", "x": 960, "y": 540, "width": 1920, "effects": [{ "id": "soft", "type": "blur", "params": { "scale": 1 } }] },
     { "id": "hero", "type": "three", "x": 960, "y": 600, "width": 1000, "height": 1000,
       "objects": [{ "id": "can", "geometry": { "type": "gltf", "asset": "can", "height": 1.2 } }],
       "loop": { "name": "spin", "target": "object:can", "params": { "turnsPerSecond": 0.15 } },
-      "postFx": [{ "id": "glow", "type": "bloom", "params": { "intensity": 0.6 } }],
+      "effects": [{ "id": "glow", "type": "bloom", "params": { "intensity": 0.6 } }],
       "tweens": [{ "target": "camera", "at": 0, "duration": 6, "ease": "sine.inOut", "to": { "position.z": 4.5 } }] },
     { "id": "title", "type": "text", "text": "Fresh every morning", "x": 960, "y": 160,
       "style": { "fontSize": 96, "fontWeight": "700", "align": "center" },
       "enter": { "name": "slideInUp" }, "exit": { "name": "fadeOut" },
-      "filters": [{ "id": "g", "type": "glow", "params": { "color": "#ffd27a", "outerStrength": 2 } }],
-      "tweens": [{ "target": "filter:g", "at": 1, "duration": 1.5, "to": { "outerStrength": 0 } }] }
+      "effects": [{ "id": "g", "type": "glow", "params": { "color": "#ffd27a", "strength": 2 } }],
+      "tweens": [{ "target": "effect:g", "at": 1, "duration": 1.5, "to": { "strength": 0 } }] }
   ]
 }
 ```

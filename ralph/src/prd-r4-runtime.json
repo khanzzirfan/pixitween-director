@@ -1,0 +1,143 @@
+{
+  "name": "Engine R4: runtime on one WebGLRenderer, MotionPlayer, lab page and e2e",
+  "branchName": "ralph/r4-runtime",
+  "description": "Wires schema, textures, 2D nodes, three layers, effects (isolated, three, stage), presets and tweens into MotionRuntime on a single Three WebGLRenderer, wraps it in <MotionPlayer>, adds /motion-lab.html and a Playwright spec (npm run engine:e2e) that checks every fixture for readiness, determinism, motion, colour and transparency. No Pixi.",
+  "metadata": {
+    "profile": "motion",
+    "specs": ["engine/docs/06-runtime-player.md"],
+    "readFirst": [
+      "engine/docs/README.md (decisions D8 to D12)",
+      "engine/docs/06-runtime-player.md (all of it)",
+      "engine/src/core, schema, timeline, stage2d, three, effects index files (from M1, M2, R1, R2, R3)",
+      "web/src/player/PlayerBridge.tsx (the handle to mirror) and web/src/dev/three-check.tsx (hashCanvas)",
+      "engine/lab/stage-smoke.tsx and three-smoke.tsx (renderer settings) and playwright.config.ts (web server block)"
+    ],
+    "requires": ["prd-r2-stage-2d", "prd-r3-effects"],
+    "owns": [
+      "engine/src/runtime/*",
+      "engine/src/react/*",
+      "engine/src/index.ts",
+      "engine/lab/motion-lab.tsx",
+      "engine/playwright.config.ts",
+      "engine/e2e/*"
+    ],
+    "sharedEdits": ["web/motion-lab.html", "web/src/dev/motion-lab.tsx", "package.json"],
+    "extraGuardrails": [
+      "Three.js only: no import of pixi.js, pixi-filters, @pixi/* or @react-three/* (lint enforces it).",
+      "The package.json edit is limited to making sure the script \"engine:e2e\": \"playwright test -c engine/playwright.config.ts\" exists."
+    ],
+    "manualGates": [
+      "MG-1: owner opens http://localhost:5173/motion-lab.html, plays every fixture end to end, edits a tween in the JSON box and sees it apply, and records anything that looks wrong."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "assemble(): stage, nodes, isolation, presets and tweens on one clock",
+      "description": "As an engine developer, I want the whole build pipeline in one function that runs without WebGL so that wiring bugs are caught by unit tests.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section 'assemble' (steps 1 to 7).",
+        "Create engine/src/runtime/assemble.ts implementing steps 1 to 7: stage Scene and createStageCamera, nodes via createNode with factories.three, displays added in order, renderOrder by depth-first index on every mesh, isolateNode for 2D nodes with enabled effects, validateTargets warnings, MotionClock, expandPresets plus layer tweens compiled with a resolve that sends effect:<id> to the isolation or the three node and everything else to node.resolveTarget, buildStageChain, primeTimeline.",
+        "Return { stage, camera, nodes, clock, renderAt, warnings, destroy } (renderAt is completed in US-002; for now it may only set visibility).",
+        "Create engine/src/runtime/assemble.test.ts with renderer null, the chain test factory, a shapes-only doc and a doc with a fake three factory."
+      ],
+      "acceptance": [
+        "assemble on a doc with two shapes and a group with one child returns 4 nodes, the stage has 3 children in layer order, and the second shape's meshes have a higher renderOrder than the first's",
+        "A shape with enter fadeIn has node.alpha.value 0 at its start and its base alpha after the preset duration (via clock.seek)",
+        "A text or shape layer with a glow effect is isolated (its display contains a plane, not its content), and a tween on effect:g reaches the fake chain's ref",
+        "A tween with an unknown property becomes one warning containing the layer id; destroy() destroys every node and the clock (spied)"
+      ],
+      "labels": ["runtime"],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "renderAt(t): visibility, opacity, node and isolation updates, stage render",
+      "description": "As an engine developer, I want each clock update to show exactly the layers that are on, fade groups correctly and render once so that every frame is a function of time.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md (renderAt) and engine/src/stage2d/opacity.ts.",
+        "Complete renderAt(t): display.visible = isVisible for every node; applyOpacityTree on the root nodes; for visible nodes node.update?.(t, frame) and the isolation's update; then stageChain ? stageChain.render(renderer) : renderer.render(stage, camera); skip rendering when renderer is null.",
+        "Add tests to assemble.test.ts with a fake renderer object (render and setRenderTarget spies) passed as renderer and the chain test factory."
+      ],
+      "acceptance": [
+        "A layer from 1 to 2 is invisible at seek 0.5, visible at 1.5 and invisible at 2",
+        "A fake three node from 0 to 3 gets update(1, 30) on seek(1) and no update on seek(4)",
+        "Each seek renders exactly once: renderer.render is called once per seek when there are no stage effects, and the stage chain's render once when there are"
+      ],
+      "labels": ["runtime"],
+      "dependsOn": ["US-001"]
+    },
+    {
+      "id": "US-003",
+      "title": "MotionRuntime: WebGLRenderer, load, play, seek, whenReady, renderFrame, readPixel",
+      "description": "As a page author, I want one object that owns the canvas and the renderer and plays a doc so that pages and the player component stay thin.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section 'MotionRuntime' (renderer settings, load steps, whenReady, destroy).",
+        "Create engine/src/runtime/MotionRuntime.ts as specified, with the WebGLRenderer created through an injectable factory (for tests) and the settings from the doc; load parses, keeps the previous doc on failure, destroys the previous assembly, loads textures and three assets, assembles; readPixel reads the canvas (WebGL readPixels with y flipped to doc coordinates).",
+        "Create engine/src/runtime/index.ts and engine/src/runtime/MotionRuntime.test.ts with a fake renderer factory."
+      ],
+      "acceptance": [
+        "load of an invalid doc returns ok false with errors and keeps the previous clock",
+        "whenReady(0.05) resolves false when a node's ready never settles and true when all settle (fake timers)",
+        "The renderer is created with preserveDrawingBuffer true, pixel ratio 1, outputColorSpace SRGBColorSpace and toneMapping NoToneMapping (checked on the fake)",
+        "destroy() disposes the assembly and calls renderer.dispose() and forceContextLoss()"
+      ],
+      "labels": ["runtime"],
+      "dependsOn": ["US-002"]
+    },
+    {
+      "id": "US-004",
+      "title": "<MotionPlayer> component and MotionHandle",
+      "description": "As a React author, I want a drop-in player with controls and a handle like the director's PlayerHandle so that a later swap is mechanical.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section '<MotionPlayer>' and web/src/player/PlayerBridge.tsx and web/src/player/Player.tsx (controls).",
+        "Create engine/src/react/MotionPlayer.tsx: runtime created in an effect (StrictMode safe), load on doc change, doc and layer errors through props, MotionHandle via useImperativeHandle, controls (play/pause, seek range with step 1/fps, time, frame back and forward) unless controls is false, onTime once per animation frame while playing.",
+        "Create engine/src/react/index.ts and engine/src/react/MotionPlayer.test.tsx with vi.mock('../runtime/MotionRuntime') and @testing-library/react."
+      ],
+      "acceptance": [
+        "Mounting and unmounting under StrictMode destroys every runtime it created (fake runtime counts)",
+        "Changing the doc prop calls load once with the new doc; an invalid doc calls onDocErrors with the errors",
+        "Clicking frame-forward at 30 fps seeks to the current time + 1/30; handle.seek(2) calls runtime.seek(2)"
+      ],
+      "labels": ["runtime", "react"],
+      "dependsOn": ["US-003"]
+    },
+    {
+      "id": "US-005",
+      "title": "Lab page /motion-lab.html with JSON editing and test hooks; public index",
+      "description": "As a project owner, I want a page to pick a fixture, edit its JSON live and see it play so that I can author and debug docs by hand.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section 'Lab page' and engine/lab/stage-smoke.tsx (hash, pixel readout).",
+        "Create engine/lab/motion-lab.tsx: fixture picker from import.meta.glob('../fixtures/*.json', { eager: true }), JSON textarea with a 400 ms debounce, schema errors with paths (last good doc keeps playing), MotionPlayer, layer errors, hash readout, ?doc=<name>&t=<sec>, and window.__motion { handle, ready, hash, pixel, errors } exactly as specified.",
+        "Create the stubs web/motion-lab.html and web/src/dev/motion-lab.tsx (one line importing ../../../engine/lab/motion-lab) following the existing stub pattern.",
+        "Create engine/src/index.ts as the public entry (schema, core, timeline, runtime, react public APIs).",
+        "Open http://localhost:5173/motion-lab.html and check every fixture plays; save a screenshot per fixture to debug/engine/."
+      ],
+      "acceptance": [
+        "Every fixture in engine/fixtures loads with no schema errors, no layer errors and no console errors",
+        "Changing a tween's 'to' value in the textarea updates the picture after the debounce without a reload; invalid JSON shows an error and keeps the last good doc",
+        "window.__motion.ready() resolves true and window.__motion.hash() returns a 12-character hex string"
+      ],
+      "labels": ["runtime", "ui"],
+      "dependsOn": ["US-004"]
+    },
+    {
+      "id": "US-006",
+      "title": "Playwright e2e: readiness, determinism, motion, colour and transparency",
+      "description": "As a project owner, I want an automated browser check of every fixture so that a regression anywhere in the engine shows up as a red test.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md section 'End-to-end' and playwright.config.ts (copy its web server block; the engine needs no API server).",
+        "Create engine/playwright.config.ts: testDir 'e2e', workers 1, chromium, outputDir '../test-results', one webServer `npx vite --config web/vite.config.ts` with DIRECTOR_WEB_PORT 5290, port 5290, reuseExistingServer false, baseURL http://localhost:5290; make sure package.json has the engine:e2e script.",
+        "Create engine/e2e/motion-lab.spec.ts: for each fixture (listed with node:fs) steps 1 to 4 of the doc; plus the basic-2d colour check ((255, 0, 0) ± 1 at the red shape's centre) and the three-postfx transparency check (a corner of the hero layer equals the plate colour ± 2).",
+        "Run `npm run engine:e2e`; fix failures in engine/ (any earlier engine code may be fixed; say so in notes)."
+      ],
+      "acceptance": [
+        "`npm run engine:e2e` passes for every fixture in engine/fixtures",
+        "For each fixture the spec asserts equal hashes for two seeks to 40 % and a different hash at 80 %",
+        "The colour check and the transparency check are in the spec and pass; screenshots exist in debug/engine/ for every fixture"
+      ],
+      "labels": ["runtime", "ui", "e2e"],
+      "dependsOn": ["US-005"]
+    }
+  ]
+}

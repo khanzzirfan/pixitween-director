@@ -1,6 +1,5 @@
 // Converts one FBX to a binary glTF (.glb) with three: scaled from centimetres to metres, animations kept. Usage: node scripts/fbx-to-glb.mjs in.fbx out.glb [scale]
 import { readFileSync, writeFileSync } from 'node:fs';
-import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 

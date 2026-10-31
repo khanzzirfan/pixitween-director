@@ -20,7 +20,6 @@ const planning = [
   { name: 'reviseStoryboard', args: { ops: adds(4) } },
   ...[1, 2, 3, 4].map((i) => ({ name: 'dispatch', args: { kind: 'build-scene', sceneId: `s${i}`, brief: `build s${i}`, reason: 'new scene' } })),
 ];
-const running = (_job: unknown, signal: AbortSignal) => new Promise<void>((_res, rej) => signal.addEventListener('abort', () => rej(new Error('stopped'))));
 /** The test crew has no job-end chain, so this is the system note a finished build would send. */
 const afterBuilds = async (t: Awaited<ReturnType<typeof makeTestCrew>>) => {
   await waitFor(() => t.board.list().length === 2 && t.board.list().every((j) => TERMINAL.includes(j.status)));
