@@ -2,6 +2,7 @@ import { AEP_SCHEMA_VERSION, parseAepCompositionSafe } from 'reacthub-pixitweenj
 import { expect, it } from 'vitest';
 import { addLayer, addScene, newFilmComposition, registerAsset, setCamera, setKeyframes } from '../../server/authoring/api';
 import { AEP_VERSION } from '../../server/authoring/constants';
+import { buildHero3DClip } from '../../server/authoring/hero3d-clip';
 import { lightValidate } from '../../server/engine/light-validator';
 
 const ASSET = 'ast_0123456789abcdef0123456789abcdef';
@@ -21,6 +22,25 @@ function film() {
 
 it('a three-scene film built through the API passes the real engine schema and the light validator', () => {
   const c = film();
+  const engine = parseAepCompositionSafe(c);
+  expect(engine.success, engine.success ? '' : JSON.stringify(engine.error.issues.slice(0, 3))).toBe(true);
+  expect(lightValidate(c).ok).toBe(true);
+});
+
+it('the 3D hero clip (animated camera fov, engine 0.3.4 or later) passes the real engine schema and the light validator', () => {
+  const c = buildHero3DClip({
+    aspect: '9:16',
+    texture: { id: ASSET, src: `/api/assets/${ASSET}`, width: 2048, height: 1024, kind: 'label' },
+    shape: 'can',
+    side: '#e8e0ce',
+    productAspect: 3,
+    title: 'Coffee Co. Cold Brew',
+    brand: 'Coffee Co.',
+    price: 3.99,
+    wasPrice: 4.75,
+    currency: 'USD',
+    accent: '#c27a3a',
+  });
   const engine = parseAepCompositionSafe(c);
   expect(engine.success, engine.success ? '' : JSON.stringify(engine.error.issues.slice(0, 3))).toBe(true);
   expect(lightValidate(c).ok).toBe(true);

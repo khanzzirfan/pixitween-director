@@ -141,7 +141,8 @@ export function buildHero3DClip(i: Hero3DInput): Comp {
     c = setKeyframes(c, b.id, 'y', [[0, r(fy * H)], [B.dollyStart, r(fy * H - u * 0.02)], [B.dollyEnd, r(ey - u * 0.02)], [D, r(ey - u * 0.035)]], 'easeInOut');
   }
 
-  // a 2D contact shadow: the engine cuts its own 3D shadow flat at the viewport edge (a dark slab under the can), so that one is off
+  // a 2D contact shadow: at this near-level camera the engine's 3D shadow (soft-edged since 0.3.4) barely shows on the ground plane,
+  // so it is off and this soft ellipse grounds the can instead
   const sw = pw * 1.1;
   const shh = pw * 0.16;
   const contact = shape(c, { x: pcx - sw / 2, y: pcy + ph / 2 - shh / 2, w: sw, h: shh }, '#000000', 1.5, { kind: 'ellipse', size: [sw, shh] }, (l) => {
@@ -215,8 +216,10 @@ export function buildHero3DClip(i: Hero3DInput): Comp {
     const old = add(c, { role: 'caption', kind: 'text', text: was, z: 0.15, style: { size: ws, weight: 500, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - dd / 2, y: wy - ws * 0.6, w: dd, h: ws * 1.2 } });
     c = setKeyframes(old.c, old.id, 'scale', pulse, 'easeInOut');
     const lw = was.length * ws * 0.56;
+    // the line is centred on the old price, so the same pulse about its own centre keeps it over the text
     const line = shape(c, { x: dcx - lw / 2, y: wy - Math.max(2, ws * 0.05), w: lw, h: Math.max(3, ws * 0.1) }, '#ff5a6e', 0.1);
     c = setKeyframes(line.c, line.id, 'opacity', [[0, 0], [1.2, 0], [1.4, 1]], 'easeOut');
+    c = setKeyframes(c, line.id, 'scale', pulse, 'easeInOut');
   }
 
   if (i.music) {

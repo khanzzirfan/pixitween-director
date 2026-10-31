@@ -84,7 +84,13 @@ describe('buildHero3DClip', () => {
     const c = buildHero3DClip(input({ price: 3.99, wasPrice: 4.75 }));
     const texts = layers(c).filter((l) => l.kind === 'text').map((l) => l.source);
     expect(texts).toEqual(expect.arrayContaining(['$3.99', '$4.75']));
-    expect(layers(c).some((l) => l.fill === '#ff5a6e')).toBe(true);
+    const line = layers(c).find((l) => l.fill === '#ff5a6e')!;
+    const old = layers(c).find((l) => l.kind === 'text' && l.source === '$4.75')!;
+    // the strike line pulses with the old price, about the same centre, so it stays over the text on every beat
+    expect(line.transform.scale).toEqual(old.transform.scale);
+    // layers are placed by their centre (anchor at the middle), so equal positions mean the same pivot
+    expect(Math.abs(line.transform.position[0] - old.transform.position[0])).toBeLessThan(1);
+    expect(Math.abs(line.transform.position[1] - old.transform.position[1])).toBeLessThan(3);
   });
 
   it('fits other aspects', () => {
