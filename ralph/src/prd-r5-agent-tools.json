@@ -1,0 +1,223 @@
+{
+  "name": "Engine R5: agent tools (bake, QA with hints, explain, receipts and undo, CLI, capture, export pack)",
+  "branchName": "ralph/r5-agent-tools",
+  "description": "Makes the engine safe for agents to author, using ideas from CozyClay (no code): a headless frame-by-frame bake, QA groups with the worst frame and a concrete hint, errors with codes and did-you-mean hints, edits with receipts, revisions and exact undo, a JSON-in/JSON-out CLI, and browser capture: frames, contact sheets, depth and normal passes, and an export pack for image-to-video models.",
+  "metadata": {
+    "profile": "motion",
+    "specs": [
+      "engine/docs/08-agent-tools.md"
+    ],
+    "readFirst": [
+      "engine/docs/08-agent-tools.md (all of it)",
+      "engine/docs/README.md and engine/docs/06-runtime-player.md (assemble with renderer null, MotionRuntime)",
+      "engine/src/runtime/assemble.ts, engine/src/schema/index.ts, engine/src/timeline/targets.ts, engine/src/three/threeNode.ts (from earlier PRDs)"
+    ],
+    "requires": [
+      "prd-r4-runtime"
+    ],
+    "owns": [
+      "engine/src/agent/*",
+      "engine/cli/*",
+      "engine/src/runtime/capture.ts",
+      "engine/src/runtime/capture.test.ts"
+    ],
+    "sharedEdits": [
+      "engine/src/three/threeNode.ts",
+      "engine/src/schema/doc.ts",
+      "engine/lab/motion-lab.tsx",
+      "package.json"
+    ],
+    "extraGuardrails": [
+      "CozyClay is AGPL-3.0: use only the ideas written in engine/docs/08-agent-tools.md. Never fetch, read or copy its source.",
+      "Everything QA and explain report must come from measured or computed values; never hard-code a finding. Receipt ids are deterministic (no Math.random, no Date.now).",
+      "The package.json edit is limited to adding the script \"engine:cli\": \"tsx engine/cli/motion.ts\". The schema edit is limited to the optional fields revision and qa.limits."
+    ],
+    "manualGates": [
+      "MG-1: owner runs `npm run engine:cli -- qa engine/fixtures/basic-2d.json`, breaks the doc on purpose (text off stage, tiny font, an unknown preset) and checks the hints lead to a fix in one or two edits."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "bakeDoc: headless frame-by-frame bake of visibility, opacity, bounds, 3D boxes",
+      "description": "As an agent, I want every frame of a doc measured without a browser so that QA can find problems with exact frame numbers.",
+      "steps": [
+        "Read engine/docs/08-agent-tools.md section 'Bake' and engine/src/runtime/assemble.ts (renderAt, renderer null) and engine/src/three/threeNode.ts.",
+        "Make createThreeNode skip its chain and rendering when renderer is null and no test chain factory is set (shared edit; existing tests keep their factory).",
+        "Create engine/src/agent/bake.ts exporting bakeDoc(doc, { fps, frames, measure }) as specified: assemble with renderer null, seekFrame per frame, record visible, effective opacity, stage-pixel axis-aligned bounds from each display's world matrix and size(), fontPx for text, camera position and object world boxes for three layers; default measure 0.55 x fontSize per character.",
+        "Create engine/src/agent/bake.test.ts on engine/fixtures/basic-2d.json and three-primitives.json (runs in jsdom without WebGL)."
+      ],
+      "acceptance": [
+        "bakeDoc(basic-2d) returns duration x fps frames per layer and two calls return deep-equal results",
+        "A shape at x 300, y 200, 200x100, anchor centre, scale 2 bakes to bounds { x: 100, y: 100, width: 400, height: 200 } on a frame where no tween moves it",
+        "A layer is visible false outside its [start, end) window and its opacity follows its fadeIn preset (0 at start)",
+        "For three-primitives, every object has a box with min below max and the camera position matches the fixture's camera at frame 0"
+      ],
+      "labels": [
+        "agent"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "QA report model and 2D checks (offstage, clipped, text size and pace, overlap, pop)",
+      "description": "As an agent, I want grouped QA findings with the worst frame and a concrete hint so that I can fix the biggest problem first and recompile.",
+      "steps": [
+        "Read engine/docs/08-agent-tools.md section 'QA' (group shape, kinds, limits, hints).",
+        "Create engine/src/agent/qa.ts exporting QaKind, QaGroup, QaReport, QA_LIMITS and qaDoc(doc, bake?, limits?) with the group-building logic (consecutive failing frames per subject and kind become one group with count, first, last, worst, worstFrame) and the 2D checks OFFSTAGE, CLIPPED, TINY_TEXT, FAST_TEXT, TEXT_OVERLAP, POP and NEVER_SEEN; each hint names numbers (pixels, seconds, sizes) computed from the bake.",
+        "Add the optional doc field qa: { limits } to engine/src/schema/doc.ts (shared edit) and merge it over QA_LIMITS.",
+        "Create engine/src/agent/qa.test.ts with small docs built in the test, one per kind, plus a clean doc."
+      ],
+      "acceptance": [
+        "A doc where every layer stays on stage, text is 64 px at 1080 high, readable for 3 s and not overlapping gives ok true and no groups",
+        "A text layer at x 2400 on a 1920 wide stage gives one OFFSTAGE group whose hint contains an x value inside the stage",
+        "A 20 px text at 1080 high gives TINY_TEXT with limit about 38 and a hint naming a scale or fontSize that meets it",
+        "Two readable text layers overlapping by 30 % give one TEXT_OVERLAP group naming both ids; a 'set' tween that moves x by 900 px mid-life gives POP with that frame as worstFrame",
+        "A layer with alpha 0 throughout gives NEVER_SEEN; warnings never change ok"
+      ],
+      "labels": [
+        "agent",
+        "qa"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "QA 3D checks (below floor, floating, camera inside, subject out of view)",
+      "description": "As an agent, I want 3D scenes checked for objects in the floor, floating objects and bad camera placements so that product shots look grounded.",
+      "steps": [
+        "Read engine/docs/08-agent-tools.md 'QA' (3D rows) and the three fields of the bake.",
+        "Add BELOW_FLOOR, FLOATING, CAMERA_INSIDE and SUBJECT_OUT to engine/src/agent/qa.ts using the baked boxes, the layer's shadow y and camera; SUBJECT_OUT projects the 8 box corners with the layer camera (built from the baked camera position, lookAt and fov) and fails when none is inside the view.",
+        "Extend engine/src/agent/qa.test.ts with three-layer docs built in the test (primitives only)."
+      ],
+      "acceptance": [
+        "A box of height 1 at position y -0.5 with shadow y 0 gives BELOW_FLOOR with a hint to add 0.5 to y",
+        "The same box at y 0.5 with no position.y tween gives FLOATING; with a position.y tween it does not",
+        "A camera at [0, 0.5, 0] inside a 2 m box gives CAMERA_INSIDE; a camera looking away from every object gives SUBJECT_OUT",
+        "three-primitives.json gives no 3D groups"
+      ],
+      "labels": [
+        "agent",
+        "qa"
+      ],
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "explainDoc: error codes and did-you-mean hints",
+      "description": "As an agent, I want every schema or target error to come with a code and a hint so that I can fix it without reading engine code.",
+      "steps": [
+        "Read engine/docs/08-agent-tools.md section 'Explain', engine/src/schema/doc.ts (parseMotionDoc errors) and engine/src/timeline/targets.ts (validateTargets).",
+        "Create engine/src/agent/explain.ts exporting explainDoc(input): map each parse and target error to one of the listed codes and a hint (closest valid names by edit distance for unknown presets, effects, targets, properties and keys; the allowed list for properties; the max for out-of-range and time overflows).",
+        "Create engine/src/agent/explain.test.ts."
+      ],
+      "acceptance": [
+        "enter { name: 'slideUp' } gives code UNKNOWN_PRESET and a hint containing 'slideInUp'",
+        "A tween to { 'rotaton': 90 } gives UNKNOWN_PROPERTY and a hint containing 'rotation'",
+        "A tween running past the layer end gives TIME_OVERFLOW with the latest allowed at or duration in the hint",
+        "A valid fixture gives ok true and no errors; explainDoc never throws on null, a string or an array"
+      ],
+      "labels": [
+        "agent"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-005",
+      "title": "applyEdit and undoEdit: atomic ops, revisions, deterministic receipts, exact inverse",
+      "description": "As an agent, I want edits that return a receipt, refuse stale revisions and undo exactly so that I can change a doc safely in many small steps.",
+      "steps": [
+        "Read engine/docs/08-agent-tools.md section 'Receipts and undo'.",
+        "Add the optional integer field revision (default 0) to the doc schema (shared edit).",
+        "Create engine/src/agent/edit.ts exporting EditOp, Receipt, applyEdit and undoEdit as specified: refuse STALE_DOC on revision mismatch, NOT_FOUND for unknown layer, tween or effect, INVALID (with explainDoc errors) when the result does not parse, all ops atomic; revision + 1 on success; receipt id = a short stable hash of revisionBefore and the JSON of the ops; inverse ops computed before applying; affected lists layer ids; qa summary from qaDoc on the result.",
+        "Create engine/src/agent/edit.test.ts."
+      ],
+      "acceptance": [
+        "applyEdit with expectRevision 0 on a revision 0 doc returns revisionAfter 1; the same call with expectRevision 5 returns STALE_DOC and leaves the input unchanged",
+        "For each op kind, applying the receipt's inverse to the result gives a doc deep-equal to the original (except revision, which increases)",
+        "Two identical applyEdit calls produce the same receipt id",
+        "A batch whose second op is invalid changes nothing and returns INVALID with at least one explain error"
+      ],
+      "labels": [
+        "agent"
+      ],
+      "dependsOn": [
+        "US-003",
+        "US-004"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "CLI: explain, qa, edit, undo, presets, effects, targets (JSON out, exit codes)",
+      "description": "As a coding agent in a terminal, I want one command per action with one JSON object out and stable exit codes so that I can author docs in a loop.",
+      "steps": [
+        "Read engine/docs/08-agent-tools.md section 'CLI'.",
+        "Create engine/cli/motion.ts implementing the seven commands with node:fs (doc in, doc out, receipts appended to <doc>.receipts.jsonl), JSON on stdout, progress on stderr, exit codes 0, 1, 2, 6; add the script \"engine:cli\": \"tsx engine/cli/motion.ts\" to package.json.",
+        "Create engine/cli/motion.test.ts that runs the command functions directly (not a subprocess) on copies of fixtures in a temporary directory under debug/engine/cli-test."
+      ],
+      "acceptance": [
+        "qa on engine/fixtures/basic-2d.json prints one JSON object with ok and groups and exits 0",
+        "edit with a wrong --expect-revision exits 6 and prints an error with code STALE_DOC and a recovery string",
+        "edit followed by undo with the printed receipt id restores the doc file content (deep-equal JSON except revision)",
+        "targets text prints the allowed properties including x, y, alpha, rotation and fill; an unknown command exits 2"
+      ],
+      "labels": [
+        "agent",
+        "cli"
+      ],
+      "dependsOn": [
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Capture: frame PNG, contact sheet, depth and normal passes",
+      "description": "As a reviewer or agent, I want exact frames, a contact sheet and depth and normal passes so that I can check a film visually and feed video models.",
+      "steps": [
+        "Read engine/docs/08-agent-tools.md section 'Capture and the export pack' and engine/src/runtime/MotionRuntime.ts (renderFrame, assembly access).",
+        "Create engine/src/runtime/capture.ts with captureFrame, contactSheet (grid of renderFrame results, frame number and time drawn under each cell) and renderPass (overrideMaterial MeshDepthMaterial or MeshNormalMaterial on each visible three layer's scene, 2D layers hidden, black background, everything restored afterwards).",
+        "Create engine/src/runtime/capture.test.ts for the pure parts (grid layout maths, frame list) and for restore-after-pass with a fake runtime.",
+        "Add buttons to engine/lab/motion-lab.tsx (shared edit) for frame, contact sheet (12 frames), depth and normal that download the PNGs; check them at http://localhost:5173/motion-lab.html on three-gltf and save copies to debug/engine/."
+      ],
+      "acceptance": [
+        "contactSheet with 12 frames and 4 columns produces a 3-row grid image whose cell labels show the frame numbers",
+        "After renderPass the next normal render gives the same canvas hash as before the pass",
+        "The depth pass of three-gltf shows the robot lighter than the floor behind it (described in notes, PNG saved), and the normal pass shows surface colours"
+      ],
+      "labels": [
+        "agent",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-006"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Export pack for image-to-video models",
+      "description": "As a director, I want a shot exported as first and last frame, depth, normal, camera data, a contact sheet and a summary so that a video model gets everything it needs in one go.",
+      "steps": [
+        "Read engine/docs/08-agent-tools.md (ExportPack) and engine/src/runtime/capture.ts.",
+        "Add exportPack(rt, { from, to }) to capture.ts: first and last frames, firstDepth, firstNormal, a contact sheet of 8 evenly spaced frames, per-frame camera data for each visible three layer (position, quaternion, fov), and a summary string built from the doc (layers on screen, text shown, camera moves).",
+        "Add an 'Export pack' button to the lab page that downloads every file plus camera.json and summary.txt; run it on three-postfx and save the files under debug/engine/pack/.",
+        "Extend capture.test.ts for the summary text and the camera data shape with a fake runtime."
+      ],
+      "acceptance": [
+        "exportPack over frames 0 to 90 returns camera data with 91 entries per visible three layer, each with a unit quaternion (length 1 within 1e-6)",
+        "The summary names every text layer's text and every three layer's objects",
+        "The lab button downloads 7 files for three-postfx (first, last, depth, normal, contact sheet, camera.json, summary.txt) and notes lists them"
+      ],
+      "labels": [
+        "agent",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-007"
+      ]
+    }
+  ]
+}

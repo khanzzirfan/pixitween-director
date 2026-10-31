@@ -72,6 +72,7 @@ engine/
   lab/         motion-lab.tsx, three-smoke.tsx
   e2e/         motion-lab.spec.ts
 tmp/reacthub-pixitweenjs/   read-only copy of the library (gitignored)
+tmp/three-story-controls/   read-only copy of NYT three-story-controls 1.0.6 (Apache-2.0), CameraRig ideas
 ```
 
 Outside `engine/`: additive config edits and tiny HTML/TSX stubs in `web/` that import `engine/lab/*` (Vite serves
@@ -89,6 +90,8 @@ HTML only from `web/`). An eslint rule forbids `pixi.js`, `pixi-filters`, `@pixi
 | [05-effects.md](05-effects.md) | the effect list, custom effects, layer isolation, stage effects |
 | [06-runtime-player.md](06-runtime-player.md) | `MotionRuntime`, `<MotionPlayer>`, lab page, e2e |
 | [07-text3d.md](07-text3d.md) | extension: 3D text with per-glyph animation |
+| [08-agent-tools.md](08-agent-tools.md) | bake, QA with hints, explain, receipts and undo, CLI, capture, export pack (ideas from CozyClay) |
+| [09-camera.md](09-camera.md) | shots by film vocabulary, rig moves, camera presets, paths (ideas from CozyClay and three-story-controls) |
 | [port-map.md](port-map.md) | library file → engine file |
 
 ## Build plan
@@ -104,6 +107,8 @@ is replaced by R4.
 | 3 | `prd-r3-effects` | 5 | glow, drop shadow, outline effects, layer isolation, stage effects, effects fixture | R1 |
 | 4 | `prd-r4-runtime` | 7 | `MotionRuntime` on `WebGLRenderer`, `<MotionPlayer>`, lab page, e2e | R2, R3 |
 | 5 | `prd-m8-showcase` | 3 | JSON Schema export, authoring guide, showcase docs | R4 |
+| 5b | `prd-r5-agent-tools` | 8 | bake, QA with hints, explain, receipts/undo, CLI, capture, export pack | R4 |
+| 5c | `prd-r6-camera` | 6 | frameShot, rig moves, camera presets, camera paths | R4 (R5 optional: its QA is used if present) |
 | 6 | `prd-t1-text3d-core` | 8 | 3D text: per-glyph meshes, targets, stagger, presets | M8 |
 | 7 | `prd-t2-text3d-lab` | 4 | text fixture, lab page, experiments | T1 |
 

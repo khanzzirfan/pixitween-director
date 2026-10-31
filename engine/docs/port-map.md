@@ -27,6 +27,14 @@ never import it. Paths below are relative to `src/`.
 | `node_modules/pixi-filters/lib/{glow,drop-shadow,outline}/*.frag` | `effects/custom/*` | Idea: shader approach for glow, drop shadow, outline (read only) | 🔁 R3 |
 | `web/src/dev/three-check.tsx` (this repo) | `engine/lab/*` | Copy `hashCanvas`, double-rAF frame helper | 🔁 R1, R4 |
 
+## Other sources (R5, R6)
+
+| Source | Engine | How |
+|--------|--------|-----|
+| `tmp/three-story-controls/src/CameraRig.ts` (NYT, Apache-2.0) | `three/camera/rig.ts` | Port the camera-relative verbs with an attribution header; not its `flyTo` (runs off our clock) |
+| `components/AepComposition/model3d/cameraMoves.ts` (library) | `timeline/presets.ts` camera presets | Adapt numbers for orbit, crane, dolly zoom, handheld |
+| CozyClay (AGPL-3.0, not stored here) | `agent/*`, `three/camera/frameShot.ts` | Ideas only: compile → QA groups with hints, receipts/undo, JSON CLI, shot vocabulary, export pack. Never copy code |
+
 ## Read for the text extension only ([07-text3d.md](07-text3d.md))
 
 `components/AepComposition/Aep3DTextMesh.tsx`, `utils/textLayout/typefaceMetricsProvider.ts` (ideas);
