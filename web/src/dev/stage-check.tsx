@@ -9,6 +9,29 @@ import '../styles.css';
 
 const SHOT_SEC = 4;
 
+/** ?film=robot: one 8 s shot of the Quaternius robot (walk, jump, wave) among converted props, to check scale, colour and clips. */
+function robotFilm(): AepCompositionJson {
+  const f = buildCartoonFilm() as { assets: Record<string, unknown>; durationInFrames: number; layers: unknown[]; precomps: Record<string, { assets: Record<string, unknown>; layers: Array<Record<string, unknown>> }> };
+  const assets = { ...f.assets, robot: { type: 'model', src: '/cartoon/characters/robot.glb' }, bed: { type: 'model', src: '/cartoon/props/q-bed-single.glb' }, can: { type: 'model', src: '/cartoon/props/q-sodacan.glb' }, plant: { type: 'model', src: '/cartoon/props/q-houseplant-1.glb' }, fridge: { type: 'model', src: '/cartoon/props/q-kitchen-fridge.glb' } };
+  const s1 = f.precomps.s1!;
+  s1.assets = assets;
+  const keep = s1.layers.filter((l) => l.kind === 'shape' || l.kind === 'stage3d');
+  const prop = (id: string, assetId: string, size: number, position: number[]) => ({ id, name: id, kind: 'prop3d', stage: 'world', inPoint: 0, outPoint: 120, source: { type: 'gltf', assetId }, size, position });
+  s1.layers = [
+    ...keep,
+    { id: 'hero', name: 'hero', kind: 'actor3d', stage: 'world', inPoint: 0, outPoint: 120, assetId: 'robot', height: 1, marks: [{ t: 0, v: [-1.2, 0, -90] }, { t: 15, v: [-1.2, 0, -90] }, { t: 60, v: [0.9, 0, -90] }, { t: 61, v: [0.9, 0, 0] }], clips: [{ name: 'Idle', startFrame: 0, loop: true }, { name: 'Walk', startFrame: 15, fadeFrames: 6, loop: true }, { name: 'Jump', startFrame: 62, fadeFrames: 4 }, { name: 'Wave', startFrame: 90, fadeFrames: 6 }] },
+    prop('bed', 'bed', 0.9, [-1.8, 0, -0.8]),
+    prop('can', 'can', 0.25, [1.5, 0, 0.3]),
+    prop('plant', 'plant', 0.5, [1.9, 0, -0.6]),
+    prop('fridge', 'fridge', 1.1, [2.4, 0, -1]),
+  ];
+  f.precomps = { s1 };
+  f.assets = assets;
+  f.durationInFrames = 120;
+  f.layers = [f.layers[0]];
+  return f as unknown as AepCompositionJson;
+}
+
 async function hashCanvas(canvas: HTMLCanvasElement | null, rect?: [number, number, number, number]): Promise<string> {
   if (!canvas) return 'no canvas';
   const small = document.createElement('canvas');
@@ -36,12 +59,14 @@ function StageCheck() {
   useEffect(() => {
     if (wantsLive) void fetch(new URLSearchParams(window.location.search).get('file') ?? '/cartoon/live-film.json').then((r) => r.json()).then(setLive);
   }, [wantsLive, filmParam]);
+  const wantsRobot = new URLSearchParams(window.location.search).get('film') === 'robot';
   const film = useMemo(() => {
+    if (wantsRobot) return robotFilm();
     if (wantsLive) return live as AepCompositionJson;
     const f = buildCartoonFilm() as { precomps: Record<string, { layers: Array<{ id: string; source?: string }> }> };
     const p = f.precomps.s4?.layers.find((l) => l.id === 'price');
     if (p) p.source = price;    return f as unknown as AepCompositionJson;
-  }, [price, wantsLive, live]);
+  }, [price, wantsLive, wantsRobot, live]);
   const verdict = useMemo(() => parseAepCompositionSafe(film), [film]);
   const duration = film ? film.durationInFrames / film.fps : 0;
 

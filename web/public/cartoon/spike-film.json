@@ -6,89 +6,101 @@
   "height": 1920,
   "fps": 30,
   "durationInFrames": 480,
-  "bgColor": "#F4EAD8",
+  "bgColor": "#F2E8D5",
   "assets": {
-    "ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae": {
+    "ast_0c7b2328c11e128d11307cbdf6027a11": {
       "type": "image",
-      "src": "/api/assets/ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae",
+      "src": "/api/assets/ast_0c7b2328c11e128d11307cbdf6027a11",
       "width": 768,
       "height": 1152
     },
-    "ast_0099884626256ecd8db68865ca83e6b0": {
+    "ast_10c2e9b87669ea6907806ea285294080": {
       "type": "image",
-      "src": "/api/assets/ast_0099884626256ecd8db68865ca83e6b0",
+      "src": "/api/assets/ast_10c2e9b87669ea6907806ea285294080",
       "width": 720,
       "height": 1280
     },
-    "ast_a2f07621e4968be7b7b1005289b907a8": {
+    "ast_ad8b80cabb2625a43ea18de8655a8b20": {
       "type": "image",
-      "src": "/api/assets/ast_a2f07621e4968be7b7b1005289b907a8",
-      "width": 720,
-      "height": 1280
-    },
-    "ast_553e05712c84d7c92e203440ea4fabd9": {
-      "type": "image",
-      "src": "/api/assets/ast_553e05712c84d7c92e203440ea4fabd9",
-      "width": 720,
-      "height": 1280
-    },
-    "ast_7ba3579f98034abc17363545d211ea72": {
-      "type": "image",
-      "src": "/api/assets/ast_7ba3579f98034abc17363545d211ea72",
+      "src": "/api/assets/ast_ad8b80cabb2625a43ea18de8655a8b20",
       "width": 256,
       "height": 752
     },
-    "ast_929ff009f229a62b629b2eeb460f4d1e": {
+    "ast_c11ebb9e739c1f6ea023499d2b019220": {
       "type": "image",
-      "src": "/api/assets/ast_929ff009f229a62b629b2eeb460f4d1e",
+      "src": "/api/assets/ast_c11ebb9e739c1f6ea023499d2b019220",
       "width": 256,
       "height": 752
     },
-    "ast_a0e6dfeca6d884e717ce00b72a5a58f9": {
+    "ast_cb3c7f48637bf39c2c870bdfc51771a4": {
       "type": "image",
-      "src": "/api/assets/ast_a0e6dfeca6d884e717ce00b72a5a58f9",
+      "src": "/api/assets/ast_cb3c7f48637bf39c2c870bdfc51771a4",
       "width": 720,
       "height": 1280
     },
-    "ast_509fc4b1ba661220cb1fc5fd4a17742b": {
+    "ast_740cb36fda1e31d21547b6517a25e31b": {
       "type": "image",
-      "src": "/api/assets/ast_509fc4b1ba661220cb1fc5fd4a17742b",
-      "width": 255,
-      "height": 751
-    },
-    "ast_eb3fb6a4e46544c8107ab5fc1ce700e3": {
-      "type": "image",
-      "src": "/api/assets/ast_eb3fb6a4e46544c8107ab5fc1ce700e3",
-      "width": 255,
-      "height": 751
-    },
-    "ast_bdcd7c23eae6c523db2bd61930ce9256": {
-      "type": "image",
-      "src": "/api/assets/ast_bdcd7c23eae6c523db2bd61930ce9256",
+      "src": "/api/assets/ast_740cb36fda1e31d21547b6517a25e31b",
       "width": 720,
       "height": 1280
     },
-    "ast_955ce0c7e63912bffed8487bc7ef23b6": {
+    "ast_fbe17f586e612310d6bdd7c4fcf8619c": {
       "type": "image",
-      "src": "/api/assets/ast_955ce0c7e63912bffed8487bc7ef23b6",
-      "width": 256,
-      "height": 752
+      "src": "/api/assets/ast_fbe17f586e612310d6bdd7c4fcf8619c",
+      "width": 720,
+      "height": 1280
     },
-    "ast_22bb0fe7a1d6388ff305d5a8d17ddcc7": {
+    "ast_6266d5decb36aa707602ebb6c8ad44f8": {
       "type": "image",
-      "src": "/api/assets/ast_22bb0fe7a1d6388ff305d5a8d17ddcc7",
-      "width": 256,
-      "height": 752
+      "src": "/api/assets/ast_6266d5decb36aa707602ebb6c8ad44f8",
+      "width": 314,
+      "height": 419
+    },
+    "ast_4726da146215abf3dc5b7317a01fa7db": {
+      "type": "image",
+      "src": "/api/assets/ast_4726da146215abf3dc5b7317a01fa7db",
+      "width": 720,
+      "height": 1280
+    },
+    "ast_11e415355af2fc3d4690a08c096a892b": {
+      "type": "audio",
+      "src": "/api/assets/ast_11e415355af2fc3d4690a08c096a892b",
+      "duration": 480
     }
   },
   "layers": [
     {
+      "kind": "audio",
+      "id": "finish:music",
+      "name": "music",
+      "inPoint": 0,
+      "outPoint": 480,
+      "assetId": "ast_11e415355af2fc3d4690a08c096a892b",
+      "level": 0.7,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
       "kind": "precomp",
-      "id": "hero",
-      "name": "hero",
+      "id": "opener",
+      "name": "opener",
       "inPoint": 0,
       "outPoint": 120,
-      "compId": "hero",
+      "compId": "opener",
       "width": 1080,
       "height": 1920,
       "transform": {
@@ -110,11 +122,11 @@
     },
     {
       "kind": "precomp",
-      "id": "pour-steam",
-      "name": "pour-steam",
+      "id": "pour",
+      "name": "pour",
       "inPoint": 120,
       "outPoint": 240,
-      "compId": "pour-steam",
+      "compId": "pour",
       "width": 1080,
       "height": 1920,
       "transform": {
@@ -188,36 +200,741 @@
     }
   ],
   "precomps": {
-    "hero": {
+    "opener": {
       "version": "1.9.0",
-      "id": "hero",
-      "name": "hero",
+      "id": "opener",
+      "name": "opener",
       "width": 1080,
       "height": 1920,
       "fps": 30,
       "durationInFrames": 120,
       "assets": {
-        "ast_0099884626256ecd8db68865ca83e6b0": {
+        "ast_10c2e9b87669ea6907806ea285294080": {
           "type": "image",
-          "src": "/api/assets/ast_0099884626256ecd8db68865ca83e6b0",
+          "src": "/api/assets/ast_10c2e9b87669ea6907806ea285294080",
           "width": 720,
           "height": 1280
         },
-        "ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae": {
+        "ast_ad8b80cabb2625a43ea18de8655a8b20": {
           "type": "image",
-          "src": "/api/assets/ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae",
-          "width": 768,
-          "height": 1152
+          "src": "/api/assets/ast_ad8b80cabb2625a43ea18de8655a8b20",
+          "width": 256,
+          "height": 752
         }
       },
       "layers": [
         {
           "kind": "image",
-          "id": "hero:bg",
+          "id": "opener:bg",
           "name": "bg",
           "inPoint": 0,
           "outPoint": 120,
-          "assetId": "ast_0099884626256ecd8db68865ca83e6b0",
+          "assetId": "ast_10c2e9b87669ea6907806ea285294080",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              360,
+              640
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.65,
+                  1.65
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.6880769230769228,
+                  1.6880769230769228
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "image",
+          "id": "opener:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_ad8b80cabb2625a43ea18de8655a8b20",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  998.4
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  540,
+                  999.2868360277135
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.5319,
+                  1.5319
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.567278752886836,
+                  1.567278752886836
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 3,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 26,
+                "direction": 180,
+                "softness": 30,
+                "opacity": 0.5,
+                "color": "#1a0f08"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "finish:opener:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:opener:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "opener:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Cold brew for slow mornings",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 96,
+            "fill": "#2B211C",
+            "weight": 700,
+            "align": "left",
+            "boxWidth": 864
+          },
+          "transform": {
+            "position": [
+              540,
+              307.2
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.94,
+                  0.94
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 21,
+                "v": [
+                  1,
+                  1
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "pour": {
+      "version": "1.9.0",
+      "id": "pour",
+      "name": "pour",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "ast_740cb36fda1e31d21547b6517a25e31b": {
+          "type": "image",
+          "src": "/api/assets/ast_740cb36fda1e31d21547b6517a25e31b",
+          "width": 720,
+          "height": 1280
+        },
+        "ast_ad8b80cabb2625a43ea18de8655a8b20": {
+          "type": "image",
+          "src": "/api/assets/ast_ad8b80cabb2625a43ea18de8655a8b20",
+          "width": 256,
+          "height": 752
+        },
+        "ast_6266d5decb36aa707602ebb6c8ad44f8": {
+          "type": "image",
+          "src": "/api/assets/ast_6266d5decb36aa707602ebb6c8ad44f8",
+          "width": 314,
+          "height": 419
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "pour:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_740cb36fda1e31d21547b6517a25e31b",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              360,
+              640
+            ],
+            "scale": [
+              1.5,
+              1.5
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "image",
+          "id": "pour:subject",
+          "name": "subject",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_6266d5decb36aa707602ebb6c8ad44f8",
+          "transform": {
+            "position": [
+              734.4,
+              1334.4
+            ],
+            "anchor": [
+              157,
+              209.5
+            ],
+            "scale": [
+              2.0621,
+              2.0621
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 3,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 24,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "image",
+          "id": "pour:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_ad8b80cabb2625a43ea18de8655a8b20",
+          "transform": {
+            "position": [
+              345.6,
+              1075.2
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              1.3277,
+              1.3277
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 26,
+                "direction": 180,
+                "softness": 30,
+                "opacity": 0.5,
+                "color": "#1a0f08"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "pour:bg-2",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              730,
+              110
+            ]
+          },
+          "fill": "#2B211C",
+          "transform": {
+            "position": [
+              419,
+              1745
+            ],
+            "anchor": [
+              365,
+              55
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.88
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:pour:grade",
+          "name": "grade",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:pour:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0.35,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "pour:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Fresh pour, served cold",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 96,
+            "fill": "#4A2C20",
+            "weight": 700,
+            "align": "center",
+            "boxWidth": 900
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  254.4
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  540,
+                  230.4
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "id": "pour:caption",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Fresh pour, served cold",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 52,
+            "fill": "#f2e8d5",
+            "weight": 600,
+            "align": "center",
+            "boxWidth": 900,
+            "letterSpacing": 6
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 6,
+                "v": [
+                  540,
+                  1524
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 26,
+                "v": [
+                  540,
+                  1500
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 6,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 26,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "label": {
+      "version": "1.9.0",
+      "id": "label",
+      "name": "label",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "ast_fbe17f586e612310d6bdd7c4fcf8619c": {
+          "type": "image",
+          "src": "/api/assets/ast_fbe17f586e612310d6bdd7c4fcf8619c",
+          "width": 720,
+          "height": 1280
+        },
+        "ast_ad8b80cabb2625a43ea18de8655a8b20": {
+          "type": "image",
+          "src": "/api/assets/ast_ad8b80cabb2625a43ea18de8655a8b20",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "label:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_fbe17f586e612310d6bdd7c4fcf8619c",
           "transform": {
             "position": [
               540,
@@ -255,18 +972,18 @@
         },
         {
           "kind": "image",
-          "id": "hero:product",
+          "id": "label:product",
           "name": "product",
           "inPoint": 0,
           "outPoint": 120,
-          "assetId": "ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae",
+          "assetId": "ast_ad8b80cabb2625a43ea18de8655a8b20",
           "transform": {
             "position": [
               {
                 "t": 0,
                 "v": [
-                  540,
-                  998.4
+                  340,
+                  220
                 ],
                 "easeOut": [
                   0.42,
@@ -278,200 +995,8 @@
               {
                 "t": 120,
                 "v": [
-                  540,
-                  1002.24
-                ]
-              }
-            ],
-            "anchor": [
-              384,
-              576
-            ],
-            "scale": [
-              {
-                "t": 0,
-                "v": [
-                  0.9844,
-                  0.9844
-                ],
-                "easeOut": [
-                  0.42,
-                  0,
-                  0.58,
-                  1
-                ]
-              },
-              {
-                "t": 120,
-                "v": [
-                  1.0828400000000002,
-                  1.0828400000000002
-                ]
-              }
-            ],
-            "rotation": 0,
-            "opacity": 1
-          }
-        },
-        {
-          "kind": "text",
-          "id": "hero:headline",
-          "name": "headline",
-          "inPoint": 0,
-          "outPoint": 120,
-          "source": "Coffee Co. Cold Brew",
-          "style": {
-            "font": "Inter",
-            "size": 64,
-            "fill": "#3B2417",
-            "weight": 600,
-            "align": "center",
-            "boxWidth": 750
-          },
-          "transform": {
-            "position": [
-              261.67999999999995,
-              280
-            ],
-            "anchor": [
-              540,
-              960
-            ],
-            "scale": [
-              0.59,
-              0.59
-            ],
-            "rotation": 0,
-            "opacity": [
-              {
-                "t": 0,
-                "v": 0,
-                "easeOut": [
-                  0,
-                  0,
-                  0.58,
-                  1
-                ]
-              },
-              {
-                "t": 18,
-                "v": 1
-              }
-            ]
-          }
-        }
-      ]
-    },
-    "pour-steam": {
-      "version": "1.9.0",
-      "id": "pour-steam",
-      "name": "pour-steam",
-      "width": 1080,
-      "height": 1920,
-      "fps": 30,
-      "durationInFrames": 120,
-      "assets": {
-        "ast_553e05712c84d7c92e203440ea4fabd9": {
-          "type": "image",
-          "src": "/api/assets/ast_553e05712c84d7c92e203440ea4fabd9",
-          "width": 720,
-          "height": 1280
-        },
-        "ast_7ba3579f98034abc17363545d211ea72": {
-          "type": "image",
-          "src": "/api/assets/ast_7ba3579f98034abc17363545d211ea72",
-          "width": 256,
-          "height": 752
-        }
-      },
-      "layers": [
-        {
-          "kind": "image",
-          "id": "pour-steam:bg",
-          "name": "bg",
-          "inPoint": 0,
-          "outPoint": 120,
-          "assetId": "ast_553e05712c84d7c92e203440ea4fabd9",
-          "transform": {
-            "position": [
-              {
-                "t": 0,
-                "v": [
-                  543.3230769230769,
-                  960
-                ],
-                "easeOut": [
-                  0.42,
-                  0,
-                  0.58,
-                  1
-                ]
-              },
-              {
-                "t": 120,
-                "v": [
-                  536.6769230769231,
-                  960
-                ]
-              }
-            ],
-            "anchor": [
-              360,
-              640
-            ],
-            "scale": [
-              {
-                "t": 0,
-                "v": [
-                  1.725,
-                  1.725
-                ],
-                "easeOut": [
-                  0.42,
-                  0,
-                  0.58,
-                  1
-                ]
-              },
-              {
-                "t": 120,
-                "v": [
-                  1.7409230769230768,
-                  1.7409230769230768
-                ]
-              }
-            ],
-            "rotation": 0,
-            "opacity": 1
-          }
-        },
-        {
-          "kind": "image",
-          "id": "pour-steam:product",
-          "name": "product",
-          "inPoint": 0,
-          "outPoint": 120,
-          "assetId": "ast_7ba3579f98034abc17363545d211ea72",
-          "transform": {
-            "position": [
-              {
-                "t": 0,
-                "v": [
-                  543.3256351039261,
-                  998.4
-                ],
-                "easeOut": [
-                  0.42,
-                  0,
-                  0.58,
-                  1
-                ]
-              },
-              {
-                "t": 120,
-                "v": [
-                  536.6743648960739,
-                  998.4
+                  335.3810623556582,
+                  202.90993071593533
                 ]
               }
             ],
@@ -483,8 +1008,8 @@
               {
                 "t": 0,
                 "v": [
-                  1.5319,
-                  1.5319
+                  1.6,
+                  1.6
                 ],
                 "easeOut": [
                   0.42,
@@ -496,34 +1021,93 @@
               {
                 "t": 120,
                 "v": [
-                  1.5460515011547347,
-                  1.5460515011547347
+                  1.6369515011547344,
+                  1.6369515011547344
                 ]
               }
             ],
             "rotation": 0,
-            "opacity": 1
-          }
+            "opacity": [
+              {
+                "t": 4,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 25,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 26,
+                "direction": 180,
+                "softness": 30,
+                "opacity": 0.5,
+                "color": "#1a0f08"
+              }
+            }
+          ]
         },
         {
-          "kind": "text",
-          "id": "pour-steam:headline",
-          "name": "headline",
+          "kind": "shape",
+          "id": "finish:label:grade",
+          "name": "grade",
           "inPoint": 0,
           "outPoint": 120,
-          "source": "Fresh Pour, Smooth Taste",
-          "style": {
-            "font": "Inter, clean sans-serif",
-            "size": 72,
-            "fill": "#3B2417",
-            "weight": 600,
-            "align": "center",
-            "boxWidth": 900
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
           },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
           "transform": {
             "position": [
               540,
-              240
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:label:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              540,
+              960
             ],
             "anchor": [
               540,
@@ -537,7 +1121,7 @@
             "opacity": [
               {
                 "t": 0,
-                "v": 0,
+                "v": 0.35,
                 "easeOut": [
                   0,
                   0,
@@ -546,137 +1130,10 @@
                 ]
               },
               {
-                "t": 18,
-                "v": 1
+                "t": 8,
+                "v": 0
               }
             ]
-          }
-        }
-      ]
-    },
-    "label": {
-      "version": "1.9.0",
-      "id": "label",
-      "name": "label",
-      "width": 1080,
-      "height": 1920,
-      "fps": 30,
-      "durationInFrames": 120,
-      "assets": {
-        "ast_bdcd7c23eae6c523db2bd61930ce9256": {
-          "type": "image",
-          "src": "/api/assets/ast_bdcd7c23eae6c523db2bd61930ce9256",
-          "width": 720,
-          "height": 1280
-        },
-        "ast_955ce0c7e63912bffed8487bc7ef23b6": {
-          "type": "image",
-          "src": "/api/assets/ast_955ce0c7e63912bffed8487bc7ef23b6",
-          "width": 256,
-          "height": 752
-        }
-      },
-      "layers": [
-        {
-          "kind": "image",
-          "id": "label:bg",
-          "name": "bg",
-          "inPoint": 0,
-          "outPoint": 120,
-          "assetId": "ast_bdcd7c23eae6c523db2bd61930ce9256",
-          "transform": {
-            "position": [
-              540,
-              960
-            ],
-            "anchor": [
-              360,
-              640
-            ],
-            "scale": [
-              {
-                "t": 0,
-                "v": [
-                  1.725,
-                  1.725
-                ],
-                "easeOut": [
-                  0.42,
-                  0,
-                  0.58,
-                  1
-                ]
-              },
-              {
-                "t": 120,
-                "v": [
-                  1.7619907076483203,
-                  1.7619907076483203
-                ]
-              }
-            ],
-            "rotation": 0,
-            "opacity": 1
-          }
-        },
-        {
-          "kind": "image",
-          "id": "label:product",
-          "name": "product",
-          "inPoint": 0,
-          "outPoint": 120,
-          "assetId": "ast_955ce0c7e63912bffed8487bc7ef23b6",
-          "transform": {
-            "position": [
-              {
-                "t": 0,
-                "v": [
-                  540,
-                  998.4
-                ],
-                "easeOut": [
-                  0.42,
-                  0,
-                  0.58,
-                  1
-                ]
-              },
-              {
-                "t": 120,
-                "v": [
-                  540,
-                  999.2240343347639
-                ]
-              }
-            ],
-            "anchor": [
-              128,
-              376
-            ],
-            "scale": [
-              {
-                "t": 0,
-                "v": [
-                  1.5319,
-                  1.5319
-                ],
-                "easeOut": [
-                  0.42,
-                  0,
-                  0.58,
-                  1
-                ]
-              },
-              {
-                "t": 120,
-                "v": [
-                  1.56477339055794,
-                  1.56477339055794
-                ]
-              }
-            ],
-            "rotation": 0,
-            "opacity": 1
           }
         },
         {
@@ -685,19 +1142,37 @@
           "name": "headline",
           "inPoint": 0,
           "outPoint": 120,
-          "source": "Cold Brew",
+          "source": "Smooth, with no bite",
           "style": {
-            "font": "Inter, clean sans-serif",
-            "size": 134,
-            "fill": "#3b2417",
-            "weight": 600,
+            "font": "Inter, system-ui, sans-serif",
+            "size": 96,
+            "fill": "#4A2C20",
+            "weight": 700,
             "align": "center",
-            "boxWidth": 864
+            "boxWidth": 900
           },
           "transform": {
             "position": [
-              540,
-              307.2
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  1454
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  540,
+                  1432
+                ]
+              }
             ],
             "anchor": [
               540,
@@ -724,7 +1199,19 @@
                 "v": 1
               }
             ]
-          }
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 4,
+                "direction": 180,
+                "softness": 8,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
         }
       ]
     },
@@ -737,15 +1224,15 @@
       "fps": 30,
       "durationInFrames": 120,
       "assets": {
-        "ast_a2f07621e4968be7b7b1005289b907a8": {
+        "ast_4726da146215abf3dc5b7317a01fa7db": {
           "type": "image",
-          "src": "/api/assets/ast_a2f07621e4968be7b7b1005289b907a8",
+          "src": "/api/assets/ast_4726da146215abf3dc5b7317a01fa7db",
           "width": 720,
           "height": 1280
         },
-        "ast_7ba3579f98034abc17363545d211ea72": {
+        "ast_ad8b80cabb2625a43ea18de8655a8b20": {
           "type": "image",
-          "src": "/api/assets/ast_7ba3579f98034abc17363545d211ea72",
+          "src": "/api/assets/ast_ad8b80cabb2625a43ea18de8655a8b20",
           "width": 256,
           "height": 752
         }
@@ -757,7 +1244,7 @@
           "name": "bg",
           "inPoint": 0,
           "outPoint": 120,
-          "assetId": "ast_a2f07621e4968be7b7b1005289b907a8",
+          "assetId": "ast_4726da146215abf3dc5b7317a01fa7db",
           "transform": {
             "position": [
               540,
@@ -768,8 +1255,8 @@
               640
             ],
             "scale": [
-              1.5,
-              1.5
+              1.65,
+              1.65
             ],
             "rotation": 0,
             "opacity": 1
@@ -781,43 +1268,87 @@
           "name": "product",
           "inPoint": 0,
           "outPoint": 120,
-          "assetId": "ast_7ba3579f98034abc17363545d211ea72",
+          "assetId": "ast_ad8b80cabb2625a43ea18de8655a8b20",
           "transform": {
             "position": [
               540,
-              998.4
+              1248
             ],
             "anchor": [
               128,
               376
             ],
             "scale": [
-              1.5319,
-              1.5319
+              0.766,
+              0.766
             ],
             "rotation": 0,
             "opacity": 1
-          }
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 26,
+                "direction": 180,
+                "softness": 30,
+                "opacity": 0.5,
+                "color": "#1a0f08"
+              }
+            }
+          ]
         },
         {
-          "kind": "text",
-          "id": "endcard:headline",
-          "name": "headline",
+          "kind": "shape",
+          "id": "finish:endcard:grade",
+          "name": "grade",
           "inPoint": 0,
           "outPoint": 120,
-          "source": "Cold Brew — $4.50",
-          "style": {
-            "font": "Inter",
-            "size": 72,
-            "fill": "#3B2417",
-            "weight": 600,
-            "align": "center",
-            "boxWidth": 860
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
           },
+          "fill": "#ffb870",
+          "blendMode": "soft-light",
           "transform": {
             "position": [
               540,
-              1640
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.16
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "finish:endcard:flash",
+          "name": "flash",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#fff3de",
+          "blendMode": "screen",
+          "transform": {
+            "position": [
+              540,
+              960
             ],
             "anchor": [
               540,
@@ -831,7 +1362,7 @@
             "opacity": [
               {
                 "t": 0,
-                "v": 0,
+                "v": 0.35,
                 "easeOut": [
                   0,
                   0,
@@ -840,8 +1371,8 @@
                 ]
               },
               {
-                "t": 18,
-                "v": 1
+                "t": 8,
+                "v": 0
               }
             ]
           }
@@ -851,28 +1382,28 @@
   },
   "meta": {
     "director": {
-      "productNoun": "product",
+      "productNoun": "can",
       "productShape": "can",
       "scenes": {
-        "hero": {
-          "precompId": "hero",
+        "opener": {
+          "precompId": "opener",
           "startFrame": 0,
           "durationFrames": 120,
           "mode": "motion",
-          "intent": "Open on the cold brew can on a wooden counter in soft morning window light, establishing a calm realistic breakfast scene",
+          "intent": "Open on the can on a wooden counter in morning window light so the product and promise are clear with sound off",
           "camera": {
             "move": "dolly-in",
             "strength": 0.5
           }
         },
-        "pour-steam": {
-          "precompId": "pour-steam",
+        "pour": {
+          "precompId": "pour",
           "startFrame": 120,
           "durationFrames": 120,
-          "mode": "motion",
-          "intent": "Can beside a fresh pour in a glass/cup with gentle steam, suggesting freshly served cold brew moment on the counter",
+          "mode": "generate",
+          "intent": "Show a fresh pour beside the can with real rising steam for freshness",
           "camera": {
-            "move": "parallax",
+            "move": "static",
             "strength": 0.5
           }
         },
@@ -881,7 +1412,7 @@
           "startFrame": 240,
           "durationFrames": 120,
           "mode": "motion",
-          "intent": "Slow close look at the label and dark brown coffee-bean band so packaging is clearly readable",
+          "intent": "Hero moment: slow close look at the can label and bean band so the product is remembered",
           "camera": {
             "move": "dolly-in",
             "strength": 0.5
@@ -892,7 +1423,7 @@
           "startFrame": 360,
           "durationFrames": 120,
           "mode": "motion",
-          "intent": "Clean end card with the can, brand line and price $4.50 to close the sale",
+          "intent": "Answer the opening morning promise with the can and clear price to buy",
           "camera": {
             "move": "static",
             "strength": 0.5
@@ -900,21 +1431,38 @@
         }
       },
       "layers": {
-        "hero:bg": {
-          "sceneId": "hero",
+        "opener:bg": {
+          "sceneId": "opener",
           "role": "bg",
-          "assetId": "ast_0099884626256ecd8db68865ca83e6b0",
+          "assetId": "ast_10c2e9b87669ea6907806ea285294080",
           "z": 11,
           "base": {
             "x": 540,
             "y": 960,
-            "scale": 1.725
+            "scale": 1.65
           }
         },
-        "endcard:bg": {
-          "sceneId": "endcard",
+        "opener:product": {
+          "sceneId": "opener",
+          "role": "product",
+          "assetId": "ast_ad8b80cabb2625a43ea18de8655a8b20",
+          "z": 10.99,
+          "base": {
+            "x": 540,
+            "y": 998.4,
+            "scale": 1.5319
+          },
+          "maskAssetId": "ast_c11ebb9e739c1f6ea023499d2b019220"
+        },
+        "opener:headline": {
+          "sceneId": "opener",
+          "role": "headline",
+          "z": 0
+        },
+        "pour:bg": {
+          "sceneId": "pour",
           "role": "bg",
-          "assetId": "ast_a2f07621e4968be7b7b1005289b907a8",
+          "assetId": "ast_740cb36fda1e31d21547b6517a25e31b",
           "z": 11,
           "base": {
             "x": 540,
@@ -922,77 +1470,28 @@
             "scale": 1.5
           }
         },
-        "pour-steam:bg": {
-          "sceneId": "pour-steam",
-          "role": "bg",
-          "assetId": "ast_553e05712c84d7c92e203440ea4fabd9",
-          "z": 11,
-          "base": {
-            "x": 540,
-            "y": 960,
-            "scale": 1.725
-          }
-        },
-        "pour-steam:product": {
-          "sceneId": "pour-steam",
+        "pour:product": {
+          "sceneId": "pour",
           "role": "product",
-          "assetId": "ast_7ba3579f98034abc17363545d211ea72",
+          "assetId": "ast_ad8b80cabb2625a43ea18de8655a8b20",
           "z": 10.99,
           "base": {
-            "x": 540,
-            "y": 998.4,
-            "scale": 1.5319
+            "x": 345.6,
+            "y": 1075.2,
+            "scale": 1.3277
           },
-          "maskAssetId": "ast_929ff009f229a62b629b2eeb460f4d1e"
+          "maskAssetId": "ast_c11ebb9e739c1f6ea023499d2b019220"
         },
-        "hero:headline": {
-          "sceneId": "hero",
+        "pour:headline": {
+          "sceneId": "pour",
           "role": "headline",
           "z": 0
-        },
-        "endcard:headline": {
-          "sceneId": "endcard",
-          "role": "headline",
-          "z": 0
-        },
-        "pour-steam:headline": {
-          "sceneId": "pour-steam",
-          "role": "headline",
-          "z": 0
-        },
-        "hero:product": {
-          "sceneId": "hero",
-          "role": "product",
-          "assetId": "ast_3d8208bfec5b5b5ac0e1cdbe51c7b2ae",
-          "z": 1,
-          "base": {
-            "x": 540,
-            "y": 998.4,
-            "scale": 0.9844
-          }
-        },
-        "label:headline": {
-          "sceneId": "label",
-          "role": "headline",
-          "z": 0
-        },
-        "endcard:product": {
-          "sceneId": "endcard",
-          "role": "product",
-          "assetId": "ast_7ba3579f98034abc17363545d211ea72",
-          "z": 10.99,
-          "base": {
-            "x": 540,
-            "y": 998.4,
-            "scale": 1.5319
-          },
-          "maskAssetId": "ast_929ff009f229a62b629b2eeb460f4d1e"
         },
         "label:bg": {
           "sceneId": "label",
           "role": "bg",
-          "assetId": "ast_bdcd7c23eae6c523db2bd61930ce9256",
-          "z": 11.99,
+          "assetId": "ast_fbe17f586e612310d6bdd7c4fcf8619c",
+          "z": 11,
           "base": {
             "x": 540,
             "y": 960,
@@ -1002,14 +1501,68 @@
         "label:product": {
           "sceneId": "label",
           "role": "product",
-          "assetId": "ast_955ce0c7e63912bffed8487bc7ef23b6",
+          "assetId": "ast_ad8b80cabb2625a43ea18de8655a8b20",
+          "z": 10.99,
+          "base": {
+            "x": 340,
+            "y": 220,
+            "scale": 1.6
+          },
+          "maskAssetId": "ast_c11ebb9e739c1f6ea023499d2b019220"
+        },
+        "label:headline": {
+          "sceneId": "label",
+          "role": "headline",
+          "z": 0
+        },
+        "pour:subject": {
+          "sceneId": "pour",
+          "role": "subject",
+          "assetId": "ast_6266d5decb36aa707602ebb6c8ad44f8",
+          "z": 10.99,
+          "base": {
+            "x": 734.4,
+            "y": 1334.4,
+            "scale": 2.0621
+          }
+        },
+        "pour:caption": {
+          "sceneId": "pour",
+          "role": "caption",
+          "z": 0
+        },
+        "pour:bg-2": {
+          "sceneId": "pour",
+          "role": "bg",
+          "z": 10,
+          "base": {
+            "x": 419,
+            "y": 1745,
+            "scale": 1
+          }
+        },
+        "endcard:bg": {
+          "sceneId": "endcard",
+          "role": "bg",
+          "assetId": "ast_4726da146215abf3dc5b7317a01fa7db",
+          "z": 11.99,
+          "base": {
+            "x": 540,
+            "y": 960,
+            "scale": 1.65
+          }
+        },
+        "endcard:product": {
+          "sceneId": "endcard",
+          "role": "product",
+          "assetId": "ast_ad8b80cabb2625a43ea18de8655a8b20",
           "z": 11.98,
           "base": {
             "x": 540,
-            "y": 998.4,
-            "scale": 1.5319
+            "y": 1248,
+            "scale": 0.766
           },
-          "maskAssetId": "ast_22bb0fe7a1d6388ff305d5a8d17ddcc7"
+          "maskAssetId": "ast_c11ebb9e739c1f6ea023499d2b019220"
         }
       }
     }

@@ -18,7 +18,7 @@ export async function finishFilm(films: FilmStore, filmId: string, assets: ToolC
       comp = registerAsset(comp, { id: ref.id, kind: 'audio', src: ref.url, duration: comp.durationInFrames });
       musicAssetId = ref.id;
     }
-    await films.commit(filmId, finishComposition(comp, { musicAssetId }), 'director', 'finish: shadow, grade, type, music');
+    await films.commit(filmId, finishComposition(comp, { musicAssetId, brief: film.brief.text }), 'director', 'finish: shadow, grade, type, music');
   } catch {
     /* the film is already built; the polish is optional */
   }

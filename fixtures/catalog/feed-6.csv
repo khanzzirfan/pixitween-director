@@ -1,0 +1,7 @@
+id,title,price,sale_price,currency,image_link,category,link
+cb-original,Coffee Co. Cold Brew,4.50,,USD,fixtures/s13/can-product.png,drinks,/p/cb-original
+cb-vanilla,Coffee Co. Vanilla Cold Brew,4.75,,USD,fixtures/s13/can-product.png,drinks,/p/cb-vanilla
+cb-mocha,Coffee Co. Mocha Cold Brew,4.75,3.99,USD,fixtures/s13/can-product.png,drinks,/p/cb-mocha
+mug-stone,Stone Mug,24.00,19.00,USD,fixtures/seed/mug-product.png,home,/p/mug-stone
+mug-sage,Sage Mug,24.00,,USD,fixtures/seed/mug-product.png,home,/p/mug-sage
+mug-night,Night Mug,26.00,,USD,fixtures/seed/mug-product.png,home,/p/mug-night

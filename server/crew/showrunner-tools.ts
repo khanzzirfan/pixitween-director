@@ -95,6 +95,17 @@ export interface Revision {
 }
 
 /** Applies storyboard ops: validates, cancels jobs of removed scenes, syncs the composition, saves the storyboard and announces it. */
+/** Without a Clippy token a generate scene can never be filled and would ship as a "Clip pending approval" stub, so a plan that asks for one gets a motion scene. */
+export function withoutGenerate(ops: StoryboardOp[]): StoryboardOp[] {
+  return ops.map((op) =>
+    op.op === 'add' && op.scene.mode === 'generate'
+      ? { ...op, scene: { ...op.scene, mode: 'motion' as const } }
+      : op.op === 'update' && op.patch.mode === 'generate'
+        ? { ...op, patch: { ...op.patch, mode: 'motion' as const } }
+        : op,
+  );
+}
+
 export async function reviseStoryboard(crew: CrewCtx, ops: StoryboardOp[], extra: { productShape?: ProductShape } = {}): Promise<Revision> {
   const film = await crew.films.get(crew.filmId);
   const before = film.storyboard ?? blankStoryboard(film);
@@ -223,7 +234,7 @@ export function createBoardTools(crew: CrewCtx): ToolDef[] {
     params: z.object({ ops: z.array(storyboardOpSchema).min(1).max(8), reason: z.string().max(200).optional(), productShape: z.enum(PRODUCT_SHAPES).optional() }),
     async run(_ctx, a) {
       try {
-        const r = await reviseStoryboard(crew, a.ops, { ...(a.productShape ? { productShape: a.productShape } : {}) });
+        const r = await reviseStoryboard(crew, loadEnv().CLIPPY_TOKEN ? a.ops : withoutGenerate(a.ops), { ...(a.productShape ? { productShape: a.productShape } : {}) });
         return { ok: true, data: r };
       } catch (e) {
         return fail(e instanceof StoryboardOpError ? e.message : `could not revise the storyboard: ${message(e)}`);
