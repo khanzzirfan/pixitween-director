@@ -74,6 +74,10 @@ function StageCheck() {
     player.current?.seek(sec);
     await frame();
   };
+  // the frame-capture script (scripts/lib/film-frames.ts) drives the page through this
+  useEffect(() => {
+    (window as unknown as { __stage?: unknown }).__stage = { seek, whenReady: (s: number) => player.current?.whenReady(s) };
+  });
   const hashAt = async (sec: number, rect?: [number, number, number, number]) => {
     await seek(sec);
     return hashCanvas(player.current?.getCanvas() ?? null, rect);
