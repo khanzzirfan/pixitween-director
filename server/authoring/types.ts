@@ -3,7 +3,7 @@ import type { Aspect } from '@shared/composition';
 
 export type { Aspect };
 export type Comp = AepCompositionJson;
-export type LayerRole = 'bg' | 'product' | 'subject' | 'headline' | 'caption' | 'camera' | 'clip' | 'product3d';
+export type LayerRole = 'bg' | 'product' | 'subject' | 'headline' | 'caption' | 'camera' | 'clip' | 'product3d' | 'stage3d' | 'actor3d' | 'prop3d';
 export type Prop = 'x' | 'y' | 'scale' | 'rotation' | 'opacity';
 export type Ease = 'linear' | 'easeIn' | 'easeOut' | 'easeInOut';
 export type CameraMove = 'static' | 'dolly-in' | 'pan' | 'orbit' | 'parallax';

@@ -5,14 +5,15 @@ import { defineConfig, devices } from '@playwright/test';
 
 // The e2e run uses its own ports and data dir, so it never touches a dev server or ./data.
 // E2E_CREW=1 runs the crew studio flow (crew on, slower fake workers) on its own ports; the default run is the classic director.
-const crew = process.env.E2E_CREW === '1';
-const API_PORT = crew ? 8798 : 8799;
-const WEB_PORT = crew ? 5198 : 5199;
+const cartoon = process.env.E2E_CARTOON === '1';
+const crew = process.env.E2E_CREW === '1' || cartoon;
+const API_PORT = cartoon ? 8797 : crew ? 8798 : 8799;
+const WEB_PORT = cartoon ? 5197 : crew ? 5198 : 5199;
 const dataDir = mkdtempSync(join(tmpdir(), 'director-e2e-'));
 
 export default defineConfig({
   testDir: 'e2e',
-  testMatch: crew ? 'crew.spec.ts' : /^(?!.*crew).*\.spec\.ts$/,
+  testMatch: cartoon ? 'cartoon.spec.ts' : crew ? 'crew.spec.ts' : /^(?!.*(crew|cartoon)).*\.spec\.ts$/,
   workers: 1,
   fullyParallel: false,
   retries: 0,
@@ -33,9 +34,10 @@ export default defineConfig({
       stderr: 'pipe',
       env: {
         DIRECTOR_FAKE: '1',
-        DIRECTOR_FAKE_DELAY_MS: crew ? '1200' : '50',
+        DIRECTOR_FAKE_DELAY_MS: cartoon ? '300' : crew ? '1200' : '50',
         CREW_ENABLED: crew ? 'true' : 'false', // crew mode is on by default; the classic flow tests the single director
-        PRODUCT_3D: crew ? 'true' : 'false', // the crew run has a 3d hero scene, so the 3D path is rehearsed offline
+        PRODUCT_3D: crew && !cartoon ? 'true' : 'false',
+        CARTOON_MODE: cartoon ? 'true' : 'false', // the toy-studio crew: fixture forge, fake blockers, a stage per scene // the crew run has a 3d hero scene, so the 3D path is rehearsed offline
         PORT: String(API_PORT),
         DATA_DIR: dataDir,
       },

@@ -1,6 +1,7 @@
 import type { ToolCtx } from '@shared/tools';
 import type { Scene } from '@shared/storyboard';
 import { layerIdsByRole, markPlaceholder } from '../authoring/api';
+import { filmCutout } from '../tools/product-cutout';
 import { runTool } from '../tools/registry';
 
 export const PLACEHOLDER_TEXT = 'Clip pending approval';
@@ -39,7 +40,8 @@ export async function ensureSceneBasics(o: {
     } else await add({ sceneId: o.scene.id, role: 'bg', kind: 'shape', fill: o.palette[0] ?? '#111827' });
   }
   if (!pending && comp && !layerIdsByRole(comp, 'product', o.scene.id).length && !layerIdsByRole(comp, 'product3d', o.scene.id).length)
-    await add({ sceneId: o.scene.id, role: 'product', kind: 'image', assetId: o.product.assetId });
+    // the cut-out when the film has one, so the default is not a photo rectangle with its studio background
+    await add({ sceneId: o.scene.id, role: 'product', kind: 'image', assetId: (await filmCutout(o.ctx))?.id ?? o.product.assetId });
   if (comp && o.scene.text && !layerIdsByRole(comp, 'headline', o.scene.id).length)
     await add({ sceneId: o.scene.id, role: 'headline', kind: 'text', text: o.scene.text, style: { color: '#ffffff' } });
   if (comp && o.scene.mode === 'generate') {

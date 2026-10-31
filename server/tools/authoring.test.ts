@@ -110,3 +110,17 @@ describe('scripted scene', () => {
     expect(Array.isArray(product.transform.position) && typeof (product.transform.position as unknown[])[0] === 'object').toBe(true);
   });
 });
+
+describe('addLayer and the raw product photo', () => {
+  it('refuses the raw photo once the film holds a cut-out, and says which one to use', async () => {
+    const s = await setup();
+    await s.call('addScene', { id: 's1', durationSec: 4 });
+    const raw = (await s.t.films.get(s.t.filmId)).assets.find((a) => a.role === 'product-photo')!;
+    const png = await s.t.assets.read(raw.id);
+    const cut = await s.t.assets.put(png, 'image/png', { role: 'cutout', sceneId: 's1' });
+    await s.t.films.mutate(s.t.filmId, (f) => ({ next: registerAsset(f.composition!, { id: cut.id, kind: 'image', src: `/api/assets/${cut.id}`, width: 64, height: 64 }), data: null }), 'director');
+    const refused = await s.call('addLayer', { sceneId: 's1', role: 'product', kind: 'image', assetId: raw.id });
+    expect(refused).toMatchObject({ ok: false });
+    expect(!refused.ok && refused.error).toContain(cut.id);
+  });
+});

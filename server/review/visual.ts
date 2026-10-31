@@ -127,6 +127,8 @@ export function buildVisualPrompt(o: {
   blind?: boolean;
   /** One line per measured text box, for a blind review. */
   measured?: string[];
+  /** Extra things to look for, one question each (the toy-studio critic asks about bodies through objects and a hidden product). */
+  questions?: string[];
 }): string {
   const images = o.frameTimes.map((t, i) => `Image ${i + 1} = ${t} s`).join(', ');
   const found = o.findings.length ? o.findings.map((f) => `- ${f}`).join('\n') : 'none';
@@ -138,6 +140,7 @@ export function buildVisualPrompt(o: {
       ...(o.findings.length ? [found] : []),
       ...(o.measured?.length ? ['Measured text boxes (pixels in the frame):', ...o.measured.map((m) => `- ${m}`)] : []),
       'Report only clear visual faults: text that is hard to read, text covering the product, a cut-off subject, or a broken frame.',
+      ...(o.questions?.length ? ['Also answer these, reporting an issue only when the answer is yes for the first and third and no for the second:', ...o.questions.map((q) => `- ${q}`)] : []),
       BLIND_RULES,
       STYLE_TELLS,
       `Reply with only a JSON object: {"sceneId": "${o.sceneId}", "pass": boolean, "issues": [{"image": number, "atSec": number, "kind": string, "where": string, "evidence": string}], "fixes": []}.`,
@@ -299,6 +302,7 @@ export async function visualReview(o: {
   /** A blind review (crew critic): see buildVisualPrompt. */
   blind?: boolean;
   measured?: string[];
+  questions?: string[];
   reviewer?: Reviewer;
   pickReviewer?: (o: { local: boolean }) => Reviewer;
 }): Promise<{ verdict: VisualVerdict; refused: RefusedFix[]; dropped: DroppedIssue[] }> {
@@ -319,7 +323,7 @@ export async function visualReview(o: {
     findings: o.findings,
     layerSummary: o.layerSummary,
     tools: o.tools,
-    ...(o.blind ? { blind: true, measured: o.measured } : {}),
+    ...(o.blind ? { blind: true, measured: o.measured, ...(o.questions ? { questions: o.questions } : {}) } : {}),
   });
   let prompt = basePrompt;
   for (let attempt = 0; attempt < (o.maxAttempts ?? 2); attempt++) {

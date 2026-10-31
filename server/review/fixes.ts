@@ -34,14 +34,14 @@ export function suggestFix(finding: Finding, ctx: FixContext): { tool: string; a
         tool: 'setTransform',
         args: { layerId: finding.layerId, scale: Math.floor((100 * 0.98 * 0.9 * w) / (box.right - box.left)) / 100 },
       };
-    const y = layer.transform.position[1];
-    const newY = box
-      ? Math.max(
-          box.top < 0.05 * ctx.comp.height ? y + (0.05 * ctx.comp.height - box.top) : y,
-          Math.min(y, y + (0.95 * ctx.comp.height - box.bottom)),
-        )
-      : y;
-    return newY !== y ? { tool: 'setTransform', args: { layerId: finding.layerId, y: newY } } : undefined;
+    const [x, y] = layer.transform.position as [number, number];
+    // shift by exactly the overflow: forward when it sticks out at the start edge, back when it sticks out at the end edge
+    const shift = (lo: number, hi: number, size: number) => (lo < 0.05 * size ? 0.05 * size - lo : hi > 0.95 * size ? 0.95 * size - hi : 0);
+    const newY = box ? y + shift(box.top, box.bottom, ctx.comp.height) : y;
+    // a box wider than the safe width is handled by the scale fix above
+    const newX = box ? x + shift(box.left, box.right, w) : x;
+    if (newX === x && newY === y) return undefined;
+    return { tool: 'setTransform', args: { layerId: finding.layerId, ...(newX !== x ? { x: newX } : {}), ...(newY !== y ? { y: newY } : {}) } };
   }
   if (finding.rule === 'R1' && finding.kind === 'text-over-product') {
     const box = ctx.boxes?.[finding.layerId!];

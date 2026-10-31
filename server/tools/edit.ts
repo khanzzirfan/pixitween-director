@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ToolCtx, ToolDef, ToolResult } from '@shared/tools';
 import { removeLayer } from '../authoring/api';
+import { AuthoringError } from '../authoring/errors';
 import { EditError, findLayer, mapAnimatable } from './edit-helpers';
 import type { AepCompositionJson } from 'reacthub-pixitweenjs';
 
@@ -21,13 +22,18 @@ async function apply(
     return { ok: false, error: e instanceof EditError ? e.message : e instanceof Error ? e.message : 'edit failed' };
   }
 }
+/** A stage actor or prop has no 2D transform: it is placed by its marks or position. */
+function flat(layer: any, id: string): any {
+  if (!layer.transform) throw new AuthoringError('bad_value', `layer '${id}' is a 3D stage member and has no 2D transform`, 'Use moveActor, or place the prop again');
+  return layer;
+}
 export const scaleLayer: ToolDef<{ layerId: string; factor: number }> = {
   name: 'scaleLayer',
   description: 'Scale a layer; larger factor = bigger (1 = unchanged).',
   params: z.object({ layerId: z.string(), factor: z.number().min(0.1).max(5) }),
   run(ctx, a) {
     return apply(ctx, a.layerId, `scaleLayer ${a.layerId} x${a.factor}`, (comp) => {
-      const { layer } = findLayer(comp, a.layerId);
+      const layer = flat(findLayer(comp, a.layerId).layer, a.layerId);
       layer.transform.scale = mapAnimatable(layer.transform.scale as any, (v: any) => [v[0] * a.factor, v[1] * a.factor]) as any;
       return comp;
     });
@@ -41,7 +47,7 @@ export const nudgeLayer: ToolDef<{ layerId: string; dxPct?: number; dyPct?: numb
     .refine((a) => a.dxPct !== undefined || a.dyPct !== undefined, 'give dxPct or dyPct'),
   run(ctx, a) {
     return apply(ctx, a.layerId, `nudgeLayer ${a.layerId}`, (comp) => {
-      const { layer } = findLayer(comp, a.layerId);
+      const layer = flat(findLayer(comp, a.layerId).layer, a.layerId);
       const position = layer.transform.position as any;
       layer.transform.position = mapAnimatable(position, (v: any) => [
         Math.max(-0.5 * comp.width, Math.min(1.5 * comp.width, v[0] + ((a.dxPct ?? 0) * comp.width) / 100)),

@@ -7,8 +7,10 @@ import {
   addLayer, addScene, newFilmComposition, removeLayer, removeScene, reorderLayer, sceneInfo, setCamera, setKeyframes, setSceneDuration,
   setText, setTransform, swapScenes,
 } from '../authoring/api';
+import { loadEnv } from '../env';
 import { readDirector } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
+import { filmCutout } from './product-cutout';
 
 /**
  * Load, apply and commit as ONE call to films.mutate (contract D-15): never a separate get then commit, which loses an
@@ -86,13 +88,21 @@ export const tools: ToolDef[] = [
       sceneId: z.string(), role, kind: z.enum(['image', 'video', 'text', 'shape']), assetId: z.string().optional(), text: z.string().optional(),
       style: style.optional(), fill: z.string().optional(), box: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).optional(), z: z.number().optional(),
     }),
-    (ctx, a) =>
-      runAuthoring(ctx, `addLayer ${a.sceneId}:${a.role}`, (c) => {
+    async (ctx, a) => {
+      // the raw product photo still has its studio background: it would sit on the plate as a grey rectangle (and replace the cut-out)
+      if (a.assetId) {
+        const film = await ctx.films.get(ctx.filmId);
+        const raw = film.assets.some((x) => x.id === a.assetId && x.role === 'product-photo');
+        const cut = raw ? await filmCutout(ctx) : undefined;
+        if (raw && cut) return { ok: false, error: `asset ${a.assetId} is the raw product photo with its studio background. Use the cut-out ${cut.id}, or call placeProduct; never add the photo as a layer.` };
+      }
+      return runAuthoring(ctx, `addLayer ${a.sceneId}:${a.role}`, (c) => {
         const before = new Set(Object.keys(readDirector(c).layers));
         const next = addLayer(c, a);
         const layerId = Object.keys(readDirector(next).layers).find((id) => !before.has(id))!;
         return { next, data: { layerId } };
-      }),
+      });
+    },
   ),
   tool('removeLayer', 'Delete a layer by id, for example s1:headline.', z.object({ layerId: z.string() }), (ctx, a) =>
     runAuthoring(ctx, `removeLayer ${a.layerId}`, (c) => ({ next: removeLayer(c, a.layerId), data: {} }), { layerId: a.layerId }),
@@ -127,6 +137,8 @@ export const tools: ToolDef[] = [
     'setCamera',
     'Give a scene a camera move: static, dolly-in, pan, orbit or parallax. strength 0 to 1. Call it last in a scene; calling again replaces it.',
     z.object({ sceneId: z.string(), move: z.enum(['static', 'dolly-in', 'pan', 'orbit', 'parallax']), strength: z.number().min(0).max(1).optional() }),
-    (ctx, a) => runAuthoring(ctx, `setCamera ${a.sceneId}`, (c) => ({ next: setCamera(c, a.sceneId, a.move, a.strength), data: { sceneId: a.sceneId } })),
+    (ctx, a) => loadEnv().CARTOON_MODE && a.move !== 'static'
+      ? Promise.resolve<ToolResult>({ ok: false, error: "setCamera: this film has a locked camera, only 'static' is allowed. Move the characters or the light instead" })
+      : runAuthoring(ctx, `setCamera ${a.sceneId}`, (c) => ({ next: setCamera(c, a.sceneId, a.move, a.strength), data: { sceneId: a.sceneId } })),
   ),
 ];

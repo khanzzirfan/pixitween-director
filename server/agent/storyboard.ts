@@ -17,7 +17,8 @@ const sceneProperties = {
   durationSec: { type: 'number' },
   intent: { type: 'string' },
   shotType: { type: 'string', enum: ['hero', 'detail', 'lifestyle', 'reveal', 'closer'] },
-  camera: { type: 'string', enum: ['static', 'dolly-in', 'pan', 'orbit', 'parallax'] },
+  // a toy-studio film has a locked camera: the motion comes from the characters and the light
+  camera: { type: 'string', enum: loadEnv().CARTOON_MODE ? ['static'] : ['static', 'dolly-in', 'pan', 'orbit', 'parallax'] },
   layersWanted: { type: 'array', items: { type: 'string', enum: ['bg', 'product', 'subject', 'headline', 'caption'] } },
   text: { type: 'string' },
   mode: { type: 'string', enum: ['motion', 'generate'] },

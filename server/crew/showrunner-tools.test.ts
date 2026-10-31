@@ -268,4 +268,13 @@ describe('say, ask, finish', () => {
     await settle();
     expect(t.events.find((e) => e.type === 'film.status')).toMatchObject({ status: 'ready' });
   });
+
+  it('finish commits the polish: a grade on each scene and the music bed', async () => {
+    const t = await setup();
+    await t.run('reviseStoryboard', { ops: add(2) });
+    expect((await t.run('finish', { summary: 'done' })).ok).toBe(true);
+    const c = (await t.film.films.get(t.film.filmId)).composition as Comp;
+    expect(JSON.stringify(c.precomps)).toContain('finish:s1:grade');
+    expect(JSON.stringify(c.layers)).toContain('finish:music');
+  });
 });

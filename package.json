@@ -19,6 +19,7 @@
     "e2e": "playwright test",
     "live": "tsx scripts/live/run.ts",
     "e2e:crew": "E2E_CREW=1 playwright test",
+    "e2e:cartoon": "E2E_CARTOON=1 playwright test",
     "check:bundle": "tsx scripts/check-bundle.ts",
     "start": "tsx server/main.ts"
   },
@@ -70,7 +71,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-resizable-panels": "^3.0.6",
-    "reacthub-pixitweenjs": "^0.3.2",
+    "reacthub-pixitweenjs": "^0.3.3",
     "sharp": "^0.35.5",
     "three": "^0.184.0",
     "undici": "^7.30.1",
