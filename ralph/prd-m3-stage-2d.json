@@ -1,7 +1,7 @@
 {
   "name": "Engine M3: 2D stage (assets, image, text, shape, group nodes)",
-  "branchName": "ralph/m3-stage-2d",
   "description": "Builds the 2D MotionNodes on Pixi v8 directly (no @pixi/react): image, text, shape and group, plus image asset loading, visibility windows and the createNode dispatcher the runtime uses. Drawing is checked later on the lab page (M7).",
+  "branchName": "ralph/m3-stage-2d",
   "userStories": [
     {
       "id": "US-001",
@@ -20,12 +20,13 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "stage2d"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-002",
@@ -44,12 +45,13 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "stage2d"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-003",
@@ -72,12 +74,13 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "stage2d"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-004",
@@ -98,14 +101,15 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-003"
       ],
       "labels": [
         "stage2d"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-005",
@@ -126,14 +130,15 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Previous local-model attempt spent 55 minutes exploring and wrote no files. Start writing engine/src/pixi text files within the first few steps, keep the scope to exactly what the acceptance criteria list, read only the files you must, and run the three gates once at the end. Text drawing is browser-verified only (m7 lab page); unit tests cover textStyleFrom mapping only.",
       "dependsOn": [
         "US-003"
       ],
       "labels": [
         "stage2d"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-006",
@@ -156,15 +161,16 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "createNode dispatcher + groupNode done; engine tests green. Full npm test keeps its pre-existing web/ React.act failures.",
       "dependsOn": [
         "US-004",
         "US-005"
       ],
       "labels": [
         "stage2d"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     }
   ],
   "metadata": {
@@ -211,6 +217,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": []
+    "manualGates": [],
+    "updatedAt": "2026-10-31T17:06:32.041Z"
   }
 }
