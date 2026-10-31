@@ -28,8 +28,10 @@ export const FOV_BASE = 30;
 export const FOV_WIDE = 80;
 /** Camera height as an angle above the product's centre: low looks up at it, high looks down. */
 export const ELEVATION: Record<Angle, number> = { low: -3, eye: 7, high: 28 };
-/** How much of the frame's height the product fills at each size. The macro frames the label, about a third of the can. */
-export const FILL: Record<ShotSize, number> = { wide: 0.32, medium: 0.5, close: 0.8, macro: 2.4 };
+/** How much of the frame's height the product fills at each size. The macro frames the label band and the name above it, about two thirds of the can. */
+export const FILL: Record<ShotSize, number> = { wide: 0.32, medium: 0.5, close: 0.8, macro: 1.5 };
+/** The lens blur. Low enough that the can's edges stay crisp in every shot; the focus distance follows the camera. */
+export const APERTURE = 0.3;
 /** Engine limits (STAGE3D_LIMITS in aep-32). */
 export const LIMITS = { props: 12, instances: 400, swarm: 200 } as const;
 
@@ -374,7 +376,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   // the board's light: key colour, and how dark or bright the world is
   const keyLevel = i.key ?? 'mid';
   const keyColor = i.tone === 'warm' ? '#ffd7a3' : i.tone === 'cool' ? '#bcd6ff' : tint(i.accent, 0.7);
-  const fieldColor = keyLevel === 'high' ? tint(i.accent, 0.9) : shade(i.accent, keyLevel === 'low' ? 0.93 : 0.85);
+  const fieldColor = keyLevel === 'high' ? tint(i.accent, 0.9) : shade(i.tone && i.tone !== 'neutral' ? keyColor : i.accent, keyLevel === 'low' ? 0.93 : 0.85);
   const haloGain = keyLevel === 'low' ? 0.6 : 1;
   const exposure = keyLevel === 'low' ? 0.95 : keyLevel === 'high' ? 1.3 : 1.1;
 
@@ -383,7 +385,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   const pcx = W / 2;
   const pcy = H * 0.5;
   const hd = H * 0.46;
-  const halo = shape(c, { x: pcx - hd / 2, y: pcy - hd / 2, w: hd, h: hd }, tint(i.accent, 0.3), 11, { kind: 'ellipse', size: [hd, hd] }, (l) => {
+  const halo = shape(c, { x: pcx - hd / 2, y: pcy - hd / 2, w: hd, h: hd }, i.tone && i.tone !== 'neutral' ? shade(keyColor, 0.45) : tint(i.accent, 0.3), 11, { kind: 'ellipse', size: [hd, hd] }, (l) => {
     l.effects = [{ name: 'gaussian-blur', params: { blurriness: r2(hd * 0.1) } }];
   });
   c = halo.c;
@@ -452,7 +454,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     outPoint: frames,
     transform: { position: [W / 2, H / 2], anchor: [W / 2, H / 2], scale: [1, 1], rotation: 0, opacity: 1 },
     viewport: { width: W, height: H },
-    camera: { position: cam.position, target: [0, PRODUCT_Y, 0], fov: cam.fov, focus: { distance: cam.focus, aperture: 0.6 } },
+    camera: { position: cam.position, target: [0, PRODUCT_Y, 0], fov: cam.fov, focus: { distance: cam.focus, aperture: APERTURE } },
     set: { ground: 'none', wall: false },
     style: { shading: 'pbr', exposure },
     shadow: { opacity: 0.45, softness: 0.7 },
@@ -471,42 +473,50 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   // copy: brand over the first shots, gone for the macro, then brand, name and price in the end hold
   const ink = keyLevel === 'high' ? shade(i.accent, 0.8) : '#ffffff';
   const top = H * (portrait ? 0.13 : 0.1);
+  // the product in the end hold: how high and wide it really stands (the wide lens and the camera height make it a little bigger than its fill)
+  const fill = FILL[sizes.at(-1) ?? 'medium'];
+  const ph = H * fill * 1.16;
+  const pw = ph / Math.max(0.3, i.productAspect);
+  const canTop = H * 0.5 - ph / 2;
+  const name = i.brand && i.title.startsWith(i.brand) ? i.title.slice(i.brand.length).trim() || i.title : i.title;
+  const nameSize = Math.round(u * 0.09);
+  // the name sits clear above the can (and the brand clear above the name); on a tall can they move up together
+  const nameCy = Math.max(H * 0.07 + u * 0.11, Math.min(top + u * 0.11, canTop - nameSize * 0.9));
   if (i.brand) {
-    const bm = add(c, { role: 'caption', kind: 'text', text: i.brand.toUpperCase(), z: 0.2, style: { size: Math.round(u * 0.032), weight: 700, color: keyLevel === 'high' ? shade(i.accent, 0.5) : tint(i.accent, 0.6), align: 'center' }, box: { x: W * 0.1, y: top, w: W * 0.8, h: u * 0.045 } });
+    const bm = add(c, { role: 'caption', kind: 'text', text: i.brand.toUpperCase(), z: 0.2, style: { size: Math.round(u * 0.032), weight: 700, color: keyLevel === 'high' ? shade(i.accent, 0.5) : tint(i.accent, 0.6), align: 'center' }, box: { x: W * 0.1, y: nameCy - u * 0.11, w: W * 0.8, h: u * 0.045 } });
     const fade: Array<[number, number]> = [[0, 0], [0.3, 0], [0.6, 1]];
     if (macro) fade.push([r2(macro.start / fps - 0.1), 1], [r2(macro.start / fps), 0], [r2(macro.end / fps), 0]);
     fade.push([r2(holdStart), 0], [r2(holdStart + 0.3), 1]);
     c = setKeyframes(bm.c, bm.id, 'opacity', dedupe(fade), 'easeOut');
   }
-  const name = i.brand && i.title.startsWith(i.brand) ? i.title.slice(i.brand.length).trim() || i.title : i.title;
-  const nameCy = top + u * 0.11;
-  const nm = words(c, ID, name, { cx: portrait ? W / 2 : W * 0.4, cy: nameCy, maxW: W * 0.84, size: Math.round(u * 0.09), color: ink, boldLast: true, z: 0.2 });
+  const nm = words(c, ID, name, { cx: portrait ? W / 2 : W * 0.4, cy: nameCy, maxW: W * 0.84, size: nameSize, color: ink, boldLast: true, z: 0.2 });
   c = typeIn(nm.c, nm.ids, r2(holdStart + 0.1), nameCy);
 
-  // the price disc beside the product, popping when the end hold starts, pulsing on the beat after
-  const fill = FILL[sizes.at(-1) ?? 'medium'];
-  const ph = H * fill;
-  const pw = ph / Math.max(0.3, i.productAspect);
+  // the price disc beside the can when there is room for it, else under it; never over it
   const priceText = formatPrice(i.price, i.currency);
-  const dd = u * 0.27;
-  const dcx = portrait ? Math.min(W - dd * 0.6, pcx + pw / 2 + dd * 0.62) : W * 0.75;
-  const dcy = portrait ? pcy + ph * 0.18 : pcy;
-  const rd = dd * 1.06;
+  const gap = u * 0.03;
+  const room = W - W * 0.03 - (pcx + pw / 2 + gap);
+  const dd = Math.min(u * 0.27, Math.max(room / 1.06, 0));
+  const beside = portrait ? dd >= u * 0.19 : true;
+  const ddUse = beside ? (portrait ? dd : u * 0.27) : u * 0.24;
+  const dcx = !portrait ? W * 0.75 : beside ? pcx + pw / 2 + gap + (ddUse * 1.06) / 2 : pcx;
+  const dcy = !portrait ? pcy : beside ? pcy + ph * 0.18 : Math.min(H - ddUse * 0.62, pcy + ph / 2 + gap + ddUse * 0.55);
+  const rd = ddUse * 1.06;
   const ring = shape(c, { x: dcx - rd / 2, y: dcy - rd / 2, w: rd, h: rd }, tint(i.accent, 0.6), 0.32, { kind: 'ellipse', size: [rd, rd] });
-  const disc = shape(ring.c, { x: dcx - dd / 2, y: dcy - dd / 2, w: dd, h: dd }, i.accent, 0.3, { kind: 'ellipse', size: [dd, dd] });
+  const disc = shape(ring.c, { x: dcx - ddUse / 2, y: dcy - ddUse / 2, w: ddUse, h: ddUse }, i.accent, 0.3, { kind: 'ellipse', size: [ddUse, ddUse] });
   const beat = 60 / (i.bpm ?? 120);
   const pulse: Array<[number, number]> = [[0, 0], [r2(holdStart), 0], [r2(holdStart + 0.25), 1.18], [r2(holdStart + 0.45), 1]];
   for (let t = holdStart + 0.45 + 2 * beat; t + 0.25 <= D; t += 2 * beat) pulse.push([r2(t - 0.2), 1], [r2(t), 1.1], [r2(t + 0.25), 1]);
   c = setKeyframes(disc.c, disc.id, 'scale', pulse, 'easeInOut');
   c = setKeyframes(c, ring.id, 'scale', pulse, 'easeInOut');
   const was = i.wasPrice !== undefined && i.wasPrice > i.price ? formatPrice(i.wasPrice, i.currency) : undefined;
-  const ps = Math.round(Math.min(dd * 0.3, (dd * 0.82) / (priceText.length * 0.6)));
-  const pr = add(c, { role: 'caption', kind: 'text', text: priceText, z: 0.15, style: { size: ps, weight: 800, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - dd / 2, y: dcy - ps * 0.6 + (was ? ps * 0.25 : 0), w: dd, h: ps * 1.2 } });
+  const ps = Math.round(Math.min(ddUse * 0.3, (ddUse * 0.82) / (priceText.length * 0.6)));
+  const pr = add(c, { role: 'caption', kind: 'text', text: priceText, z: 0.15, style: { size: ps, weight: 800, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - ddUse / 2, y: dcy - ps * 0.6 + (was ? ps * 0.25 : 0), w: ddUse, h: ps * 1.2 } });
   c = setKeyframes(pr.c, pr.id, 'scale', pulse, 'easeInOut');
   if (was) {
     const ws = Math.round(ps * 0.55);
     const wy = dcy - ps * 0.55;
-    const old = add(c, { role: 'caption', kind: 'text', text: was, z: 0.15, style: { size: ws, weight: 500, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - dd / 2, y: wy - ws * 0.6, w: dd, h: ws * 1.2 } });
+    const old = add(c, { role: 'caption', kind: 'text', text: was, z: 0.15, style: { size: ws, weight: 500, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - ddUse / 2, y: wy - ws * 0.6, w: ddUse, h: ws * 1.2 } });
     c = setKeyframes(old.c, old.id, 'scale', pulse, 'easeInOut');
     const lw = was.length * ws * 0.56;
     const line = shape(c, { x: dcx - lw / 2, y: wy - Math.max(2, ws * 0.05), w: lw, h: Math.max(3, ws * 0.1) }, '#ff5a6e', 0.1);

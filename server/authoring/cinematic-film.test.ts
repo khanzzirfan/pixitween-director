@@ -264,3 +264,29 @@ describe('what the board says reaches the film', () => {
     for (const t of ids.filter((id) => id.startsWith('cine:caption'))) expect(at(t)).toBeGreaterThan(Math.max(...flash.map(at)));
   });
 });
+
+describe('the end card keeps clear of the product', () => {
+  const c = buildCinematicFilm(input());
+  const [W, H] = [1080, 1920];
+  const canH = H * FILL.medium * 1.16;
+  const canW = canH / 3;
+  const at = (l: Obj) => {
+    const p = (l.transform as any).position;
+    const v = Array.isArray(p) && typeof p[0] === 'object' ? p[0].v : p;
+    return v as [number, number];
+  };
+  it('puts the name above the can and the brand above the name', () => {
+    const [, nameY] = at(layers(c).find((l) => l.id === 'cine:caption-2')!);
+    const [, brandY] = at(layers(c).find((l) => l.id === 'cine:caption')!);
+    expect(nameY + 0.045 * W).toBeLessThan(H / 2 - canH / 2);
+    expect(brandY).toBeLessThan(nameY);
+  });
+  it('puts the price disc beside the can, not over it', () => {
+    const [x] = at(layers(c).find((l) => l.id === 'cine:caption-4')!);
+    expect(x - 0.19 * W * 0.5).toBeGreaterThanOrEqual(W / 2 + canW / 2);
+    expect(x + 0.19 * W * 0.5).toBeLessThanOrEqual(W);
+  });
+  it('frames the macro on the label band and the name above it, not just the band', () => {
+    expect(FILL.macro).toBeLessThanOrEqual(1.6);
+  });
+});

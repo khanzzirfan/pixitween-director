@@ -70,7 +70,7 @@
           "note": "cold: ice cubes circle the turning can while the camera pushes low up its cream side"
         },
         {
-          "size": "medium",
+          "size": "close",
           "move": "push",
           "seconds": 0.8,
           "angle": "high",
@@ -100,13 +100,13 @@
           "size": "medium",
           "move": "dolly-zoom",
           "seconds": 1,
-          "angle": "eye",
+          "angle": "low",
           "phase": "reveal",
           "product": "still",
           "note": "reveal: the lens widens and the can holds its size against the dark"
         },
         {
-          "size": "medium",
+          "size": "wide",
           "move": "hold",
           "seconds": 2,
           "phase": "close",
@@ -168,7 +168,7 @@
         {
           "size": "medium",
           "move": "push",
-          "seconds": 0.7,
+          "seconds": 1.2,
           "angle": "high",
           "phase": "build",
           "product": "turn",
@@ -225,7 +225,7 @@
           "note": "reveal: the lens widens while the can holds its size in the clearing dark"
         },
         {
-          "size": "medium",
+          "size": "wide",
           "move": "hold",
           "seconds": 2.8,
           "phase": "close",
@@ -310,7 +310,7 @@
           "note": "chocolate shards orbit the turning can as the camera swings round it low"
         },
         {
-          "size": "medium",
+          "size": "wide",
           "move": "push",
           "seconds": 0.9,
           "angle": "high",
@@ -341,7 +341,7 @@
           "size": "medium",
           "move": "dolly-zoom",
           "seconds": 1,
-          "angle": "eye",
+          "angle": "low",
           "phase": "reveal",
           "product": "still",
           "cut": "hard",
