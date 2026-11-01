@@ -14,7 +14,7 @@ export const REQUIRED_DOCS: RequiredDoc[] = [
   {
     path: 'README.md',
     headings: [
-      h(1, 'PixiTween Director'),
+      h(1, 'Shelfreel'),
       h(2, 'What it does'),
       h(2, 'Demo'),
       h(2, 'Meta models used'),

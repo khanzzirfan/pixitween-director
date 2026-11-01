@@ -34,7 +34,7 @@ it('a crew film gets the studio: crew board and live storyboard, not the classic
 it('a classic film renders the classic panels exactly as before', async () => {
   open(film(false));
   await waitFor(() => expect(screen.getByTestId('film-status')).toHaveTextContent('building'));
-  for (const n of ['new-film', 'storyboard', 'player', 'review', 'chat', 'generate', 'export', 'gallery']) expect(screen.getByTestId(`slot-${n}`)).toBeInTheDocument();
+  for (const n of ['new-film', 'storyboard', 'player', 'review', 'chat', 'catalog', 'export', 'gallery']) expect(screen.getByTestId(`slot-${n}`)).toBeInTheDocument();
   expect(screen.queryByTestId('crew-studio')).toBeNull();
 });
 

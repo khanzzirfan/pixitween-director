@@ -1,7 +1,32 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "web", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev:web"], "port": 5173 },
-    { "name": "dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 5173 }
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:web"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "dev-fake",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:fake"
+      ],
+      "port": 5180
+    }
   ]
 }

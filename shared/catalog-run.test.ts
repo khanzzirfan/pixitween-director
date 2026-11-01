@@ -26,21 +26,20 @@ const product = {
 
 const row = (status: CatalogRow['status']): CatalogRow => catalogRowSchema.parse({ product, status });
 
-const run = (overrides: Record<string, unknown> = {}) =>
-  catalogRunSchema.parse({
-    id: catalogId,
-    filmId,
-    aspect: '9:16',
-    createdAt: '2026-11-01T00:00:00.000Z',
-    state: 'running',
-    costUsd: 0,
-    rows: [row('queued')],
-    ...overrides,
-  });
+const run = (overrides: Record<string, unknown> = {}) => ({
+  id: catalogId,
+  filmId,
+  aspect: '9:16',
+  createdAt: '2026-11-01T00:00:00.000Z',
+  state: 'running',
+  costUsd: 0,
+  rows: [row('queued')],
+  ...overrides,
+});
 
 describe('catalogRunSchema', () => {
   it('accepts a run with one queued row and fills the row defaults', () => {
-    const parsed = run();
+    const parsed = catalogRunSchema.parse(run());
     expect(parsed.id).toBe(catalogId);
     expect(parsed.rows).toHaveLength(1);
     expect(parsed.rows[0]!.status).toBe('queued');

@@ -293,7 +293,8 @@
       ],
       "dependsOn": [
         "US-009"
-      ]
+      ],
+      "notes": "Browser check: headless Chromium (through @playwright/test) against the owner's already-running dev server on http://localhost:5173. The POST to /api/catalogs was intercepted, so the check spent nothing and wrote nothing to the owner's data dir (MG-1, the real-key click, stays the owner's own manual gate). What I saw: (1) on a new film the rail shows a 'Catalog' tab, data-testid rail-catalog, label 'Catalog', sitting between Desk and Plan; (2) clicking it opens the panel with the Product CSV input (accept .csv), the multiple Photos input, the Video format picker on 9:16, the help line 'id,title,price,sale_price,currency,image_link,category,link,brand' and the 'Use demo feed (6 products)' button; (3) clicking that button sent a multipart body carrying name=\"demo\" with feed-6 (and aspect 9:16) and window.location.search became '?catalog=cat_0123456789ab'; (4) a 400 bad_feed with two errors rendered exactly two list items, 'the feed header is missing: price, img, cat' and 'the feed has no rows', and left the URL alone. Screenshot and the check script: debug/c1/us010/."
     },
     {
       "id": "US-011",

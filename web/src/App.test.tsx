@@ -7,7 +7,7 @@ afterEach(() => window.history.replaceState({}, '', '/'));
 
 it('renders the eight slots', () => {
   render(<App />);
-  for (const name of ['new-film', 'storyboard', 'player', 'review', 'chat', 'generate', 'export', 'gallery']) {
+  for (const name of ['new-film', 'storyboard', 'player', 'review', 'chat', 'catalog', 'export', 'gallery']) {
     expect(screen.getByTestId(`slot-${name}`)).toBeInTheDocument();
   }
 });

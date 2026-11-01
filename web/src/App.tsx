@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFilm } from './api/useFilm';
 import { FixturePage } from './dev/FixturePage';
 import BackendBadge from './panels/BackendBadge';
@@ -6,24 +6,18 @@ import Chat from './panels/Chat';
 import Desk from './panels/Desk';
 import ExportPanel from './panels/ExportPanel';
 import Gallery from './panels/Gallery';
-import GenerateApproval from './panels/GenerateApproval';
 import NewFilm from './panels/NewFilm';
 import Review from './panels/Review';
 import Storyboard from './panels/Storyboard';
 import Player, { type PlayerHandle } from './player/Player';
 import { CrewStudio } from './crew/CrewStudio';
 import { ReplayPage } from './crew/replay/ReplayPage';
+import CatalogImport from './catalog/CatalogImport';
+import CatalogPage from './catalog/CatalogPage';
 import { Filmstrip, sceneStarts } from './shell/Filmstrip';
+import { Slot } from './shell/Slot';
 import { StudioShell, type ShellTab } from './shell/StudioShell';
 import { STEPS, stepFor } from './shell/steps';
-
-function Slot({ name, children }: { name: string; children: ReactNode }) {
-  return (
-    <section className="slot" data-testid={`slot-${name}`}>
-      {children}
-    </section>
-  );
-}
 
 function Director({ filmId }: { filmId: string | null }) {
   const { film, events } = useFilm(filmId);
@@ -45,10 +39,10 @@ function Director({ filmId }: { filmId: string | null }) {
   const costs = events.reduce((n, e) => (e.type === 'cost' ? n + e.usd : n), 0);
 
   const tabs: ShellTab[] = [
+    { id: 'catalog', label: 'Catalog', icon: 'grid', content: <Slot name="catalog"><CatalogImport /></Slot> },
     { id: 'new', label: 'Desk', icon: 'plus', content: <Slot name="new-film"><Desk /></Slot> },
     { id: 'plan', label: 'Plan', icon: 'list', badge: scenes.length || undefined, content: <Slot name="storyboard"><Storyboard {...panelProps} /></Slot> },
     { id: 'review', label: 'Review', icon: 'eye', content: <Slot name="review"><Review {...panelProps} getPlayer={getPlayer} /></Slot> },
-    { id: 'generate', label: 'Generate', icon: 'bolt', content: <Slot name="generate"><GenerateApproval {...panelProps} /></Slot> },
     exportTab,
     galleryTab,
   ];
@@ -66,7 +60,7 @@ function Director({ filmId }: { filmId: string | null }) {
       steps={STEPS}
       step={film ? stepFor(status) : 0}
       tabs={tabs}
-      defaultTab={film ? 'plan' : 'new'}
+      defaultTab={film ? 'plan' : 'catalog'}
       stage={<Slot name="player"><Player ref={playerRef} composition={film?.composition ?? null} /></Slot>}
       strip={<Filmstrip scenes={scenes} selected={selected} onSelect={jump} />}
       side={filmId === null
@@ -89,6 +83,9 @@ export function App() {
   }, []);
   const params = new URLSearchParams(search);
   if (params.get('fixture') === '1') return <FixturePage />;
+  // a catalog run brings its own carrier film, so it is its own page, not a film of the studio's
+  const catalogParam = params.get('catalog');
+  if (catalogParam) return <CatalogPage key={catalogParam} catalogId={catalogParam} />;
   const filmParam = params.get('film');
   if (params.get('replay') === '1' && filmParam) return <ReplayPage key={filmParam} filmId={filmParam} />;
   // keyed, so going home (or opening another film) starts the shell fresh on the right tab

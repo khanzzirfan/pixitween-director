@@ -70,3 +70,23 @@ checked, edit a price and see the clip update at $0.
 ## Not in scope
 
 Showrunner planning, Spark price read off frames, Publish/MP4, product page mock, variant line films (`buildVariantFilm`).
+
+## Try it
+
+No keys needed: fake mode paints flat placeholder art for $0 and uses its own data dir (`data-fake/`) and ports, so it never touches `./data` or a running dev server.
+
+```bash
+npm run dev:fake
+```
+
+Open http://localhost:5180, then:
+
+1. **Catalog** tab → **Use demo feed (6 products)**. The URL changes to `?catalog=cat_…` and the wall fills to `6/6 done`. The first finished row plays on the stage.
+2. Click **Stone Mug** ($19.00, on sale from $24.00). Untick **on sale**, type `21`, press Enter. The row shows `$21.00` and `updated in N ms · $0.00`, and the player reloads the clip.
+3. Try the guards: `-3` shows `Enter a price like 19.00`; on sale with a sale price at or above the old price is refused.
+4. Your own feed: **Download a sample CSV** in the panel, edit it, and upload it with **Build catalog**. Rows whose `image_link` is a repo path under `fixtures/` need no photo upload; otherwise upload the photos it names.
+5. Stop the server mid-run and start it again: the run settles to `done`, and the rows that were still moving show `stopped: the server restarted…`.
+
+Automated: `npm test` (unit, offline) and `npm run e2e -- e2e/catalog-runner.spec.ts` (browser, fake art).
+
+Real art (billed): `npm run dev` with `META_API_KEY` set. The first demo run spends about $0.02 (SAM cut-outs for 2 photos, plates for looks missing from `look-plates.json`); a second run costs $0.00 because cut-outs are cached by photo in `<DATA_DIR>/catalogs/cutouts.json`. Fake runs keep their cut-outs in memory, so they never poison that cache.

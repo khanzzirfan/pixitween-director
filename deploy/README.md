@@ -1,4 +1,4 @@
-# Deploying PixiTween Director on Fly.io
+# Deploying Shelfreel on Fly.io
 
 One small container: the built web app and the Node server, with a 1 GB volume for films. Nothing here is run for you; these are the commands to run yourself.
 
@@ -7,7 +7,7 @@ One small container: the built web app and the Node server, with a 1 GB volume f
 - `flyctl` installed and logged in (`fly auth login`).
 - A payment method on your Fly account.
 - Price a shared-cpu-1x machine with 1 GB of RAM and a 1 GB volume on Fly's pricing page before you approve the cost. This repository states no number.
-- Keys ready: your Meta API key, a passcode for creating films, and the Clippy URL and token if you want generate mode.
+- Keys ready: your Meta API key and a passcode for creating films and catalog runs.
 
 ## Pre-deploy checks
 
@@ -43,10 +43,9 @@ Secrets are set on Fly and never written to a file in this repository. Run `fly 
 
 ```bash
 fly secrets set -a <app> META_API_KEY=<your key> DIRECTOR_PASSCODE=<your passcode>
-fly secrets set -a <app> CLIPPY_MCP_URL=<your clippy url> CLIPPY_TOKEN=<your clippy token>
 ```
 
-Without a passcode anyone can create films. Without the Clippy values generate mode is unavailable and everything else works.
+Without a passcode anyone can create films and catalog runs, and spend your Meta key.
 
 ## Deploy
 

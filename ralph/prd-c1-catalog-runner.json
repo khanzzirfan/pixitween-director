@@ -24,13 +24,14 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "backend",
         "contracts"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-002",
@@ -54,7 +55,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -62,7 +63,8 @@
       "labels": [
         "backend",
         "store"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-003",
@@ -84,13 +86,14 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "backend",
         "security"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-004",
@@ -112,13 +115,14 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "backend",
         "art"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-005",
@@ -141,7 +145,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -149,7 +153,8 @@
       "labels": [
         "backend",
         "authoring"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-006",
@@ -173,7 +178,7 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002",
@@ -184,7 +189,8 @@
       "labels": [
         "backend",
         "runner"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-007",
@@ -208,7 +214,7 @@
         "`npm run lint` passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-006"
@@ -216,7 +222,8 @@
       "labels": [
         "backend",
         "http"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-008",
@@ -239,7 +246,7 @@
         "`npm run lint` passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-007"
@@ -247,7 +254,8 @@
       "labels": [
         "backend",
         "http"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-009",
@@ -269,7 +277,7 @@
         "`npm run lint` passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -277,7 +285,8 @@
       "labels": [
         "frontend",
         "api"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-010",
@@ -301,15 +310,16 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Browser check: headless Chromium (through @playwright/test) against the owner's already-running dev server on http://localhost:5173. The POST to /api/catalogs was intercepted, so the check spent nothing and wrote nothing to the owner's data dir (MG-1, the real-key click, stays the owner's own manual gate). What I saw: (1) on a new film the rail shows a 'Catalog' tab, data-testid rail-catalog, label 'Catalog', sitting between Desk and Plan; (2) clicking it opens the panel with the Product CSV input (accept .csv), the multiple Photos input, the Video format picker on 9:16, the help line 'id,title,price,sale_price,currency,image_link,category,link,brand' and the 'Use demo feed (6 products)' button; (3) clicking that button sent a multipart body carrying name=\"demo\" with feed-6 (and aspect 9:16) and window.location.search became '?catalog=cat_0123456789ab'; (4) a 400 bad_feed with two errors rendered exactly two list items, 'the feed header is missing: price, img, cat' and 'the feed has no rows', and left the URL alone. Screenshot and the check script: debug/c1/us010/.",
       "dependsOn": [
         "US-009"
       ],
       "labels": [
         "frontend",
         "ui"
-      ]
+      ],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-011",
@@ -333,8 +343,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 11,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Built by ralph (iteration 11, interrupted) then verified by hand: wall tests, typecheck, lint pass. Browser look covered by e2e/catalog-runner.spec.ts.",
       "dependsOn": [
         "US-009"
       ],
@@ -364,8 +374,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Built by hand: price editor in CatalogWall.tsx, 4 new tests. Browser look covered by e2e/catalog-runner.spec.ts.",
       "dependsOn": [
         "US-011"
       ],
@@ -395,8 +405,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Built by hand: e2e/catalog-runner.spec.ts passes (6/6, Stone Mug $21.00, no WebGL errors); C1 section added to CATALOG-CREW.md.",
       "dependsOn": [
         "US-008",
         "US-010",
@@ -474,6 +484,6 @@
       "MG-2: owner edits one price on the wall (24.00 -> 19.00) three times, stopwatches Enter to new price on screen, and records the median next to the server `ms` the tile shows.",
       "MG-3: owner plays 3 clips from the wall in Chrome and scores how they look (1-5)."
     ],
-    "updatedAt": "2026-11-01T11:07:54.922Z"
+    "updatedAt": "2026-11-01T12:59:30.845Z"
   }
 }

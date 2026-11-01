@@ -11,8 +11,8 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-it('the Chat header has the Local-mode switch and says which model made the last edit', async () => {
+it('the Chat header says which model made the last edit and offers no Local-mode switch', async () => {
   render(<Chat film={null} events={[turn]} />);
-  expect(await screen.findByRole('switch', { name: 'Local mode (Muse Glimmer)' })).toBeInTheDocument();
-  expect(screen.getByText('edited by Muse Glimmer (local) · 24 s')).toBeInTheDocument();
+  expect(await screen.findByText('edited by Muse Glimmer (local) · 24 s')).toBeInTheDocument();
+  expect(screen.queryByRole('switch', { name: 'Local mode (Muse Glimmer)' })).toBeNull();
 });

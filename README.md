@@ -1,6 +1,6 @@
-# PixiTween Director
+# Shelfreel
 
-> An AI film director that makes product videos as **editable layers**, not flat MP4s. Built for the Meta Global AI Developer Hackathon (27 Oct – 4 Nov 2026).
+> Your whole catalog, as ads. Drop in a product CSV and a crew of Muse agents makes a checked, editable video ad for every product, and a price change re-cuts the ad in a second for $0. Built for the Meta Global AI Developer Hackathon (27 Oct – 4 Nov 2026).
 
 <!-- OWNER:gif -->
 
@@ -8,14 +8,15 @@
 
 ## What it does
 
-Give it a product photo and a brief, typed or spoken. A crew of Muse agents plans the film and builds it as a timeline of layers while you keep directing it:
+**Catalog runner (the main flow).** Open the **Catalog** tab, drop in a product CSV (`id,title,price,sale_price,currency,image_link,category,link,brand`) and the photos it names, or start from the demo feed.
 
-1. **Muse Voice Transcribe** turns a voice memo into the brief. **Muse Wonder** is the showrunner: it writes the storyboard and a style bible, then hands out jobs. See [`docs/crew.md`](docs/crew.md).
-2. **Muse Spark** builders work on different scenes **at the same time**. A message you send while they work ("add a sunset scene after the second one") changes the plan, and only the scenes it touches are rebuilt.
-3. For every scene the crew picks the cheapest technique that tells the shot, and says why: **motion** (stills, layers and camera moves; cents), **3D** (the real product, wearing its photo's label, turning in studio light; free) or **generate** (a real video clip; credits, and only after you approve the price). See [`docs/3d.md`](docs/3d.md).
-4. **Muse Image** paints each scene's background. **SAM 3.1** cuts the product out as a transparent layer, so the camera moves through real depth and a headline can sit behind the product.
-5. The film plays instantly in the browser on our PixiJS timeline engine. A **blind critic** that never sees the storyboard looks at captured frames and reports what is on screen; rule checks measure overlaps and safe areas. The showrunner fixes what hurts the film.
-6. Ask for three takes of a scene and pick the best. Every edit is validated, versioned and undoable. **Local mode** runs chat edits on **Muse Glimmer 30B** on your own machine. A finished film can be replayed as a show: *Watch it being made*.
+1. **SAM 3.1** cuts each distinct product photo out once, as a transparent layer.
+2. **Muse Image** paints one set (a "plate") per look and product class: a tabletop, a pedestal, a room. A vision read of each plate names its surfaces, so the product is stood on the table, not floating in front of the wall.
+3. Each product gets a short retail clip built from layers: the product, its name, a price badge (with the struck-through old price on a sale), the brand mark. Clips are built in code from the feed, so the title and price are always exactly the feed's.
+4. A **verifier** bakes every frame of every clip from its JSON, with no render, and checks it: the price stays inside its badge, the text sits above the product layer, the product stands on a surface, nothing leaves the frame. What it can fix it fixes on the clip's input and builds again; what it cannot it flags on the row.
+5. **Edit a price** and only that clip is rebuilt: no model call, $0, about a second.
+
+**Single film (for chat and voice testers).** Give it one product photo and a brief, typed or spoken (**Muse Voice Transcribe**). **Muse Wonder**, the showrunner, writes a storyboard and a style bible; **Muse Spark** builders work on different scenes at the same time, and a message you send while they work changes only the scenes it touches. A blind critic that never sees the storyboard reviews captured frames. Every edit is validated, versioned and undoable, and a finished film can be replayed: *Watch it being made*. See [`docs/crew.md`](docs/crew.md).
 
 ## Demo
 
@@ -30,10 +31,8 @@ Give it a product photo and a brief, typed or spoken. A crew of Muse agents plan
 | Muse Wonder | `muse-wonder-1.0` | the showrunner: plans, sets the style bible, dispatches and answers | [`server/llm/wonder-backend.ts`](server/llm/wonder-backend.ts) |
 | Muse Spark 1.3 | `muse-spark-1.3-contributor` | storyboard (strict JSON schema), parallel tool calls that build each scene, frame review, chat edits | [`server/meta/spark.ts`](server/meta/spark.ts) |
 | Muse Image | `muse-image-1.0` | scene backgrounds and product shots | [`server/meta/image.ts`](server/meta/image.ts) |
-| SAM 3.1 | `sam-3.1` | product cut-outs (transparent layers) and product-visibility checks in generated clips | [`server/meta/sam.ts`](server/meta/sam.ts) |
+| SAM 3.1 | `sam-3.1` | product cut-outs: one transparent layer per catalog photo, and the product layer of a single film | [`server/meta/sam.ts`](server/meta/sam.ts) |
 | Muse Voice Transcribe | `muse-voice-transcribe-1.0` | the spoken brief and push-to-talk to the showrunner | [`server/meta/transcribe.ts`](server/meta/transcribe.ts) |
-| Muse Glimmer 30B (open weights) | `muse-glimmer:30b-mlx` through Ollama | **Local mode**: chat edits and frame review on your own hardware | [`server/llm/glimmer-backend.ts`](server/llm/glimmer-backend.ts) |
-| Muse Spark Open (open weights) | on Baseten | optional backend for chat edits (`EDIT_BACKEND=spark-open`) | [`server/llm/spark-open-backend.ts`](server/llm/spark-open-backend.ts) |
 
 ## Architecture
 
@@ -45,7 +44,6 @@ flowchart LR
   Workers --> Tools["Tools<br/>authoring · art · 3D · review · edit"]
   Tools --> Store[("Films, versions,<br/>event logs, assets")]
   Tools --> Meta["Meta models"]
-  Tools --> Clippy["Clippy video clips<br/>(approved only)"]
 ```
 
 The full picture, with the film lifecycle and the tool list, is in [`docs/architecture.md`](docs/architecture.md).
@@ -56,7 +54,7 @@ Everything in this repository was written during the event: its git history star
 
 | Folder | What it holds |
 |--------|---------------|
-| `server/` | the Hono API, the crew, the agents, the tools, the Meta and Clippy clients, the stores |
+| `server/` | the Hono API, the crew, the agents, the tools, the Meta clients, the catalog runner, the stores |
 | `web/` | the React studio, the player, frame capture, export and replay |
 | `shared/` | contracts used by both: film state, storyboard, events, crew, tools |
 | `scripts/` | live checks, the cost-per-film calculator, the crew report, the submission preflight |
@@ -70,7 +68,6 @@ Everything in this repository was written during the event: its git history star
 | Dependency | What it is | How we use it |
 |------------|-----------|---------------|
 | [`reacthub-pixitweenjs`](https://www.npmjs.com/package/reacthub-pixitweenjs) | our own PixiJS and GSAP timeline engine, published on npm before the hackathon under its own source-available licence (free for individuals, non-profits and organisations under €1M revenue) | the player: it renders the composition JSON the agents write. Installed from npm; never copied or edited here. Gaps are tracked in [`ENGINE-NEEDS.md`](ENGINE-NEEDS.md) |
-| Clippy video-generation service | a pre-existing remote service | only for approved *generate* scenes ([`server/clippy/mcp.ts`](server/clippy/mcp.ts)) |
 | `@meta-sam/parser` | Meta's parser for SAM output, under the SAM License | reading SAM 3.1 results |
 | Third-party libraries | React, PixiJS, Hono, Three.js, sharp, zod and others | see `package.json`; licences in the packages |
 
@@ -79,7 +76,7 @@ Everything in this repository was written during the event: its git history star
 ```bash
 git clone <this repository> && cd pixitween-director
 npm ci
-cp .env.example .env        # set META_API_KEY; optional: CLIPPY_*, GLIMMER_*, DIRECTOR_PASSCODE
+cp .env.example .env        # set META_API_KEY; optional: DIRECTOR_PASSCODE
 npm run dev                 # web on :5173, API on :8787
 ```
 
@@ -101,16 +98,15 @@ With no keys, `DIRECTOR_FAKE=1 npm run dev` runs the whole crew offline with scr
 
 <!-- OWNER:cost-table -->
 
-Every Meta and Clippy call is recorded as one `cost` event in the film's event log, so `npx tsx scripts/cost-per-film.ts data/films/<id>/events.jsonl` prints the complete record for a film. The crew has a budget per film (`CREW_FILM_BUDGET_USD`, default 1.50) and refuses new jobs once it is spent.
+Every Meta call is recorded as one `cost` event in the film's event log, so `npx tsx scripts/cost-per-film.ts data/films/<id>/events.jsonl` prints the complete record for a film. The crew has a budget per film (`CREW_FILM_BUDGET_USD`, default 1.50) and refuses new jobs once it is spent.
 
-Planning prices, from the vendor pages on 27 Oct 2026: Muse Spark 1.3 contributor $0.10 / $0.20 per 1M tokens in and out; Muse Image $0.01 per image; SAM 3.1 $2.50 per 1,000 images and $0.20 per 1,000 video frames; Muse Voice Transcribe $0.18 per hour. A generated clip is billed by the video provider (25 Clippy credits reserved per clip). 3D scenes cost nothing to render.
+Planning prices, from the vendor pages on 27 Oct 2026: Muse Spark 1.3 contributor $0.10 / $0.20 per 1M tokens in and out; Muse Image $0.01 per image; SAM 3.1 $2.50 per 1,000 images and $0.20 per 1,000 video frames; Muse Voice Transcribe $0.18 per hour. 3D scenes cost nothing to render.
 
 ## Limitations
 
-- **Muse Spark's video review is coarse.** It sees sampled stills and hears no audio on 1.3, and it missed a caption crossing the product in our test. So review uses frames as images plus measured rules, and generated clips are checked with SAM video tracking.
-- **Meta has no video- or speech-generation model** (checked 27 Oct against the docs, the live model list and the open-weight models). Motion comes from the browser timeline; real footage only from an approved generate clip; there is no Meta voice-over.
+- **Muse Spark's video review is coarse.** It sees sampled stills and hears no audio on 1.3, and it missed a caption crossing the product in our test. So review uses frames as images plus measured rules, and catalog clips are checked from their JSON before anything is rendered.
+- **Meta has no video- or speech-generation model** (checked 27 Oct against the docs, the live model list and the open-weight models). Motion comes from the browser timeline; there is no Meta voice-over.
 - **Voice Transcribe repeats some words** ("our our") and gives turn-level timestamps only; we pass the text to Spark as it is.
-- **Glimmer is the local and private lane, not the fast one.** On an Apple M3 Max it took 20 to 33 s per tool turn, against 13 to 16 s for Spark.
 - Muse Image returns 1920x1280 when asked for 1536x1024 and cannot output transparent backgrounds, so every transparent layer comes from SAM.
 - 3D product shots show the front of the product as photographed: the sides take its edge colour, and the turn is limited to 35 degrees either side. Soft or deformable packaging should stay in motion. The realism score and the cost of a live 3D film are still to be measured.
 - The crew's wall time and cost per film on a live run are still to be measured. The first live run did not finish within 8 minutes before the finish policy was changed; the numbers will be in [`docs/crew.md`](docs/crew.md) once re-measured.

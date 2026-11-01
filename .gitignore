@@ -5,6 +5,7 @@ web/dist/
 .env.*
 !.env.example
 data/
+data-fake/
 debug/
 .ralph-tui/iterations/
 .ralph-tui/session*.json

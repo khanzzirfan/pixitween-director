@@ -59,7 +59,7 @@ it('architecture names only events that exist, and every Meta model row of the t
   expect(dotted.length).toBeGreaterThan(0);
   for (const n of dotted) expect(events, n).toContain(`'${n}'`);
   const table = section(t, 'Where Meta models are used');
-  for (const id of ['muse-spark-1.3-contributor', 'muse-image-1.0', 'sam-3.1', 'muse-voice-transcribe-1.0', 'muse-wonder-1.0', 'muse-glimmer:30b-mlx']) expect(table, id).toContain(id);
+  for (const id of ['muse-spark-1.3-contributor', 'muse-image-1.0', 'sam-3.1', 'muse-voice-transcribe-1.0', 'muse-wonder-1.0']) expect(table, id).toContain(id);
 });
 
 it('architecture names the real folders it points at', () => {
@@ -73,14 +73,14 @@ it('architecture names the real folders it points at', () => {
 it('README links every call site of the Meta models table to a file that exists', () => {
   const t = section(read('README.md'), 'Meta models used');
   const targets = [...t.matchAll(/\]\(([^)]+)\)/g)].map((m) => m[1]!);
-  expect(targets.length).toBeGreaterThanOrEqual(6);
+  expect(targets.length).toBeGreaterThanOrEqual(5);
   const all = new Set(tracked());
   for (const target of targets) expect(all.has(target), target).toBe(true);
 });
 
 it('README has the pitch, the owner markers and no draft text', () => {
   const t = read('README.md');
-  expect(t.startsWith('# PixiTween Director')).toBe(true);
+  expect(t.startsWith('# Shelfreel')).toBe(true);
   for (const m of ['gif', 'live-url', 'video-url', 'cost-table', 'team']) expect(t, m).toContain(`<!-- OWNER:${m} -->`);
   expect(t).not.toContain('<fill:');
   const order = ['## What it does', '## Demo', '## Meta models used', '## Architecture'].map((h) => t.indexOf(h));
@@ -92,7 +92,7 @@ it('README runs only npm scripts that exist, and its limitations carry the verif
   const scripts = Object.keys((JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts);
   for (const m of t.matchAll(/npm run ([\w:-]+)/g)) expect(scripts, m[1]).toContain(m[1]);
   const lim = section(t, 'Limitations');
-  for (const s of ['coarse', 'no video- or speech-generation model', 'repeats some words', 'not the fast one', '1920x1280']) expect(lim, s).toContain(s);
+  for (const s of ['coarse', 'no video- or speech-generation model', 'repeats some words', '1920x1280']) expect(lim, s).toContain(s);
   expect(section(t, 'Built during the hackathon')).toContain('14 PRDs');
   expect(section(t, 'Cost per film')).toContain('`cost` event');
 });
@@ -135,8 +135,7 @@ it('demo script has its labels and its headings', () => {
   for (const s of [
     'Built during the Meta Global AI Developer Hackathon, 27 Oct – 4 Nov 2026',
     'Engine: our own Three.js engine (built in this hackathon)',
-    'Video model: Clippy (pre-existing service), approved by the user',
-    'Muse Glimmer 30B, local, open weights',
+    'Clips checked from their JSON before any render',
   ])
     expect(labels, s).toContain(s);
 });
