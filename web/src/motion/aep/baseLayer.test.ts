@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { AepAnimatable } from '@shared/aep/transform';
 import { mapBaseLayer, type AepBaseLayer } from './baseLayer';
 
 function layer(overrides: Partial<AepBaseLayer> = {}): AepBaseLayer {
@@ -15,6 +16,11 @@ function layer(overrides: Partial<AepBaseLayer> = {}): AepBaseLayer {
     },
     ...overrides,
   };
+}
+
+/** The same layer with another rotation (static or keyframed). */
+function withRotation(rotation: AepAnimatable<number>): AepBaseLayer {
+  return layer({ transform: { position: [960, 540], anchor: [960, 540], scale: [1, 1], rotation, opacity: 1 } });
 }
 
 describe('mapBaseLayer', () => {
@@ -88,5 +94,46 @@ describe('mapBaseLayer', () => {
     const { base, warnings } = mapBaseLayer(layer({ blendMode: 'multiply' }), 30);
     expect(base.blendMode).toBe('multiply');
     expect(warnings).toHaveLength(0);
+  });
+});
+
+describe('mapBaseLayer rotation units', () => {
+  it('turns a legacy radian rotation into degrees', () => {
+    const { base } = mapBaseLayer(withRotation(0.383972), 30);
+    expect(base.rotation).toBeCloseTo(22, 2);
+  });
+
+  it('keeps a degree rotation as it is', () => {
+    const { base } = mapBaseLayer(withRotation(22), 30, 'deg');
+    expect(base.rotation).toBe(22);
+  });
+
+  it('turns every key of a keyframed radian rotation into degrees', () => {
+    const { base, tweens } = mapBaseLayer(
+      withRotation([
+        { t: 0, v: -0.383972 },
+        { t: 30, v: 0.069813 },
+        { t: 60, v: 0 },
+      ]),
+      30,
+    );
+    expect(base.rotation).toBeCloseTo(-22, 2);
+    expect(tweens.map((t) => t.from.rotation)).toEqual([expect.closeTo(-22, 2), expect.closeTo(4, 2)]);
+    expect(tweens.map((t) => t.to.rotation)).toEqual([expect.closeTo(4, 2), expect.closeTo(0, 2)]);
+  });
+
+  it('keeps every key of a keyframed degree rotation as it is', () => {
+    const { base, tweens } = mapBaseLayer(
+      withRotation([
+        { t: 0, v: -22 },
+        { t: 30, v: 4 },
+        { t: 60, v: 0 },
+      ]),
+      30,
+      'deg',
+    );
+    expect(base.rotation).toBe(-22);
+    expect(tweens.map((t) => t.from.rotation)).toEqual([-22, 4]);
+    expect(tweens.map((t) => t.to.rotation)).toEqual([4, 0]);
   });
 });

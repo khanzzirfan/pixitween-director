@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildRetailClip, pulseKeys, retailLayout, shade, type Rect, type RetailClipInput } from './retail-clip';
+import { rotationValues } from './test-helpers';
+import { LOOKS } from './looks';
+import { baseFromPlate, buildRetailClip, plateOverscan, pulseKeys, retailLayout, shade, type Rect, type RetailClipInput } from './retail-clip';
 import type { Obj } from './types';
 
 const input = (o: Partial<RetailClipInput> = {}): RetailClipInput => ({
@@ -69,6 +71,12 @@ describe('buildRetailClip', () => {
   it('formats the price with its currency', () => {
     const c = buildRetailClip(input({ price: 4.5, currency: 'EUR' })) as any;
     expect(layers(c).some((l) => l.source === '€4.50')).toBe(true);
+  });
+
+  it('writes its rotations in degrees, so nothing was converted twice', () => {
+    const c = buildRetailClip(input()) as any;
+    expect(c.meta.rotationUnit).toBe('deg');
+    for (const v of rotationValues(c)) expect(Math.abs(v)).toBeLessThanOrEqual(720);
   });
 
   it('animates the badge pieces together with a pop then pulses inside the clip', () => {
@@ -173,6 +181,15 @@ describe('looks', () => {
     expect(layers(flat).some((l) => l.kind === 'shape' && l.blendMode === 'screen' && l.path.kind === 'rect' && Array.isArray(l.transform.opacity))).toBe(false);
   });
 
+  it('the world turns 1.5 degrees over the clip, in degrees', () => {
+    for (const look of ['flat-lay', 'lifestyle-room'] as const) {
+      const c = buildRetailClip(input({ look })) as any;
+      const plates = layers(c).filter((l) => l.kind === 'image' && l.assetId === 'ast_plate');
+      expect(plates.length).toBeGreaterThan(0);
+      for (const p of plates) expect(p.transform.rotation.at(-1).v).toBe(1.5);
+    }
+  });
+
   it('never uses track mattes or masks (the player draws them empty inside a scene)', () => {
     for (const look of ['tabletop-hero', 'studio-pedestal', 'flat-lay'] as const) {
       expect(layers(buildRetailClip(input({ look, frame: true }))).some((l) => l.trackMatte || l.masks)).toBe(false);
@@ -212,5 +229,58 @@ describe('looks', () => {
         if (l.transform.rotation !== undefined && typeof l.transform.rotation === 'object') expect(last).toBeLessThan(L.captionZone.y);
       }
     }
+  });
+});
+
+describe('retailLayout: the base line follows the plate', () => {
+  const product = { width: 256, height: 752 };
+  const base = (o: { baseY?: number } = {}) => {
+    const L = retailLayout(1080, 1920, product, o);
+    return (L.pack.y + L.pack.h) / 1920;
+  };
+  // the tabletop plate's read: the table runs from its back edge 63.4% down the plate to its front edge 85% down
+  const table = { surfaces: [{ name: 'table top', top: 0.634, bottom: 0.85, left: 0, right: 1 }], busy: [] };
+
+  it('stands the pack at 70 % of a portrait frame when the plate is unread', () => {
+    expect(base()).toBeCloseTo(0.7, 3);
+    expect(baseFromPlate({ surfaces: [] })).toBeUndefined();
+  });
+
+  it('stands the pack in the middle of the surface the read names, above the caption zone, mapped through the overscan', () => {
+    // the table's front edge (0.85) is under the caption zone, so the usable band is 0.634 to 0.83
+    expect(baseFromPlate(table)).toBeCloseTo((0.634 + 0.83) / 2, 3);
+    // the drifting plate is 4% bigger than the window about its centre: the back edge moves down to 0.639
+    expect(baseFromPlate(table, 1.04)).toBeCloseTo((0.5 + 0.134 * 1.04 + 0.83) / 2, 3);
+  });
+
+  it('keeps the base above the caption zone when the surface runs to the frame bottom', () => {
+    const floor = { surfaces: [{ name: 'floor', top: 0.79, bottom: 1, left: 0, right: 1 }] };
+    const b = baseFromPlate(floor)!;
+    expect(b).toBeLessThan(0.84);
+    expect(b).toBeGreaterThan(0.79);
+  });
+
+  it('stands the pack on the plinth, not the floor in front of it (the pedestal plate\'s read)', () => {
+    const pedestal = { surfaces: [{ name: 'floor', top: 0.769, bottom: 1, left: 0, right: 1 }, { name: 'plinth top', top: 0.644, bottom: 0.675, left: 0.032, right: 0.93 }] };
+    expect(baseFromPlate(pedestal)).toBeCloseTo((0.644 + 0.675) / 2, 3);
+  });
+
+  it('ignores a surface that is not under the frame centre', () => {
+    expect(baseFromPlate({ surfaces: [{ name: 'shelf', top: 0.3, bottom: 0.4, left: 0, right: 0.3 }] })).toBeUndefined();
+  });
+
+  it('builds the clip with the read: the pack base lands on the table', () => {
+    const c = buildRetailClip(input({ plate: { id: 'ast_plate', src: '/p.png', width: 720, height: 1280, map: table } })) as any;
+    const pack = layers(c).find((l) => l.id === 'clip:product')!;
+    const f = pack.transform.position.at(-1);
+    const s = pack.transform.scale.at(-1).v[1];
+    const bottom = (f.v[1] + (s * 752) / 2) / 1920;
+    expect(bottom).toBeCloseTo(baseFromPlate(table, plateOverscan(LOOKS['tabletop-hero']))!, 2);
+  });
+
+  it('an explicit baseY (the fixer\'s knob) wins over the read', () => {
+    expect(base({ baseY: 0.79 })).toBeCloseTo(0.79, 3);
+    const L = retailLayout(1080, 1920, product, { baseY: 0.8 });
+    expect(L.pack.y + L.pack.h).toBeLessThanOrEqual(L.captionZone.y);
   });
 });

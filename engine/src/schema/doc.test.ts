@@ -122,6 +122,33 @@ describe('cross-field rules', () => {
     expect(paths(errors)).toContain('layers[0].end');
   });
 
+  it('a rect or an ellipse needs a size, a polystar needs its points and its radius', () => {
+    const errors = mustFail(doc({ layers: [{ id: 's', type: 'shape', shape: 'rect', width: 10 }] }));
+    expect(paths(errors)).toContain('layers[0].height');
+
+    const star = mustFail(doc({ layers: [{ id: 's', type: 'shape', shape: 'polystar', outerRadius: 100 }] }));
+    expect(paths(star)).toContain('layers[0].points');
+  });
+
+  it('a star\'s inner radius cannot reach past its outer radius', () => {
+    const errors = mustFail(
+      doc({ layers: [{ id: 's', type: 'shape', shape: 'polystar', points: 16, outerRadius: 100, innerRadius: 120, starType: 'star' }] }),
+    );
+    expect(paths(errors)).toContain('layers[0].innerRadius');
+  });
+
+  it('takes a polystar layer and a sized rect', () => {
+    const parsed = mustParse(
+      doc({
+        layers: [
+          { id: 'star', type: 'shape', shape: 'polystar', points: 16, outerRadius: 100, innerRadius: 43, starType: 'star' },
+          { id: 'box', type: 'shape', shape: 'rect', width: 10, height: 10 },
+        ],
+      }),
+    );
+    expect(parsed.layers).toHaveLength(2);
+  });
+
   it('rule 3: a child end past its group length', () => {
     const errors = mustFail(
       doc({

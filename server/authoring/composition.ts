@@ -1,4 +1,5 @@
 import { ASPECT_SIZES } from '@shared/composition';
+import type { AepRotationUnit } from '@shared/aep/rotation';
 import { AEP_VERSION } from './constants';
 import { AuthoringError, hintList } from './errors';
 import type { Aspect, Comp, Obj } from './types';
@@ -17,8 +18,18 @@ export function newFilmComposition(o: { aspect: Aspect; title?: string; palette?
     assets: {},
     layers: [],
     precomps: {},
-    meta: { director: { scenes: {}, layers: {} } },
+    // 'deg' from now on: a film's layer rotations are degrees (a film without the flag is a
+    // legacy film and its rotations are radians).
+    meta: { director: { scenes: {}, layers: {} }, rotationUnit: 'deg' },
   };
+}
+
+/**
+ * Declares the unit the composition's layer rotations are written in. A film that still writes
+ * radians (the old Pixi player's unit) says so, so the converter scales it to degrees.
+ */
+export function setRotationUnit(c: Comp, unit: AepRotationUnit): Comp {
+  return { ...c, meta: { ...(c.meta ?? {}), rotationUnit: unit } };
 }
 
 /** `duration` is passed through in the engine's own unit, FRAMES (asset.ts). */

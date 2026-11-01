@@ -106,9 +106,30 @@ describe('convertShape effects', () => {
   });
 
   it('reports and drops an effect it cannot convert', () => {
-    const { layer, warnings } = convertShape(blurred([{ name: 'glow', params: {} }]), 30);
+    const { layer, warnings } = convertShape(blurred([{ name: 'levels', params: {} }]), 30);
     expect(layer.effects).toEqual([]);
-    expect(warnings.join(' ')).toMatch(/unsupported effect 'glow'/);
+    expect(warnings.join(' ')).toMatch(/unsupported effect 'levels'/);
+  });
+});
+
+describe('convertImage effects', () => {
+  const withEffects = (effects: unknown) => ({ ...productImageLayer('ast_1'), effects }) as unknown as AepImageLayer;
+
+  it('keeps the drop shadow and the blur of an image layer', () => {
+    const { layer, warnings } = convertImage(
+      withEffects([
+        { name: 'drop-shadow', params: { distance: 40, direction: 180, softness: 30, opacity: 0.5, color: '#000000' } },
+        { name: 'gaussian-blur', params: { blurriness: 8 } },
+      ]),
+      30,
+      { width: 1080, height: 1920 },
+    );
+
+    expect(layer.effects).toEqual([
+      { id: 'fx0', type: 'dropShadow', enabled: true, params: { color: '#000000', alpha: 0.5, distance: 80, angle: 90, blur: 30 } },
+      { id: 'fx1', type: 'gaussianBlur', enabled: true, params: { strength: 16 } },
+    ]);
+    expect(warnings).toEqual([]);
   });
 });
 

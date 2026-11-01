@@ -1,7 +1,7 @@
 {
   "name": "App A4: the studio Player on the Motion engine (same PlayerHandle, audio, capture, selection)",
-  "description": "Rebuilds web/src/player on the Motion engine: the composition goes through aepToMotion and plays on MotionRuntime, behind VITE_ENGINE (motion by default at the end). The PlayerHandle contract (canvas, play, pause, seek, time, whenReady) stays, audio cues play in sync, review capture and export keep working, and canvas selection gets layer bounds from the engine.",
   "branchName": "ralph/a4-player-swap",
+  "description": "Rebuilds web/src/player on the Motion engine: the composition goes through aepToMotion and plays on MotionRuntime, behind VITE_ENGINE (motion by default at the end). The PlayerHandle contract (canvas, play, pause, seek, time, whenReady) stays, audio cues play in sync, review capture and export keep working, and canvas selection gets layer bounds from the engine.",
   "userStories": [
     {
       "id": "US-001",
@@ -21,14 +21,13 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "frontend",
         "player"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -49,7 +48,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -57,8 +56,7 @@
       "labels": [
         "frontend",
         "player"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -79,7 +77,7 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -87,8 +85,7 @@
       "labels": [
         "frontend",
         "player"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -107,7 +104,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003"
@@ -115,8 +112,7 @@
       "labels": [
         "frontend",
         "capture"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -137,7 +133,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003"
@@ -145,8 +141,7 @@
       "labels": [
         "frontend",
         "selection"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-006",
@@ -167,7 +162,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-004",
@@ -177,8 +172,7 @@
         "frontend",
         "player",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -221,9 +215,9 @@
       "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
       "Keep the PlayerHandle method names and their meaning (seconds at the boundary). getApp() may return null on the motion engine; every caller must cope with null.",
-      "Keep the library path working behind VITE_ENGINE=library until A5; do not delete it here.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "Keep the library path working behind VITE_ENGINE=library until A5; do not delete it here."
     ],
     "qualityGates": {
       "universal": [
@@ -237,7 +231,6 @@
     },
     "manualGates": [
       "MG-1: owner opens the studio on a stored film with VITE_ENGINE=motion, plays, seeks, and runs one review capture."
-    ],
-    "updatedAt": "2026-10-31T23:27:41.744Z"
+    ]
   }
 }

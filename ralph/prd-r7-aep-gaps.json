@@ -1,7 +1,7 @@
 {
   "name": "Engine R7: gaps for director films (cubic eases, pixel pivot, night and disco lighting)",
-  "description": "Adds the three engine features the AEP converter needs to play director films faithfully: cubic-bezier eases written as cubic(x1,y1,x2,y2), a pixel pivot on every layer that overrides the 0..1 anchor, and the night and disco lighting presets the director uses. Nothing else.",
   "branchName": "ralph/r7-aep-gaps",
+  "description": "Adds the three engine features the AEP converter needs to play director films faithfully: cubic-bezier eases written as cubic(x1,y1,x2,y2), a pixel pivot on every layer that overrides the 0..1 anchor, and the night and disco lighting presets the director uses. Nothing else.",
   "userStories": [
     {
       "id": "US-001",
@@ -24,14 +24,13 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "timeline",
         "schema"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -54,14 +53,13 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "core",
         "schema"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -81,13 +79,12 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "three"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -139,8 +136,8 @@
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside engine/ (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). They are not yours: do not edit those files. The `npm test` gate passes when no other test fails; also run `npx vitest run engine` and it must be fully green.",
       "R1 is done: engine/ is Three-only. MotionNode (engine/src/core/types.ts) has `display` (layer transform) and `content` (the meshes, offset by the anchor); NodeContext has `renderer`. Effects live in engine/src/effects (EFFECTS, registerEffect, buildEffectChain, setEffectChainFactoryForTests).",
-      "Do not use GSAP CustomEase or any GSAP plugin; a cubic bezier is a small pure solver in engine/src/timeline/ease.ts.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+      "Do not use GSAP CustomEase or any GSAP plugin; a cubic bezier is a small pure solver in engine/src/timeline/ease.ts."
     ],
     "qualityGates": {
       "universal": [
@@ -152,7 +149,6 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": [],
-    "updatedAt": "2026-10-31T22:45:44.591Z"
+    "manualGates": []
   }
 }

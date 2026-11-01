@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Obj } from './types';
+import { rotationValues } from './test-helpers';
 import { buildVariantFilm, inkOn, tint, type VariantFilmInput } from './variant-film';
 
 const can = { id: 'ast_can', src: '/c.png', width: 256, height: 752 };
@@ -39,7 +40,7 @@ describe('buildVariantFilm', () => {
       expect(ls.some((l) => l.kind === 'shape' && l.fill === input().variants[n]!.color && l.path.size[0] === 1080)).toBe(true);
       const pack = ls.find((l) => l.kind === 'image')!;
       const rot = pack.transform.rotation.map((k: any) => k.v);
-      expect(Math.abs(rot[0])).toBeGreaterThan(0.2); // about 22 degrees, in radians
+      expect(Math.abs(rot[0])).toBeCloseTo(22, 2); // 22 degrees in: the pack tumbles in tilted
       expect(rot[rot.length - 1]).toBe(0);
       const sc = pack.transform.scale.map((k: any) => k.v[0]);
       expect(sc[0]).toBe(0);
@@ -49,6 +50,12 @@ describe('buildVariantFilm', () => {
     const r1 = scene(c, 'v1').find((l) => l.kind === 'image')!.transform.rotation[0].v;
     const r2 = scene(c, 'v2').find((l) => l.kind === 'image')!.transform.rotation[0].v;
     expect(Math.sign(r1)).toBe(-Math.sign(r2));
+  });
+
+  it('writes its rotations in degrees, so nothing was converted twice', () => {
+    const c = buildVariantFilm(input()) as any;
+    expect(c.meta.rotationUnit).toBe('deg');
+    for (const v of rotationValues(c)) expect(Math.abs(v)).toBeLessThanOrEqual(720);
   });
 
   it('after the first act the field whips in from the right in a few frames', () => {

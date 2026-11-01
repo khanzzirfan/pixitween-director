@@ -23,8 +23,8 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "done by ralph; theme hook now follows the system setting when nothing is stored",
+      "passes": false,
+      "notes": "",
       "dependsOn": [],
       "labels": [
         "frontend"
@@ -52,8 +52,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "done by hand (Claude): StudioShell, steps.ts, shell.css, badges and keyboard shortcuts included; tests in StudioShell.test.tsx",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-001"
       ],
@@ -82,8 +82,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "done by hand: narrow layout, no panel group; chat is a rail tab",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-002"
       ],
@@ -112,8 +112,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "done by hand: classic flow in the shell; ExportPanel.integration.test clicks rail-export first",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-002"
       ],
@@ -143,8 +143,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "done by hand: CrewStudio in the shell with extraTabs; e2e/crew.spec.ts opens rail-crew; phone frame no longer used in the studio or intake",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-002"
       ],
@@ -174,8 +174,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "done by hand: Filmstrip.tsx and stage fit CSS; click seeks the player",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-002"
       ],
@@ -204,8 +204,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 7,
-      "passes": true,
-      "notes": "done by hand: two-line scene rows, Activity in a details element",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-004"
       ],
@@ -233,8 +233,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 8,
-      "passes": true,
-      "notes": "done by hand: one row per scene, credit note once (ModeToggle hint hidden by CSS inside the shell)",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-004"
       ],
@@ -263,8 +263,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 9,
-      "passes": true,
-      "notes": "done by hand: compact review blocks, \"edited by\" never prints undefined (unknown backend shows \"the director\")",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-004"
       ],
@@ -280,11 +280,11 @@
       "steps": [
         "Read docs/studio-ui-redesign-spec.md section 6 (NewFilm), web/src/panels/NewFilm.tsx and web/src/crew/ChatIntake.tsx.",
         "Remove the PhoneView wrapper around ChatIntake in NewFilm so the intake fills the panel.",
-        "Compact the classic form: product photo and name in one row, 3-row brief with the counter inside the field corner, format as a segmented control (keep the radio inputs and their names '16:9', '9:16', '1:1'), preview thumbnail at most 120 px, one primary button 'Create my storyboard \u2192'.",
+        "Compact the classic form: product photo and name in one row, 3-row brief with the counter inside the field corner, format as a segmented control (keep the radio inputs and their names '16:9', '9:16', '1:1'), preview thumbnail at most 120 px, one primary button 'Create my storyboard →'.",
         "Update the affected tests."
       ],
       "acceptanceCriteria": [
-        "The accessible names 'Product photo', 'Product name', 'Brief' and the button 'Create my storyboard \u2192' are unchanged",
+        "The accessible names 'Product photo', 'Product name', 'Brief' and the button 'Create my storyboard →' are unchanged",
         "In crew mode NewFilm renders ChatIntake without an element with role group named 'Phone view'",
         "At 1440x900 the classic form's submit button is visible without scrolling the left panel",
         "`npm run typecheck` passes",
@@ -293,8 +293,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 10,
-      "passes": true,
-      "notes": "done by hand: photo and name share a row, thumbnail capped at 120 px, intake no longer in a phone frame",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-004"
       ],
@@ -322,8 +322,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 11,
-      "passes": true,
-      "notes": "done by hand: created date on cards, storyboard title as fallback, two-column grid; global .badge clash fixed in shell.css",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-004"
       ],
@@ -353,8 +353,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 12,
-      "passes": true,
-      "notes": "done by hand: badges, number keys, brackets, ? sheet, header cost opens Crew tab, Space clicks the player button",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-005",
         "US-006"
@@ -384,8 +384,8 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 13,
-      "passes": true,
-      "notes": "done by hand: e2e/studio-shell.spec.ts (desktop no scroll, resize persists, rail collapse; phone no sideways scroll)",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-005",
         "US-006",

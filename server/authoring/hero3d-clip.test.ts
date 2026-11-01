@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { rotationValues } from './test-helpers';
 import { buildHero3DClip, HERO3D_BEATS, type Hero3DInput } from './hero3d-clip';
 import type { Obj } from './types';
 
@@ -34,7 +35,7 @@ describe('buildHero3DClip', () => {
     const fps = c.fps;
     const ys = m.transform.position.map((k: any) => k.v[1]);
     expect(ys[0]).toBeLessThan(0);
-    expect(Math.abs(m.transform.rotation[0].v)).toBeGreaterThan(0.3); // about 24 degrees, in radians
+    expect(m.transform.rotation[0].v).toBeCloseTo(-24, 2); // 24 degrees of tilt, in degrees
     expect(m.transform.rotation.at(-1).v).toBe(0);
     const rot = m.view.rotation;
     expect(rot[0].v[1]).toBeLessThan(-180); // a fast spin as it falls
@@ -91,6 +92,12 @@ describe('buildHero3DClip', () => {
     // layers are placed by their centre (anchor at the middle), so equal positions mean the same pivot
     expect(Math.abs(line.transform.position[0] - old.transform.position[0])).toBeLessThan(1);
     expect(Math.abs(line.transform.position[1] - old.transform.position[1])).toBeLessThan(3);
+  });
+
+  it('writes its rotations in degrees, so nothing was converted twice', () => {
+    const c = buildHero3DClip(input());
+    expect((c as any).meta.rotationUnit).toBe('deg');
+    for (const v of rotationValues(c)) expect(Math.abs(v)).toBeLessThanOrEqual(720);
   });
 
   it('fits other aspects', () => {

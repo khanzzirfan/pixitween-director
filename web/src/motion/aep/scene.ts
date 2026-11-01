@@ -9,6 +9,7 @@
 import type { AepLayer } from '@shared/aep/layer';
 import type { AepAssetMap } from '@shared/aep/asset';
 import type { AepCompositionJson } from '@shared/aep/composition';
+import { rotationUnitOf, type AepRotationUnit } from '@shared/aep/rotation';
 import { isStageMember, stageMembersOf } from '@shared/aep/stage3d';
 import type { AepThemeMap } from '@shared/aep/theme';
 import type { Layer, GroupLayer } from '@engine/schema';
@@ -25,6 +26,8 @@ export interface ConvertLayersOptions {
   resolveUrl?: (src: string) => string;
   /** The composition these layers belong to (text anchors are read against its size). */
   compSize?: { width: number; height: number };
+  /** The unit the composition's layer rotations are written in ('rad' for a legacy film). */
+  rotationUnit?: AepRotationUnit;
 }
 
 export interface ConvertLayersResult {
@@ -56,31 +59,31 @@ export function convertLayers(
 
     switch (layer.kind) {
       case 'shape': {
-        const result = convertShape(layer, fps, theme, opts.compSize);
+        const result = convertShape(layer, fps, theme, opts.compSize, opts.rotationUnit);
         warnings.push(...result.warnings);
         emitted.push(result.layer);
         break;
       }
       case 'image': {
-        const result = convertImage(layer, fps);
+        const result = convertImage(layer, fps, opts.compSize, opts.rotationUnit);
         warnings.push(...result.warnings);
         emitted.push(result.layer);
         break;
       }
       case 'text': {
-        const result = convertText(layer, fps, theme, opts.compSize);
+        const result = convertText(layer, fps, theme, opts.compSize, opts.rotationUnit);
         warnings.push(...result.warnings);
         emitted.push(result.layer);
         break;
       }
       case 'model3d': {
-        const result = convertModel3D(layer, fps);
+        const result = convertModel3D(layer, fps, opts.rotationUnit);
         warnings.push(...result.warnings);
         if (result.layer) emitted.push(result.layer);
         break;
       }
       case 'stage3d': {
-        const result = convertWorld(layer, stageMembersOf(layers, layer.id), { assets, fps });
+        const result = convertWorld(layer, stageMembersOf(layers, layer.id), { assets, fps, rotationUnit: opts.rotationUnit });
         warnings.push(...result.warnings);
         emitted.push(result.layer);
         break;
@@ -97,9 +100,12 @@ export function convertLayers(
           warnings.push(`layer ${layer.id}: precomp '${layer.compId}' has no inline layers`);
           break;
         }
+        // A precomp inherits its parent's rotation unit unless it declares its own.
+        const nestedUnit = rotationUnitOf(nested, opts.rotationUnit ?? 'rad');
         const nestedResult = convertLayers(nested.layers, nested.assets, nested.precomps, nested.fps, nested.theme ?? theme, {
           ...opts,
           compSize: { width: nested.width, height: nested.height },
+          rotationUnit: nestedUnit,
         });
         warnings.push(...nestedResult.warnings);
         audio.push(...nestedResult.audio);
@@ -108,7 +114,8 @@ export function convertLayers(
           break;
         }
 
-        const { base, tweens, warnings: baseWarnings } = mapBaseLayer(layer, fps);
+        // The precomp layer itself lives in the parent composition, so it keeps the parent's unit.
+        const { base, tweens, warnings: baseWarnings } = mapBaseLayer(layer, fps, opts.rotationUnit);
         warnings.push(...baseWarnings);
 
         const group: GroupLayer = {

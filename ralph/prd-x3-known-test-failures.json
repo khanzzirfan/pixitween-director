@@ -1,7 +1,7 @@
 {
   "name": "X3: fix the 11 known test failures",
-  "description": "Fixes the 10 failures in scripts/preflight/docs.test.ts and the 1 in web/src/authoring-agreement.test.tsx so that npm test is fully green on the merged branch.",
   "branchName": "ralph/x3-known-test-failures",
+  "description": "Fixes the 10 failures in scripts/preflight/docs.test.ts and the 1 in web/src/authoring-agreement.test.tsx so that npm test is fully green on the merged branch.",
   "userStories": [
     {
       "id": "US-001",
@@ -19,13 +19,12 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "10 failures, all in scripts/preflight/docs.test.ts. Web test now passes (4/4).\nGROUP A stale doc content (docs/new-vs-existing.md):\n1. new-vs-existing five headings/schema version: doc lacks '1.12.0' (AEP_SCHEMA_VERSION in shared/aep/composition.ts).\n2. new-vs-existing names every top-level folder: doc lacks `engine/` (tracked dir not in folder table).\nGROUP B missing docs files (ENOENT, never in git history on any branch):\n3. demo narration 250-380 words: docs/demo-script.md missing.\n4. demo shot list >=12 rows: docs/demo-script.md missing.\n5. demo script labels/headings: docs/demo-script.md missing.\n6. project description 180-230 words: docs/submission-answers.md missing.\n7. evidence path of claimed row is a file: docs/submission-answers.md missing.\n8. X post <=280 chars: docs/x-post.md missing.\n9. s1-evidence fixtures + eight live gates: docs/s1-evidence.md missing.\n10. s1-evidence latencies match findings: docs/s1-evidence.md missing.\nweb/src/authoring-agreement.test.tsx: 0 failures now (already fixed by merge); US-003 only needs verification.\nNote: npm test still red (10 above) until US-002; typecheck and lint pass.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [],
       "labels": [
         "tests"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -43,7 +42,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -51,8 +50,7 @@
       "labels": [
         "tests",
         "docs"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -70,15 +68,14 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
       ],
       "labels": [
         "tests"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -96,7 +93,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002",
@@ -104,8 +101,7 @@
       ],
       "labels": [
         "tests"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -156,7 +152,6 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": [],
-    "updatedAt": "2026-11-01T03:17:43.056Z"
+    "manualGates": []
   }
 }

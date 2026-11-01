@@ -1,7 +1,7 @@
 {
   "name": "Engine R5: agent tools (bake, QA with hints, explain, receipts and undo, CLI, capture, export pack)",
-  "description": "Makes the engine safe for agents to author, a headless frame-by-frame bake, QA groups with the worst frame and a concrete hint, errors with codes and did-you-mean hints, edits with receipts, revisions and exact undo, a JSON-in/JSON-out CLI, and browser capture: frames, contact sheets, depth and normal passes, and an export pack for image-to-video models.",
   "branchName": "ralph/r5-agent-tools",
+  "description": "Makes the engine safe for agents to author, a headless frame-by-frame bake, QA groups with the worst frame and a concrete hint, errors with codes and did-you-mean hints, edits with receipts, revisions and exact undo, a JSON-in/JSON-out CLI, and browser capture: frames, contact sheets, depth and normal passes, and an export pack for image-to-video models.",
   "userStories": [
     {
       "id": "US-001",
@@ -19,17 +19,16 @@
         "A layer is visible false outside its [start, end) window and its opacity follows its fadeIn preset (0 at start)",
         "For three-primitives, every object has a box with min below max and the camera position matches the fixture's camera at frame 0",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "agent"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -48,11 +47,11 @@
         "Two readable text layers overlapping by 30 % give one TEXT_OVERLAP group naming both ids; a 'set' tween that moves x by 900 px mid-life gives POP with that frame as worstFrame",
         "A layer with alpha 0 throughout gives NEVER_SEEN; warnings never change ok",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -60,8 +59,7 @@
       "labels": [
         "agent",
         "qa"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -78,11 +76,11 @@
         "A camera at [0, 0.5, 0] inside a 2 m box gives CAMERA_INSIDE; a camera looking away from every object gives SUBJECT_OUT",
         "three-primitives.json gives no 3D groups",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -90,8 +88,7 @@
       "labels": [
         "agent",
         "qa"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -108,17 +105,16 @@
         "A tween running past the layer end gives TIME_OVERFLOW with the latest allowed at or duration in the hint",
         "A valid fixture gives ok true and no errors; explainDoc never throws on null, a string or an array",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "agent"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -136,11 +132,11 @@
         "Two identical applyEdit calls produce the same receipt id",
         "A batch whose second op is invalid changes nothing and returns INVALID with at least one explain error",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003",
@@ -148,8 +144,7 @@
       ],
       "labels": [
         "agent"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-006",
@@ -166,11 +161,11 @@
         "edit followed by undo with the printed receipt id restores the doc file content (deep-equal JSON except revision)",
         "targets text prints the allowed properties including x, y, alpha, rotation and fill; an unknown command exits 2",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-005"
@@ -178,8 +173,7 @@
       "labels": [
         "agent",
         "cli"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-007",
@@ -196,12 +190,12 @@
         "After renderPass the next normal render gives the same canvas hash as before the pass",
         "The depth pass of three-gltf shows the robot lighter than the floor behind it (described in notes, PNG saved), and the normal pass shows surface colours",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes",
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-006"
@@ -209,8 +203,7 @@
       "labels": [
         "agent",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-008",
@@ -227,12 +220,12 @@
         "The summary names every text layer's text and every three layer's objects",
         "The lab button downloads 7 files for three-postfx (first, last, depth, normal, contact sheet, camera.json, summary.txt) and notes lists them",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes",
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-007"
@@ -240,8 +233,7 @@
       "labels": [
         "agent",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -286,15 +278,15 @@
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside engine/ (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). They are not yours: do not edit those files. The `npm test` gate passes when no other test fails; also run `npx vitest run engine` and it must be fully green.",
       "R1 is done: engine/ is Three-only. MotionNode (engine/src/core/types.ts) has `display` (layer transform) and `content` (the meshes, offset by the anchor); NodeContext has `renderer`. Effects live in engine/src/effects (EFFECTS, registerEffect, buildEffectChain, setEffectChainFactoryForTests).",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
       "Write the code in strict TypeScript on our engine APIs; engine/docs/08-agent-tools.md stays the contract.",
       "Everything QA and explain report must come from measured or computed values; never hard-code a finding. Receipt ids are deterministic (no Math.random, no Date.now).",
-      "The package.json edit is limited to adding the script \"engine:cli\": \"tsx engine/cli/motion.ts\". The schema edit is limited to the optional fields revision and qa.limits.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "The package.json edit is limited to adding the script \"engine:cli\": \"tsx engine/cli/motion.ts\". The schema edit is limited to the optional fields revision and qa.limits."
     ],
     "qualityGates": {
       "universal": [
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "ui": [
@@ -303,7 +295,6 @@
     },
     "manualGates": [
       "MG-1: owner runs `npm run engine:cli -- qa engine/fixtures/basic-2d.json`, breaks the doc on purpose (text off stage, tiny font, an unknown preset) and checks the hints lead to a fix in one or two edits."
-    ],
-    "updatedAt": "2026-11-01T02:31:54.348Z"
+    ]
   }
 }

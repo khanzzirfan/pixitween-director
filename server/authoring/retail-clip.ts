@@ -1,3 +1,4 @@
+import type { LayoutTier, PlateMap } from '@engine/qa';
 import { formatPrice } from '@shared/catalog';
 import { ASPECT_SIZES } from '@shared/composition';
 import { newFilmComposition, registerAsset } from './composition';
@@ -13,6 +14,8 @@ export interface ClipAsset {
   src: string;
   width: number;
   height: number;
+  /** A plate's read (server/media/plate-map.ts): its surfaces and busy grid. The product stands on a surface from it. */
+  map?: Pick<PlateMap, 'surfaces' | 'busy' | 'quadrants'>;
 }
 
 export interface Rect {
@@ -50,6 +53,8 @@ export interface RetailClipInput {
   look?: LookId;
   /** Music tempo; the price lands and pulses on its beats. */
   bpm?: number;
+  /** The base line as a fraction of the frame height, over the one the plate's read gives. The verifier's fixer sets it. */
+  baseY?: number;
 }
 
 export interface RetailLayout {
@@ -62,9 +67,13 @@ export interface RetailLayout {
 
 const ID = 'clip';
 const r = (n: number) => Math.round(n * 100) / 100;
+/** Degrees, to 1e-4: a film's layer rotations are degrees, and the rounding keeps the numbers short. */
+const round4 = (n: number) => Math.round(n * 1e4) / 1e4;
 // rects that only touch do not overlap; the half-pixel tolerance keeps rounding from rejecting a badge placed exactly a gap away
 const EPS = 0.5;
 const hit = (a: Rect, b: Rect) => a.x < b.x + b.w - EPS && b.x < a.x + a.w - EPS && a.y < b.y + b.h - EPS && b.y < a.y + a.h - EPS;
+/** The caption zone starts this far down the window; a base below it would put the pack behind the caption. */
+const CAPTION_TOP = 0.84;
 const grow = (a: Rect, m: number): Rect => ({ x: a.x - m, y: a.y - m, w: a.w + 2 * m, h: a.h + 2 * m });
 
 /**
@@ -75,19 +84,19 @@ export function retailLayout(
   W: number,
   H: number,
   product: { width: number; height: number },
-  o: { frame?: boolean; badgeSlot?: 'auto' | Slot; brand?: boolean } = {},
+  o: { frame?: boolean; badgeSlot?: 'auto' | Slot; brand?: boolean; baseY?: number } = {},
 ): RetailLayout {
   const m = o.frame ? Math.min(W, H) * 0.035 : 0;
   const win: Rect = { x: m, y: m, w: W - 2 * m, h: H - 2 * m };
   const portrait = H > W;
-  const captionZone: Rect = { x: win.x, y: win.y + win.h * 0.84, w: win.w, h: win.h * 0.16 };
+  const captionZone: Rect = { x: win.x, y: win.y + win.h * CAPTION_TOP, w: win.w, h: win.h * (1 - CAPTION_TOP) };
   const gap = Math.min(W, H) * 0.03;
   const pad = Math.min(W, H) * 0.04;
   const k = Math.min((win.w * 0.6) / product.width, (win.h * (portrait ? 0.46 : 0.6)) / product.height);
   const pw = product.width * k;
   const ph = product.height * k;
   // the pack stands on a table: its base sits on a line in the lower part of the frame, where the plate's tabletop is
-  const baseY = win.y + win.h * (portrait ? 0.7 : 0.76);
+  const baseY = win.y + win.h * (portrait ? (o.baseY ?? 0.7) : 0.76);
   const pack: Rect = { x: win.x + (win.w - pw) / 2, y: Math.max(win.y + pad, baseY - ph), w: pw, h: ph };
 
   const keepOut = (extra: Rect[]) => [grow(pack, gap), captionZone, ...extra];
@@ -194,10 +203,27 @@ export function shade(hex: string, f: number): string {
   return `#${ch((n >> 16) & 255)}${ch((n >> 8) & 255)}${ch(n & 255)}`;
 }
 
+/** How much the plate is scaled past the window about its centre, so its drift or turn never shows an edge. */
+export function plateOverscan(look: Look): number {
+  return look.world === 'drift' ? 1.04 : look.world === 'rotate' || look.world === 'rack-focus' ? 1.07 : 1;
+}
+
+/**
+ * Where the pack's base goes, as a fraction of the window height, from the plate's read: the middle of the highest surface
+ * under the frame centre (a plinth or table is the stage; the floor in front of it is not), clipped to above the caption zone. The middle leaves the most room for the plate's drift and turn
+ * either way. The plate fills the window, overscanned by `over` about its centre. Undefined when no surface lies under the centre.
+ */
+export function baseFromPlate(map: Pick<PlateMap, 'surfaces'>, over = 1): number | undefined {
+  const s = map.surfaces.filter((x) => x.left <= 0.5 && x.right >= 0.5).sort((a, b) => a.top - b.top)[0];
+  if (!s) return undefined;
+  const toWin = (f: number) => 0.5 + (f - 0.5) * over;
+  const top = toWin(s.top);
+  const bottom = Math.min(toWin(s.bottom), CAPTION_TOP - 0.01);
+  if (bottom <= top) return undefined;
+  return Math.round(((top + bottom) / 2) * 1e4) / 1e4;
+}
+
 const FONT_SERIF = 'Georgia, "Times New Roman", serif';
-/** Layer rotation for the player. The AEP schema says degrees, but the player reads a layer's rotation as radians (checked
- * on screen, 31 Oct 2026), so every rotation goes through here: one line to change when the engine is fixed. */
-const deg = (d: number) => r((d * Math.PI) / 180 * 1e4) / 1e4;
 
 /**
  * One short retail clip for one product, the template behind a catalog. The look decides the world (a themed plate that drifts,
@@ -212,13 +238,24 @@ export function buildRetailClip(i: RetailClipInput): Comp {
   const look: Look = LOOKS[i.look ?? 'tabletop-hero'];
   const accent = i.accent ?? '#0a7a3d';
   const rand = rng(i.title);
-  const L = retailLayout(W, H, i.product, { ...(i.frame !== undefined ? { frame: i.frame } : {}), ...(i.badgeSlot ? { badgeSlot: i.badgeSlot } : {}), brand: !!i.brand });
-  const win = L.window;
   const plate = look.plate === null ? undefined : i.plate;
+  // The world turns a little over the clip: 1.5 degrees (the corpus has the flat-lay plate rotate about 1.5°, and the
+  // rack-focus room takes the same slow turn). The plate is overscanned so the turn never shows a corner.
+  const turns = look.world === 'rotate' || look.world === 'rack-focus';
+  const over = plateOverscan(look);
+  const baseY = i.baseY ?? (plate?.map && H > W ? baseFromPlate(plate.map, over) : undefined);
+  const L = retailLayout(W, H, i.product, { ...(i.frame !== undefined ? { frame: i.frame } : {}), ...(i.badgeSlot ? { badgeSlot: i.badgeSlot } : {}), brand: !!i.brand, ...(baseY !== undefined ? { baseY } : {}) });
+  const win = L.window;
+  // A film's layer rotations are degrees (the engine reads degrees); the composition says so in its meta.
   let c = newFilmComposition({ aspect: i.aspect, title: i.title, palette: [i.frame ? accent : '#f4f1ec'] });
   if (plate) c = registerAsset(c, { id: plate.id, kind: 'image', src: plate.src, width: plate.width, height: plate.height });
   c = registerAsset(c, { id: i.product.id, kind: 'image', src: i.product.src, width: i.product.width, height: i.product.height });
   c = addScene(c, { id: ID, durationSec: D, mode: 'motion', intent: `Retail clip: ${i.title} (${look.id})` });
+
+  // The stack the verifier checks (qaLayout): which tier each layer belongs to, and what must stay inside what.
+  const tiers: Record<string, LayoutTier> = {};
+  const contains: Array<{ container: string; content: string }> = [];
+  const tier = (id: string, t: LayoutTier): string => ((tiers[id] = t), id);
 
   if (i.frame) c = shape(c, { x: 0, y: 0, w: W, h: H }, accent, 12).c;
 
@@ -226,26 +263,34 @@ export function buildRetailClip(i: RetailClipInput): Comp {
   const cx = win.x + win.w / 2;
   if (plate) {
     const p = add(c, { role: 'bg', kind: 'image', assetId: plate.id, box: win, z: 11 });
+    tier(p.id, 'backdrop');
     c = patch(p.c, p.id, (l) => {
       if (look.plateBlur > 0) l.effects = [{ name: 'gaussian-blur', params: { blurriness: look.plateBlur } }];
-      const over = look.world === 'drift' ? 1.04 : look.world === 'rotate' ? 1.07 : 1;
       l.transform.scale = (l.transform.scale as number[]).map((v) => r(v * over * 1e4) / 1e4);
     });
     if (look.world === 'drift') c = setKeyframes(c, p.id, 'x', [[0, r(cx)], [D, r(cx - W * 0.012)]], 'linear');
-    if (look.world === 'rotate') c = setKeyframes(c, p.id, 'rotation', [[0, 0], [D, deg(1.5)]], 'linear');
+    if (turns) c = setKeyframes(c, p.id, 'rotation', [[0, 0], [D, 1.5]], 'linear');
     if (look.world === 'rack-focus') {
       // focus racks from the room to the product: a soft copy of the plate fades up over the sharp one
       const soft = add(c, { role: 'bg', kind: 'image', assetId: plate.id, box: win, z: 10.9 });
-      c = patch(soft.c, soft.id, (l) => { l.effects = [{ name: 'gaussian-blur', params: { blurriness: 7 } }]; });
+      tier(soft.id, 'backdrop');
+      c = patch(soft.c, soft.id, (l) => {
+        l.effects = [{ name: 'gaussian-blur', params: { blurriness: 7 } }];
+        l.transform.scale = (l.transform.scale as number[]).map((v) => r(v * over * 1e4) / 1e4);
+      });
+      // the soft copy turns with the sharp one, so the two stay aligned while the focus racks
+      if (turns) c = setKeyframes(c, soft.id, 'rotation', [[0, 0], [D, 1.5]], 'linear');
       c = setKeyframes(c, soft.id, 'opacity', [[0, 0], [0.3, 0], [1.1, 1]], 'easeInOut');
     }
   } else {
     // a drawn world: the brand colour with slow light rays behind the product
     // a deeper shade of the brand colour, so the accent badge and brand tile still stand out against it
-    c = shape(c, win, shade(accent, 0.45), 11).c;
+    const world = shape(c, win, shade(accent, 0.45), 11);
+    c = world.c;
+    tier(world.id, 'backdrop');
     const diag = Math.hypot(win.w, win.h);
     const rays = shape(c, { x: cx - diag / 2, y: L.pack.y + L.pack.h / 2 - diag / 2, w: diag, h: diag }, '#ffffff', 10.8, { kind: 'polystar', starType: 'star', points: 14, outerRadius: diag / 2, innerRadius: diag * 0.012 }, (l) => { l.transform.opacity = 0.13; });
-    c = setKeyframes(rays.c, rays.id, 'rotation', [[0, 0], [D, deg(10)]], 'linear');
+    c = setKeyframes(rays.c, rays.id, 'rotation', [[0, 0], [D, 10]], 'linear');
   }
 
   if (i.frame && L.window.x > 0) {
@@ -276,6 +321,7 @@ export function buildRetailClip(i: RetailClipInput): Comp {
   const pack = add(c, { role: 'product', kind: 'image', assetId: i.product.id, box: L.pack });
   c = patch(pack.c, pack.id, (l) => { l.effects = [{ name: 'drop-shadow', params: packShadow }]; });
   const packId = pack.id;
+  tier(packId, 'subject');
   // copies that move with the pack: a reflection on a gloss floor and a soft copy for the focus rack
   const followers: string[] = [];
   let reflectionId: string | undefined;
@@ -283,12 +329,14 @@ export function buildRetailClip(i: RetailClipInput): Comp {
     const refl = add(c, { role: 'subject', kind: 'image', assetId: i.product.id, box: L.pack, z: 1.4 }, 'subject');
     c = patch(refl.c, refl.id, (l) => { l.effects = [{ name: 'gaussian-blur', params: { blurriness: 3 } }]; });
     reflectionId = refl.id;
+    tier(refl.id, 'subject');
   }
   let softPackId: string | undefined;
   if (look.world === 'rack-focus') {
     const soft = add(c, { role: 'subject', kind: 'image', assetId: i.product.id, box: L.pack, z: 0.97 }, 'subject');
     c = patch(soft.c, soft.id, (l) => { l.effects = [{ name: 'gaussian-blur', params: { blurriness: 9 } }]; });
     softPackId = soft.id;
+    tier(soft.id, 'subject');
     followers.push(soft.id);
   }
   if (look.sweep) {
@@ -300,7 +348,7 @@ export function buildRetailClip(i: RetailClipInput): Comp {
     const t0 = Math.min(1.1, D - 1.3);
     const band = shape(c, { x: L.pack.x + L.pack.w * 0.12 - bw / 2, y: L.pack.y + (L.pack.h - bh) / 2, w: bw, h: bh }, '#ffffff', 0.9, undefined, (l) => {
       l.blendMode = 'screen';
-      l.transform.rotation = deg(8);
+      l.transform.rotation = 8;
       l.effects = [{ name: 'gaussian-blur', params: { blurriness: r(bw * 0.22) } }];
     });
     c = setKeyframes(band.c, band.id, 'x', [[0, r(L.pack.x + L.pack.w * 0.12)], [t0, r(L.pack.x + L.pack.w * 0.12)], [t0 + 1.1, r(L.pack.x + L.pack.w * 0.88)]], 'easeInOut');
@@ -329,12 +377,13 @@ export function buildRetailClip(i: RetailClipInput): Comp {
     for (let n = 0; n < 22; n++) {
       const w = u * (0.012 + rand() * 0.01);
       const x = win.x + win.w * (0.04 + rand() * 0.92);
-      const y0 = win.y + win.h * (-0.04 + rand() * 0.5);
+      // it starts just inside the top edge: a piece wholly above the frame while fading in is off stage
+      const y0 = win.y + w * 2 + win.h * rand() * 0.5;
       const fall = win.h * (0.12 + rand() * 0.16);
       const y1 = Math.min(y0 + fall, L.captionZone.y - w * 2);
-      const piece = shape(c, { x: x - w / 2, y: y0 - w, w, h: w * 1.8 }, colours[n % colours.length]!, 0.85, undefined, (l) => { l.transform.rotation = deg(rand() * 180); });
+      const piece = shape(c, { x: x - w / 2, y: y0 - w, w, h: w * 1.8 }, colours[n % colours.length]!, 0.85, undefined, (l) => { l.transform.rotation = round4(rand() * 180); });
       c = setKeyframes(piece.c, piece.id, 'y', [[0, r(y0)], [D, r(y1)]], 'linear');
-      c = setKeyframes(c, piece.id, 'rotation', [[0, 0], [D, deg((rand() > 0.5 ? 1 : -1) * (90 + rand() * 180))]], 'linear');
+      c = setKeyframes(c, piece.id, 'rotation', [[0, 0], [D, round4((rand() > 0.5 ? 1 : -1) * (90 + rand() * 180))]], 'linear');
       c = setKeyframes(c, piece.id, 'opacity', [[0, 0], [0.4, 0.95]], 'easeOut');
     }
   }
@@ -351,7 +400,9 @@ export function buildRetailClip(i: RetailClipInput): Comp {
   const z = L.captionZone;
   [0.08, 0.14, 0.2, 0.26].forEach((op, n) => {
     const top = n === 0 ? z.h * 0.25 : 0;
-    c = shape(c, { x: z.x, y: z.y + (z.h * (3 - n)) / 4 - top, w: z.w, h: (z.h * (n + 1)) / 4 + top }, '#000000', 0.2, undefined, (l) => { l.transform.opacity = op; }).c;
+    const fade = shape(c, { x: z.x, y: z.y + (z.h * (3 - n)) / 4 - top, w: z.w, h: (z.h * (n + 1)) / 4 + top }, '#000000', 0.2, undefined, (l) => { l.transform.opacity = op; });
+    c = fade.c;
+    tier(fade.id, 'overlay');
   });
   const fit = Math.floor((z.w * 0.84) / (i.title.length * (look.name === 'bold' ? 0.6 : 0.52)));
   const nameSize = Math.min(Math.round(H * (look.name === 'bold' ? 0.027 : 0.022)), fit);
@@ -361,17 +412,19 @@ export function buildRetailClip(i: RetailClipInput): Comp {
       : { size: nameSize, weight: look.name === 'bold' ? 800 : 500, color: '#ffffff', align: 'center' as const };
   const name = add(c, { role: 'headline', kind: 'text', text: i.title, style: nameStyle, box: { x: z.x + z.w * 0.08, y: z.y + z.h * 0.28, w: z.w * 0.84, h: z.h * 0.3 } });
   c = look.name === 'tracked-serif' ? patch(name.c, name.id, (l) => { l.style.letterSpacing = 3; }) : name.c;
-  const textIds = [name.id];
+  const textIds = [tier(name.id, 'text')];
   if (i.subtitle) {
     const sub = add(c, { role: 'caption', kind: 'text', text: i.subtitle, style: { size: Math.round(nameSize * 0.82), weight: 400, color: '#f2f2f2', align: 'center' }, box: { x: z.x + z.w * 0.08, y: z.y + z.h * 0.58, w: z.w * 0.84, h: z.h * 0.26 } });
     c = sub.c;
-    textIds.push(sub.id);
+    textIds.push(tier(sub.id, 'text'));
   }
 
   // price badge in the free slot: an accent shape around a white face, the shape from the look
   const { d, cx: bx, cy: by } = L.badge;
   const badgeIds: string[] = [];
-  const put = (s: { c: Comp; id: string }) => ((c = s.c), s.id);
+  const put = (s: { c: Comp; id: string }) => ((c = s.c), tier(s.id, 'overlay'));
+  let faceId = '';
+  const offCentre: Record<string, number> = {};
   if (d > 0) {
     const sq = (s: number): Rect => ({ x: bx - s / 2, y: by - s / 2, w: s, h: s });
     let face: { w: number; h: number };
@@ -379,12 +432,14 @@ export function buildRetailClip(i: RetailClipInput): Comp {
       const ph = d * 0.46;
       badgeIds.push(put(shape(c, { x: bx - d / 2, y: by - ph / 2, w: d, h: ph }, accent, 0.6, { kind: 'rect', size: [d, ph], roundness: ph / 2 })));
       face = { w: d * 0.92, h: ph * 0.8 };
-      badgeIds.push(put(shape(c, { x: bx - face.w / 2, y: by - face.h / 2, w: face.w, h: face.h }, '#ffffff', 0.55, { kind: 'rect', size: [face.w, face.h], roundness: face.h / 2 })));
+      faceId = put(shape(c, { x: bx - face.w / 2, y: by - face.h / 2, w: face.w, h: face.h }, '#ffffff', 0.55, { kind: 'rect', size: [face.w, face.h], roundness: face.h / 2 }));
+      badgeIds.push(faceId);
     } else {
       const ring = look.price === 'burst' ? { kind: 'polystar', starType: 'star', points: 16, outerRadius: d / 2, innerRadius: d * 0.43 } : { kind: 'ellipse', size: [d, d] };
       const f = look.price === 'burst' ? 0.76 : 0.82;
       badgeIds.push(put(shape(c, sq(d), accent, 0.6, ring)));
-      badgeIds.push(put(shape(c, sq(d * f), '#ffffff', 0.55, { kind: 'ellipse', size: [d * f, d * f] })));
+      faceId = put(shape(c, sq(d * f), '#ffffff', 0.55, { kind: 'ellipse', size: [d * f, d * f] }));
+      badgeIds.push(faceId);
       face = { w: d * f, h: d * f };
     }
     const priceText = formatPrice(i.price, i.currency);
@@ -394,7 +449,9 @@ export function buildRetailClip(i: RetailClipInput): Comp {
     const py = was ? by + face.h * 0.08 : by;
     const price = add(c, { role: 'caption', kind: 'text', text: priceText, z: 0.5, style: { size: priceSize, weight: 800, color: '#111111', align: 'center' }, box: { x: bx - face.w * 0.48, y: py - priceSize * 0.6, w: face.w * 0.96, h: priceSize * 1.2 } });
     c = price.c;
-    badgeIds.push(price.id);
+    badgeIds.push(tier(price.id, 'text'));
+    contains.push({ container: faceId, content: price.id });
+    if (py !== by) offCentre[price.id] = py;
     if (was) {
       const ws = Math.round(priceSize * 0.55);
       const wy = by - face.h * 0.24;
@@ -403,7 +460,10 @@ export function buildRetailClip(i: RetailClipInput): Comp {
       const lw = was.length * ws * 0.6;
       const strike = shape(c, { x: bx - lw / 2, y: wy - Math.max(2, ws * 0.06), w: lw, h: Math.max(3, ws * 0.12) }, '#c0152f', 0.45);
       c = strike.c;
-      badgeIds.push(old.id, strike.id);
+      badgeIds.push(tier(old.id, 'text'), strike.id);
+      contains.push({ container: faceId, content: old.id });
+      offCentre[old.id] = wy;
+      offCentre[strike.id] = wy;
     }
   }
 
@@ -414,7 +474,8 @@ export function buildRetailClip(i: RetailClipInput): Comp {
     c = tile.c;
     const mark = add(c, { role: 'caption', kind: 'text', text: i.brand, z: 0.3, style: { size: Math.min(Math.round(b.w * 0.2), Math.floor((b.w * 0.86) / (i.brand.length * 0.6))), weight: 800, color: '#ffffff', align: 'center' }, box: { x: b.x, y: b.y + b.h * 0.3, w: b.w, h: b.h * 0.4 } });
     c = mark.c;
-    brandIds.push(tile.id, mark.id);
+    brandIds.push(tier(tile.id, 'overlay'), tier(mark.id, 'text'));
+    contains.push({ container: tile.id, content: mark.id });
   }
 
   // motion. The scale is relative to the fitted size and y moves with it, so the base stays on the table.
@@ -444,7 +505,14 @@ export function buildRetailClip(i: RetailClipInput): Comp {
   if (shadowId) c = setKeyframes(c, shadowId, 'scale', hero, 'easeOut');
   const pulse = pulseKeys(D, i.bpm ?? 120, look.pop);
   for (const id of badgeIds) c = setKeyframes(c, id, 'scale', pulse, look.pop === 'slam' ? 'easeOut' : 'easeInOut');
+  // a line that sits off the ring's centre must move with the ring's scale, or on the pop-in it drifts out of the ring
+  const ease = look.pop === 'slam' ? 'easeOut' : 'easeInOut';
+  for (const [id, y] of Object.entries(offCentre)) c = setKeyframes(c, id, 'y', pulse.map(([t, v]) => [t, r(by + (y - by) * v)] as [number, number]), ease);
   for (const id of textIds) c = setKeyframes(c, id, 'opacity', [[0, 0], [1, 0], [1.4, 1]], 'easeOut');
   for (const id of brandIds) c = setKeyframes(c, id, 'opacity', [[0, 0], [0.6, 0], [1, 1]], 'easeOut');
+  // grounded: the pack itself, never its reflection or soft copy, which share its asset
+  // what the critic needs to ask about the plate: the surface the pack stands on and what each quadrant holds
+  const surface = plate?.map?.surfaces.filter((x) => x.left <= 0.5 && x.right >= 0.5).sort((x, y) => x.top - y.top)[0]?.name;
+  c.meta = { ...(c.meta ?? {}), layout: { tiers, contains, grounded: [packId], ...(plate?.map ? { plate: { ...(surface ? { surface } : {}), ...(plate.map.quadrants ? { quadrants: plate.map.quadrants } : {}) } } : {}) } };
   return c;
 }

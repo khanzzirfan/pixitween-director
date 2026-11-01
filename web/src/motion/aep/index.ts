@@ -2,6 +2,7 @@
 // Unsupported fields/layer kinds become warnings; it throws only when its own output
 // fails parseMotionDoc / validateTargets (a converter bug, not a film problem).
 import type { AepCompositionJson } from '@shared/aep/composition';
+import { rotationUnitOf } from '@shared/aep/rotation';
 import { parseMotionDoc, type MotionDoc } from '@engine/schema';
 import { validateTargets } from '@engine/timeline';
 import { convertAssets } from './assets';
@@ -32,8 +33,15 @@ export function aepToMotion(comp: AepCompositionJson, opts: { resolveUrl?(src: s
   const converted = convertLayers(comp.layers, comp.assets, comp.precomps, comp.fps, comp.theme, {
     ...opts,
     compSize: { width: comp.width, height: comp.height },
+    // A film without the flag is a legacy film: its layer rotations are radians.
+    rotationUnit: rotationUnitOf(comp),
   });
   const { warnings, audio } = converted;
+  // An unknown unit would otherwise be read as radians (the legacy unit) without a word.
+  const declared = comp.meta?.rotationUnit;
+  if (declared !== undefined && declared !== 'deg' && declared !== 'rad') {
+    warnings.push(`comp ${comp.id}: unknown rotationUnit '${String(declared)}'; reading the rotations as radians`);
+  }
   let { layers } = converted;
   if (layers.length === 0) {
     // MotionDoc requires >= 1 layer; keep an invisible placeholder so audio-only/unsupported comps still load.

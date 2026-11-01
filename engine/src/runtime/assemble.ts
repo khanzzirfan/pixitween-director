@@ -90,6 +90,47 @@ export function assemble(doc: MotionDoc, ctx: AssembleContext): Assembly {
   const warnings: string[] = [];
   for (const error of validateTargets(doc)) warnings.push(`${error.path}: ${error.message}`);
 
+  // A soft-light layer blends into the frame behind it, so it needs that frame as a texture. The
+  // runtime draws the stage without the soft-light layer (and without everything drawn after it)
+  // into a target and hands it over; the layer's own material then blends into it.
+  const softLightNodes = nodes.filter((node) => node.layer.blendMode === 'soft-light' && node.setBackdrop);
+  const backdrops = softLightNodes.map(
+    () => new THREE.WebGLRenderTarget(doc.width, doc.height, { type: THREE.HalfFloatType, depthBuffer: false }),
+  );
+  for (const node of softLightNodes) {
+    // An isolated layer renders its own content alone, so its effects would run on the frame
+    // behind it rather than on the layer.
+    if (node.layer.effects.some((effect) => effect.enabled !== false)) {
+      warnings.push(`${node.id}: a soft-light layer with effects is not supported; the effects run on the frame behind it`);
+    }
+  }
+
+  function captureBackdrops(): void {
+    const renderer = ctx.renderer;
+    if (!renderer) return;
+    softLightNodes.forEach((node, index) => {
+      // The frame behind the layer: the stage without the layer itself and without everything
+      // drawn after it, so the texture holds what the layer actually sits on.
+      const hidden: THREE.Object3D[] = [];
+      for (let i = nodes.indexOf(node); i < nodes.length; i++) {
+        const display = nodes[i].display;
+        if (display.visible) {
+          display.visible = false;
+          hidden.push(display);
+        }
+      }
+      const previous = renderer.getRenderTarget();
+      try {
+        renderer.setRenderTarget(backdrops[index]);
+        renderer.render(stage, camera);
+      } finally {
+        renderer.setRenderTarget(previous);
+        for (const display of hidden) display.visible = true;
+      }
+      node.setBackdrop?.(backdrops[index].texture, { width: doc.width, height: doc.height });
+    });
+  }
+
   const clock = new MotionClock({ duration: doc.duration, fps: doc.fps });
 
   for (const node of nodes) {
@@ -134,6 +175,10 @@ export function assemble(doc: MotionDoc, ctx: AssembleContext): Assembly {
       if (node.display.visible) isolations.get(node.id)?.update(timeSec, frame);
     }
 
+    // The frame behind a soft-light layer is drawn before the stage, so the layer blends into what
+    // is really under it.
+    captureBackdrops();
+
     if (stageChain) stageChain.render(rendererOrStub);
     else ctx.renderer?.render(stage, camera);
   }
@@ -144,6 +189,7 @@ export function assemble(doc: MotionDoc, ctx: AssembleContext): Assembly {
 
   function destroy(): void {
     for (const isolation of isolations.values()) isolation.dispose();
+    for (const backdrop of backdrops) backdrop.dispose();
     stageChain?.dispose();
     for (const node of topNodes) node.destroy();
     clock.destroy();

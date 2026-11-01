@@ -1,7 +1,7 @@
 {
   "name": "App A3: AEP → MotionDoc converter for 3D (model3d, stage3d world, actors, props)",
-  "description": "Extends the A2 converter so the director's 3D layers play on the engine's three layer: model3d product shots (the label can), and the cartoon world (stage3d with its actor3d and prop3d members: camera, lights, ground, backdrop, glTF actors with a clip and blocking marks, props). Toon shading, curved walls and bone attach become warnings for later work.",
   "branchName": "ralph/a3-aep-3d",
+  "description": "Extends the A2 converter so the director's 3D layers play on the engine's three layer: model3d product shots (the label can), and the cartoon world (stage3d with its actor3d and prop3d members: camera, lights, ground, backdrop, glTF actors with a clip and blocking marks, props). Toon shading, curved walls and bone attach become warnings for later work.",
   "userStories": [
     {
       "id": "US-001",
@@ -23,15 +23,14 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "frontend",
         "converter",
         "3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -53,15 +52,14 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "frontend",
         "converter",
         "3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -81,7 +79,7 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -90,8 +88,7 @@
         "frontend",
         "converter",
         "3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -111,7 +108,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003"
@@ -120,8 +117,7 @@
         "frontend",
         "converter",
         "3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -142,7 +138,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001",
@@ -153,8 +149,7 @@
         "converter",
         "3d",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -195,8 +190,8 @@
       "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
-      "3D values are metres and degrees in both formats; convert only units the spec names. Keep every converted three layer within the engine limits (50 objects, 6 lights, 16..2048 px).",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+      "3D values are metres and degrees in both formats; convert only units the spec names. Keep every converted three layer within the engine limits (50 objects, 6 lights, 16..2048 px)."
     ],
     "qualityGates": {
       "universal": [
@@ -210,7 +205,6 @@
     },
     "manualGates": [
       "MG-1: owner opens http://localhost:5173/aep-motion.html?film=<id> for one product-3D film and one cartoon film and judges the 3D scene."
-    ],
-    "updatedAt": "2026-10-31T23:20:05.702Z"
+    ]
   }
 }

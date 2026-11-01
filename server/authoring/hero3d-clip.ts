@@ -46,8 +46,6 @@ export interface Hero3DInput {
 
 const ID = 'hero';
 const r = (n: number) => Math.round(n * 100) / 100;
-/** Layer (2D) rotation for the player, which reads radians (see retail-clip.ts `deg`). */
-const deg = (d: number) => r(((d * Math.PI) / 180) * 1e4) / 1e4;
 const EASE_OUT: [number, number, number, number] = [0.16, 1, 0.3, 1];
 const EASE_IN_OUT: [number, number, number, number] = [0.42, 0, 0.58, 1];
 const LINEAR: [number, number, number, number] = [0, 0, 1, 1];
@@ -99,6 +97,7 @@ export function buildHero3DClip(i: Hero3DInput): Comp {
   const portrait = H > W;
   const D = Math.max(4, i.durationSec ?? 5);
   const B = HERO3D_BEATS;
+  // A film's layer rotations are degrees (the engine reads degrees); the composition says so in its meta.
   let c = newFilmComposition({ aspect: i.aspect, title: `${i.brand ?? i.title}: 3D hero`, palette: [i.accent] });
   const fps = c.fps as number;
   c = addScene(c, { id: ID, durationSec: D, mode: 'motion', intent: '3D hero: the can tumbles in, turns under a moving key light, dolly zoom, price held' });
@@ -166,7 +165,7 @@ export function buildHero3DClip(i: Hero3DInput): Comp {
   const pid = `${ID}:product3d`;
   // the tumble: falls in from above the frame tilted, overshoots the tilt a little, settles upright
   c = setKeyframes(c, pid, 'y', [[0, r(pcy - H * 0.75)], [r(B.land - 0.1), r(pcy + u * 0.01)], [B.land, r(pcy)]], 'easeOut');
-  c = setKeyframes(c, pid, 'rotation', [[0, deg(-24)], [r(B.land - 0.15), deg(5)], [r(B.land + 0.15), 0]], 'easeOut');
+  c = setKeyframes(c, pid, 'rotation', [[0, -24], [r(B.land - 0.15), 5], [r(B.land + 0.15), 0]], 'easeOut');
   c = patch(c, pid, (l) => {
     // the spin: a fast 3/4 spin as it falls, then the slow turn that shows the label under the moving light, ending a little open
     l.view = {

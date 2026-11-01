@@ -1,0 +1,3240 @@
+{
+  "version": "1.9.0",
+  "id": "film",
+  "name": "Coffee Co.: Original, Vanilla Cream, Mocha",
+  "width": 1080,
+  "height": 1080,
+  "fps": 30,
+  "durationInFrames": 300,
+  "bgColor": "#7a3b12",
+  "assets": {
+    "ast_5f70b53ecd06e5ce73d07b8d26bd69f0": {
+      "type": "image",
+      "src": "/api/assets/ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+      "width": 256,
+      "height": 752
+    }
+  },
+  "layers": [
+    {
+      "kind": "precomp",
+      "id": "v1",
+      "name": "v1",
+      "inPoint": 0,
+      "outPoint": 66,
+      "compId": "v1",
+      "width": 1080,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "v2",
+      "name": "v2",
+      "inPoint": 66,
+      "outPoint": 132,
+      "compId": "v2",
+      "width": 1080,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "v3",
+      "name": "v3",
+      "inPoint": 132,
+      "outPoint": 198,
+      "compId": "v3",
+      "width": 1080,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    },
+    {
+      "kind": "precomp",
+      "id": "end",
+      "name": "end",
+      "inPoint": 198,
+      "outPoint": 300,
+      "compId": "end",
+      "width": 1080,
+      "height": 1080,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    }
+  ],
+  "precomps": {
+    "v1": {
+      "version": "1.9.0",
+      "id": "v1",
+      "name": "v1",
+      "width": 1080,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 66,
+      "assets": {
+        "ast_5f70b53ecd06e5ce73d07b8d26bd69f0": {
+          "type": "image",
+          "src": "/api/assets/ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "v1:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 66,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1080
+            ]
+          },
+          "fill": "#3b2314",
+          "transform": {
+            "position": [
+              540,
+              540
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "v1:bg-2",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 66,
+          "path": {
+            "kind": "ellipse",
+            "size": [
+              837,
+              837
+            ]
+          },
+          "fill": "#c4bdb9",
+          "transform": {
+            "position": [
+              540,
+              583.2
+            ],
+            "anchor": [
+              418.5,
+              418.5
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.6,
+                  0.6
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 12,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": [
+                  1.06,
+                  1.06
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 9,
+                "v": 0.95,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 40,
+                "v": 0.7,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": 0.95
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "gaussian-blur",
+              "params": {
+                "blurriness": 66.96
+              }
+            }
+          ]
+        },
+        {
+          "kind": "image",
+          "id": "v1:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 66,
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  583.2
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": [
+                  540,
+                  583.2
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": [
+                  540,
+                  687.66
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0,
+                  0
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 13,
+                "v": [
+                  0.9616600000000001,
+                  0.9616600000000001
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  0.890426,
+                  0.890426
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": [
+                  0.979468,
+                  0.979468
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 60,
+                "v": [
+                  2.226064,
+                  2.226064
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": [
+                  2.315106,
+                  2.315106
+                ]
+              }
+            ],
+            "rotation": [
+              {
+                "t": 0,
+                "v": -22,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 13,
+                "v": 4,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 19,
+                "v": 0
+              }
+            ],
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 4,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 24,
+                "direction": 180,
+                "softness": 34,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "id": "v1:caption",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 66,
+          "source": "Original",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 130,
+            "fill": "#ffffff",
+            "weight": 800,
+            "align": "center",
+            "boxWidth": 624
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  165.2
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 9,
+                "v": [
+                  540,
+                  165.2
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  540,
+                  151.2
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 9,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 17,
+                "v": 1,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": 1,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 56,
+                "v": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "v2": {
+      "version": "1.9.0",
+      "id": "v2",
+      "name": "v2",
+      "width": 1080,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 66,
+      "assets": {
+        "ast_5f70b53ecd06e5ce73d07b8d26bd69f0": {
+          "type": "image",
+          "src": "/api/assets/ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "v2:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 66,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1080
+            ]
+          },
+          "fill": "#e8c872",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  1620,
+                  540
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 4,
+                "v": [
+                  540,
+                  540
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "v2:bg-2",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 66,
+          "path": {
+            "kind": "ellipse",
+            "size": [
+              837,
+              837
+            ]
+          },
+          "fill": "#f8efd5",
+          "transform": {
+            "position": [
+              540,
+              583.2
+            ],
+            "anchor": [
+              418.5,
+              418.5
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.6,
+                  0.6
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 12,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": [
+                  1.06,
+                  1.06
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 9,
+                "v": 0.95,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 40,
+                "v": 0.7,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": 0.95
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "gaussian-blur",
+              "params": {
+                "blurriness": 66.96
+              }
+            }
+          ]
+        },
+        {
+          "kind": "image",
+          "id": "v2:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 66,
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  583.2
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": [
+                  540,
+                  583.2
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": [
+                  540,
+                  687.66
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0,
+                  0
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 13,
+                "v": [
+                  0.9616600000000001,
+                  0.9616600000000001
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  0.890426,
+                  0.890426
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": [
+                  0.979468,
+                  0.979468
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 60,
+                "v": [
+                  2.226064,
+                  2.226064
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": [
+                  2.315106,
+                  2.315106
+                ]
+              }
+            ],
+            "rotation": [
+              {
+                "t": 0,
+                "v": 22,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 13,
+                "v": -4,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 19,
+                "v": 0
+              }
+            ],
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 4,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 24,
+                "direction": 180,
+                "softness": 34,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "id": "v2:caption",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 66,
+          "source": "Vanilla",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 125,
+            "fill": "#1a1a1a",
+            "weight": 500,
+            "align": "center",
+            "boxWidth": 490.00000000000006
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  333.75,
+                  165.2
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 9,
+                "v": [
+                  333.75,
+                  165.2
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  333.75,
+                  151.2
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 9,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 17,
+                "v": 1,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": 1,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 56,
+                "v": 0
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "v2:caption-2",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 66,
+          "source": "Cream",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 125,
+            "fill": "#1a1a1a",
+            "weight": 800,
+            "align": "center",
+            "boxWidth": 375
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  803.75,
+                  165.2
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 13,
+                "v": [
+                  803.75,
+                  165.2
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 22,
+                "v": [
+                  803.75,
+                  151.2
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 13,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 20,
+                "v": 1,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": 1,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 56,
+                "v": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "v3": {
+      "version": "1.9.0",
+      "id": "v3",
+      "name": "v3",
+      "width": 1080,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 66,
+      "assets": {
+        "ast_5f70b53ecd06e5ce73d07b8d26bd69f0": {
+          "type": "image",
+          "src": "/api/assets/ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "v3:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 66,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1080
+            ]
+          },
+          "fill": "#a0522d",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  1620,
+                  540
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 4,
+                "v": [
+                  540,
+                  540
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "v3:bg-2",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 66,
+          "path": {
+            "kind": "ellipse",
+            "size": [
+              837,
+              837
+            ]
+          },
+          "fill": "#e3cbc0",
+          "transform": {
+            "position": [
+              540,
+              583.2
+            ],
+            "anchor": [
+              418.5,
+              418.5
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.6,
+                  0.6
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 12,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": [
+                  1.06,
+                  1.06
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 9,
+                "v": 0.95,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 40,
+                "v": 0.7,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": 0.95
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "gaussian-blur",
+              "params": {
+                "blurriness": 66.96
+              }
+            }
+          ]
+        },
+        {
+          "kind": "image",
+          "id": "v3:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 66,
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  583.2
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": [
+                  540,
+                  583.2
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": [
+                  540,
+                  687.66
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0,
+                  0
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 13,
+                "v": [
+                  0.9616600000000001,
+                  0.9616600000000001
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  0.890426,
+                  0.890426
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": [
+                  0.979468,
+                  0.979468
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 60,
+                "v": [
+                  2.226064,
+                  2.226064
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": [
+                  2.315106,
+                  2.315106
+                ]
+              }
+            ],
+            "rotation": [
+              {
+                "t": 0,
+                "v": -22,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 13,
+                "v": 4,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 19,
+                "v": 0
+              }
+            ],
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 4,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 24,
+                "direction": 180,
+                "softness": 34,
+                "opacity": 0.35,
+                "color": "#000000"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "text",
+          "id": "v3:caption",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 66,
+          "source": "Mocha",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 130,
+            "fill": "#ffffff",
+            "weight": 800,
+            "align": "center",
+            "boxWidth": 390
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  165.2
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 9,
+                "v": [
+                  540,
+                  165.2
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": [
+                  540,
+                  151.2
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 9,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 17,
+                "v": 1,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": 1,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 56,
+                "v": 0
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "end": {
+      "version": "1.9.0",
+      "id": "end",
+      "name": "end",
+      "width": 1080,
+      "height": 1080,
+      "fps": 30,
+      "durationInFrames": 102,
+      "assets": {
+        "ast_5f70b53ecd06e5ce73d07b8d26bd69f0": {
+          "type": "image",
+          "src": "/api/assets/ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "shape",
+          "id": "end:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 102,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              777.6
+            ]
+          },
+          "fill": "#e7dcd4",
+          "transform": {
+            "position": [
+              540,
+              388.8
+            ],
+            "anchor": [
+              540,
+              388.8
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "end:bg-2",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 102,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              302.4
+            ]
+          },
+          "fill": "#7a3b12",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  1231.2
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 11,
+                "v": [
+                  540,
+                  928.8
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              151.2
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "end:bg-3",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 102,
+          "path": {
+            "kind": "ellipse",
+            "size": [
+              169.4175319148936,
+              24.70672340425532
+            ]
+          },
+          "fill": "#000000",
+          "transform": {
+            "position": [
+              216,
+              779.3648
+            ],
+            "anchor": [
+              84.7087659574468,
+              12.35336170212766
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 17,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 21,
+                "v": 0.35
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "gaussian-blur",
+              "params": {
+                "blurriness": 8.82
+              }
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "end:bg-4",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 102,
+          "path": {
+            "kind": "ellipse",
+            "size": [
+              169.4175319148936,
+              24.70672340425532
+            ]
+          },
+          "fill": "#000000",
+          "transform": {
+            "position": [
+              540,
+              779.3648
+            ],
+            "anchor": [
+              84.7087659574468,
+              12.35336170212766
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 20,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 24,
+                "v": 0.35
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "gaussian-blur",
+              "params": {
+                "blurriness": 8.82
+              }
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "end:bg-5",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 102,
+          "path": {
+            "kind": "ellipse",
+            "size": [
+              169.4175319148936,
+              24.70672340425532
+            ]
+          },
+          "fill": "#000000",
+          "transform": {
+            "position": [
+              864,
+              779.3648
+            ],
+            "anchor": [
+              84.7087659574468,
+              12.35336170212766
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 23,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 27,
+                "v": 0.35
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "gaussian-blur",
+              "params": {
+                "blurriness": 8.82
+              }
+            }
+          ]
+        },
+        {
+          "kind": "image",
+          "id": "end:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 102,
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  216,
+                  -10.8
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": [
+                  216,
+                  -10.8
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 17,
+                "v": [
+                  216,
+                  537.84
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 21,
+                "v": [
+                  216,
+                  529.2
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.689362,
+                  0.689362
+                ]
+              },
+              {
+                "t": 21,
+                "v": [
+                  0.689362,
+                  0.689362
+                ]
+              },
+              {
+                "t": 102,
+                "v": [
+                  0.72383,
+                  0.72383
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 8,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 10,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "image",
+          "id": "end:product-2",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 102,
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  -10.8
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 11,
+                "v": [
+                  540,
+                  -10.8
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 20,
+                "v": [
+                  540,
+                  537.84
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 24,
+                "v": [
+                  540,
+                  529.2
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.689362,
+                  0.689362
+                ]
+              },
+              {
+                "t": 24,
+                "v": [
+                  0.689362,
+                  0.689362
+                ]
+              },
+              {
+                "t": 102,
+                "v": [
+                  0.72383,
+                  0.72383
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 11,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 13,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "image",
+          "id": "end:product-3",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 102,
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  864,
+                  -10.8
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 14,
+                "v": [
+                  864,
+                  -10.8
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 23,
+                "v": [
+                  864,
+                  537.84
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  1,
+                  1
+                ]
+              },
+              {
+                "t": 27,
+                "v": [
+                  864,
+                  529.2
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.689362,
+                  0.689362
+                ]
+              },
+              {
+                "t": 27,
+                "v": [
+                  0.689362,
+                  0.689362
+                ]
+              },
+              {
+                "t": 102,
+                "v": [
+                  0.72383,
+                  0.72383
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 14,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 16,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "end:caption",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 102,
+          "source": "$4.50",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 54,
+            "fill": "#ffffff",
+            "weight": 800,
+            "align": "center",
+            "boxWidth": 324
+          },
+          "transform": {
+            "position": [
+              216,
+              868.32
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.6,
+                  0.6
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 23,
+                "v": [
+                  0.6,
+                  0.6
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 30,
+                "v": [
+                  1.1,
+                  1.1
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 35,
+                "v": [
+                  1,
+                  1
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 23,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 30,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "end:caption-2",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 102,
+          "source": "$4.75",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 54,
+            "fill": "#ffffff",
+            "weight": 800,
+            "align": "center",
+            "boxWidth": 324
+          },
+          "transform": {
+            "position": [
+              540,
+              868.32
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.6,
+                  0.6
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 26,
+                "v": [
+                  0.6,
+                  0.6
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 33,
+                "v": [
+                  1.1,
+                  1.1
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 38,
+                "v": [
+                  1,
+                  1
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 26,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 33,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "end:caption-3",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 102,
+          "source": "$4.75",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 54,
+            "fill": "#ffffff",
+            "weight": 800,
+            "align": "center",
+            "boxWidth": 324
+          },
+          "transform": {
+            "position": [
+              864,
+              868.32
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0.6,
+                  0.6
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 29,
+                "v": [
+                  0.6,
+                  0.6
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 36,
+                "v": [
+                  1.1,
+                  1.1
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 41,
+                "v": [
+                  1,
+                  1
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 29,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 36,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "end:caption-4",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 102,
+          "source": "$5.50",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 33,
+            "fill": "#ffffff",
+            "weight": 500,
+            "align": "center",
+            "boxWidth": 324
+          },
+          "transform": {
+            "position": [
+              864,
+              817.02
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 29,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 36,
+                "v": 0.8
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "end:caption-5",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 102,
+          "source": "Pick",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 92,
+            "fill": "#1a1a1a",
+            "weight": 500,
+            "align": "center",
+            "boxWidth": 206.08
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  182.12,
+                  186.8
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 27,
+                "v": [
+                  182.12,
+                  186.8
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 36,
+                "v": [
+                  182.12,
+                  172.8
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 27,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 35,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "end:caption-6",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 102,
+          "source": "your",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 92,
+            "fill": "#1a1a1a",
+            "weight": 500,
+            "align": "center",
+            "boxWidth": 206.08
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  415.8,
+                  186.8
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 31,
+                "v": [
+                  415.8,
+                  186.8
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 40,
+                "v": [
+                  415.8,
+                  172.8
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 31,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 38,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "end:caption-7",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 102,
+          "source": "cold",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 92,
+            "fill": "#1a1a1a",
+            "weight": 500,
+            "align": "center",
+            "boxWidth": 206.08
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  649.48,
+                  186.8
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 34,
+                "v": [
+                  649.48,
+                  186.8
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 43,
+                "v": [
+                  649.48,
+                  172.8
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 34,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 42,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "end:caption-8",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 102,
+          "source": "brew",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 92,
+            "fill": "#1a1a1a",
+            "weight": 800,
+            "align": "center",
+            "boxWidth": 220.79999999999998
+          },
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  890.52,
+                  186.8
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 38,
+                "v": [
+                  890.52,
+                  186.8
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 47,
+                "v": [
+                  890.52,
+                  172.8
+                ]
+              }
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 38,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 45,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "end:caption-9",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 102,
+          "source": "Coffee Co.",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 43,
+            "fill": "#6e3510",
+            "weight": 700,
+            "align": "center",
+            "boxWidth": 864
+          },
+          "transform": {
+            "position": [
+              540,
+              297
+            ],
+            "anchor": [
+              540,
+              540
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 59,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "end:bg-6",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 102,
+          "path": {
+            "kind": "rect",
+            "size": [
+              92.4,
+              3.3000000000000003
+            ]
+          },
+          "fill": "#ff5a6e",
+          "transform": {
+            "position": [
+              864,
+              816.67
+            ],
+            "anchor": [
+              46.2,
+              1.6500000000000001
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 36,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 42,
+                "v": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "meta": {
+    "director": {
+      "scenes": {
+        "v1": {
+          "precompId": "v1",
+          "startFrame": 0,
+          "durationFrames": 66,
+          "mode": "motion",
+          "intent": "Original: colour field, tumble in, push to the label"
+        },
+        "v2": {
+          "precompId": "v2",
+          "startFrame": 66,
+          "durationFrames": 66,
+          "mode": "motion",
+          "intent": "Vanilla Cream: colour field, tumble in, push to the label"
+        },
+        "v3": {
+          "precompId": "v3",
+          "startFrame": 132,
+          "durationFrames": 66,
+          "mode": "motion",
+          "intent": "Mocha: colour field, tumble in, push to the label"
+        },
+        "end": {
+          "precompId": "end",
+          "startFrame": 198,
+          "durationFrames": 102,
+          "mode": "motion",
+          "intent": "Lineup of every variant with the tagline and prices, held"
+        }
+      },
+      "layers": {
+        "v1:bg": {
+          "sceneId": "v1",
+          "role": "subject",
+          "z": 11
+        },
+        "v1:bg-2": {
+          "sceneId": "v1",
+          "role": "subject",
+          "z": 10
+        },
+        "v1:product": {
+          "sceneId": "v1",
+          "role": "product",
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "z": 1
+        },
+        "v1:caption": {
+          "sceneId": "v1",
+          "role": "caption",
+          "z": 0.2
+        },
+        "v2:bg": {
+          "sceneId": "v2",
+          "role": "subject",
+          "z": 11
+        },
+        "v2:bg-2": {
+          "sceneId": "v2",
+          "role": "subject",
+          "z": 10
+        },
+        "v2:product": {
+          "sceneId": "v2",
+          "role": "product",
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "z": 1
+        },
+        "v2:caption": {
+          "sceneId": "v2",
+          "role": "caption",
+          "z": 0.2
+        },
+        "v2:caption-2": {
+          "sceneId": "v2",
+          "role": "caption",
+          "z": 0.2
+        },
+        "v3:bg": {
+          "sceneId": "v3",
+          "role": "subject",
+          "z": 11
+        },
+        "v3:bg-2": {
+          "sceneId": "v3",
+          "role": "subject",
+          "z": 10
+        },
+        "v3:product": {
+          "sceneId": "v3",
+          "role": "product",
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "z": 1
+        },
+        "v3:caption": {
+          "sceneId": "v3",
+          "role": "caption",
+          "z": 0.2
+        },
+        "end:bg": {
+          "sceneId": "end",
+          "role": "subject",
+          "z": 11
+        },
+        "end:bg-2": {
+          "sceneId": "end",
+          "role": "subject",
+          "z": 10.9
+        },
+        "end:bg-3": {
+          "sceneId": "end",
+          "role": "subject",
+          "z": 1.5
+        },
+        "end:product": {
+          "sceneId": "end",
+          "role": "product",
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "z": 1
+        },
+        "end:caption": {
+          "sceneId": "end",
+          "role": "caption",
+          "z": 0.2
+        },
+        "end:bg-4": {
+          "sceneId": "end",
+          "role": "subject",
+          "z": 1.5
+        },
+        "end:product-2": {
+          "sceneId": "end",
+          "role": "product",
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "z": 1
+        },
+        "end:caption-2": {
+          "sceneId": "end",
+          "role": "caption",
+          "z": 0.2
+        },
+        "end:bg-5": {
+          "sceneId": "end",
+          "role": "subject",
+          "z": 1.5
+        },
+        "end:product-3": {
+          "sceneId": "end",
+          "role": "product",
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "z": 1
+        },
+        "end:caption-3": {
+          "sceneId": "end",
+          "role": "caption",
+          "z": 0.2
+        },
+        "end:caption-4": {
+          "sceneId": "end",
+          "role": "caption",
+          "z": 0.2
+        },
+        "end:bg-6": {
+          "sceneId": "end",
+          "role": "subject",
+          "z": 0.15
+        },
+        "end:caption-5": {
+          "sceneId": "end",
+          "role": "caption",
+          "z": 0.2
+        },
+        "end:caption-6": {
+          "sceneId": "end",
+          "role": "caption",
+          "z": 0.2
+        },
+        "end:caption-7": {
+          "sceneId": "end",
+          "role": "caption",
+          "z": 0.2
+        },
+        "end:caption-8": {
+          "sceneId": "end",
+          "role": "caption",
+          "z": 0.2
+        },
+        "end:caption-9": {
+          "sceneId": "end",
+          "role": "caption",
+          "z": 0.2
+        }
+      }
+    },
+    "rotationUnit": "deg"
+  }
+}

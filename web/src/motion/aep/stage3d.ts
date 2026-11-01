@@ -4,6 +4,7 @@
 import type { AepLayer } from '@shared/aep/layer';
 import type { AepAssetMap } from '@shared/aep/asset';
 import type { AepAnimatable } from '@shared/aep/transform';
+import type { AepRotationUnit } from '@shared/aep/rotation';
 import type { Object3D, ThreeLayer } from '@engine/schema';
 import { isKeyframed, propertyTweens, type ConvertedTween } from './keyframes';
 import { mapBaseLayer } from './baseLayer';
@@ -18,6 +19,8 @@ export interface StageContext {
   fps: number;
   /** The world's in-point (frames): members' keyframes are composition frames, tweened on the world's clock. */
   worldInPoint?: number;
+  /** The unit the composition's layer rotations are written in ('rad' for a legacy film). */
+  rotationUnit?: AepRotationUnit;
 }
 
 export interface ConvertWorldResult {
@@ -273,7 +276,7 @@ function cubicBezierAt([x1, y1, x2, y2]: readonly number[], x: number): number {
 
 export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerCtx: StageContext): ConvertWorldResult {
   const ctx: StageContext = { ...outerCtx, worldInPoint: world.inPoint };
-  const { base, tweens: baseTweens, warnings } = mapBaseLayer(world, ctx.fps);
+  const { base, tweens: baseTweens, warnings } = mapBaseLayer(world, ctx.fps, ctx.rotationUnit);
   const id = sanitizeId(world.id);
 
   let { width, height } = world.viewport;

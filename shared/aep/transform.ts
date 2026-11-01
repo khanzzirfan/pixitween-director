@@ -42,7 +42,7 @@ export const aepTransformSchema = z
     position: aepAnimatableOf(vec2),
     anchor: aepAnimatableOf(vec2),
     scale: aepAnimatableOf(vec2),
-    rotation: aepAnimatableOf(z.number()), // degrees
+    rotation: aepAnimatableOf(z.number()), // degrees, or radians for a legacy film (see ./rotation.ts)
     opacity: aepAnimatableOf(z.number().min(0).max(1)),
     skew: aepAnimatableOf(z.number()).optional(),
     skewAxis: aepAnimatableOf(z.number()).optional(),

@@ -2,10 +2,11 @@
 // ("Time" and "Base transform") for the conversion rules this implements. Per-kind
 // converters spread `base` and append their own fields on top.
 import type { AepTransform, AepAnimatable } from '@shared/aep/transform';
+import { RAD_TO_DEG, type AepRotationUnit } from '@shared/aep/rotation';
 import { isKeyframed, propertyTweens, type AepPropertyValue, type ConvertedTween } from './keyframes';
 
-export type MotionBlendMode = 'normal' | 'add' | 'multiply' | 'screen';
-const SUPPORTED_BLEND_MODES: readonly MotionBlendMode[] = ['normal', 'add', 'multiply', 'screen'];
+export type MotionBlendMode = 'normal' | 'add' | 'multiply' | 'screen' | 'soft-light';
+const SUPPORTED_BLEND_MODES: readonly MotionBlendMode[] = ['normal', 'add', 'multiply', 'screen', 'soft-light'];
 
 // Common fields every AEP layer kind carries (`shared/aep/layer.ts`'s `layerBase`).
 export interface AepBaseLayer {
@@ -51,7 +52,7 @@ function anchorToPivot(value: AepAnimatable<AepPropertyValue>): [number, number]
   return [ax, ay];
 }
 
-export function mapBaseLayer(layer: AepBaseLayer, fps: number): BaseLayerResult {
+export function mapBaseLayer(layer: AepBaseLayer, fps: number, rotationUnit?: AepRotationUnit): BaseLayerResult {
   const { id, inPoint, outPoint, transform, blendMode } = layer;
   const warnings: string[] = [];
   const tweens: ConvertedTween[] = [];
@@ -63,6 +64,16 @@ export function mapBaseLayer(layer: AepBaseLayer, fps: number): BaseLayerResult 
   tweens.push(...scale.tweens);
 
   const rotation = propertyTweens(transform.rotation, { fps, inPoint, props: ['rotation'] });
+  // The engine reads a layer's rotation in degrees. A 'deg' film passes through; a legacy
+  // film (no unit flag, or 'rad') stores radians, the unit the old Pixi player read.
+  const rotationScale = rotationUnit === 'deg' ? 1 : RAD_TO_DEG;
+  if (rotationScale !== 1) {
+    rotation.initial.rotation = round(rotation.initial.rotation * rotationScale);
+    for (const tween of rotation.tweens) {
+      tween.from.rotation = round(tween.from.rotation * rotationScale);
+      tween.to.rotation = round(tween.to.rotation * rotationScale);
+    }
+  }
   tweens.push(...rotation.tweens);
 
   const opacity = propertyTweens(transform.opacity, { fps, inPoint, props: ['alpha'] });

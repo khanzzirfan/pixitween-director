@@ -12,6 +12,8 @@ const FIXTURE_NAMES = [
   "basic-2d",
   "camera-moves",
   "effects-2d",
+  "polystar",
+  "soft-light",
   "three-gltf",
   "three-postfx",
   "three-primitives",
@@ -130,6 +132,70 @@ test("basic-2d: the #ff0000 badge renders red at its centre", async ({
   expect(r).toBeGreaterThanOrEqual(254);
   expect(g).toBeLessThanOrEqual(1);
   expect(b).toBeLessThanOrEqual(1);
+});
+
+test("polystar: the 16-point star draws with points, and the 6-point polygon fills", async ({
+  page,
+}) => {
+  await openFixture(page, "polystar");
+  expect(await page.evaluate(() => window.__motion.ready())).toBe(true);
+  expect(await page.evaluate(() => window.__motion.errors())).toEqual([]);
+
+  // The star sits at (700, 540) with an outer radius of 220 and an inner radius of 95. A tip
+  // points straight up, and the inner corners sit half a tip (11.25 degrees) to the side of it,
+  // so the ray towards an inner corner leaves the star long before the ray towards a tip does.
+  const star = await page.evaluate(() => {
+    const reach = 220 * 0.6;
+    return {
+      centre: window.__motion.pixel(700, 540),
+      tip: window.__motion.pixel(700, Math.round(540 - reach)),
+      valley: window.__motion.pixel(
+        Math.round(700 + reach * Math.sin(Math.PI / 16)),
+        Math.round(540 - reach * Math.cos(Math.PI / 16)),
+      ),
+    };
+  });
+
+  // The star is filled white, and the ray towards an inner corner has already left it.
+  expect(star.centre[0], "the star's centre is white").toBeGreaterThan(240);
+  expect(star.tip[0], "the star is filled towards its tip").toBeGreaterThan(240);
+  expect(star.valley[0], "the star ends before its inner corner").toBeLessThan(80);
+
+  // The polygon is filled with its own colour.
+  const polygon = await page.evaluate(() => window.__motion.pixel(1250, 540));
+  expect(polygon[2], "the polygon is blue").toBeGreaterThan(200);
+  expect(polygon[0], "the polygon is blue").toBeLessThan(120);
+
+  await page
+    .locator("canvas")
+    .first()
+    .screenshot({ path: path.join(DEBUG_DIR, "polystar.png") });
+});
+
+test("soft-light: a white layer at half opacity leaves the plate where it is, and a normal one washes it out", async ({
+  page,
+}) => {
+  await openFixture(page, "soft-light");
+  expect(await page.evaluate(() => window.__motion.ready())).toBe(true);
+  expect(await page.evaluate(() => window.__motion.errors())).toEqual([]);
+
+  // Both halves of the fixture are the same mid-grey plate (#808080) with a white full-frame
+  // layer at half opacity over it. The left one blends soft-light, the right one blends normal.
+  const soft = await page.evaluate(() => window.__motion.pixel(240, 200));
+  const normal = await page.evaluate(() => window.__motion.pixel(1680, 200));
+
+  // Soft light at 0.5 is the identity, so the plate stays where it was: within 3 % of 128.
+  expect(Math.abs(soft[0] - 128), "the soft-light plate is unchanged").toBeLessThanOrEqual(3);
+  expect(Math.abs(soft[1] - 128)).toBeLessThanOrEqual(3);
+  expect(Math.abs(soft[2] - 128)).toBeLessThanOrEqual(3);
+
+  // A normal blend at half opacity washes the plate out: it reads as the mix of grey and white.
+  expect(normal[0], "the normal plate is washed out").toBeGreaterThan(180);
+
+  await page
+    .locator("canvas")
+    .first()
+    .screenshot({ path: path.join(DEBUG_DIR, "soft-light.png") });
 });
 
 test("three-postfx: a corner of the hero layer stays the plate colour through the tweened bloom/vignette", async ({

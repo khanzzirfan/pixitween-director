@@ -56,9 +56,11 @@ describe('fixture contents', () => {
       './basic-2d.json',
       './camera-moves.json',
       './effects-2d.json',
+      './polystar.json',
       './showcase-product-turntable.json',
       './showcase-robot-dance.json',
       './showcase-title-card.json',
+      './soft-light.json',
       './three-gltf.json',
       './three-postfx.json',
       './three-primitives.json',
@@ -124,6 +126,26 @@ describe('fixture contents', () => {
         }
       }
     }
+  });
+
+  it('polystar holds a 16-point star and a 6-point polygon, and they draw without target errors', () => {
+    const doc = parseOrThrow('polystar', fixture('./polystar.json'));
+    expect(validateTargets(doc)).toEqual([]);
+
+    const star = doc.layers.find((layer) => layer.id === 'star');
+    if (!star || star.type !== 'shape') throw new Error('polystar has no star layer');
+    expect(star.shape).toBe('polystar');
+    expect(star.starType).toBe('star');
+    expect(star.points).toBe(16);
+    expect(star.outerRadius).toBe(220);
+    expect(star.innerRadius).toBe(95);
+
+    const polygon = doc.layers.find((layer) => layer.id === 'polygon');
+    if (!polygon || polygon.type !== 'shape') throw new Error('polystar has no polygon layer');
+    expect(polygon.shape).toBe('polystar');
+    expect(polygon.starType).toBe('polygon');
+    expect(polygon.points).toBe(6);
+    expect(polygon.outerRadius).toBe(150);
   });
 
   it('three-text uses the glyph presets and a staggered words tween with zero target and preset errors', () => {

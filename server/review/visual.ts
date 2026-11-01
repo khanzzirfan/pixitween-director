@@ -129,6 +129,8 @@ export function buildVisualPrompt(o: {
   measured?: string[];
   /** Extra things to look for, one question each (the toy-studio critic asks about bodies through objects and a hidden product). */
   questions?: string[];
+  /** Questions where a "yes" is the fault (the retail critic: is the product floating?). One issue per yes. */
+  faultQuestions?: string[];
 }): string {
   const images = o.frameTimes.map((t, i) => `Image ${i + 1} = ${t} s`).join(', ');
   const found = o.findings.length ? o.findings.map((f) => `- ${f}`).join('\n') : 'none';
@@ -141,6 +143,7 @@ export function buildVisualPrompt(o: {
       ...(o.measured?.length ? ['Measured text boxes (pixels in the frame):', ...o.measured.map((m) => `- ${m}`)] : []),
       'Report only clear visual faults: text that is hard to read, text covering the product, a cut-off subject, or a broken frame.',
       ...(o.questions?.length ? ['Also answer these, reporting an issue only when the answer is yes for the first and third and no for the second:', ...o.questions.map((q) => `- ${q}`)] : []),
+      ...(o.faultQuestions?.length ? ['Also answer these. Report one issue for each question whose answer is yes, with the image number and what you see:', ...o.faultQuestions.map((q) => `- ${q}`)] : []),
       BLIND_RULES,
       STYLE_TELLS,
       `Reply with only a JSON object: {"sceneId": "${o.sceneId}", "pass": boolean, "issues": [{"image": number, "atSec": number, "kind": string, "where": string, "evidence": string}], "fixes": []}.`,
@@ -303,6 +306,7 @@ export async function visualReview(o: {
   blind?: boolean;
   measured?: string[];
   questions?: string[];
+  faultQuestions?: string[];
   reviewer?: Reviewer;
   pickReviewer?: (o: { local: boolean }) => Reviewer;
 }): Promise<{ verdict: VisualVerdict; refused: RefusedFix[]; dropped: DroppedIssue[] }> {
@@ -323,7 +327,7 @@ export async function visualReview(o: {
     findings: o.findings,
     layerSummary: o.layerSummary,
     tools: o.tools,
-    ...(o.blind ? { blind: true, measured: o.measured, ...(o.questions ? { questions: o.questions } : {}) } : {}),
+    ...(o.blind ? { blind: true, measured: o.measured, ...(o.questions ? { questions: o.questions } : {}), ...(o.faultQuestions ? { faultQuestions: o.faultQuestions } : {}) } : {}),
   });
   let prompt = basePrompt;
   for (let attempt = 0; attempt < (o.maxAttempts ?? 2); attempt++) {

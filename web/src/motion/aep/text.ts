@@ -3,10 +3,12 @@
 import type { AepLayer } from '@shared/aep/layer';
 import type { AepEffect } from '@shared/aep/effect';
 import type { AepAnimatable } from '@shared/aep/transform';
+import type { AepRotationUnit } from '@shared/aep/rotation';
 import { resolveThemedColorValue, type AepThemeMap } from '@shared/aep/theme';
 import type { TextLayer, TextStyle } from '@engine/schema';
 import { isKeyframed, type ConvertedTween } from './keyframes';
 import { mapBaseLayer } from './baseLayer';
+import { convertEffects, dropShadowParams, stageScale } from './effects';
 import { sanitizeId } from './sanitizeId';
 
 type AepTextLayer = Extract<AepLayer, { kind: 'text' }>;
@@ -41,35 +43,38 @@ function mapFontWeight(weight: number | string | undefined, id: string, warnings
   return '400';
 }
 
-function numParam(value: unknown, fallback: number): number {
-  if (value === undefined) return fallback;
-  return firstValue(value as AepAnimatable<number>);
-}
-
-function colorParam(value: unknown, fallback: string): string {
-  if (value === undefined) return fallback;
-  return firstValue(value as AepAnimatable<string>);
-}
-
-function convertDropShadow(effect: AepEffect): NonNullable<TextStyle['dropShadow']> {
-  const { params } = effect;
+/**
+ * The engine draws a text layer's shadow into the text's own canvas (`style.dropShadow`), so it stays
+ * glued to the glyphs and follows the text's measured size; the layer-effect path would freeze an
+ * isolation target at build time. The shadow's params are the shared ones, so it falls the way the
+ * AEP says it does.
+ */
+function convertDropShadow(
+  effect: AepEffect,
+  layerId: string,
+  compSize: { width: number; height: number } | undefined,
+  warnings: string[],
+): NonNullable<TextStyle['dropShadow']> {
+  const shadow = dropShadowParams(effect, stageScale(compSize), layerId, warnings);
   return {
-    distance: numParam(params.distance, 4),
-    angle: numParam(params.direction, 45),
-    blur: numParam(params.softness, 4),
-    alpha: numParam(params.opacity, 0.5),
-    color: colorParam(params.color, '#000000'),
+    color: shadow.color,
+    alpha: Math.min(1, Math.max(0, shadow.alpha)),
+    // The text style's own bounds (engine/src/schema/layers2d.ts).
+    blur: Math.min(64, Math.max(0, shadow.blur)),
+    distance: Math.min(256, Math.max(0, shadow.distance)),
+    angle: shadow.angle,
   };
 }
 
-function convertStyle(layer: AepTextLayer, theme: AepThemeMap | undefined, warnings: string[]): TextStyle {
+function convertStyle(
+  layer: AepTextLayer,
+  theme: AepThemeMap | undefined,
+  warnings: string[],
+  compSize: { width: number; height: number } | undefined,
+): TextStyle {
   const { style, effects } = layer;
 
   const dropShadowEffect = effects?.find((effect) => effect.name === 'drop-shadow');
-  const unsupportedEffects = effects?.filter((effect) => effect.name !== 'drop-shadow') ?? [];
-  for (const effect of unsupportedEffects) {
-    warnings.push(`layer ${layer.id}: unsupported effect '${effect.name}'`);
-  }
 
   const result: TextStyle = {
     fontFamily: style.font,
@@ -84,7 +89,10 @@ function convertStyle(layer: AepTextLayer, theme: AepThemeMap | undefined, warni
     stroke: style.stroke
       ? { color: firstValue(style.stroke.color), width: firstValue(style.stroke.width) }
       : undefined,
-    dropShadow: dropShadowEffect ? convertDropShadow(dropShadowEffect) : undefined,
+    dropShadow:
+      dropShadowEffect === undefined
+        ? undefined
+        : convertDropShadow(dropShadowEffect, layer.id, compSize, warnings),
   };
 
   return result;
@@ -111,9 +119,14 @@ export function convertText(
   fps: number,
   theme?: AepThemeMap,
   compSize?: { width: number; height: number },
+  rotationUnit?: AepRotationUnit,
 ): ConvertTextResult {
-  const { base, tweens, warnings } = mapBaseLayer(layer, fps);
+  const { base, tweens, warnings } = mapBaseLayer(layer, fps, rotationUnit);
   if (isKeyframed(layer.transform.anchor)) warnings.push(`layer ${layer.id}: animated anchor is not supported yet; using the first value`);
+
+  // The text's own shadow goes into the style (the engine draws it into the text canvas); every other
+  // effect of a text layer goes through the shared path like it does on any other layer.
+  const otherEffects = layer.effects?.filter((effect) => effect.name !== 'drop-shadow');
 
   const textLayer: TextLayer = {
     ...base,
@@ -121,11 +134,11 @@ export function convertText(
     pivot: undefined,
     id: sanitizeId(layer.id),
     anchor: textAnchor(layer, compSize),
-    effects: [],
+    effects: convertEffects(layer.id, otherEffects, compSize, warnings),
     tweens: toEngineTweens(tweens),
     type: 'text',
     text: firstValue(layer.source),
-    style: convertStyle(layer, theme, warnings),
+    style: convertStyle(layer, theme, warnings, compSize),
   };
 
   return { layer: textLayer, warnings };

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -58,5 +59,10 @@ describe.skipIf(!existsSync(filmsDir))('stored films -> aepToMotion', () => {
     for (const [k, n] of [...kinds].sort((a, b) => b[1] - a[1])) console.log(`WARNKIND ${n} ${k}`);
     expect(skipped3d).toEqual([]);
     expect(converted).toBeGreaterThanOrEqual(0);
+    // The warning count every stored film produced before R8 US-001 (2026-11-01): the rotation
+    // unit rule must not change how many warnings a film converts with. R8 US-005 took six of
+    // them away — the six soft-light layers of film_468089c52f71 now convert instead of warning. Passing clearcoat and the key/fill/rim lighting overrides
+    // through to the engine took two more away (the hero:product3d layer of the Cold Brew films).
+    expect(totalWarnings).toBe(89);
   });
 });

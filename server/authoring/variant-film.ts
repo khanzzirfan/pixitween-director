@@ -46,8 +46,6 @@ export interface VariantFilmInput {
 }
 
 const r = (n: number) => Math.round(n * 100) / 100;
-/** Layer rotation for the player, which reads radians (see retail-clip.ts `deg`). */
-const deg = (d: number) => r(((d * Math.PI) / 180) * 1e4) / 1e4;
 
 /** Mixes a hex colour toward white by f (0..1). */
 export function tint(hex: string, f: number): string {
@@ -135,6 +133,7 @@ export function buildVariantFilm(i: VariantFilmInput): Comp {
   const portrait = H > W;
   const A = Math.max(1.6, i.actSec ?? 2.2);
   const E = Math.max(i.endSec ?? 3.4, (vs.length * A * 0.3) / 0.7);
+  // A film's layer rotations are degrees (the engine reads degrees); the composition says so in its meta.
   let c = newFilmComposition({ aspect: i.aspect, title: `${i.brand}: ${vs.map((v) => v.name).join(', ')}`, palette: [i.accent, ...vs.map((v) => v.color)] });
   for (const v of vs) if (!c.assets[v.product.id]) c = registerAsset(c, { id: v.product.id, kind: 'image', src: v.product.src, width: v.product.width, height: v.product.height });
 
@@ -165,7 +164,7 @@ export function buildVariantFilm(i: VariantFilmInput): Comp {
     const punchAt = r(A - 0.55);
     const s = (v2: number) => r(v2 * pk * 1e4) / 1e4;
     c = setKeyframes(c, pack.id, 'scale', [[0, 0], [0.42, s(1.08)], [0.6, s(1)], [punchAt, s(1.1)], [r(A - 0.2), s(2.5)], [A, s(2.6)]], 'easeOut');
-    c = setKeyframes(c, pack.id, 'rotation', [[0, deg(side * 22)], [0.42, deg(-side * 4)], [0.62, 0]], 'easeOut');
+    c = setKeyframes(c, pack.id, 'rotation', [[0, side * 22], [0.42, -side * 4], [0.62, 0]], 'easeOut');
     c = setKeyframes(c, pack.id, 'opacity', [[0, 0], [0.12, 1]], 'easeOut');
     // the label sits a little above the middle of most packs: keep it centred as the punch scales the pack
     c = setKeyframes(c, pack.id, 'y', [[0, r(pcy)], [punchAt, r(pcy)], [A, r(pcy + ph * 0.06 * 2.6)]], 'easeIn');

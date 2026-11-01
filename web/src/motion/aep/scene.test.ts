@@ -110,4 +110,52 @@ describe('convertLayers', () => {
     expect(layers[0].type).toBe('three');
     expect(warnings).toHaveLength(0);
   });
+
+  it('gives a precomp the rotation unit of its parent, unless it declares its own', () => {
+    const precompLayer: AepLayer = {
+      kind: 'precomp',
+      id: 'scene1',
+      inPoint: 0,
+      outPoint: 120,
+      compId: 'comp_scene1',
+      width: 100,
+      height: 100,
+      transform: baseTransform,
+    };
+    const tilted = (rotation: number): AepLayer => ({
+      kind: 'shape',
+      id: 'tilted',
+      inPoint: 0,
+      outPoint: 120,
+      path: { kind: 'rect', size: [10, 10] },
+      transform: { ...baseTransform, rotation },
+    });
+    const nested = (): AepCompositionJson => ({
+      version: '1.0.0',
+      id: 'comp_scene1',
+      width: 100,
+      height: 100,
+      fps: 30,
+      durationInFrames: 120,
+      layers: [tilted(22)],
+      assets: {},
+    });
+
+    // The parent writes degrees, so the precomp inherits them.
+    const inherited = convertLayers([precompLayer], {}, { comp_scene1: nested() }, 30, undefined, { rotationUnit: 'deg' });
+    const inheritedChild = inherited.layers[0].type === 'group' ? inherited.layers[0].children[0] : undefined;
+    expect(inheritedChild?.rotation).toBe(22);
+
+    // The precomp declares radians for itself, so its own layer is converted.
+    const own = convertLayers(
+      [precompLayer],
+      {},
+      { comp_scene1: { ...nested(), meta: { rotationUnit: 'rad' } } },
+      30,
+      undefined,
+      { rotationUnit: 'deg' },
+    );
+    const ownChild = own.layers[0].type === 'group' ? own.layers[0].children[0] : undefined;
+    expect(ownChild?.rotation).toBeCloseTo(22 * (180 / Math.PI), 2);
+  });
 });

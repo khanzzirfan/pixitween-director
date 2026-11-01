@@ -174,6 +174,36 @@ function shotSubjectIds(subject: string): string[] | null {
   return ids.length > 0 ? ids : null;
 }
 
+/**
+ * What a shape layer needs for its kind: a rect and an ellipse state their size, a polystar states
+ * the points and the radius it is drawn from (its size is that radius twice over). A star's inner
+ * radius cannot reach past its outer radius.
+ */
+function checkShapeLayer(layer: Extract<Layer, { type: 'shape' }>, path: (string | number)[], ctx: z.RefinementCtx): void {
+  if (layer.shape === 'polystar') {
+    if (layer.points === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'a polystar layer needs a point count', path: [...path, 'points'] });
+    }
+    if (layer.outerRadius === undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'a polystar layer needs an outer radius', path: [...path, 'outerRadius'] });
+    }
+    if (layer.innerRadius !== undefined && layer.outerRadius !== undefined && layer.innerRadius > layer.outerRadius) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `the inner radius ${layer.innerRadius} cannot be larger than the outer radius ${layer.outerRadius}`,
+        path: [...path, 'innerRadius'],
+      });
+    }
+    return;
+  }
+  if (layer.width === undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: `a ${layer.shape} layer needs a width`, path: [...path, 'width'] });
+  }
+  if (layer.height === undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: `a ${layer.shape} layer needs a height`, path: [...path, 'height'] });
+  }
+}
+
 function applyCrossFieldRules(doc: ParsedDoc, ctx: z.RefinementCtx): void {
   const { assets, duration } = doc;
   const seenLayerIds = new Set<string>();
@@ -237,6 +267,10 @@ function applyCrossFieldRules(doc: ParsedDoc, ctx: z.RefinementCtx): void {
 
     if (layer.type === 'image') {
       checkAsset(assets, layer.asset, 'image', [...path, 'asset'], ctx);
+    }
+
+    if (layer.type === 'shape') {
+      checkShapeLayer(layer, path, ctx);
     }
 
     if (layer.type === 'three') {

@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 7.5,
+  "background": "#101418",
+  "assets": {},
+  "layers": [
+    {
+      "id": "star",
+      "type": "shape",
+      "shape": "polystar",
+      "starType": "star",
+      "points": 16,
+      "outerRadius": 220,
+      "innerRadius": 95,
+      "fill": "#ffffff",
+      "x": 700,
+      "y": 540
+    },
+    {
+      "id": "polygon",
+      "type": "shape",
+      "shape": "polystar",
+      "starType": "polygon",
+      "points": 6,
+      "outerRadius": 150,
+      "fill": "#4c9aff",
+      "x": 1250,
+      "y": 540,
+      "loop": { "name": "pulse", "duration": 1.2 }
+    },
+    {
+      "id": "caption",
+      "type": "text",
+      "text": "16-point star   6-point polygon",
+      "x": 960,
+      "y": 950,
+      "style": {
+        "fontSize": 44,
+        "fontWeight": "600",
+        "align": "center",
+        "fill": "#cbd5e1"
+      }
+    }
+  ]
+}

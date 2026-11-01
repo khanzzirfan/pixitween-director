@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { TargetRef } from '../../core/paths';
-import { configure2DMaterial } from '../../core/stage';
-import { applyBaseTransform, applyBlendMode, createLayerObjects, resolveBaseTarget } from '../../core/transform';
+import { createLayerMaterial, type LayerMaterial } from '../../core/layerMaterial';
+import { applyBaseTransform, createLayerObjects, resolveBaseTarget } from '../../core/transform';
 import type { MotionNode, NodeFactory } from '../../core/types';
 import type { TextLayer } from '../../schema';
 import { drawText } from '../text/draw';
@@ -43,7 +43,7 @@ function buildTextNode(layer: TextLayer, parentStart: number): MotionNode {
   const style = { ...layer.style };
 
   let size = { width: 0, height: 0 };
-  let material: THREE.MeshBasicMaterial | null = null;
+  let material: LayerMaterial | null = null;
   let texture: THREE.CanvasTexture | null = null;
 
   applyBaseTransform(display, content, layer, size);
@@ -66,10 +66,9 @@ function buildTextNode(layer: TextLayer, parentStart: number): MotionNode {
       } else {
         texture = new THREE.CanvasTexture(ctx2d.canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
-        material = new THREE.MeshBasicMaterial({ map: texture });
-        configure2DMaterial(material);
-        applyBlendMode(material, layer.blendMode);
-        mesh = new THREE.Mesh(geometry, material);
+        // The canvas holds the text's own colour, so the material's colour stays white.
+        material = createLayerMaterial({ blendMode: layer.blendMode, color: '#ffffff', map: texture });
+        mesh = new THREE.Mesh(geometry, material.material);
         mesh.name = `${layer.id}:plane`;
         content.add(mesh);
       }
@@ -141,7 +140,11 @@ function buildTextNode(layer: TextLayer, parentStart: number): MotionNode {
     },
 
     applyOpacity(effective) {
-      if (material) material.opacity = effective;
+      material?.setAlpha(effective);
+    },
+
+    setBackdrop(texture, stage) {
+      material?.setBackdrop?.(texture, stage);
     },
 
     ready,

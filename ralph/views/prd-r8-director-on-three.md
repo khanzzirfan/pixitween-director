@@ -7,7 +7,7 @@
 - Owns: `web/src/motion/aep/effects.ts`, `web/src/motion/aep/effects.test.ts`, `web/src/motion/aep/directorFilms.test.ts`, `fixtures/r8/*`, `scripts/gen-r8-fixtures.ts`, `engine/e2e/director-films.spec.ts`
 - Stories: 8
 
-Makes the Three.js engine the only way our director films are checked and played. Closes the four things the AEP converter silently drops on our retail clip and variant film (image effects incl. drop shadow and blur, soft-light blend, polystar shapes, rotation units), removes the radians workaround from the authoring code, and adds a guard so a film can never again lose a feature without a failing test. Leaves out new cinematic features (fake dolly zoom, ingredient cloud, lit 3D can): those are the next PRD.
+Makes the Three.js engine the only way our director films are checked and played. Closes the four things the AEP converter silently drops on our retail clip and variant film (image effects incl. drop shadow and blur, soft-light blend, polystar shapes (price burst), rotation units), removes the radians workaround from the authoring code, and adds a guard so a film can never again lose a feature without a failing test. Leaves out toon, outline, gif and new cinematic features (fake dolly zoom, ingredient cloud, lit 3D can): those are the next PRD.
 
 ## Manual gates (owner; Ralph never runs these)
 

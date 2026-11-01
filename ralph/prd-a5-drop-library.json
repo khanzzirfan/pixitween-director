@@ -1,7 +1,7 @@
 {
   "name": "App A5: remove reacthub-pixitweenjs and Pixi from the app",
-  "description": "Deletes the library player path and every Pixi use in web/, server/ and scripts/, rewrites the tests and dev pages that depended on the library, removes the packages from package.json and adds a repo-wide lint fence.",
   "branchName": "ralph/a5-drop-library",
+  "description": "Deletes the library player path and every Pixi use in web/, server/ and scripts/, rewrites the tests and dev pages that depended on the library, removes the packages from package.json and adds a repo-wide lint fence.",
   "userStories": [
     {
       "id": "US-001",
@@ -20,14 +20,13 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "frontend",
         "cleanup"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -47,7 +46,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -56,8 +55,7 @@
         "frontend",
         "cleanup",
         "tests"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -76,14 +74,13 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "getValidator() hands out the light validator (no dynamic import, no warning). The preflight 'engine' check now reads the schema version from shared/aep/composition.ts and checks the versions the app writes against it (engine.schema, engine.written). The eslint fence for server/, shared/ and scripts/ now bans the library outright and keeps @shared/aep a type-only contract; server/lint-rules.test.ts reads the fenced packages out of the effective eslint config so it never names one. The comment in server/product3d/types.ts names our own schema now. Also removed the library name from scripts/preflight/docs.test.ts (the acceptance grep covers scripts/ too): the new-vs-existing check reads the schema version, and the demo-script label is now 'Engine: our own Three.js engine (built in this hackathon)'. Left for the owner: docs/new-vs-existing.md still names the library and its version, and docs/motion-kit.md still quotes the removed console.warn. npm test: 10 known failures, all in scripts/preflight/docs.test.ts (the owner's submission docs do not exist yet); the server/lint-rules.test.ts failure is fixed.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [],
       "labels": [
         "backend",
         "cleanup"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -104,16 +101,15 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Uninstalled all nine packages: reacthub-pixitweenjs, pixi.js, @pixi/react, @pixi/sound, pixi-filters, gl-transitions, @react-three/fiber, @react-three/drei and @react-three/postprocessing. None of them had to be kept: no file in server/, web/, shared/, scripts/, engine/, e2e/ or motion/ imported any of them any more (the only hits left were comments in the ported schema/engine files). Kept: three, postprocessing, gsap, @gsap/react, lottie-web and the rest, all still imported. eslint.config.js now has a repo-wide @typescript-eslint/no-restricted-imports fence over the dropped packages; the server/ and engine/ blocks start from the same list because a flat config replaces a rule wholesale, so an area that narrows the rule has to carry the dropped packages with it. The unscoped packages are named exactly and the two scoped families are fenced as a group (@pixi/*, @react-three/*): naming @pixi/react *and* matching @pixi/* would report the same import twice. server/lint-rules.test.ts gained a test that every repo-wide fenced package is restricted in web/, server/, shared/, scripts/ and engine/. Removed 'pixi.js' and '@pixi/react' from the vite and vitest dedupe lists and the vitest server.deps.inline list. fixtures/s08a/seed-films/demo-mug/seed.test.ts parsed with the library; it now parses with our own @shared/aep parser. Acceptance check: a temporary web/src/tmp-check.ts importing 'pixi.js' fails npm run lint (deleted afterwards). npm run typecheck, npm run lint and npm run build pass; npm test has the same 10 known failures as before (all in scripts/preflight/docs.test.ts, the owner's submission docs that do not exist yet) and one more test passing (the new fence test). Gotcha: the shell had NODE_ENV=production, so npm uninstall pruned the devDependencies as well; env -u NODE_ENV npm install --include=dev put them back.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-002",
         "US-003"
       ],
       "labels": [
         "cleanup"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -169,8 +165,8 @@
       "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
-      "npm uninstall is allowed for the packages this PRD removes (it rewrites package-lock.json); no other dependency changes.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+      "npm uninstall is allowed for the packages this PRD removes (it rewrites package-lock.json); no other dependency changes."
     ],
     "qualityGates": {
       "universal": [
@@ -182,7 +178,6 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": [],
-    "updatedAt": "2026-10-31T23:58:49.493Z"
+    "manualGates": []
   }
 }

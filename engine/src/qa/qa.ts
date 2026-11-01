@@ -7,7 +7,25 @@ import { bakeDoc, type BakedCamera, type BakedDoc, type BakedLayer, type Bounds 
 // first and recompiles. Pure and deterministic: the same bake always gives the same report.
 // 3D kinds (BELOW_FLOOR, FLOATING, CAMERA_INSIDE, SUBJECT_OUT) read the object boxes and camera of three layers.
 
-export type QaKind = 'OFFSTAGE' | 'CLIPPED' | 'TINY_TEXT' | 'FAST_TEXT' | 'TEXT_OVERLAP' | 'POP' | 'NEVER_SEEN' | 'BELOW_FLOOR' | 'FLOATING' | 'CAMERA_INSIDE' | 'SUBJECT_OUT';
+export type QaKind =
+  | 'OFFSTAGE'
+  | 'CLIPPED'
+  | 'TINY_TEXT'
+  | 'FAST_TEXT'
+  | 'TEXT_OVERLAP'
+  | 'POP'
+  | 'NEVER_SEEN'
+  | 'BELOW_FLOOR'
+  | 'FLOATING'
+  | 'CAMERA_INSIDE'
+  | 'SUBJECT_OUT'
+  // qaPlacement (./placement.ts), read against a plate map
+  | 'NOT_GROUNDED'
+  | 'COVERS_SUBJECT'
+  | 'TEXT_ON_BUSY'
+  // qaLayout (./layout.ts), read against a layout spec
+  | 'LAYER_ORDER'
+  | 'NOT_CONTAINED';
 
 export interface QaLimits {
   /** A layer counts as visible above this effective opacity. */

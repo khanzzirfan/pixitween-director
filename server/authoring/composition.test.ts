@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
-import { newFilmComposition, registerAsset, setAssetSrc } from './composition';
+import { newFilmComposition, registerAsset, setAssetSrc, setRotationUnit } from './composition';
 import { deepFreeze } from './test-helpers';
 import type { Comp, Obj } from './types';
 
@@ -8,6 +8,11 @@ it('creates a valid empty 9:16 film', () => {
   const c = newFilmComposition({ aspect: '9:16' });
   expect(c).toMatchObject({ version: '1.9.0', width: 1080, height: 1920, fps: 30, durationInFrames: 1 });
   expect(lightValidate(c).ok).toBe(true);
+});
+
+it('writes degrees as the rotation unit of a new film', () => {
+  expect(newFilmComposition({ aspect: '16:9' }).meta?.rotationUnit).toBe('deg');
+  expect(setRotationUnit(newFilmComposition({ aspect: '16:9' }), 'rad').meta?.rotationUnit).toBe('rad');
 });
 
 it('registers assets, passing duration through only when given', () => {

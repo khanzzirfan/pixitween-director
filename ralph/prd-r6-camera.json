@@ -1,7 +1,7 @@
 {
   "name": "Engine R6: camera (frameShot, rig moves, camera presets, camera paths)",
-  "description": "Gives three layers a director's camera: frame a shot by size, angle and side camera-relative rig moves pan/tilt/roll/dolly/truck/pedestal presets cameraTo, orbit, crane, dollyZoom and handheld (from the library's cameraMoves.ts), and stateless camera paths, all on the GSAP clock.",
   "branchName": "ralph/r6-camera",
+  "description": "Gives three layers a director's camera: frame a shot by size, angle and side camera-relative rig moves pan/tilt/roll/dolly/truck/pedestal presets cameraTo, orbit, crane, dollyZoom and handheld (from the library's cameraMoves.ts), and stateless camera paths, all on the GSAP clock.",
   "userStories": [
     {
       "id": "US-001",
@@ -22,13 +22,12 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "camera"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -50,7 +49,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -58,8 +57,7 @@
       "labels": [
         "camera",
         "schema"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -81,15 +79,14 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
       ],
       "labels": [
         "camera"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -110,7 +107,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003"
@@ -118,8 +115,7 @@
       "labels": [
         "camera",
         "presets"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -141,8 +137,8 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "engine/fixtures/camera-moves.json (1920x1080, 30 fps, 20.5 s) is a camera reel: a plate, then eleven three layers, one per chapter, so only one is on screen at a time. The scene is plain geometry (a robot built of boxes - legs, body, a thin screen head with a dark visor band, an arm - and a yellow can) because a glTF layer builds its rig asynchronously and the camera presets are expanded at assemble time, before the rig exists; on plain geometry every preset really moves the camera. Chapters: shot-extreme-wide (camera.shot, the camera 18 m back on a 50 mm-equivalent lens, the robot tiny on the cartoon hills), shot-wide (the robot and the can whole with room around them), shot-medium (the robot from the chest up), shot-close-up (the robot's head: the dark visor across the top of the frame, the cyan face below), shot-extreme-close-up (the visor alone, filling the frame), move-camera-to (cameraTo: the camera travels from a wide rest pose to a framed medium shot of the robot), move-orbit (orbit, 35 degrees: the robot seen from the front at the start and from a three-quarter angle at the peak of the swing), move-crane (crane, 1.6 m: the camera lifts, so we look down on the top of the head and the can's lid), move-dolly-zoom (dollyZoom, 0.5: the robot keeps its size in frame while the perspective stretches - the visor narrows to a slit), move-handheld (handheld, 2.5 degrees: the frame wobbles), move-path (camera.path: three keys, the camera arcs from the right of the robot to its left). Each shot carries its own fov (50, 35, 35, 20, 14): the tighter the shot, the longer the lens, and the layers use near 0.05 m because an extreme close-up stands 23 cm from the head. Browser check: the owner's dev server on http://localhost:5173 serves blank pages in this shell (it was started with NODE_ENV=production, so React's jsx-dev-runtime has no jsxDEV and the page throws), so the check ran through the sanctioned fallback, npm run engine:e2e, which starts its own Vite on 5290 with NODE_ENV=development and drives the same /motion-lab.html?doc=camera-moves page headlessly. Nine e2e tests pass, including the new camera one: the centre of the frame is the backdrop in the extreme wide, the cyan head in the close-up, the dark visor in the extreme close-up, and every camera chapter changes the canvas hash between its start and its middle. One screenshot per chapter is in debug/engine/camera-moves-<chapter>.png. engine/fixtures/fixtures.test.ts and engine/src/timeline/targets.test.ts now list the fixture, and fixtures.test.ts asserts the coverage: no target errors, all five shot sizes, all five camera presets and a camera path. R5's qaDoc does not exist yet, so its CAMERA_INSIDE and SUBJECT_OUT rows were checked by hand with a scratch test (since deleted): no camera is inside an object at any point of any chapter, and the ray through the middle of every shot's frame hits its subject. Deviation: the story says 12 s and three layers; the reel needs eleven layers (five shot sizes, five presets and a path) and 20.5 s for each move to be readable, and the sizes and the presets are two chapters each.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-004"
       ],
@@ -150,8 +146,7 @@
         "camera",
         "fixtures",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-006",
@@ -170,16 +165,15 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "engine/docs/camera-guide.md (new). The story said to append a 'Camera' section to engine/docs/authoring.md (M8 US-002) if it exists, otherwise create engine/docs/camera-guide.md: authoring.md does not exist in this tree yet, so the guide is its own file, with a note at the top that it becomes the authoring guide's camera chapter when M8 lands. The guide documents the whole vocabulary with the numbers the code uses: the five shot sizes (extremeWide, wide, medium, closeUp, extremeCloseUp) with what each frames and the fraction of the frame and of the subject it takes, the four angles (eye 0, low -20, high +25, overhead +80) as elevations, the six sides (front 0, left3q -35, right3q +35, leftProfile -90, rightProfile +90, back 180) as azimuths, the six rig targets (rig.pan, rig.tilt, rig.roll in degrees; rig.dolly, rig.truck, rig.pedestal in metres) with the sign of each and the order they compose in, the five presets (cameraTo, crane, dollyZoom, orbit, handheld) with their kind, default duration, parameters and defaults, and camera.path (the keys, the curve, the local times, the fov carry-over and the rule that a path cannot share a layer with camera position or lookAt tweens). It also has a 'Rules that bite' section (the shot size picks the distance and the lens picks the perspective; near has to be smaller than the distance to the subject; the subject must name objects of the same layer; a camera preset needs a rig that exists at assemble time, so plain geometry, not glTF; a loop needs whole periods; a path declares the camera) and four complete recipes: a product close-up with an orbit, a crane reveal, a dolly zoom on a character and a handheld documentary feel. Verification (a scratch test at engine/fixtures/camera-guide.scratch.test.ts, since deleted): all four recipes parse with parseMotionDoc; the camera.path fragment parses inside a doc; the guide contains every name in SHOT_SIZES, SHOT_ANGLES, SHOT_SIDES, the six rig.* entries of CAMERA_PROPS and CAMERA_PRESET_NAMES (5/4/6/6/5); recipe 1's frameShot puts the camera 0.183 m from the 24 cm bottle, outside it and further than its near plane of 0.05, on the +x/+z side of right3q; recipe 3's dollyZoom goes from z 5 m to 3 m and from 40 to 62.5 degrees; recipe 2's crane lifts the camera from y 0.5 to 2.3; recipe 4's handheld never leaves the camera more than 1.2 degrees off; recipe 1's orbit expands to 16 tweens (two whole 4 s periods in 8 s) and recipe 4's handheld to 40 (five whole 2 s periods in 10 s). Gates: npm run typecheck passes, npm run lint passes, npx vitest run engine is fully green (52 files, 481 tests) and npm test fails only on the 10 known scripts/preflight/docs.test.ts cases (the owner's submission docs are not in this tree). No browser check: the story is a document, and every claim in it was checked against the code instead.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-005"
       ],
       "labels": [
         "camera",
         "docs"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -227,9 +221,9 @@
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside engine/ (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). They are not yours: do not edit those files. The `npm test` gate passes when no other test fails; also run `npx vitest run engine` and it must be fully green.",
       "R1 is done: engine/ is Three-only. MotionNode (engine/src/core/types.ts) has `display` (layer transform) and `content` (the meshes, offset by the anchor); NodeContext has `renderer`. Effects live in engine/src/effects (EFFECTS, registerEffect, buildEffectChain, setEffectChainFactoryForTests).",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
       "Never edit tmp/.",
-      "No camera motion may run outside the MotionClock: no gsap.to/fromTo outside compileTweens, no requestAnimationFrame loops, no damping that depends on previous frames.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "No camera motion may run outside the MotionClock: no gsap.to/fromTo outside compileTweens, no requestAnimationFrame loops, no damping that depends on previous frames."
     ],
     "qualityGates": {
       "universal": [
@@ -243,7 +237,6 @@
     },
     "manualGates": [
       "MG-1: owner views engine/fixtures/camera-moves.json on http://localhost:5173/motion-lab.html and judges whether each shot size and move reads as its name."
-    ],
-    "updatedAt": "2026-11-01T01:32:52.392Z"
+    ]
   }
 }

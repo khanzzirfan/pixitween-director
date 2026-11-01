@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GroupLayerSchema, ImageLayerSchema, ShapeLayerSchema, TextLayerSchema } from './layers2d';
+import { GroupLayerSchema, ImageLayerSchema, PolystarShapeSchema, ShapeLayerSchema, TextLayerSchema } from './layers2d';
 import { LayerSchema } from './layer';
 
 describe('ImageLayerSchema', () => {
@@ -66,11 +66,55 @@ describe('ShapeLayerSchema', () => {
     expect(layer.effects).toEqual([]);
   });
 
-  it('rejects a missing size, a negative radius, a bad shape and an unknown key', () => {
-    expect(ShapeLayerSchema.safeParse({ id: 's', type: 'shape', shape: 'rect', width: 10 }).success).toBe(false);
+  it('rejects a negative radius, a bad shape and an unknown key', () => {
     expect(ShapeLayerSchema.safeParse({ id: 's', type: 'shape', shape: 'rect', width: 10, height: 10, radius: -1 }).success).toBe(false);
     expect(ShapeLayerSchema.safeParse({ id: 's', type: 'shape', shape: 'round', width: 10, height: 10 }).success).toBe(false);
     expect(ShapeLayerSchema.safeParse({ id: 's', type: 'shape', shape: 'rect', width: 10, height: 10, foo: 1 }).success).toBe(false);
+  });
+
+  it('takes a polystar: its points and its two radii', () => {
+    const layer = ShapeLayerSchema.parse({
+      id: 's',
+      type: 'shape',
+      shape: 'polystar',
+      points: 16,
+      outerRadius: 100,
+      innerRadius: 43,
+      starType: 'star',
+    });
+    expect(layer.shape).toBe('polystar');
+    expect(layer.points).toBe(16);
+    expect(layer.outerRadius).toBe(100);
+    expect(layer.innerRadius).toBe(43);
+    expect(layer.starType).toBe('star');
+  });
+
+  it('rejects a polystar with fewer than three points', () => {
+    expect(
+      ShapeLayerSchema.safeParse({ id: 's', type: 'shape', shape: 'polystar', points: 2, outerRadius: 100, innerRadius: 43, starType: 'star' })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe('PolystarShapeSchema', () => {
+  it('takes a star of 16 points', () => {
+    const shape = PolystarShapeSchema.parse({ shape: 'polystar', points: 16, outerRadius: 100, innerRadius: 43, starType: 'star' });
+    expect(shape.points).toBe(16);
+    expect(shape.outerRadius).toBe(100);
+    expect(shape.innerRadius).toBe(43);
+    expect(shape.starType).toBe('star');
+  });
+
+  it('defaults to a star and takes a polygon', () => {
+    expect(PolystarShapeSchema.parse({ shape: 'polystar', points: 6, outerRadius: 100 }).starType).toBe('star');
+    expect(PolystarShapeSchema.parse({ shape: 'polystar', points: 6, outerRadius: 100, starType: 'polygon' }).starType).toBe('polygon');
+  });
+
+  it('rejects fewer than three points, a radius of zero and an unknown key', () => {
+    expect(PolystarShapeSchema.safeParse({ shape: 'polystar', points: 2, outerRadius: 100, innerRadius: 43, starType: 'star' }).success).toBe(false);
+    expect(PolystarShapeSchema.safeParse({ shape: 'polystar', points: 16, outerRadius: 0, innerRadius: 43, starType: 'star' }).success).toBe(false);
+    expect(PolystarShapeSchema.safeParse({ shape: 'polystar', points: 16, outerRadius: 100, foo: 1 }).success).toBe(false);
   });
 });
 
@@ -125,5 +169,11 @@ describe('LayerSchema', () => {
       children: [{ id: 'inner', type: 'group', children: [{ id: 'leaf', type: 'text', text: 'hi' }] }],
     });
     expect(outer.type).toBe('group');
+  });
+
+  it('takes soft-light as a blend mode and refuses an unknown one', () => {
+    const shape = LayerSchema.parse({ id: 's', type: 'shape', shape: 'rect', width: 1, height: 1, blendMode: 'soft-light' });
+    expect(shape.blendMode).toBe('soft-light');
+    expect(LayerSchema.safeParse({ id: 's', type: 'shape', shape: 'rect', width: 1, height: 1, blendMode: 'overlay' }).success).toBe(false);
   });
 });

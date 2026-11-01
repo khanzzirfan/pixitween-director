@@ -522,4 +522,79 @@ describe('assemble', () => {
     expect(values[2].v).toBeCloseTo(0, 5);
     result.destroy();
   });
+
+  it('hands a soft-light layer the frame behind it and draws that frame first', () => {
+    // The visibility of every stage child, as each render saw it.
+    const frames: boolean[][] = [];
+    const renderer = {
+      render: vi.fn((scene: THREE.Scene) => {
+        frames.push(scene.children.map((child) => child.visible));
+      }),
+      getRenderTarget: vi.fn(() => null),
+      setRenderTarget: vi.fn(),
+    } as unknown as THREE.WebGLRenderer;
+
+    const doc = parse({
+      version: 1,
+      width: 100,
+      height: 80,
+      duration: 2,
+      layers: [
+        { id: 'plate', type: 'shape', shape: 'rect', width: 100, height: 80, start: 0, end: 2 },
+        { id: 'grade', type: 'shape', shape: 'rect', width: 100, height: 80, start: 0, end: 2, blendMode: 'soft-light' },
+        { id: 'caption', type: 'shape', shape: 'rect', width: 10, height: 10, start: 0, end: 2 },
+      ],
+    });
+
+    const result = assemble(doc, { ...baseCtx, renderer });
+    frames.length = 0;
+
+    result.clock.seek(1);
+    // The frame behind the grade, then the stage.
+    expect(frames).toHaveLength(2);
+    // The grade and everything drawn after it are left out of the frame behind the grade.
+    expect(frames[0]).toEqual([true, false, false]);
+    expect(frames[1]).toEqual([true, true, true]);
+
+    const grade = result.nodes[1];
+    const material = meshesOf(grade)[0].material as THREE.ShaderMaterial;
+    expect(material.uniforms.uBackdrop.value).toBeInstanceOf(THREE.Texture);
+    expect(material.uniforms.uStage.value.toArray()).toEqual([100, 80]);
+    expect(material.uniforms.uAlpha.value).toBe(1);
+  });
+
+  it('warns about a soft-light layer that also has effects', () => {
+    const fakeChain: EffectChain = {
+      render: vi.fn(),
+      setSize: vi.fn(),
+      resolveTarget: vi.fn(() => null),
+      dispose: vi.fn(),
+      errors: [],
+    };
+    setEffectChainFactoryForTests(() => fakeChain);
+
+    const doc = parse({
+      version: 1,
+      width: 100,
+      height: 80,
+      duration: 2,
+      layers: [
+        {
+          id: 'grade',
+          type: 'shape',
+          shape: 'rect',
+          width: 100,
+          height: 80,
+          start: 0,
+          end: 2,
+          blendMode: 'soft-light',
+          effects: [{ id: 'g', type: 'glow' }],
+        },
+      ],
+    });
+
+    const result = assemble(doc, baseCtx);
+
+    expect(result.warnings.join(' ')).toContain('a soft-light layer with effects is not supported');
+  });
 });

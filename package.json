@@ -13,6 +13,7 @@
     "dev:nowatch": "concurrently -n server,web \"npm:dev:server:nowatch\" \"npm:dev:web\"",
     "dev:web": "vite --config web/vite.config.ts",
     "build": "vite build --config web/vite.config.ts",
+    "r8:fixtures": "tsx scripts/gen-r8-fixtures.ts",
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit && tsc -p engine/tsconfig.json --noEmit",
     "lint": "eslint .",
     "test": "vitest run",

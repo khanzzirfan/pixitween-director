@@ -33,3 +33,4 @@ const clip = buildRetailClip({
 const out = `web/public/cartoon/${outArg ?? 'retail-clip.json'}`;
 writeFileSync(out, JSON.stringify(clip, null, 2));
 console.log(`wrote ${out} (${look}${made ? ', own plate' : ', stock plate'}${lookArg === 'auto' ? `: ${pick.why}` : ''}, ${aspect})`);
+console.log(`view: http://localhost:5173/aep-motion.html?src=/cartoon/${out.split('/').pop()}  (Three engine)\n      or /stage-check.html?film=live&file=/cartoon/${out.split('/').pop()}`);

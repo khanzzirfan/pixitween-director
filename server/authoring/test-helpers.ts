@@ -1,4 +1,4 @@
-import type { Comp } from './types';
+import type { Comp, Obj } from './types';
 import { addScene } from './scenes';
 import { newFilmComposition } from './composition';
 
@@ -23,6 +23,21 @@ import { registerAsset } from './composition';
 import { addLayer } from './layers';
 
 export const MUG = 'ast_0123456789abcdef0123456789abcdef';
+
+/**
+ * Every layer rotation in a composition, static or keyframed: the numbers the film is
+ * written in. A film's rotations are degrees, so a value over 720 means a conversion ran twice.
+ */
+export function rotationValues(c: Comp): number[] {
+  const out: number[] = [];
+  const take = (rot: unknown) => {
+    if (typeof rot === 'number') out.push(rot);
+    else if (Array.isArray(rot)) for (const k of rot as Array<{ v: number }>) out.push(k.v);
+  };
+  const scenes = Object.values((c.precomps ?? {}) as Record<string, Obj>);
+  for (const s of [...scenes, c as unknown as Obj]) for (const l of ((s.layers ?? []) as Obj[])) take(l.transform?.rotation);
+  return out;
+}
 
 /** 16:9 film, one 4 s scene s1, the 384x672 mug registered, and a bg shape, product and headline added. */
 export function mugScene(): Comp {

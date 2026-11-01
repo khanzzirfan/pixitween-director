@@ -24,8 +24,6 @@ function defaultOpen(filmId: string, replay = false) {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-const ratio = (a: GalleryItem['aspect']) => a.replace(':', ' / ');
-
 export default function Gallery({ fetchFilms = api.listFilms, onOpen = defaultOpen, onReplay = (id) => defaultOpen(id, true) }: GalleryProps) {
   const [state, setState] = useState<{ kind: 'loading' } | { kind: 'error' } | { kind: 'ready'; items: GalleryItem[] }>({ kind: 'loading' });
 
@@ -55,7 +53,7 @@ export default function Gallery({ fetchFilms = api.listFilms, onOpen = defaultOp
           {state.items.map((it) => (
             <div key={it.id} className="gallery-item">
             <button type="button" className="gallery-card" aria-label={`${it.title}, ${formatDuration(it.durationSec)}`} onClick={() => onOpen(it.id)}>
-              <img src={it.thumbUrl} alt={it.title} style={{ aspectRatio: ratio(it.aspect) }} />
+              <img src={it.thumbUrl} alt={it.title} />
               <span className="meta">
                 <span className="title">{it.title}</span>
                 <br />

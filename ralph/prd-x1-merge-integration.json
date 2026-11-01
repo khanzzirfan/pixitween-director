@@ -1,7 +1,7 @@
 {
   "name": "X1: merge the integration branch into feat/gsap-threejs and resolve conflicts",
-  "description": "Checkpoints the Three.js migration, merges the integration branch (catalogue, cinematic and hero3d work, 16 commits) into this branch, resolves every conflict keeping our Three.js engine and no Pixi, ports integration code that still imports the library, and finishes with a green typecheck, lint and test run.",
   "branchName": "ralph/x1-merge-integration",
+  "description": "Checkpoints the Three.js migration, merges the integration branch (catalogue, cinematic and hero3d work, 16 commits) into this branch, resolves every conflict keeping our Three.js engine and no Pixi, ports integration code that still imports the library, and finishes with a green typecheck, lint and test run.",
   "userStories": [
     {
       "id": "US-001",
@@ -21,13 +21,12 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "merge"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -47,7 +46,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -55,8 +54,7 @@
       "labels": [
         "merge",
         "config"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -74,15 +72,14 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
       ],
       "labels": [
         "merge"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -100,15 +97,14 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003"
       ],
       "labels": [
         "merge"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -127,7 +123,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-004"
@@ -135,8 +131,7 @@
       "labels": [
         "merge",
         "cleanup"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-006",
@@ -156,7 +151,7 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-005"
@@ -164,8 +159,7 @@
       "labels": [
         "merge",
         "tests"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -226,7 +220,6 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": [],
-    "updatedAt": "2026-11-01T03:13:30.856Z"
+    "manualGates": []
   }
 }

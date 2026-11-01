@@ -68,6 +68,56 @@ describe('createShapeNode', () => {
     expect(strokeBox.max.y).toBeCloseTo(fillBox.max.y);
   });
 
+  it('builds a polystar whose box is the outer radius twice over and whose first point is at the top', () => {
+    const layer = ShapeLayerSchema.parse({
+      id: 'a',
+      type: 'shape',
+      shape: 'polystar',
+      points: 16,
+      outerRadius: 100,
+      innerRadius: 43,
+      starType: 'star',
+    });
+    const node = createShapeNode(layer, context(), 0);
+    const mesh = meshes(node)[0];
+    const box = boundingBox(mesh.geometry as THREE.BufferGeometry);
+
+    expect(node.size()).toEqual({ width: 200, height: 200 });
+    expect(box.min.x).toBeCloseTo(0);
+    expect(box.max.x).toBeCloseTo(200);
+    expect(box.min.y).toBeCloseTo(-200);
+    expect(box.max.y).toBeCloseTo(0);
+
+    // The star's first point is straight up, so a corner sits at the top of the box.
+    const position = (mesh.geometry as THREE.BufferGeometry).attributes.position;
+    const top = Array.from({ length: position.count }, (_, i) => ({
+      x: position.getX(i),
+      y: position.getY(i),
+    })).some((point) => Math.abs(point.x - 100) < 1e-6 && Math.abs(point.y) < 1e-6);
+    expect(top).toBe(true);
+  });
+
+  it('builds a polystar stroke as a ring around the same star', () => {
+    const layer = ShapeLayerSchema.parse({
+      id: 'a',
+      type: 'shape',
+      shape: 'polystar',
+      points: 16,
+      outerRadius: 100,
+      innerRadius: 43,
+      starType: 'star',
+      stroke: { color: '#000000', width: 4 },
+    });
+    const node = createShapeNode(layer, context(), 0);
+    expect(meshes(node)).toHaveLength(2);
+    const fillBox = boundingBox(meshes(node)[0].geometry as THREE.BufferGeometry);
+    const strokeBox = boundingBox(meshes(node)[1].geometry as THREE.BufferGeometry);
+    expect(strokeBox.min.x).toBeCloseTo(fillBox.min.x);
+    expect(strokeBox.max.x).toBeCloseTo(fillBox.max.x);
+    expect(strokeBox.min.y).toBeCloseTo(fillBox.min.y);
+    expect(strokeBox.max.y).toBeCloseTo(fillBox.max.y);
+  });
+
   it('sets the fill material colour via resolveTarget and applies opacity to both materials', () => {
     const layer = ShapeLayerSchema.parse({
       id: 'a',

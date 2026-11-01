@@ -1,7 +1,7 @@
 {
   "name": "Engine M8: showcase fixtures, authoring guide, JSON Schema export",
-  "description": "Makes the engine usable by people and models: a JSON Schema export for tool calling, an authoring guide with recipes, and three showcase docs (product turntable, title card, robot dance) that run through the lab page and the e2e spec.",
   "branchName": "ralph/m8-showcase",
+  "description": "Makes the engine usable by people and models: a JSON Schema export for tool calling, an authoring guide with recipes, and three showcase docs (product turntable, title card, robot dance) that run through the lab page and the e2e spec.",
   "userStories": [
     {
       "id": "US-001",
@@ -17,18 +17,17 @@
         "The schema's layer definition lists the five type values image, text, shape, group and three",
         "JSON.stringify of the schema is under 200 KB",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "schema",
         "docs"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -43,17 +42,16 @@
         "engine/docs/authoring.md contains six recipes and each complete doc in it parses with parseMotionDoc (recorded in notes)",
         "Every preset name and every effect type in the guide exists in engine/src/schema/enums.ts",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": " Marked done by the watcher: agent hung after writing the guide; 6+ complete doc snippets verified with parseMotionDoc.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [],
       "labels": [
         "docs"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -71,21 +69,20 @@
         "`npm run engine:e2e` passes including the three showcase docs",
         "notes describes what each showcase looks like at 25 %, 50 % and 75 % of its duration",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes",
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "Verified headless via npm run engine:e2e (12 passed; lab page /motion-lab.html?doc=<name>); screenshots in debug/engine/showcase-*-{25,50,75}.png. parseMotionDoc ok + validateTargets 0 errors for all three.\nPRODUCT TURNTABLE (8s): 25% (2s): blurred sky/hill plate, can mid-turn, headline CITRUS SPARKLING has slid up with a warm gold glow, price card (GBP 2.49) popped in. 50% (4s): can turned showing blue band shading, bloom swelling, headline glow nearly faded to plain white. 75% (6s): can lit warmer/cream, glow gone, headline plain white, price card still shown, vignette at edges.\nTITLE CARD (5s): 25% (1.25s): MOTION with strong red/blue chromatic-aberration fringes, drop shadow, orange pulsing disc, gold rule across, tagline under it. 50% (2.5s): fringe nearly gone (tweened to 0), same layout. 75% (3.75s): clean sharp white title, no fringe, shadow visible; exit not yet started.\nROBOT DANCE (8s, 1080x1080): 25% (2s): orange robot front/3-quarter view mid-Dance, head sharp (dof), title MIDNIGHT ROBOT top, 'now playing - Dance' bottom, vignette. 50% (4s): camera orbited to robot's side, profile view, dancing. 75% (6s): camera behind-side, back of robot with a purple speaker behind it.\nGotcha fixed: speaker-r originally sat on the camera orbit and filled the frame at ~5.6-6.0s (75% was an empty purple frame); moved to [-3,1.2,1.6]. e2e spec now lists the 3 showcases and saves 25/50/75 screenshots for them.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-002"
       ],
       "labels": [
         "fixtures",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -135,7 +132,7 @@
     "qualityGates": {
       "universal": [
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "ui": [
@@ -144,7 +141,6 @@
     },
     "manualGates": [
       "MG-1: owner watches the three showcase docs on http://localhost:5173/motion-lab.html and judges whether they look good enough to show."
-    ],
-    "updatedAt": "2026-11-01T02:12:20.989Z"
+    ]
   }
 }

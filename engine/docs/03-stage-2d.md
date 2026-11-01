@@ -70,7 +70,7 @@ holding the meshes, laid out in pixels from (0, 0) to (width, −height)).
 export function createLayerObjects(layer: Layer): { display: THREE.Group; content: THREE.Group };
 export function applyBaseTransform(display: THREE.Group, content: THREE.Group, layer: Layer, size: { width: number; height: number }): void;
 export function resolveBaseTarget(node: { display: THREE.Group; alpha: { value: number } }, prop: string): TargetRef | null;
-export function blendingFor(mode: 'normal' | 'add' | 'multiply' | 'screen'): Partial<THREE.Material>;
+export function blendingFor(mode: 'normal' | 'add' | 'multiply' | 'screen' | 'soft-light'): Partial<THREE.Material>;
 ```
 
 - `display.position = (x, toWorldY(y), 0)`; `display.rotation.z = toWorldRotation(rad(rotation))`;
@@ -83,7 +83,9 @@ export function blendingFor(mode: 'normal' | 'add' | 'multiply' | 'screen'): Par
   writes `node.alpha.value`. Getters return doc-space values. `skewX`/`skewY` are not supported (removed from the
   allowlist).
 - Blend modes: `normal` → `NormalBlending`; `add` → `AdditiveBlending`; `multiply` → `MultiplyBlending` with
-  `premultipliedAlpha: true`; `screen` → `CustomBlending` with `OneFactor` / `OneMinusSrcColorFactor`.
+  `premultipliedAlpha: true`; `screen` → `CustomBlending` with `OneFactor` / `OneMinusSrcColorFactor`;
+  `soft-light` → `NoBlending`, because the soft-light material blends the layer into the frame behind it
+  itself (see *Blend modes* below).
 
 ## Opacity (R2: `engine/src/stage2d/opacity.ts`)
 
@@ -122,11 +124,31 @@ parallel; one failure does not stop the others.
 |------|---------|------|---------------|
 | `imageNode.ts` | `Mesh(PlaneGeometry(w, h))` translated to `(w/2, −h/2)`, `MeshBasicMaterial({ map, color: tint })` | width/height from the layer, aspect kept when one is missing, natural size when neither | `tint` (colour) |
 | `textNode.ts` | the text drawn on a 2D canvas at 2× pixel ratio → `CanvasTexture` (sRGB) on a plane of the measured size | measured lines | `fill` (colour; redraws the canvas) |
-| `shapeNode.ts` | `ShapeGeometry` of a rounded rect (`radius`) or an ellipse; stroke as a second mesh shaped as a ring (outer shape with the inset shape as a hole) | `width × height` | `fill` (colour) |
+| `shapeNode.ts` | `ShapeGeometry` of a rounded rect (`radius`), an ellipse or a polystar (a star or a polygon, drawn from its points); stroke as a second mesh shaped as a ring (outer shape with the inset shape as a hole) | `width × height` (a polystar is twice its outer radius) | `fill` (colour) |
 | `groupNode.ts` | a `Group` holding the children's displays in order; no meshes | union of children's bounds | none |
 
 All materials go through `configure2DMaterial` and `blendingFor(layer.blendMode)`. A missing image texture gives
 an empty content group, size 0×0, and a `ready` that rejects with `Error("motion: image asset <id> did not load")`.
+
+## Blend modes (R8: `engine/src/core/softLight.ts`)
+
+`normal`, `add`, `multiply` and `screen` are the GPU's own blending. `soft-light` is the W3C formula
+(`https://www.w3.org/TR/compositing/#blending-soft-light`), which the GPU cannot do, so the engine blends it
+itself:
+
+```ts
+// engine/src/core/softLight.ts (pure)
+export function softLightBlend(base: number, blend: number): number;       // the W3C formula, one channel
+export function softLightComposite(backdrop: number, source: number, alpha: number): number;
+```
+
+- The runtime draws the stage without the soft-light layer — and without everything drawn after it — into a
+  render target and hands that frame to the layer (`engine/src/runtime/assemble.ts`). The layer's material
+  samples it, runs the formula and writes the result, so the layer replaces the frame instead of blending
+  with it a second time.
+- The layer's colour is scaled by the layer's opacity before it goes into the formula, because the engine
+  blends in premultiplied alpha: a white layer at half opacity is a half-grey blend, and soft light at 0.5 is
+  the identity, so a half-opaque white layer leaves the frame where it was.
 
 ### Text (R2)
 

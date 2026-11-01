@@ -134,6 +134,10 @@ export function blendingFor(mode: BlendMode): Partial<THREE.Material> {
         blendSrc: THREE.OneFactor,
         blendDst: THREE.OneMinusSrcColorFactor,
       };
+    case 'soft-light':
+      // The soft-light material blends the layer into the frame behind it itself and writes the
+      // result, so it replaces the frame instead of blending with it a second time.
+      return { blending: THREE.NoBlending };
     case 'normal':
     default:
       return { blending: THREE.NormalBlending };

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { pathRef, type PropKind, type TargetRef } from '../core/paths';
-import { configure2DMaterial } from '../core/stage';
-import { applyBaseTransform, applyBlendMode, createLayerObjects, resolveBaseTarget } from '../core/transform';
+import { createLayerMaterial } from '../core/layerMaterial';
+import { applyBaseTransform, createLayerObjects, resolveBaseTarget } from '../core/transform';
 import type { MotionNode, NodeContext, NodeFactory } from '../core/types';
 import { buildEffectChain, type EffectChain } from '../effects/chain';
 import { EFFECTS, type ParamValue } from '../effects/table';
@@ -241,9 +241,14 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
   // Linear half-float colour: the chain writes linear values and the stage converts to sRGB on output.
   const target = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, depthBuffer: true });
   const planeGeometry = new THREE.PlaneGeometry(width, height);
-  const planeMaterial = new THREE.MeshBasicMaterial({ map: target.texture, transparent: true, toneMapped: false });
-  configure2DMaterial(planeMaterial);
-  applyBlendMode(planeMaterial, layer.blendMode);
+  // The rig's render target holds premultiplied colour, so the plane's own texture is read as such.
+  const plane = createLayerMaterial({
+    blendMode: layer.blendMode,
+    color: '#ffffff',
+    map: target.texture,
+    premultiplied: true,
+  });
+  const planeMaterial = plane.material;
   // The rig's output is already multiplied by alpha, and its tone mapping and colour encoding ran on that
   // premultiplied colour (as the reacthub-pixitweenjs offscreen renderer's did, which is what gives
   // glass and soft edges their look). It is added over what is behind it as it is, not multiplied
@@ -256,10 +261,10 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
     planeMaterial.blendSrcAlpha = THREE.OneFactor;
     planeMaterial.blendDstAlpha = THREE.OneMinusSrcAlphaFactor;
   }
-  const plane = new THREE.Mesh(planeGeometry, planeMaterial);
-  plane.name = `${layer.id}:plane`;
-  plane.position.set(width / 2, -height / 2, 0);
-  content.add(plane);
+  const planeMesh = new THREE.Mesh(planeGeometry, planeMaterial);
+  planeMesh.name = `${layer.id}:plane`;
+  planeMesh.position.set(width / 2, -height / 2, 0);
+  content.add(planeMesh);
 
   const warnings: string[] = [];
   const errors: string[] = [];
@@ -445,7 +450,11 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
     },
 
     applyOpacity(effective) {
-      planeMaterial.opacity = effective;
+      plane.setAlpha(effective);
+    },
+
+    setBackdrop(texture, stage) {
+      plane.setBackdrop?.(texture, stage);
     },
 
     update(timeSec) {
@@ -497,7 +506,7 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
       rig = null;
       target.dispose();
       planeGeometry.dispose();
-      planeMaterial.dispose();
+      plane.dispose();
       display.removeFromParent();
     },
   };

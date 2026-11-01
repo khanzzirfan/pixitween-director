@@ -3,6 +3,7 @@
 // `object:<id>`, and the camera distance is chosen so object height x camera.fit fills the viewport height.
 import type { AepLayer } from '@shared/aep/layer';
 import type { AepAnimatable, AepKeyframe } from '@shared/aep/transform';
+import type { AepRotationUnit } from '@shared/aep/rotation';
 import type { Object3D, ThreeLayer } from '@engine/schema';
 import { isKeyframed, propertyTweens, type ConvertedTween } from './keyframes';
 import { mapBaseLayer } from './baseLayer';
@@ -54,8 +55,8 @@ export function objectTweens(
   return out;
 }
 
-export function convertModel3D(layer: AepModel3DLayer, fps: number): ConvertModel3DResult {
-  const { base, tweens: baseTweens, warnings } = mapBaseLayer(layer, fps);
+export function convertModel3D(layer: AepModel3DLayer, fps: number, rotationUnit?: AepRotationUnit): ConvertModel3DResult {
+  const { base, tweens: baseTweens, warnings } = mapBaseLayer(layer, fps, rotationUnit);
   const id = sanitizeId(layer.id);
   const { source } = layer;
 
@@ -85,7 +86,7 @@ export function convertModel3D(layer: AepModel3DLayer, fps: number): ConvertMode
     opacity: 1,
     map: layer.textures?.label ? sanitizeId(layer.textures.label) : undefined,
   };
-  if (mat?.clearcoat !== undefined) warnings.push(`layer ${layer.id}: material.clearcoat is not supported yet`);
+  if (mat?.clearcoat !== undefined) material.clearcoat = first(mat.clearcoat);
   if (mat?.style === 'toon' || mat?.outline) warnings.push(`layer ${layer.id}: toon style / outline is not supported yet`);
   if (layer.textures?.front) warnings.push(`layer ${layer.id}: textures.front is not supported yet`);
 
@@ -144,12 +145,28 @@ export function convertModel3D(layer: AepModel3DLayer, fps: number): ConvertMode
   }
 
   const { lighting } = layer;
-  if (lighting?.key || lighting?.fill || lighting?.rim) warnings.push(`layer ${layer.id}: lighting key/fill/rim overrides are not supported yet; using the preset`);
+  // Key, fill and rim overrides ride on the engine's `lighting` fields; keyframed ones also become `lighting` tweens.
+  const lightingFields: Record<string, number | string | undefined> = {};
+  const lightingTweens: ConvertedTween[] = [];
+  const addLight = (prop: string, value: ReturnType<typeof first> | undefined, raw: unknown) => {
+    if (raw === undefined) return;
+    lightingFields[prop] = value as number;
+    if (isKeyframed(raw as never)) {
+      for (const t of propertyTweens(raw as never, { fps, inPoint: layer.inPoint, props: [prop] }).tweens) {
+        lightingTweens.push({ ...t, ...{ target: 'lighting' } });
+      }
+    }
+  };
+  addLight('keyAzimuth', lighting?.key?.azimuth !== undefined ? first(lighting.key.azimuth) : undefined, lighting?.key?.azimuth);
+  addLight('keyElevation', lighting?.key?.elevation !== undefined ? first(lighting.key.elevation) : undefined, lighting?.key?.elevation);
+  addLight('keyIntensity', lighting?.key?.intensity !== undefined ? first(lighting.key.intensity) : undefined, lighting?.key?.intensity);
+  addLight('fillIntensity', lighting?.fill?.intensity !== undefined ? first(lighting.fill.intensity) : undefined, lighting?.fill?.intensity);
+  addLight('rimIntensity', lighting?.rim?.intensity !== undefined ? first(lighting.rim.intensity) : undefined, lighting?.rim?.intensity);
+  if (lighting?.key?.color !== undefined) lightingFields.keyColor = lighting.key.color as string;
 
   const shadowOpacity = layer.shadow ? first(layer.shadow.opacity) : 0;
-  if (layer.shadow?.softness !== undefined) warnings.push(`layer ${layer.id}: shadow.softness is not supported yet`);
 
-  const engineTweens = [...baseTweens, ...viewTweens, ...cameraTweens].map((t) => ({ repeat: 0, yoyo: false, ...t }));
+  const engineTweens = [...baseTweens, ...viewTweens, ...cameraTweens, ...lightingTweens].map((t) => ({ repeat: 0, yoyo: false, ...t }));
   if (engineTweens.length > 64) warnings.push(`layer ${layer.id}: ${engineTweens.length} tweens exceed the engine limit of 64`);
 
   const three = {
@@ -172,12 +189,14 @@ export function convertModel3D(layer: AepModel3DLayer, fps: number): ConvertMode
     lighting: {
       preset: lighting?.preset ?? 'studio',
       environment: lighting?.environment,
+      ...lightingFields,
     },
     lights: [],
     shadow: {
       enabled: shadowOpacity > 0,
       opacity: shadowOpacity,
       y: -objectHeight / 2 + (layer.shadow?.offsetY ?? 0),
+      softness: layer.shadow?.softness,
     },
     objects: [
       {

@@ -41,6 +41,11 @@ export interface MotionNode {
   readonly alpha: { value: number };
   /** Sets the effective opacity (own alpha × ancestors) on every material the node owns (not its children's). */
   applyOpacity(effective: number): void;
+  /**
+   * A soft-light layer blends into the frame behind it, so the runtime hands it that frame: the
+   * texture the layer samples and the size of the stage it was drawn at.
+   */
+  setBackdrop?(texture: THREE.Texture, stage: { width: number; height: number }): void;
   /** Called on every clock update while visible (3D render, isolated effects, text redraw). */
   update?(timeSec: number, frame: number): void;
   readonly ready: Promise<void>;

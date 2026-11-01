@@ -1,7 +1,7 @@
 {
   "name": "Engine R2: 2D stage on Three (textures, image, text, shape, group, opacity)",
-  "description": "Builds the 2D MotionNodes on Three.js: image planes with textures, text drawn on a canvas into a CanvasTexture, shapes from ShapeGeometry with strokes, groups, opacity propagation through the tree, and the createNode dispatcher. Ends with a 2D smoke page. No Pixi.",
   "branchName": "ralph/r2-stage-2d",
+  "description": "Builds the 2D MotionNodes on Three.js: image planes with textures, text drawn on a canvas into a CanvasTexture, shapes from ShapeGeometry with strokes, groups, opacity propagation through the tree, and the createNode dispatcher. Ends with a 2D smoke page. No Pixi.",
   "userStories": [
     {
       "id": "US-001",
@@ -20,13 +20,12 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "stage2d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -47,15 +46,14 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
       ],
       "labels": [
         "stage2d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -76,14 +74,13 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "stage2d",
         "text"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -105,7 +102,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003"
@@ -113,8 +110,7 @@
       "labels": [
         "stage2d",
         "text"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -135,13 +131,12 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "stage2d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-006",
@@ -163,7 +158,7 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002",
@@ -172,8 +167,7 @@
       ],
       "labels": [
         "stage2d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-007",
@@ -195,7 +189,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-006"
@@ -203,8 +197,7 @@
       "labels": [
         "stage2d",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -246,9 +239,9 @@
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside engine/ (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). They are not yours: do not edit those files. The `npm test` gate passes when no other test fails; also run `npx vitest run engine` and it must be fully green.",
       "R1 is done: engine/ is Three-only. MotionNode (engine/src/core/types.ts) has `display` (layer transform) and `content` (the meshes, offset by the anchor); NodeContext has `renderer`. Effects live in engine/src/effects (EFFECTS, registerEffect, buildEffectChain, setEffectChainFactoryForTests).",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
       "Three.js only: no import of pixi.js, pixi-filters, @pixi/* or @react-three/* (lint enforces it).",
-      "jsdom has no 2D canvas context: text drawing is tested with an injected fake context and checked in the browser.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "jsdom has no 2D canvas context: text drawing is tested with an injected fake context and checked in the browser."
     ],
     "qualityGates": {
       "universal": [
@@ -260,7 +253,6 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": [],
-    "updatedAt": "2026-10-31T21:34:17.731Z"
+    "manualGates": []
   }
 }

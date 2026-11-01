@@ -8,7 +8,7 @@
       "title": "Delete the Pixi 2D stage and pixi-filters code; move visibility to core",
       "description": "As an engine developer, I want the Pixi-era 2D and filter code gone so that nothing in the engine depends on Pixi except the two files later stories rewrite.",
       "steps": [
-        "Read engine/docs/README.md (Pixi \u2192 Three table) and engine/docs/port-map.md (status column), then list engine/src/pixi, engine/src/filters and every file that imports from them (grep).",
+        "Read engine/docs/README.md (Pixi → Three table) and engine/docs/port-map.md (status column), then list engine/src/pixi, engine/src/filters and every file that imports from them (grep).",
         "Move engine/src/pixi/visibility.ts and its test to engine/src/core/visibility.ts (same function, same tests) and export isVisible from engine/src/core/index.ts.",
         "Delete engine/src/pixi/ (all files), engine/src/filters/ (all files) and engine/fixtures/filters-2d.json; remove any import of them elsewhere (only engine/lab/three-smoke.tsx and engine/src/three may still import pixi.js after this story; they are rewritten in US-005 and US-006).",
         "Run npm run typecheck and npm test and fix only breakages caused by the deletion."
@@ -22,8 +22,8 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
-      "notes": "Built directly on 1 Nov 2026. Browser check (headless Chromium, debug/engine/r1-smoke-*.png): robot waves and casts a shadow, can renders, transparent post-fx layer shows the stage colour at its corner, seek 2.0/0/2.0 gives equal hashes on all three fixtures.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [],
       "labels": [
         "cleanup"
@@ -35,7 +35,7 @@
       "description": "As an author, I want one effects list on every layer and on the doc, with one target form, so that 2D and 3D effects are written the same way.",
       "steps": [
         "Read engine/docs/01-schema.md (Layer base, three, Effect, Cross-field rules), engine/docs/05-effects.md (Effect types table with the Where column) and engine/docs/02-timeline.md (Target paths), then engine/src/schema/enums.ts, parts.ts, layers2d.ts, layer3d.ts, doc.ts and engine/src/timeline/targets.ts.",
-        "In enums.ts replace FILTER_2D_TYPES and POSTFX_TYPES with EFFECT_TYPES (the 18 types of the table) plus EFFECT_SCOPES (type \u2192 'any' | 'three' | '2d'); in parts.ts replace Filter2DSchema and PostFxSchema with EffectSchema { id, type, enabled = true, params: Record<string, number | string> = {} }.",
+        "In enums.ts replace FILTER_2D_TYPES and POSTFX_TYPES with EFFECT_TYPES (the 18 types of the table) plus EFFECT_SCOPES (type → 'any' | 'three' | '2d'); in parts.ts replace Filter2DSchema and PostFxSchema with EffectSchema { id, type, enabled = true, params: Record<string, number | string> = {} }.",
         "Rename the layer field filters to effects (2D layers), replace postFx with effects on three layers, rename the doc field filters to effects; add the cross-field rule: dof only on three layers, glow/dropShadow/outline only on 2D layers, doc-level effects only of scope 'any'; effect ids unique per list.",
         "In engine/src/timeline/targets.ts replace the filter: and postfx: target forms with effect:<id> (allowed on every layer kind, id must exist in that layer's effects) and remove skewX and skewY from the base layer props.",
         "Update the four fixtures in engine/fixtures to the new field and target names with types from the new list (keep the same intent), fix compile errors in engine/src/three caused by the renamed types (behaviour unchanged), and update the existing schema and targets tests."
@@ -50,8 +50,8 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "Built directly on 1 Nov 2026. Browser check (headless Chromium, debug/engine/r1-smoke-*.png): robot waves and casts a shadow, can renders, transparent post-fx layer shows the stage colour at its corner, seek 2.0/0/2.0 gives equal hashes on all three fixtures.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-001"
       ],
@@ -80,8 +80,8 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "Built directly on 1 Nov 2026. Browser check (headless Chromium, debug/engine/r1-smoke-*.png): robot waves and casts a shadow, can renders, transparent post-fx layer shows the stage colour at its corner, seek 2.0/0/2.0 gives equal hashes on all three fixtures.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-002"
       ],
@@ -109,8 +109,8 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Built directly on 1 Nov 2026. Browser check (headless Chromium, debug/engine/r1-smoke-*.png): robot waves and casts a shadow, can renders, transparent post-fx layer shows the stage colour at its corner, seek 2.0/0/2.0 gives equal hashes on all three fixtures.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-002"
       ],
@@ -139,8 +139,8 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": true,
-      "notes": "Built directly on 1 Nov 2026. Browser check (headless Chromium, debug/engine/r1-smoke-*.png): robot waves and casts a shadow, can renders, transparent post-fx layer shows the stage colour at its corner, seek 2.0/0/2.0 gives equal hashes on all three fixtures.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-003",
         "US-004"
@@ -171,8 +171,8 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 6,
-      "passes": true,
-      "notes": "Built directly on 1 Nov 2026. Browser check (headless Chromium, debug/engine/r1-smoke-*.png): robot waves and casts a shadow, can renders, transparent post-fx layer shows the stage colour at its corner, seek 2.0/0/2.0 gives equal hashes on all three fixtures.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-005"
       ],
@@ -200,8 +200,8 @@
         "`npm run lint` passes"
       ],
       "priority": 7,
-      "passes": true,
-      "notes": "Built directly on 1 Nov 2026. Browser check (headless Chromium, debug/engine/r1-smoke-*.png): robot waves and casts a shadow, can renders, transparent post-fx layer shows the stage colour at its corner, seek 2.0/0/2.0 gives equal hashes on all three fixtures.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-006"
       ],
@@ -219,7 +219,7 @@
       "engine/docs/01-schema.md"
     ],
     "readFirst": [
-      "engine/docs/README.md (Pixi \u2192 Three table, decisions D8 to D11, build plan)",
+      "engine/docs/README.md (Pixi → Three table, decisions D8 to D11, build plan)",
       "engine/docs/03-stage-2d.md sections 'Stage space', 'The MotionNode contract', 'Base transform', 'Visibility'",
       "engine/docs/04-three.md and engine/docs/05-effects.md sections 'The effect table' and 'The chain'",
       "engine/docs/port-map.md (status column: what is kept, rebuilt, deleted)",
@@ -273,10 +273,10 @@
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside engine/ (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). They are not yours: do not edit those files. The `npm test` gate passes when no other test fails; also run `npx vitest run engine` and it must be fully green.",
       "R1 is done: engine/ is Three-only. MotionNode (engine/src/core/types.ts) has `display` (layer transform) and `content` (the meshes, offset by the anchor); NodeContext has `renderer`. Effects live in engine/src/effects (EFFECTS, registerEffect, buildEffectChain, setEffectChainFactoryForTests).",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
       "Before starting, confirm the archived engine PRDs M1, M2, M4 and M6 are done and committed (ralph/prd-m1-foundation.json, prd-m2-timeline.json, prd-m4-three.json, prd-m6-postfx.json all passes true) and `npm run typecheck && npm test` pass; if not, set notes to 'blocked: base engine not committed' and stop.",
       "The goal is Three.js and GSAP only. Do not add, keep or write any import of pixi.js, pixi-filters, @pixi/* or @react-three/* under engine/. pixi.js stays installed only because the director app uses it.",
-      "Deleting Pixi-era engine code is expected in this PRD (engine/src/pixi, engine/src/filters, engine/src/three/offscreen.ts, engine/src/three/postfx, engine/fixtures/filters-2d.json). Keep every other existing test green or update it to the new names in the same story.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "Deleting Pixi-era engine code is expected in this PRD (engine/src/pixi, engine/src/filters, engine/src/three/offscreen.ts, engine/src/three/postfx, engine/fixtures/filters-2d.json). Keep every other existing test green or update it to the new names in the same story."
     ],
     "qualityGates": {
       "universal": [

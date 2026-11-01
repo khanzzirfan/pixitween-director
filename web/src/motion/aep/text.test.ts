@@ -44,7 +44,7 @@ describe('convertText', () => {
     expect(warnings).toHaveLength(0);
   });
 
-  it('converts a drop-shadow effect to style.dropShadow', () => {
+  it('converts a drop-shadow effect to style.dropShadow, falling the way the AEP direction says', () => {
     const layer = headlineLayer({
       effects: [
         {
@@ -56,7 +56,8 @@ describe('convertText', () => {
     const { layer: converted, warnings } = convertText(layer, 30);
     expect(converted.style.dropShadow).toEqual({
       distance: 4,
-      angle: 180,
+      // The AEP direction 180 is straight down; the engine's angle is the same vector from the right.
+      angle: 90,
       blur: 8,
       alpha: 0.35,
       color: '#000000',
@@ -64,14 +65,30 @@ describe('convertText', () => {
     expect(warnings).toHaveLength(0);
   });
 
-  it('warns on an unknown effect name without throwing', () => {
+  it('scales the text shadow distance from the player stage to the comp', () => {
     const layer = headlineLayer({
-      effects: [{ name: 'glow', params: {} }],
+      effects: [{ name: 'drop-shadow', params: { distance: 4, direction: 180, softness: 8, opacity: 0.35, color: '#000000' } }],
+    });
+    const { layer: converted } = convertText(layer, 30, undefined, { width: 1080, height: 1920 });
+    expect(converted.style.dropShadow?.distance).toBe(8);
+  });
+
+  it('puts the other effects of a text layer in the layer effects', () => {
+    const layer = headlineLayer({ effects: [{ name: 'gaussian-blur', params: { blurriness: 9 } }] });
+    const { layer: converted, warnings } = convertText(layer, 30, undefined, { width: 1080, height: 1920 });
+    expect(converted.effects).toEqual([{ id: 'fx0', type: 'gaussianBlur', enabled: true, params: { strength: 18 } }]);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('warns on an effect the engine has no counterpart for, without throwing', () => {
+    const layer = headlineLayer({
+      effects: [{ name: 'levels', params: {} }],
     });
     expect(() => convertText(layer, 30)).not.toThrow();
     const { warnings } = convertText(layer, 30);
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('glow');
+    expect(warnings[0]).toContain('headline');
+    expect(warnings[0]).toContain('levels');
   });
 
   it("reads the anchor against the composition: [W/2, H/2] centres the text on its position", () => {

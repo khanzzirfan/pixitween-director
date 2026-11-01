@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { TargetRef } from '../../core/paths';
-import { configure2DMaterial } from '../../core/stage';
-import { applyBaseTransform, applyBlendMode, createLayerObjects, resolveBaseTarget } from '../../core/transform';
+import { createLayerMaterial, type LayerMaterial } from '../../core/layerMaterial';
+import { applyBaseTransform, createLayerObjects, resolveBaseTarget } from '../../core/transform';
 import type { MotionNode, NodeContext, NodeFactory } from '../../core/types';
 import type { ImageLayer } from '../../schema';
 
@@ -53,7 +53,7 @@ function buildImageNode(layer: ImageLayer, ctx: NodeContext, parentStart: number
 
   const texture = ctx.textures.get(layer.asset);
   let size = { width: 0, height: 0 };
-  let material: THREE.MeshBasicMaterial | null = null;
+  let material: LayerMaterial | null = null;
   let geometry: THREE.PlaneGeometry | null = null;
   let ready: Promise<void>;
 
@@ -63,10 +63,8 @@ function buildImageNode(layer: ImageLayer, ctx: NodeContext, parentStart: number
     size = imageSize(texture, layer);
     geometry = new THREE.PlaneGeometry(size.width, size.height);
     geometry.translate(size.width / 2, -size.height / 2, 0);
-    material = new THREE.MeshBasicMaterial({ map: texture, color: layer.tint });
-    configure2DMaterial(material);
-    applyBlendMode(material, layer.blendMode);
-    const mesh = new THREE.Mesh(geometry, material);
+    material = createLayerMaterial({ blendMode: layer.blendMode, color: layer.tint, map: texture });
+    const mesh = new THREE.Mesh(geometry, material.material);
     mesh.name = `${layer.id}:plane`;
     content.add(mesh);
     ready = Promise.resolve();
@@ -95,7 +93,11 @@ function buildImageNode(layer: ImageLayer, ctx: NodeContext, parentStart: number
     },
 
     applyOpacity(effective) {
-      if (material) material.opacity = effective;
+      material?.setAlpha(effective);
+    },
+
+    setBackdrop(texture, stage) {
+      material?.setBackdrop?.(texture, stage);
     },
 
     ready,

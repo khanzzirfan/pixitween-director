@@ -1,7 +1,7 @@
 {
   "name": "App A2: AEP → MotionDoc converter for 2D films (keyframes, transform, shape, text, image, precomp, audio)",
-  "description": "A pure converter in web/src/motion/aep/ that turns a director AepCompositionJson into a MotionDoc for the Motion engine: frame keyframes become seconds tweens with cubic eases, transforms map with pixel pivots, shape/text/image/precomp layers convert, audio becomes cues. 3D layers become warnings here (A3 converts them). Tested on every stored film.",
   "branchName": "ralph/a2-aep-2d",
+  "description": "A pure converter in web/src/motion/aep/ that turns a director AepCompositionJson into a MotionDoc for the Motion engine: frame keyframes become seconds tweens with cubic eases, transforms map with pixel pivots, shape/text/image/precomp layers convert, audio becomes cues. 3D layers become warnings here (A3 converts them). Tested on every stored film.",
   "userStories": [
     {
       "id": "US-001",
@@ -23,14 +23,13 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "frontend",
         "converter"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -51,7 +50,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -59,8 +58,7 @@
       "labels": [
         "frontend",
         "converter"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -81,7 +79,7 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -89,8 +87,7 @@
       "labels": [
         "frontend",
         "converter"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -110,7 +107,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -118,8 +115,7 @@
       "labels": [
         "frontend",
         "converter"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -141,7 +137,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003",
@@ -150,8 +146,7 @@
       "labels": [
         "frontend",
         "converter"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-006",
@@ -172,7 +167,7 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-005"
@@ -180,8 +175,7 @@
       "labels": [
         "frontend",
         "converter"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-007",
@@ -203,7 +197,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-006"
@@ -211,8 +205,7 @@
       "labels": [
         "frontend",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -248,8 +241,8 @@
       "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
-      "The converter is pure: no DOM, no fetch, no three. It imports only types and parse helpers from @engine/schema and @shared/aep.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+      "The converter is pure: no DOM, no fetch, no three. It imports only types and parse helpers from @engine/schema and @shared/aep."
     ],
     "qualityGates": {
       "universal": [
@@ -263,7 +256,6 @@
     },
     "manualGates": [
       "MG-1: owner opens http://localhost:5173/aep-motion.html?film=<id> for two stored films and compares them with the studio player."
-    ],
-    "updatedAt": "2026-10-31T23:07:44.867Z"
+    ]
   }
 }

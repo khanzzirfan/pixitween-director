@@ -1,7 +1,7 @@
 {
   "name": "X2: end-to-end catalogue test with Muse (one can product, S19) on the Three.js engine",
-  "description": "Last task. Proves the merged branch end to end on ONE catalogue product (a can): runs the paid S19 catalogue live script with Muse under a hard budget on a one-product feed, converts and plays the produced film on the Three.js player in headless Chromium, opens it in the studio, and writes a report with cost, screenshots and results. The S20 cinematic run and the cartoon (toon) story are out of scope.",
   "branchName": "ralph/x2-e2e-catalog",
+  "description": "Last task. Proves the merged branch end to end on ONE catalogue product (a can): runs the paid S19 catalogue live script with Muse under a hard budget on a one-product feed, converts and plays the produced film on the Three.js player in headless Chromium, opens it in the studio, and writes a report with cost, screenshots and results. The S20 cinematic run and the cartoon (toon) story are out of scope.",
   "userStories": [
     {
       "id": "US-001",
@@ -21,14 +21,13 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "e2e",
         "live"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -46,7 +45,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -54,8 +53,7 @@
       "labels": [
         "e2e",
         "live"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -74,7 +72,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -82,8 +80,7 @@
       "labels": [
         "e2e",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -102,16 +99,15 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 4,
-      "passes": true,
-      "notes": "Browser check (engine playwright on :5290, API mocked): /?film=cb-original shows 3D can, $4.50 price, accent disc on dark plate; Play advanced to 0:02.0, seek to 0:02.5, no console errors. Screenshot debug/engine/studio-cb-original.png.",
+      "passes": false,
+      "notes": "",
       "dependsOn": [
         "US-003"
       ],
       "labels": [
         "e2e",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -129,7 +125,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-004"
@@ -137,8 +133,7 @@
       "labels": [
         "e2e",
         "docs"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -195,7 +190,6 @@
     },
     "manualGates": [
       "MG-1: owner opens the studio, picks a produced catalogue film and judges how it looks."
-    ],
-    "updatedAt": "2026-11-01T03:25:32.989Z"
+    ]
   }
 }

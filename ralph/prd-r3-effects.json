@@ -1,7 +1,7 @@
 {
   "name": "Engine R3: effects for 2D layers and the stage (glow, drop shadow, outline, isolation)",
-  "description": "Gives 2D layers the looks the Pixi filters gave, on Three: custom glow, drop shadow and outline effects for postprocessing, layer isolation (render one layer into its own target through the chain and show it on a plane), doc-level stage effects, and the effects-2d fixture.",
   "branchName": "ralph/r3-effects",
+  "description": "Gives 2D layers the looks the Pixi filters gave, on Three: custom glow, drop shadow and outline effects for postprocessing, layer isolation (render one layer into its own target through the chain and show it on a plane), doc-level stage effects, and the effects-2d fixture.",
   "userStories": [
     {
       "id": "US-001",
@@ -22,13 +22,12 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "effects"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -48,15 +47,14 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
       ],
       "labels": [
         "effects"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -77,15 +75,14 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
       ],
       "labels": [
         "effects"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -107,15 +104,14 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003"
       ],
       "labels": [
         "effects"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -136,7 +132,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-004"
@@ -144,8 +140,7 @@
       "labels": [
         "effects",
         "fixtures"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -191,8 +186,8 @@
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside engine/ (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). They are not yours: do not edit those files. The `npm test` gate passes when no other test fails; also run `npx vitest run engine` and it must be fully green.",
       "R1 is done: engine/ is Three-only. MotionNode (engine/src/core/types.ts) has `display` (layer transform) and `content` (the meshes, offset by the anchor); NodeContext has `renderer`. Effects live in engine/src/effects (EFFECTS, registerEffect, buildEffectChain, setEffectChainFactoryForTests).",
-      "Three.js only: the custom effects subclass postprocessing's Effect with their own GLSL. Reading pixi-filters shader files for ideas is fine; importing pixi-filters is not (lint enforces it).",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+      "Three.js only: the custom effects subclass postprocessing's Effect with their own GLSL. Reading pixi-filters shader files for ideas is fine; importing pixi-filters is not (lint enforces it)."
     ],
     "qualityGates": {
       "universal": [
@@ -204,7 +199,6 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": [],
-    "updatedAt": "2026-10-31T21:53:13.272Z"
+    "manualGates": []
   }
 }

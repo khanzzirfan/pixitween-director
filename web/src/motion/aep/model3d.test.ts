@@ -75,6 +75,26 @@ describe('convertModel3D', () => {
     expect(t!.duration).toBe(4);
   });
 
+  it('passes clearcoat, key/fill/rim overrides and shadow softness through without a warning', () => {
+    const src = heroLayer();
+    const layer = {
+      ...src,
+      material: { ...src.material, clearcoat: 0.6 },
+      lighting: {
+        key: { azimuth: 40, intensity: [{ t: 0, v: 1.2 }, { t: 60, v: 2 }], color: '#ffd9a0' },
+        fill: { intensity: 0.3 },
+        rim: { intensity: 1.5 },
+      },
+      shadow: { opacity: 0.4, softness: 0.7 },
+    } as unknown as AepModel3DLayer;
+    const { layer: out, warnings } = convertModel3D(layer, 30);
+    expect(warnings.filter((w) => /not supported/.test(w))).toEqual([]);
+    expect(out?.objects[0].material.clearcoat).toBe(0.6);
+    expect(out?.lighting).toMatchObject({ keyAzimuth: 40, keyIntensity: 1.2, keyColor: '#ffd9a0', fillIntensity: 0.3, rimIntensity: 1.5 });
+    expect(out?.shadow.softness).toBe(0.7);
+    expect(out?.tweens.some((tw) => tw.target === 'lighting' && 'keyIntensity' in tw.to)).toBe(true);
+  });
+
   it('places the camera so height x fit fills the viewport', () => {
     const { layer } = convertModel3D(heroLayer(), 30);
     expect(layer!.camera.fov).toBe(30);

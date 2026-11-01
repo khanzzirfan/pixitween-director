@@ -65,7 +65,7 @@ function makeNode(layer: Layer): FakeNode {
 function localSize(layer: Layer): { width: number; height: number } {
   switch (layer.type) {
     case 'shape':
-      return { width: layer.width, height: layer.height };
+      return { width: layer.width ?? 0, height: layer.height ?? 0 };
     case 'image':
       return { width: layer.width ?? 0, height: layer.height ?? 0 };
     case 'text':

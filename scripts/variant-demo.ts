@@ -20,3 +20,4 @@ const film = buildVariantFilm({
 const out = `web/public/cartoon/${outArg}`;
 writeFileSync(out, JSON.stringify(film, null, 2));
 console.log(`wrote ${out} (${(film.durationInFrames / film.fps).toFixed(1)} s, ${aspectArg})`);
+console.log(`view: http://localhost:5173/aep-motion.html?src=/cartoon/${out.split('/').pop()}  (Three engine)\n      or /stage-check.html?film=live&file=/cartoon/${out.split('/').pop()}`);

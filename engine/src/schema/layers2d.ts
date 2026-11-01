@@ -15,7 +15,7 @@ export const LayerBaseShape = {
   scale: z.union([z.number(), z.tuple([z.number(), z.number()])]).default(1),
   rotation: z.number().default(0),
   alpha: z.number().min(0).max(1).default(1),
-  blendMode: z.enum(['normal', 'add', 'multiply', 'screen']).default('normal'),
+  blendMode: z.enum(['normal', 'add', 'multiply', 'screen', 'soft-light']).default('normal'),
   effects: z.array(EffectSchema).max(8).default([]),
   enter: PresetRefSchema.optional(),
   exit: PresetRefSchema.optional(),
@@ -70,16 +70,40 @@ export const TextLayerSchema = z
   })
   .strict();
 
+/**
+ * A star or a polygon: the shape a polystar is drawn from. `points` is the number of tips (a star
+ * has that many tips and as many inner corners), `outerRadius` the distance from the centre to a
+ * tip and `innerRadius` the distance to an inner corner. A polygon ignores the inner radius: all
+ * of its corners sit on the outer radius.
+ */
+export const PolystarShapeSchema = z
+  .object({
+    shape: z.literal('polystar'),
+    points: z.number().int().min(3),
+    outerRadius: z.number().positive(),
+    innerRadius: z.number().min(0).optional(),
+    starType: z.enum(['star', 'polygon']).default('star'),
+  })
+  .strict();
+export type PolystarShape = z.output<typeof PolystarShapeSchema>;
+
 export const ShapeLayerSchema = z
   .object({
     ...LayerBaseShape,
     type: z.literal('shape'),
-    shape: z.enum(['rect', 'ellipse']),
-    width: z.number().positive(),
-    height: z.number().positive(),
+    shape: z.enum(['rect', 'ellipse', 'polystar']),
+    // A rect or an ellipse states its size; a polystar's size is its outer radius twice over, so it
+    // may leave the size out (the doc's cross-field rules say which shape needs what).
+    width: z.number().positive().optional(),
+    height: z.number().positive().optional(),
     fill: ColorSchema.default('#ffffff'),
     radius: z.number().min(0).default(0),
     stroke: z.object({ color: ColorSchema, width: z.number().positive() }).strict().optional(),
+    // The polystar's own fields.
+    points: z.number().int().min(3).optional(),
+    outerRadius: z.number().positive().optional(),
+    innerRadius: z.number().min(0).optional(),
+    starType: z.enum(['star', 'polygon']).optional(),
   })
   .strict();
 

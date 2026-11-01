@@ -8,6 +8,7 @@ import { runRules } from '../../review/rules';
 import { ReviewError, visualReview, type Reviewer, type VisualFrame } from '../../review/visual';
 import type { Comp } from '../../authoring/types';
 import { sceneHasStage, stageFindings, STAGE_VISION_QUESTIONS } from '../../cartoon/checks';
+import { retailFaultQuestions } from '../../authoring/retail-critic';
 import { createId } from '../ids';
 import type { WorkerResult } from '../scheduler';
 import type { CrewCtx } from '../showrunner-tools';
@@ -119,6 +120,8 @@ export async function runCriticJob(job: Job, signal: AbortSignal, crew: CrewCtx,
       }
     }
 
+    // a retail clip: ask what the boxes cannot say (grounded, contact shadow, type on a busy patch), from its own JSON and plate read
+    const retailQuestions = retailFaultQuestions(comp as never);
     let summary = captured ? '' : 'no browser connected; rules only';
     if (captured) {
       try {
@@ -132,6 +135,7 @@ export async function runCriticJob(job: Job, signal: AbortSignal, crew: CrewCtx,
           tools: [],
           blind: true,
           ...(staged ? { questions: STAGE_VISION_QUESTIONS } : {}),
+          ...(retailQuestions.length ? { faultQuestions: retailQuestions } : {}),
           measured: measured ? Object.entries(measured).map(([id, b]) => `${id}: left ${Math.round(b.left)}, top ${Math.round(b.top)}, right ${Math.round(b.right)}, bottom ${Math.round(b.bottom)}`) : [],
           ...(o.reviewer ? { reviewer: o.reviewer } : {}),
         });

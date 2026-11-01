@@ -22,7 +22,7 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -47,7 +47,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -75,7 +75,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -103,7 +103,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003"
@@ -131,7 +131,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -159,7 +159,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -187,7 +187,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-006"
@@ -216,7 +216,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-007"
@@ -244,7 +244,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 9,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -272,7 +272,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 10,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -300,7 +300,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 11,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -329,7 +329,7 @@
         "`npm run lint` passes"
       ],
       "priority": 12,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -358,7 +358,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 13,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003",
@@ -392,7 +392,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 14,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-013"
@@ -430,7 +430,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 15,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-013",
@@ -467,7 +467,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 16,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-013"
@@ -500,7 +500,7 @@
         "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
       ],
       "priority": 17,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-016"
@@ -585,7 +585,6 @@
     },
     "manualGates": [
       "MG-4: owner runs the 09-crew-swarm.md section 4 demo script in the browser against the live API twice in a row and records a screen capture of the crew board with 4 builder lanes busy at once."
-    ],
-    "completion": "Marked passing from the build records of 29-30 Oct 2026 (offline tests and the crew e2e were green); not re-checked story by story."
+    ]
   }
 }

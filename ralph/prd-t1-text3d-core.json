@@ -1,7 +1,7 @@
 {
   "name": "Engine T1: 3D text core (schema, layout, glyph meshes, targets, stagger, presets)",
-  "description": "Extends the finished engine with text3d objects in the three layer: one extruded Mesh per glyph from Three's TextGeometry, a tiny typeface layout, glyph/word/line tween targets with deterministic stagger and five text presets. Run only after prd-r4-runtime and prd-m8-showcase have fully passed.",
   "branchName": "ralph/t1-text3d-core",
+  "description": "Extends the finished engine with text3d objects in the three layer: one extruded Mesh per glyph from Three's TextGeometry, a tiny typeface layout, glyph/word/line tween targets with deterministic stagger and five text presets. Run only after prd-r4-runtime and prd-m8-showcase have fully passed.",
   "userStories": [
     {
       "id": "US-001",
@@ -21,18 +21,17 @@
         "A loop preset glyphWave with target 'glyphs:t' on a three layer that has text3d object 't' passes; with target 'glyphs:nope' it fails",
         "All existing engine/src/schema tests and the engine fixtures test still pass unchanged",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "schema",
         "text3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -51,18 +50,17 @@
         "align 'left' keeps every line's left edge equal and 'right' keeps every right edge equal; a character missing from the font is listed in skipped and given no glyph",
         "layoutText3D returns identical output for identical input (deep equal on two calls)",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "layout",
         "text3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -81,11 +79,11 @@
         "glyph group positions plus their mesh offsets reproduce layoutText3D's glyph x and y within 1e-6 when summed through the hierarchy",
         "dispose() calls dispose on each unique geometry exactly once and on every material (spied); a second dispose() call does nothing",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
@@ -93,8 +91,7 @@
       "labels": [
         "three",
         "text3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -113,11 +110,11 @@
         "A character missing from the font adds a warning containing the character and the object id to the rig's warnings; the scene still builds",
         "rig.dispose() disposes the text geometries and materials (spied) and existing buildScene tests still pass",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001",
@@ -126,8 +123,7 @@
       "labels": [
         "three",
         "text3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -145,11 +141,11 @@
         "rotation.z ref has kind 'deg'; writing 90 through a GSAP tween ends at Math.PI / 2 on the glyph group",
         "ThreeNode.resolveTargets('glyphs:nope', 'alpha') returns null and resolveTarget behaviour for existing targets is unchanged (existing tests pass)",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-004"
@@ -158,8 +154,7 @@
         "three",
         "text3d",
         "timeline"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-006",
@@ -178,11 +173,11 @@
         "staggerSpan(5, 0.1, 'start', 1, 0) equals 1.4; with repeat 1 it equals 2.4",
         "A tween without stagger on a multi-ref target moves all refs together; all existing compile tests pass",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -190,8 +185,7 @@
       "labels": [
         "timeline",
         "text3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-007",
@@ -210,11 +204,11 @@
         "assemble on a doc whose fake three node returns 3 refs for 'glyphs:t' compiles the staggered tween with start offsets 0, each and 2*each (checked via clock.seek)",
         "Existing validateTargets and assemble tests still pass",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-005",
@@ -224,8 +218,7 @@
         "timeline",
         "runtime",
         "text3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-008",
@@ -244,11 +237,11 @@
         "glyphWave with 5 units over a 10 s loop span leaves every unit at offset.y 0 at the end of the span and produces no tweens when the span is shorter than one period plus the tail",
         "A layer with two text3d objects and a text preset without a target gives an error asking for a target; all existing preset tests pass",
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-007"
@@ -257,8 +250,7 @@
         "timeline",
         "presets",
         "text3d"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -311,22 +303,21 @@
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside engine/ (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). They are not yours: do not edit those files. The `npm test` gate passes when no other test fails; also run `npx vitest run engine` and it must be fully green.",
       "R1 is done: engine/ is Three-only. MotionNode (engine/src/core/types.ts) has `display` (layer transform) and `content` (the meshes, offset by the anchor); NodeContext has `renderer`. Effects live in engine/src/effects (EFFECTS, registerEffect, buildEffectChain, setEffectChainFactoryForTests).",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
       "Before starting, confirm every story of ralph/prd-r4-runtime.json and ralph/prd-m8-showcase.json has passes true and `npm run typecheck && npm test` pass; if not, set notes to 'blocked: engine PRDs not finished' and stop.",
       "These stories edit files built by the engine PRDs (metadata.sharedEdits). Keep every existing test green and every edit additive: no existing export, field, default or behaviour changes.",
-      "No new dependency. Fonts are Three typeface JSON loaded with three/examples/jsm/loaders/FontLoader.js and TextGeometry from three/examples/jsm/geometries/TextGeometry.js.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "No new dependency. Fonts are Three typeface JSON loaded with three/examples/jsm/loaders/FontLoader.js and TextGeometry from three/examples/jsm/geometries/TextGeometry.js."
     ],
     "qualityGates": {
       "universal": [
         "`npm run typecheck` passes",
-        "`npm test` has no failures except the known ones in scripts/preflight/docs.test.ts (offline, no network)",
+        "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
       ],
       "ui": [
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ]
     },
-    "manualGates": [],
-    "updatedAt": "2026-11-01T02:46:05.711Z"
+    "manualGates": []
   }
 }

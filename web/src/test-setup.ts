@@ -6,4 +6,6 @@ afterEach(cleanup);
 
 // jsdom has no canvas 2D context; lottie-web touches one at import time.
 vi.mock('lottie-web', () => ({ default: { loadAnimation: vi.fn(), setQuality: vi.fn() } }));
-HTMLCanvasElement.prototype.getContext = (() => null) as never;
+// A test that runs in the node environment (the stored-film test reads data/films with node:fs)
+// has no HTMLCanvasElement.
+if (typeof HTMLCanvasElement !== 'undefined') HTMLCanvasElement.prototype.getContext = (() => null) as never;

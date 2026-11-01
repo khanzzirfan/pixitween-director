@@ -1,7 +1,7 @@
 {
   "name": "Engine R4: runtime on one WebGLRenderer, MotionPlayer, lab page and e2e",
-  "description": "Wires schema, textures, 2D nodes, three layers, effects (isolated, three, stage), presets and tweens into MotionRuntime on a single Three WebGLRenderer, wraps it in <MotionPlayer>, adds /motion-lab.html and a Playwright spec (npm run engine:e2e) that checks every fixture for readiness, determinism, motion, colour and transparency. No Pixi.",
   "branchName": "ralph/r4-runtime",
+  "description": "Wires schema, textures, 2D nodes, three layers, effects (isolated, three, stage), presets and tweens into MotionRuntime on a single Three WebGLRenderer, wraps it in <MotionPlayer>, adds /motion-lab.html and a Playwright spec (npm run engine:e2e) that checks every fixture for readiness, determinism, motion, colour and transparency. No Pixi.",
   "userStories": [
     {
       "id": "US-001",
@@ -23,13 +23,12 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [],
       "labels": [
         "runtime"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-002",
@@ -49,15 +48,14 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-001"
       ],
       "labels": [
         "runtime"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-003",
@@ -78,15 +76,14 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-002"
       ],
       "labels": [
         "runtime"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-004",
@@ -106,7 +103,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-003"
@@ -114,8 +111,7 @@
       "labels": [
         "runtime",
         "react"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-005",
@@ -138,7 +134,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-004"
@@ -146,8 +142,7 @@
       "labels": [
         "runtime",
         "ui"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     },
     {
       "id": "US-006",
@@ -169,7 +164,7 @@
         "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": "",
       "dependsOn": [
         "US-005"
@@ -178,8 +173,7 @@
         "runtime",
         "ui",
         "e2e"
-      ],
-      "completionNotes": "Completed by agent"
+      ]
     }
   ],
   "metadata": {
@@ -228,9 +222,9 @@
       "Record only real results. Never invent measurements or test output.",
       "`npm test` has 11 known failures outside engine/ (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). They are not yours: do not edit those files. The `npm test` gate passes when no other test fails; also run `npx vitest run engine` and it must be fully green.",
       "R1 is done: engine/ is Three-only. MotionNode (engine/src/core/types.ts) has `display` (layer transform) and `content` (the meshes, offset by the anchor); NodeContext has `renderer`. Effects live in engine/src/effects (EFFECTS, registerEffect, buildEffectChain, setEffectChainFactoryForTests).",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
       "Three.js only: no import of pixi.js, pixi-filters, @pixi/* or @react-three/* (lint enforces it).",
-      "The package.json edit is limited to making sure the script \"engine:e2e\": \"playwright test -c engine/playwright.config.ts\" exists.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+      "The package.json edit is limited to making sure the script \"engine:e2e\": \"playwright test -c engine/playwright.config.ts\" exists."
     ],
     "qualityGates": {
       "universal": [
@@ -244,7 +238,6 @@
     },
     "manualGates": [
       "MG-1: owner opens http://localhost:5173/motion-lab.html, plays every fixture end to end, edits a tween in the JSON box and sees it apply, and records anything that looks wrong."
-    ],
-    "updatedAt": "2026-10-31T22:38:42.335Z"
+    ]
   }
 }
