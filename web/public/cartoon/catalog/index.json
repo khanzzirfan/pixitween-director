@@ -1,0 +1,86 @@
+[
+  {
+    "id": "cb-original",
+    "title": "Coffee Co. Cold Brew",
+    "price": 4.5,
+    "was": null,
+    "look": "hero-3d",
+    "why": "tall round pack with a label to wrap, so it turns in 3D",
+    "accent": "#402f27",
+    "file": "cb-original.json"
+  },
+  {
+    "id": "cb-vanilla",
+    "title": "Coffee Co. Vanilla Cold Brew",
+    "price": 4.75,
+    "was": null,
+    "look": "hero-3d",
+    "why": "tall round pack with a label to wrap, so it turns in 3D",
+    "accent": "#402f27",
+    "file": "cb-vanilla.json"
+  },
+  {
+    "id": "cb-mocha",
+    "title": "Coffee Co. Mocha Cold Brew",
+    "price": 3.99,
+    "was": 4.75,
+    "look": "price-promo",
+    "why": "on sale, so the price leads",
+    "accent": "#402f27",
+    "file": "cb-mocha.json"
+  },
+  {
+    "id": "mug-stone",
+    "title": "Stone Mug",
+    "price": 19,
+    "was": 24,
+    "look": "price-promo",
+    "why": "on sale, so the price leads",
+    "accent": "#8c623b",
+    "file": "mug-stone.json"
+  },
+  {
+    "id": "mug-sage",
+    "title": "Sage Mug",
+    "price": 24,
+    "was": null,
+    "look": "lifestyle-room",
+    "why": "square pack, \"mug\" suits the lifestyle-room look",
+    "accent": "#8c623b",
+    "file": "mug-sage.json"
+  },
+  {
+    "id": "mug-night",
+    "title": "Night Mug",
+    "price": 26,
+    "was": null,
+    "look": "lifestyle-room",
+    "why": "square pack, \"mug\" suits the lifestyle-room look",
+    "accent": "#8c623b",
+    "file": "mug-night.json"
+  },
+  {
+    "film": "drinks",
+    "brand": "Coffee Co.",
+    "tagline": "Pick your cold brew",
+    "variants": [
+      "Original",
+      "Vanilla",
+      "Mocha"
+    ],
+    "accent": "#402f27",
+    "file": "film-drinks.json"
+  },
+  {
+    "film": "home",
+    "brand": "Hearth",
+    "tagline": "Pick your mug",
+    "variants": [
+      "Stone",
+      "Sage",
+      "Night"
+    ],
+    "accent": "#8c623b",
+    "file": "film-home.json"
+  }
+]

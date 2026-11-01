@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 8,
+  "background": "#0b0f14",
+  "assets": {
+    "plate": { "type": "image", "url": "/cartoon/backdrop.png" },
+    "can": { "type": "gltf", "url": "/cartoon/props/can.glb" }
+  },
+  "layers": [
+    {
+      "id": "plate",
+      "type": "image",
+      "asset": "plate",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "alpha": 0.85,
+      "effects": [{ "id": "soft", "type": "blur", "params": { "scale": 1.8 } }],
+      "end": 8
+    },
+    {
+      "id": "turntable",
+      "type": "three",
+      "x": 960,
+      "y": 640,
+      "width": 1600,
+      "height": 900,
+      "background": "transparent",
+      "lighting": { "preset": "golden" },
+      "shadow": { "enabled": true, "opacity": 0.45, "y": 0 },
+      "camera": {
+        "position": [0, 1.05, 3.2],
+        "lookAt": [0, 0.65, 0],
+        "fov": 30,
+        "near": 0.05,
+        "far": 60,
+        "path": {
+          "curve": "smooth",
+          "keys": [
+            { "t": 0, "position": [0, 1.05, 3.2], "lookAt": [0, 0.65, 0], "fov": 30 },
+            { "t": 1.34, "position": [2.771, 1.05, 1.6], "lookAt": [0, 0.65, 0] },
+            { "t": 2.67, "position": [2.771, 1.05, -1.6], "lookAt": [0, 0.65, 0] },
+            { "t": 4, "position": [0, 1.05, -3.2], "lookAt": [0, 0.65, 0] },
+            { "t": 5.34, "position": [-2.771, 1.05, -1.6], "lookAt": [0, 0.65, 0] },
+            { "t": 6.67, "position": [-2.771, 1.05, 1.6], "lookAt": [0, 0.65, 0] },
+            { "t": 8, "position": [0, 1.05, 3.2], "lookAt": [0, 0.65, 0] }
+          ]
+        }
+      },
+      "objects": [
+        {
+          "id": "can",
+          "geometry": { "type": "gltf", "asset": "can", "height": 1.3 },
+          "position": [0, 0.65, 0]
+        }
+      ],
+      "effects": [
+        { "id": "bloom", "type": "bloom", "params": { "intensity": 0.35, "threshold": 0.78, "smoothing": 0.12 } }
+      ],
+      "tweens": [
+        {
+          "target": "effect:bloom",
+          "at": 0,
+          "duration": 3,
+          "ease": "sine.inOut",
+          "from": { "intensity": 0.35 },
+          "to": { "intensity": 1.9 }
+        },
+        {
+          "target": "effect:bloom",
+          "at": 3,
+          "duration": 5,
+          "ease": "sine.inOut",
+          "from": { "intensity": 1.9 },
+          "to": { "intensity": 0.4 }
+        }
+      ],
+      "end": 8
+    },
+    {
+      "id": "kicker",
+      "type": "text",
+      "text": "NEW SEASON · SINGLE ORIGIN",
+      "x": 960,
+      "y": 132,
+      "style": {
+        "fontSize": 26,
+        "fontWeight": "600",
+        "align": "center",
+        "fill": "#a3b8c4",
+        "letterSpacing": 10
+      },
+      "enter": { "name": "fadeInDown", "duration": 0.7 },
+      "exit": { "name": "fadeOut", "duration": 0.5 },
+      "end": 8
+    },
+    {
+      "id": "headline",
+      "type": "text",
+      "text": "CITRUS SPARKLING",
+      "x": 960,
+      "y": 232,
+      "style": {
+        "fontSize": 86,
+        "fontWeight": "800",
+        "align": "center",
+        "fill": "#fff7ed",
+        "letterSpacing": 6
+      },
+      "effects": [
+        { "id": "halo", "type": "glow", "params": { "color": "#fbbf24", "strength": 1.6, "distance": 24 } }
+      ],
+      "enter": { "name": "slideInUp", "duration": 0.8 },
+      "exit": { "name": "fadeOut", "duration": 0.6 },
+      "tweens": [
+        {
+          "target": "effect:halo",
+          "at": 1.1,
+          "duration": 4.4,
+          "ease": "sine.inOut",
+          "from": { "strength": 1.6 },
+          "to": { "strength": 0 }
+        }
+      ],
+      "end": 8
+    },
+    {
+      "id": "price-card",
+      "type": "group",
+      "x": 960,
+      "y": 930,
+      "pivot": [0, 0],
+      "enter": { "name": "popIn", "duration": 0.7 },
+      "exit": { "name": "fadeOut", "duration": 0.6 },
+      "end": 8,
+      "children": [
+        {
+          "id": "price-plate",
+          "type": "shape",
+          "shape": "rect",
+          "width": 560,
+          "height": 176,
+          "radius": 34,
+          "fill": "#0f172a",
+          "alpha": 0.92,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "price-label",
+          "type": "text",
+          "text": "£2.49",
+          "x": 0,
+          "y": -24,
+          "style": {
+            "fontSize": 76,
+            "fontWeight": "800",
+            "align": "center",
+            "fill": "#fbbf24"
+          }
+        },
+        {
+          "id": "price-note",
+          "type": "text",
+          "text": "330 ml · canned this morning",
+          "x": 0,
+          "y": 52,
+          "style": {
+            "fontSize": 24,
+            "fontWeight": "500",
+            "align": "center",
+            "fill": "#94a3b8",
+            "letterSpacing": 2
+          }
+        }
+      ]
+    }
+  ]
+}

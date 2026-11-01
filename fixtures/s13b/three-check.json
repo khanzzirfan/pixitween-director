@@ -1,0 +1,289 @@
+{
+ "version": "1.9.0",
+ "id": "film",
+ "name": "Three check",
+ "width": 1920,
+ "height": 1080,
+ "fps": 30,
+ "durationInFrames": 120,
+ "bgColor": "#1f2937",
+ "assets": {
+  "ast_00000000000000000000000000000c13": {
+   "type": "image",
+   "src": "/dev/can-label.png",
+   "width": 2048,
+   "height": 1024
+  }
+ },
+ "layers": [
+  {
+   "kind": "precomp",
+   "id": "s1",
+   "name": "s1",
+   "inPoint": 0,
+   "outPoint": 120,
+   "compId": "s1",
+   "width": 1920,
+   "height": 1080,
+   "transform": {
+    "position": [
+     0,
+     0
+    ],
+    "anchor": [
+     0,
+     0
+    ],
+    "scale": [
+     1,
+     1
+    ],
+    "rotation": 0,
+    "opacity": 1
+   }
+  }
+ ],
+ "precomps": {
+  "s1": {
+   "version": "1.9.0",
+   "id": "s1",
+   "name": "s1",
+   "width": 1920,
+   "height": 1080,
+   "fps": 30,
+   "durationInFrames": 120,
+   "assets": {
+    "ast_00000000000000000000000000000c13": {
+     "type": "image",
+     "src": "/dev/can-label.png",
+     "width": 2048,
+     "height": 1024
+    }
+   },
+   "layers": [
+    {
+     "kind": "shape",
+     "id": "s1:bg",
+     "name": "bg",
+     "inPoint": 0,
+     "outPoint": 120,
+     "path": {
+      "kind": "rect",
+      "size": [
+       1920,
+       1080
+      ]
+     },
+     "fill": "#d9d4c7",
+     "transform": {
+      "position": [
+       960,
+       540
+      ],
+      "anchor": [
+       960,
+       540
+      ],
+      "scale": [
+       1,
+       1
+      ],
+      "rotation": 0,
+      "opacity": 1
+     }
+    },
+    {
+     "kind": "text",
+     "id": "s1:headline",
+     "name": "headline",
+     "inPoint": 0,
+     "outPoint": 120,
+     "source": "Behind the can",
+     "style": {
+      "font": "Inter, system-ui, sans-serif",
+      "size": 120,
+      "fill": "#7c2d12",
+      "weight": 700,
+      "align": "center",
+      "boxWidth": 800
+     },
+     "transform": {
+      "position": [
+       960,
+       490
+      ],
+      "anchor": [
+       960,
+       540
+      ],
+      "scale": [
+       1,
+       1
+      ],
+      "rotation": 0,
+      "opacity": 1
+     }
+    },
+    {
+     "id": "s1:product3d",
+     "name": "product3d",
+     "kind": "model3d",
+     "inPoint": 0,
+     "outPoint": 120,
+     "transform": {
+      "position": [
+       960,
+       510
+      ],
+      "anchor": [
+       400,
+       740
+      ],
+      "scale": [
+       0.75,
+       0.75
+      ],
+      "rotation": 0,
+      "opacity": 1
+     },
+     "viewport": {
+      "width": 800,
+      "height": 1480
+     },
+     "source": {
+      "type": "primitive",
+      "shape": "can",
+      "proportions": {
+       "width": 1,
+       "height": 2.5
+      }
+     },
+     "textures": {
+      "label": "ast_00000000000000000000000000000c13",
+      "side": "#c82828"
+     },
+     "material": {
+      "roughness": 0.35,
+      "metalness": 0.55
+     },
+     "view": {
+      "rotation": [
+       {
+        "t": 0,
+        "v": [
+         4,
+         -18,
+         0
+        ],
+        "easeIn": [
+         0.42,
+         0,
+         0.58,
+         1
+        ],
+        "easeOut": [
+         0.42,
+         0,
+         0.58,
+         1
+        ]
+       },
+       {
+        "t": 120,
+        "v": [
+         4,
+         18,
+         0
+        ]
+       }
+      ]
+     },
+     "lighting": {
+      "preset": "studio",
+      "environment": "room",
+      "key": {
+       "azimuth": 20,
+       "elevation": 75
+      }
+     },
+     "shadow": {
+      "opacity": 0.35,
+      "softness": 0.6
+     },
+     "camera": {
+      "fov": 30,
+      "fit": 1.5
+     }
+    },
+    {
+     "kind": "text",
+     "id": "s1:caption",
+     "name": "caption",
+     "inPoint": 0,
+     "outPoint": 120,
+     "source": "In front of it",
+     "style": {
+      "font": "Inter, system-ui, sans-serif",
+      "size": 43,
+      "fill": "#1f2937",
+      "weight": 700,
+      "align": "center",
+      "boxWidth": 800
+     },
+     "transform": {
+      "position": [
+       960,
+       945
+      ],
+      "anchor": [
+       960,
+       540
+      ],
+      "scale": [
+       1,
+       1
+      ],
+      "rotation": 0,
+      "opacity": 1
+     }
+    }
+   ]
+  }
+ },
+ "meta": {
+  "director": {
+   "scenes": {
+    "s1": {
+     "precompId": "s1",
+     "startFrame": 0,
+     "durationFrames": 120,
+     "mode": "motion",
+     "intent": "The can turns in golden light"
+    }
+   },
+   "layers": {
+    "s1:bg": {
+     "sceneId": "s1",
+     "role": "bg",
+     "z": 10
+    },
+    "s1:headline": {
+     "sceneId": "s1",
+     "role": "headline",
+     "z": 2
+    },
+    "s1:caption": {
+     "sceneId": "s1",
+     "role": "caption",
+     "z": 0
+    },
+    "s1:product3d": {
+     "sceneId": "s1",
+     "role": "product3d",
+     "assetId": "ast_00000000000000000000000000000c13",
+     "z": 1
+    }
+   }
+  }
+ }
+}

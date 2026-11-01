@@ -1,0 +1,216 @@
+{
+  "name": "App A3: AEP → MotionDoc converter for 3D (model3d, stage3d world, actors, props)",
+  "description": "Extends the A2 converter so the director's 3D layers play on the engine's three layer: model3d product shots (the label can), and the cartoon world (stage3d with its actor3d and prop3d members: camera, lights, ground, backdrop, glTF actors with a clip and blocking marks, props). Toon shading, curved walls and bone attach become warnings for later work.",
+  "branchName": "ralph/a3-aep-3d",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "model3d → three layer (primitive can with label, glTF, view rotation, camera fit)",
+      "description": "As a viewer, I want the 3D product shot to turn on the new engine so that product films keep their hero moment.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md 'model3d' and shared/aep/layer.ts (aepModel3D* schemas: viewport, source, textures, material, view, lighting, shadow, camera).",
+        "Create web/src/motion/aep/model3d.ts exporting convertModel3D(layer, ctx) returning a three layer: size from viewport, transparent background, base transform from A2's baseLayer, lighting preset, shadow opacity, one object: a cylinder for source.shape 'can' (radius 0.5, height proportions.height) with material.map = textures.label and color = textures.side, or a gltf object for a gltf source; view.rotation (keyframed [x,y,z] degrees) → object rotation.x/y/z tweens; camera.fov kept and camera.position.z chosen so the object height × camera.fit fills the viewport height (z = h*fit / (2*tan(fov/2))).",
+        "Wire it into convertLayers in convert.ts in place of the A2 warning.",
+        "Create web/src/motion/aep/model3d.test.ts with the stored 'hero:product3d' layer shape."
+      ],
+      "acceptanceCriteria": [
+        "The stored product3d layer converts to a three layer 441x1296 with one cylinder object of height 3.075 whose material.map is the label asset",
+        "Its view.rotation keyframes [4,-18,0] -> [4,18,0] over 120 frames give a tween on object:<id> 'rotation.y' from -18 to 18 over 4 s",
+        "camera.position.z equals 3.075 * 1.5 / (2 * tan(15°)) within 1e-6 for fov 30, fit 1.5",
+        "The converted doc passes parseMotionDoc and validateTargets",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "frontend",
+        "converter",
+        "3d"
+      ],
+      "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "US-002",
+      "title": "stage3d world → three layer (camera, lights, ground, backdrop)",
+      "description": "As a viewer, I want the cartoon set to appear (floor, painted backdrop, lighting) so that the characters have a world to stand in.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md 'stage3d' and shared/aep/layer.ts (aepStageCameraSchema, aepStageSetSchema, aepStageLightsSchema, aepStageStyleSchema).",
+        "Create web/src/motion/aep/stage3d.ts exporting convertWorld(world, members, ctx): a three layer of viewport size with camera position/target(lookAt)/fov, lighting preset (unknown → 'studio' + warning), a ground plane object (groundSize, rotation [-90,0,0], material.color = set.ground) and, when set.backdrop is set, a backdrop plane with material.map = the backdrop image at z = -wall.distance, sized wall.height tall with the image aspect; curve and style.shading 'toon' / outline add one warning each.",
+        "In convert.ts, for each stage3d layer collect the layers of the same list whose stage equals its id as members and remove them from the 2D list.",
+        "Create web/src/motion/aep/stage3d.test.ts with a world copied from a stored cartoon film."
+      ],
+      "acceptanceCriteria": [
+        "The stored 'wake:world' converts to one three layer 1920x1080 with camera position [0,1.7,7.4], lookAt [0,0.9,0], fov 35 and lighting preset 'golden'",
+        "It has a ground plane of size [16,8] coloured '#dbcebb' and a backdrop plane whose material.map is the backdrop image asset",
+        "Its actor3d and prop3d members no longer appear as separate layers or warnings in the converted 2D list",
+        "Toon style adds exactly one warning naming the world id",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "frontend",
+        "converter",
+        "3d"
+      ],
+      "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "US-003",
+      "title": "actor3d members: glTF actors with a clip and blocking marks",
+      "description": "As a viewer, I want the characters standing on their marks and moving between them so that the cartoon shots read.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md 'actor3d' and shared/aep/layer.ts (actor3d: assetId, height, marks, clips) and engine/src/schema/layer3d.ts (gltf geometry height, Animation3D).",
+        "Add convertActor(actor, ctx) to stage3d.ts: a gltf object (asset from assetId, height default 1.0), position [marks.x, 0, marks.z], rotation [0, facing, 0]; keyframed marks → object position.x / position.z / rotation.y tweens via propertyTweens; clips[0] → animation { clip: name, loop, offset: startFrame / fps }; more than one clip → warning (only the first plays).",
+        "Add tests to stage3d.test.ts using the stored 'first-sip:pip' actor and one actor with keyframed marks if a stored film has one (else a hand-made one)."
+      ],
+      "acceptanceCriteria": [
+        "The stored pip actor (marks [0,0,0], clips [{ name: 'Idle', startFrame: 0, loop: true }]) converts to a gltf object with animation clip 'Idle', loop true, offset 0, at position [0,0,0]",
+        "Keyframed marks [0,0,0] -> [2,1,90] over frames 0..60 give tweens on position.x 0 -> 2, position.z 0 -> 1 and rotation.y 0 -> 90 over 2 s",
+        "An actor with two clips gives one warning naming the actor and the dropped clip",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "frontend",
+        "converter",
+        "3d"
+      ],
+      "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "US-004",
+      "title": "prop3d members: glTF and primitive props, product role, attach fallback",
+      "description": "As a viewer, I want the props and the product in the scene so that the set is dressed and the product is visible.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md 'prop3d' and shared/aep/layer.ts (prop3d: source, size, position, rotation, scale, role, attach, textures).",
+        "Add convertProp(prop, actors, ctx) to stage3d.ts: gltf source → gltf object with height = size; primitive source → the matching primitive (reuse model3d's mapping); card source → plane with textures.front as map; position/rotation/scale (keyframed → tweens); attach { actor } → position = that actor's position + [0.25, 0.9 × actor height, 0] with one warning; keep the engine's 50-object limit (drop extras with a warning).",
+        "Add tests to stage3d.test.ts with the stored 'first-sip:counter' and 'first-sip:cold-brew' props."
+      ],
+      "acceptanceCriteria": [
+        "The stored counter prop converts to a gltf object with geometry height 0.6 at position [1.5,0,0]",
+        "The attached cold-brew prop is placed at pip's position + [0.25, 0.9, 0] and adds one warning naming 'first-sip:cold-brew' and the bone",
+        "A world with 60 props converts to at most 50 objects and one warning",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "frontend",
+        "converter",
+        "3d"
+      ],
+      "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "US-005",
+      "title": "Golden test covers 3D films; browser check of one cartoon and one product film",
+      "description": "As a project owner, I want every stored film, 3D included, to convert and the two 3D kinds to look right on the dev page.",
+      "steps": [
+        "Read web/src/motion/aep/films.test.ts (A2) and web/src/dev/aep-motion.tsx.",
+        "Make films.test.ts assert zero 'skipped' warnings for model3d, stage3d, actor3d and prop3d kinds across all stored films (other warnings are allowed and counted).",
+        "Open http://localhost:5173/aep-motion.html?film=<id> with headless Chromium for one film with a stage3d layer and one with a model3d layer (find them with a node script over data/films), save screenshots at 25 % and 75 % to debug/app/ and record what you saw in notes."
+      ],
+      "acceptanceCriteria": [
+        "films.test.ts passes on every stored film with no 3D 'skipped' warnings",
+        "The cartoon screenshot shows the ground, the backdrop and at least one character; the product screenshot shows the can, and the 25 % and 75 % frames differ",
+        "notes names the film ids and screenshots and lists the remaining warning kinds with counts",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-004"
+      ],
+      "labels": [
+        "frontend",
+        "converter",
+        "3d",
+        "ui"
+      ],
+      "completionNotes": "Completed by agent"
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/10-aep-adapter.md"
+    ],
+    "readFirst": [
+      "engine/docs/10-aep-adapter.md (section 3D)",
+      "engine/docs/04-three.md and engine/src/schema/layer3d.ts (three layer, Object3D, Light3D, camera, animation)",
+      "shared/aep/layer.ts (model3d, stage3d, actor3d, prop3d schemas) and shared/aep/stage3d.ts",
+      "web/src/motion/aep/convert.ts and keyframes.ts from A2"
+    ],
+    "requires": [
+      "prd-a2-aep-2d"
+    ],
+    "owns": [
+      "web/src/motion/aep/model3d.ts",
+      "web/src/motion/aep/model3d.test.ts",
+      "web/src/motion/aep/stage3d.ts",
+      "web/src/motion/aep/stage3d.test.ts"
+    ],
+    "sharedEdits": [
+      "web/src/motion/aep/convert.ts",
+      "web/src/motion/aep/convert.test.ts",
+      "web/src/motion/aep/films.test.ts"
+    ],
+    "profile": "adopt",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; use the stored films under data/films/*/versions/*.json (read with node:fs) and assets under web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/10-aep-adapter.md and engine/docs/README.md before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "The app's composition format is AepCompositionJson from `@shared/aep` (our own copy of the schema). Never import `reacthub-pixitweenjs`, `pixi.js`, `@pixi/*` or `pixi-filters` in new code.",
+      "Use the engine through `@engine/*` (engine/src). Do not edit engine/ except the files in metadata.sharedEdits; if the engine lacks something, add a row to docs/todos/ENGINE-NEEDS.md, use a workaround and say so in notes.",
+      "Edit only the files the story names, their tests, and metadata.sharedEdits. Do not change server/ behaviour, agent prompts or stored films.",
+      "No `@ts-nocheck` and no `@ts-ignore`. `@ts-expect-error` only with a reason on the same line.",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic; check drawing in the browser. Never weaken a test to make it pass.",
+      "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
+      "Record only real results. Never invent measurements or test output.",
+      "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
+      "3D values are metres and degrees in both formats; convert only units the spec names. Keep every converted three layer within the engine limits (50 objects, 6 lights, 16..2048 px).",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner opens http://localhost:5173/aep-motion.html?film=<id> for one product-3D film and one cartoon film and judges the 3D scene."
+    ],
+    "updatedAt": "2026-10-31T23:20:05.702Z"
+  }
+}

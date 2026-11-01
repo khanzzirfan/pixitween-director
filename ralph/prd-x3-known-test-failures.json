@@ -1,0 +1,162 @@
+{
+  "name": "X3: fix the 11 known test failures",
+  "description": "Fixes the 10 failures in scripts/preflight/docs.test.ts and the 1 in web/src/authoring-agreement.test.tsx so that npm test is fully green on the merged branch.",
+  "branchName": "ralph/x3-known-test-failures",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Diagnose the 11 failures",
+      "description": "As a maintainer, I want each failure explained so that the fixes target causes.",
+      "steps": [
+        "Run npx vitest run scripts/preflight/docs.test.ts web/src/authoring-agreement.test.tsx and read every failure.",
+        "Write the cause of each failure in notes (one line each) and group them."
+      ],
+      "acceptanceCriteria": [
+        "notes lists all failing tests with a one-line cause each",
+        "No test file was edited in this story (git diff --stat on the two test files is empty)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": "10 failures, all in scripts/preflight/docs.test.ts. Web test now passes (4/4).\nGROUP A stale doc content (docs/new-vs-existing.md):\n1. new-vs-existing five headings/schema version: doc lacks '1.12.0' (AEP_SCHEMA_VERSION in shared/aep/composition.ts).\n2. new-vs-existing names every top-level folder: doc lacks `engine/` (tracked dir not in folder table).\nGROUP B missing docs files (ENOENT, never in git history on any branch):\n3. demo narration 250-380 words: docs/demo-script.md missing.\n4. demo shot list >=12 rows: docs/demo-script.md missing.\n5. demo script labels/headings: docs/demo-script.md missing.\n6. project description 180-230 words: docs/submission-answers.md missing.\n7. evidence path of claimed row is a file: docs/submission-answers.md missing.\n8. X post <=280 chars: docs/x-post.md missing.\n9. s1-evidence fixtures + eight live gates: docs/s1-evidence.md missing.\n10. s1-evidence latencies match findings: docs/s1-evidence.md missing.\nweb/src/authoring-agreement.test.tsx: 0 failures now (already fixed by merge); US-003 only needs verification.\nNote: npm test still red (10 above) until US-002; typecheck and lint pass.",
+      "dependsOn": [],
+      "labels": [
+        "tests"
+      ],
+      "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "US-002",
+      "title": "Fix the docs preflight failures",
+      "description": "As a maintainer, I want scripts/preflight/docs.test.ts green so that the submission check passes.",
+      "steps": [
+        "Fix each failure from US-001 in scripts/preflight/docs.test.ts: update stale docs under docs/ or the paths the test reads.",
+        "Re-run npx vitest run scripts/preflight and confirm the rest of that folder still passes."
+      ],
+      "acceptanceCriteria": [
+        "npx vitest run scripts/preflight/docs.test.ts passes",
+        "No assertion was deleted or loosened: git diff on scripts/preflight/docs.test.ts shows each change explained in notes",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "tests",
+        "docs"
+      ],
+      "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "US-003",
+      "title": "Fix the authoring agreement failure",
+      "description": "As a maintainer, I want web/src/authoring-agreement.test.tsx green so that authoring and the schema agree.",
+      "steps": [
+        "Fix the one failing test in web/src/authoring-agreement.test.tsx at its cause (see US-001 notes).",
+        "Re-run npx vitest run web/src and confirm no other web test regressed."
+      ],
+      "acceptanceCriteria": [
+        "npx vitest run web/src/authoring-agreement.test.tsx passes",
+        "The change keeps the test's assertion meaning (explained in notes)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "tests"
+      ],
+      "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "US-004",
+      "title": "Full run",
+      "description": "As a maintainer, I want the whole suite green so that every later PRD can trust npm test.",
+      "steps": [
+        "Run npm run typecheck, npm run lint and npm test.",
+        "If any test still fails, fix its cause and re-run the full gate until it is green."
+      ],
+      "acceptanceCriteria": [
+        "npm test passes with zero failures",
+        "npm run typecheck and npm run lint pass",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": "",
+      "dependsOn": [
+        "US-002",
+        "US-003"
+      ],
+      "labels": [
+        "tests"
+      ],
+      "completionNotes": "Completed by agent"
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/10-aep-adapter.md"
+    ],
+    "readFirst": [
+      "scripts/preflight/docs.test.ts and the docs or files it checks",
+      "web/src/authoring-agreement.test.tsx",
+      "the output of: npx vitest run scripts/preflight/docs.test.ts web/src/authoring-agreement.test.tsx"
+    ],
+    "requires": [
+      "prd-x1-merge-integration"
+    ],
+    "owns": [
+      "scripts/preflight/docs.test.ts",
+      "web/src/authoring-agreement.test.tsx"
+    ],
+    "sharedEdits": [
+      "docs/**",
+      "scripts/preflight/**",
+      "package.json"
+    ],
+    "profile": "adopt",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; use the stored films under data/films/*/versions/*.json (read with node:fs) and assets under web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/10-aep-adapter.md and engine/docs/README.md before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "The app's composition format is AepCompositionJson from `@shared/aep` (our own copy of the schema). Never import `reacthub-pixitweenjs`, `pixi.js`, `@pixi/*` or `pixi-filters` in new code.",
+      "Use the engine through `@engine/*` (engine/src). Do not edit engine/ except the files in metadata.sharedEdits; if the engine lacks something, add a row to docs/todos/ENGINE-NEEDS.md, use a workaround and say so in notes.",
+      "Edit only the files the story names, their tests, and metadata.sharedEdits. Do not change server/ behaviour, agent prompts or stored films.",
+      "No `@ts-nocheck` and no `@ts-ignore`. `@ts-expect-error` only with a reason on the same line.",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic; check drawing in the browser. Never weaken a test to make it pass.",
+      "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
+      "Record only real results. Never invent measurements or test output.",
+      "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+      "EXCEPTION to the rule above, for this PRD only: you MAY edit scripts/preflight/docs.test.ts and web/src/authoring-agreement.test.tsx. Fix the cause (a stale doc, a renamed file, a changed schema) rather than weakening an assertion; if an assertion checks something that no longer exists on purpose (for example the removed library), update it to the new truth and say why in notes."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [],
+    "updatedAt": "2026-11-01T03:17:43.056Z"
+  }
+}
