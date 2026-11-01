@@ -5,7 +5,7 @@ import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { z } from 'zod';
 import type { AepCompositionJson } from '@shared/aep';
-import { CATALOG_ID_RE, catalogRowSchema, catalogRunSchema, type CatalogRow, type CatalogRun } from '@shared/catalog-run';
+import { CATALOG_ID_RE, LINE_ID_RE, catalogRowSchema, catalogRunSchema, type CatalogRow, type CatalogRun } from '@shared/catalog-run';
 
 /** A product id becomes a file name, so it may not point out of the run's own folder. */
 export const PRODUCT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -27,11 +27,13 @@ export interface RunStore {
   get(id: string): Promise<CatalogRun | undefined>;
   list(): Promise<CatalogRun[]>;
   updateRow(id: string, productId: string, patch: RowPatch): Promise<CatalogRow>;
-  setRun(id: string, patch: Partial<Pick<CatalogRun, 'state' | 'costUsd'>>): Promise<CatalogRun>;
+  setRun(id: string, patch: Partial<Pick<CatalogRun, 'state' | 'costUsd' | 'films'>>): Promise<CatalogRun>;
   saveClip(id: string, productId: string, comp: AepCompositionJson): Promise<CatalogRow>;
   readClip(id: string, productId: string): Promise<AepCompositionJson | undefined>;
   saveBuild(id: string, productId: string, input: unknown): Promise<void>;
   readBuild<T = unknown>(id: string, productId: string): Promise<T | undefined>;
+  saveFilm(id: string, lineId: string, comp: AepCompositionJson): Promise<void>;
+  readFilm(id: string, lineId: string): Promise<AepCompositionJson | undefined>;
 }
 
 export function createRunStore({ dir }: RunStoreOptions): RunStore {
@@ -43,7 +45,7 @@ export function createRunStore({ dir }: RunStoreOptions): RunStore {
     return join(root, id);
   };
   const runFile = (id: string) => join(runDir(id), 'run.json');
-  const productFile = (id: string, productId: string, folder: 'clips' | 'build') => {
+  const productFile = (id: string, productId: string, folder: 'clips' | 'build' | 'films') => {
     if (!PRODUCT_ID_RE.test(productId)) throw new RangeError(`not a product id: ${productId}`);
     return join(runDir(id), folder, `${productId}.json`);
   };
@@ -130,7 +132,7 @@ export function createRunStore({ dir }: RunStoreOptions): RunStore {
     });
   };
 
-  const setRun = async (id: string, patch: Partial<Pick<CatalogRun, 'state' | 'costUsd'>>): Promise<CatalogRun> => {
+  const setRun = async (id: string, patch: Partial<Pick<CatalogRun, 'state' | 'costUsd' | 'films'>>): Promise<CatalogRun> => {
     return locked(id, async () => {
       const run = await readRun(id);
       const next = catalogRunSchema.parse({ ...run, ...patch });
@@ -167,5 +169,15 @@ export function createRunStore({ dir }: RunStoreOptions): RunStore {
     return locked(id, () => readJson<T>(productFile(id, productId, 'build')));
   };
 
-  return { create, get, list, updateRow, setRun, saveClip, readClip, saveBuild, readBuild };
+  const saveFilm = async (id: string, lineId: string, comp: AepCompositionJson): Promise<void> => {
+    if (!LINE_ID_RE.test(lineId)) throw new RangeError(`not a line id: ${lineId}`);
+    return locked(id, () => writeJson(productFile(id, lineId, 'films'), comp));
+  };
+
+  const readFilm = async (id: string, lineId: string): Promise<AepCompositionJson | undefined> => {
+    if (!LINE_ID_RE.test(lineId)) throw new RangeError(`not a line id: ${lineId}`);
+    return locked(id, () => readJson<AepCompositionJson>(productFile(id, lineId, 'films')));
+  };
+
+  return { create, get, list, updateRow, setRun, saveClip, readClip, saveBuild, readBuild, saveFilm, readFilm };
 }

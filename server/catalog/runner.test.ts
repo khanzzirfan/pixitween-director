@@ -7,7 +7,7 @@ import { makeTestFilm } from '../test-utils/film';
 import { fakeArt } from './art';
 import { createCutoutCache } from './photos';
 import { createRunStore } from './run-store';
-import { runCatalog, type CatalogEvent, type PlateRef } from './runner';
+import { nounOf, runCatalog, type CatalogEvent, type PlateRef } from './runner';
 
 // The demo feed: six products, two photos, two categories. Every photo is a repo path, so the
 // run reads them from the disk and spends nothing on the fake art.
@@ -148,5 +148,25 @@ describe('runCatalog', () => {
     expect(others).toHaveLength(5);
     expect(others.every((r) => isFinal(r.status) && r.status !== 'failed')).toBe(true);
     expect(t.emitted.filter((e) => e.type === 'catalog.done')).toHaveLength(1);
+  });
+});
+
+describe('nounOf', () => {
+  const product = (title: string, category: string) => ({ id: 'x', title, price: 10, imageUrl: 'fixtures/x.png', category }) as Product;
+
+  it('keeps the category nouns of the demo feed', () => {
+    expect(nounOf(product('Coffee Co. Cold Brew', 'drinks'))).toBe('can');
+    expect(nounOf(product('Stone Mug', 'home'))).toBe('mug');
+  });
+
+  it('names the thing from the category or title words', () => {
+    expect(nounOf(product("Wave Rider 9'0 Longboard", 'beach summer surfboard'))).toBe('surfboard');
+    expect(nounOf(product('Clear Water Swim Goggles', 'swim summer'))).toBe('goggles');
+    expect(nounOf(product('Ice Cold Beach Cooler', 'beach summer drinks'))).toBe('cooler');
+  });
+
+  it('falls back to the last word of the title, then to product', () => {
+    expect(nounOf(product('Reef Sandals', 'beach'))).toBe('sandals');
+    expect(nounOf(product('A1', 'misc'))).toBe('product');
   });
 });

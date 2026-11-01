@@ -10,11 +10,23 @@ import { LOOKS, pickLook, type ClipLook, type OccasionId } from '../authoring/lo
 import { newPrepareCache, type Prepared3D } from '../product3d/prepare';
 import type { CatalogArt } from './art';
 import { photoKey, resolvePhoto, type CutoutCache, type CutoutEntry } from './photos';
+import { buildLineFilms } from './line-film';
 import { buildRow, loadPlateMap, type RowBuild } from './row';
 import type { RowPatch, RunStore } from './run-store';
 
 /** The product class, by category: what SAM cuts out and what the plate's centre must not hold. */
 const NOUN: Record<string, string> = { drinks: 'can', home: 'mug' };
+/** Words in a category or title that name the thing, for a feed whose categories are not the two above. First match wins. */
+const NOUN_WORDS: Array<[RegExp, string]> = [
+  [/\b(surfboards?|longboards?|shortboards?)\b/i, 'surfboard'],
+  [/\b(goggles)\b/i, 'goggles'],
+  [/\b(towels?)\b/i, 'towel'],
+  [/\b(coolers?|esky|ice ?box)\b/i, 'cooler'],
+  [/\b(trunks|shorts|swimsuits?)\b/i, 'swim shorts'],
+  [/\b(hats?|caps?)\b/i, 'hat'],
+  [/\b(bags?|backpacks?)\b/i, 'bag'],
+  [/\b(bottles?)\b/i, 'bottle'],
+];
 /** The colour a photo that carries none of its own falls back to. */
 const FALLBACK_ACCENT = '#3d4a5c';
 /** A failure's message is cut to this many characters, so a row's error stays readable. */
@@ -59,8 +71,19 @@ export interface RunCatalogOptions {
   now?: () => number;
 }
 
-/** The product class of a product: its category's, or 'product'. */
-const nounOf = (p: Product): string => NOUN[p.category] ?? 'product';
+/**
+ * The product class of a product: its category's, else a word of its category or title that names
+ * the thing, else the last word of its title ("Clear Water Swim Goggles" is goggles), else 'product'.
+ * SAM cuts out what it is asked for by name, so a vague word finds nothing in the photo.
+ */
+export function nounOf(p: Product): string {
+  const known = NOUN[p.category];
+  if (known) return known;
+  const text = `${p.category} ${p.title}`;
+  for (const [re, noun] of NOUN_WORDS) if (re.test(text)) return noun;
+  const last = p.title.trim().split(/\s+/).pop()?.toLowerCase().replace(/[^a-z]/g, '');
+  return last && last.length > 2 ? last : 'product';
+}
 
 /** A plate's key: the look and the product class it was painted for. */
 const plateKey = (look: string, noun: string): string => `${look}:${noun}`;
@@ -197,6 +220,14 @@ export async function runCatalog(o: RunCatalogOptions): Promise<void> {
     }
   }
 
-  await store.setRun(run.id, { state: 'done', costUsd: cost });
+  // The showcase: one variant film per line, cut from the clips the rows were built from. It costs nothing, and a film that
+  // cannot be built never stops the run from ending.
+  let films: Awaited<ReturnType<typeof buildLineFilms>> = [];
+  try {
+    films = await buildLineFilms((await store.get(run.id)) ?? run, store);
+  } catch (e) {
+    console.error(`catalog ${run.id}: the line films could not be built:`, e);
+  }
+  await store.setRun(run.id, { state: 'done', costUsd: cost, films });
   emit({ type: 'catalog.done', catalogId: run.id, costUsd: cost, ms: now() - started });
 }

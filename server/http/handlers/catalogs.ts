@@ -13,6 +13,7 @@ import { LOOKS, type ClipLook } from '../../authoring/looks';
 import { fakeArt, realArt, type CatalogArt } from '../../catalog/art';
 import { createCutoutCache, createMemoryCutoutCache } from '../../catalog/photos';
 import { buildRow, type RowBuild } from '../../catalog/row';
+import { buildLineFilms } from '../../catalog/line-film';
 import { createRunStore, type RunStore } from '../../catalog/run-store';
 import { runCatalog, type PlateRef, type PlateStore } from '../../catalog/runner';
 import { loadEnv } from '../../env';
@@ -237,6 +238,12 @@ export function registerCatalogRoutes(app: Hono, deps: AppDeps, opts: CatalogRou
     return c.json(await settle(run));
   });
 
+  app.get('/api/catalogs/:id/films/:lineId', async (c) => {
+    const film = await runs().readFilm(c.req.param('id'), c.req.param('lineId')).catch(() => undefined);
+    if (!film) return c.json(notFound, 404);
+    return c.json(film);
+  });
+
   app.get('/api/catalogs/:id/clips/:productId', async (c) => {
     const clip = await runs().readClip(c.req.param('id'), c.req.param('productId')).catch(() => undefined);
     if (!clip) return c.json(notFound, 404);
@@ -293,6 +300,15 @@ export function registerCatalogRoutes(app: Hono, deps: AppDeps, opts: CatalogRou
       check: result.check,
       ms: Math.round(performance.now() - started),
     });
+    // The line films that show this product carry its price too, so they are cut again (free, from the stored builds).
+    const after = await runs().get(id);
+    if (after?.films?.some((f) => f.productIds.includes(productId))) {
+      try {
+        await runs().setRun(id, { films: await buildLineFilms(after, runs()) });
+      } catch (err) {
+        console.error(`catalog ${id}: the line films could not be rebuilt after the edit:`, err);
+      }
+    }
     // The wall hears about the new row the same way the runner told it about the old one.
     deps.makeToolCtx(run.filmId).emit({ type: 'catalog.row', catalogId: id, row: updated });
     return c.json({ row: updated }, 200);

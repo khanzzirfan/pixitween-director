@@ -43,5 +43,20 @@
     "id": "ast_e86d29b01156d41f1c1617bd3c25e46a",
     "width": 720,
     "height": 1280
+  },
+  "tabletop-hero:surfboard": {
+    "id": "ast_22f9c6fe01fa360f95fd8ab166e1bd90",
+    "width": 720,
+    "height": 1280
+  },
+  "flat-lay:towel": {
+    "id": "ast_2304c450629a2c309cf1aa75a4811796",
+    "width": 720,
+    "height": 1280
+  },
+  "tabletop-hero:cooler": {
+    "id": "ast_8e699d17349a8a409d5da74ad1032eb6",
+    "width": 720,
+    "height": 1280
   }
 }

@@ -50,6 +50,26 @@ export const catalogRowSchema = z.object({
 });
 export type CatalogRow = z.infer<typeof catalogRowSchema>;
 
+/** A line film's id: `line-` and the line's name, so it is safe as a file name. */
+export const LINE_ID_RE = /^line-[a-z0-9-]{1,48}$/;
+
+/**
+ * A line film: the products of one line (one brand, else one category) in one variant film, each
+ * tumbling in on its own colour field, then a lineup end card. Built when the run ends and again
+ * after a price edit of one of its products.
+ */
+export const lineFilmSchema = z.object({
+  id: z.string().regex(LINE_ID_RE),
+  /** The brand, or the category when the products carry no brand. */
+  title: z.string().min(1),
+  /** The end card's line. */
+  tagline: z.string(),
+  productIds: z.array(z.string()).min(2),
+  /** Bumped every time the film is rebuilt, so the player reads it again. */
+  version: z.number().int().min(1),
+});
+export type LineFilm = z.infer<typeof lineFilmSchema>;
+
 export const catalogRunSchema = z.object({
   id: z.string().regex(CATALOG_ID_RE),
   /** The carrier film: its ctx runs the art, its event log carries the catalog events. */
@@ -59,6 +79,8 @@ export const catalogRunSchema = z.object({
   state: z.enum(['running', 'done']),
   costUsd: z.number().min(0),
   rows: z.array(catalogRowSchema).min(1).max(200),
+  /** The line films, once the run has ended. */
+  films: z.array(lineFilmSchema).optional(),
 });
 export type CatalogRun = z.infer<typeof catalogRunSchema>;
 

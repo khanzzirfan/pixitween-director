@@ -1,0 +1,6 @@
+id,title,price,sale_price,currency,image_link,category,link,brand
+surf-longboard,Wave Rider 9'0 Longboard,429.00,349.00,USD,fixtures/catalog/surf/surf-longboard.jpg,beach summer surfboard,/p/surf-longboard,Saltline
+surf-shortboard,Pocket Rocket 6'0 Shortboard,389.00,,USD,fixtures/catalog/surf/surf-shortboard.jpg,beach summer surfboard,/p/surf-shortboard,Saltline
+beach-towel,Sun Stripe Beach Towel,29.00,,USD,fixtures/catalog/surf/beach-towel.jpg,beach summer,/p/beach-towel,Saltline
+swim-goggles,Clear Water Swim Goggles,18.00,14.00,USD,fixtures/catalog/surf/swim-goggles.jpg,swim summer,/p/swim-goggles,Saltline
+sun-cooler,Ice Cold Beach Cooler,59.00,,USD,fixtures/catalog/surf/sun-cooler.jpg,beach summer drinks,/p/sun-cooler,Saltline
