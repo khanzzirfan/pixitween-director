@@ -31,9 +31,10 @@ const rows: Array<[string, Record<string, unknown>]> = [
 ];
 
 const CREW_VARIANTS = 9; // S12a; each one is parsed in events.crew.test.ts
+const CATALOG_VARIANTS = 2; // C1 US-001; each one is parsed in catalog-run.test.ts
 
-it('has exactly 13 original variants, one table row each, plus the crew ones', () => {
-  expect(filmEventSchema.options).toHaveLength(13 + CREW_VARIANTS);
+it('has exactly 13 original variants, one table row each, plus the crew and catalog ones', () => {
+  expect(filmEventSchema.options).toHaveLength(13 + CREW_VARIANTS + CATALOG_VARIANTS);
   expect(rows).toHaveLength(13);
 });
 
