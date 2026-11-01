@@ -4,7 +4,8 @@ import { type Object3D as Object3DSpec } from '../../schema/layer3d';
 import { disposeObject3D } from './dispose';
 import { buildGeometry } from './geometry';
 import { normalizeGltf, pickClip, type LoadedGltf } from './gltf';
-import { makeMaterial } from './materials';
+import { makeMaterial, makeUnlitMaterial } from './materials';
+import { buildSwarm } from './swarm';
 import { buildText3D, type Text3DResult } from '../text/build';
 import { recordText3DStats } from '../text/debug';
 import type { Font } from 'three/examples/jsm/loaders/FontLoader.js';
@@ -29,8 +30,28 @@ export interface BuiltObject {
   clip?: THREE.AnimationClip;
   /** The glyph hierarchy of a text3d object (for unit targets). */
   text?: Text3DResult;
+  /** Per-frame work for life, billboard, flipbook and swarm: `localSec` is the layer clock. Absent when none applies. */
+  tick?: (localSec: number, camera: THREE.Camera) => void;
   warnings: string[];
   dispose: () => void;
+}
+
+const FIT_BOX = new THREE.Box3();
+const FIT_SIZE = new THREE.Vector3();
+const FIT_CENTER = new THREE.Vector3();
+
+/** Scales `object` so its largest side is `size`, then stands it on y = 0 centred in x and z. */
+function fitToSize(object: THREE.Object3D, size: number): void {
+  object.updateMatrixWorld(true);
+  FIT_BOX.setFromObject(object, true).getSize(FIT_SIZE);
+  const largest = Math.max(FIT_SIZE.x, FIT_SIZE.y, FIT_SIZE.z);
+  object.scale.multiplyScalar(largest > 1e-9 ? size / largest : 1);
+  object.updateMatrixWorld(true);
+  FIT_BOX.setFromObject(object, true).getCenter(FIT_CENTER);
+  object.position.x -= FIT_CENTER.x;
+  object.position.z -= FIT_CENTER.z;
+  object.position.y -= FIT_BOX.min.y;
+  object.updateMatrixWorld(true);
 }
 
 export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): BuiltObject {
@@ -53,6 +74,8 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
   let shared = false;
   let disposeText: (() => void) | undefined;
   let textResult: Text3DResult | undefined;
+  let flipMaterial: THREE.MeshBasicMaterial | THREE.MeshStandardMaterial | undefined;
+  let swarmTime: ((t: number) => void) | undefined;
 
   if (spec.geometry.type === 'gltf') {
     shared = true;
@@ -61,7 +84,8 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
       warnings.push(`gltf asset ${JSON.stringify(spec.geometry.asset)} is not loaded`);
     } else {
       const content = cloneSkinned(loaded.scene);
-      normalizeGltf(content, { height: spec.geometry.height });
+      if (spec.fit !== undefined) fitToSize(content, spec.fit);
+      else normalizeGltf(content, { height: spec.geometry.height });
       root.add(content);
       if (spec.animation) {
         const picked = pickClip(loaded.animations, spec.animation.clip);
@@ -89,8 +113,69 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
     }
   } else {
     const geometry = buildGeometry(spec.geometry);
-    const mesh = new THREE.Mesh(geometry, makeMaterial(spec.material, ctx.textures));
-    root.add(mesh);
+    let material: THREE.Material | THREE.Material[];
+    if (spec.material.unlit) {
+      material = makeUnlitMaterial(spec.material, ctx.textures);
+    } else {
+      material = makeMaterial(spec.material, ctx.textures);
+      if (spec.geometry.type === 'extrude' && spec.geometry.sideColor) {
+        // Caps carry the map, the sides a plain colour.
+        material = [material, makeMaterial({ ...spec.material, map: undefined, color: spec.geometry.sideColor }, ctx.textures)];
+      }
+      if (spec.geometry.type === 'lathe' && spec.material.map) {
+        // The lathe's u seam faces +z, which would split the label down the middle; half a turn
+        // puts the label's centre on the front.
+        const texture = ctx.textures?.get(spec.material.map);
+        if (texture) texture.offset.x = 0.5;
+      }
+    }
+    flipMaterial = (Array.isArray(material) ? material[0] : material) as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
+    const mesh = new THREE.Mesh(geometry, material);
+    // Cards draw after the opaque objects so they blend over them.
+    if (spec.material.unlit) mesh.renderOrder = 1;
+    if (spec.fit !== undefined) fitToSize(mesh, spec.fit);
+    if (spec.swarm) {
+      const swarm = buildSwarm(mesh, spec.swarm);
+      // The instanced copy took a baked clone of the geometry; the source mesh is not drawn.
+      geometry.dispose();
+      root.add(swarm.mesh);
+      swarmTime = swarm.setTime;
+    } else {
+      root.add(mesh);
+    }
+  }
+
+  let tick: BuiltObject['tick'];
+  const flipFrames = spec.flipbook ? spec.flipbook.frames.map((id) => ctx.textures?.get(id)) : [];
+  if (spec.life || spec.billboard || spec.flipbook || swarmTime) {
+    const roll = THREE.MathUtils.degToRad(spec.rotation[2]);
+    let lastFrame = -1;
+    tick = (localSec, camera) => {
+      const start = spec.life?.start ?? 0;
+      // In the scene from its start up to (not including) its end, like a layer's in/out points.
+      if (spec.life) root.visible = localSec >= start && localSec < spec.life.end;
+      if (!root.visible) return;
+      const t = Math.max(0, localSec - start);
+      swarmTime?.(t);
+      if (spec.billboard) {
+        root.quaternion.copy(camera.quaternion);
+        root.rotateZ(roll);
+      }
+      if (spec.flipbook && flipMaterial) {
+        const n = flipFrames.length;
+        const raw = Math.floor(t * spec.flipbook.fps);
+        const frame = spec.flipbook.loop ? raw % n : Math.min(raw, n - 1);
+        const texture = flipFrames[frame];
+        if (texture && frame !== lastFrame) {
+          lastFrame = frame;
+          texture.wrapS = THREE.ClampToEdgeWrapping;
+          texture.wrapT = THREE.ClampToEdgeWrapping;
+          texture.colorSpace = THREE.SRGBColorSpace;
+          flipMaterial.map = texture;
+          flipMaterial.needsUpdate = true;
+        }
+      }
+    };
   }
 
   root.traverse((child) => {
@@ -109,5 +194,5 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
     disposeObject3D(root, shared ? { onlyOwned: true } : {});
   };
 
-  return { root, mixer, clip, text: textResult, warnings, dispose };
+  return { root, mixer, clip, text: textResult, tick, warnings, dispose };
 }

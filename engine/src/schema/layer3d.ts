@@ -32,7 +32,7 @@ export type LightingEnvironment = (typeof LIGHTING_ENVIRONMENTS)[number];
 
 export const LightingEnvironmentSchema = z.enum(LIGHTING_ENVIRONMENTS);
 
-export const GEOMETRY_3D_TYPES = ['box', 'sphere', 'cylinder', 'torus', 'plane', 'gltf', 'text3d'] as const;
+export const GEOMETRY_3D_TYPES = ['box', 'sphere', 'cylinder', 'torus', 'plane', 'gltf', 'text3d', 'extrude', 'lathe'] as const;
 
 export type Geometry3DType = (typeof GEOMETRY_3D_TYPES)[number];
 
@@ -80,6 +80,33 @@ export const Text3DGeometrySchema = z
   })
   .strict();
 
+// A flat contour pushed to a depth (a bean, a petal), centred on the origin. Contour, depth and bevel
+// are in the contour's own units (image pixels, y down); `fit` on the object sizes it. Group 0 is the
+// front and back caps, group 1 the sides.
+export const ExtrudeGeometrySchema = z
+  .object({
+    type: z.literal('extrude'),
+    contour: z.array(z.tuple([z.number(), z.number()])).min(3).max(2000),
+    depth: z.number().min(0),
+    bevel: z.number().min(0).optional(),
+    /** Colour of the extruded sides; the front and back caps take the material (and its map). */
+    sideColor: ColorSchema.optional(),
+  })
+  .strict();
+
+export const LATHE_SHAPES = ['can', 'bottle', 'jar', 'tube', 'pouch'] as const;
+
+// A turned packaging body (can, bottle, ...) from a fixed profile, centred on the origin. The UVs wrap a
+// label once around the body (u = angle, v = height), with the label's centre on +z.
+export const LatheGeometrySchema = z
+  .object({
+    type: z.literal('lathe'),
+    shape: z.enum(LATHE_SHAPES),
+    width: z.number().positive(),
+    height: z.number().positive(),
+  })
+  .strict();
+
 export const Geometry3DSchema = z.discriminatedUnion('type', [
   BoxGeometrySchema,
   SphereGeometrySchema,
@@ -88,6 +115,8 @@ export const Geometry3DSchema = z.discriminatedUnion('type', [
   PlaneGeometrySchema,
   GltfGeometrySchema,
   Text3DGeometrySchema,
+  ExtrudeGeometrySchema,
+  LatheGeometrySchema,
 ]);
 
 export type Geometry3D = z.output<typeof Geometry3DSchema>;
@@ -101,6 +130,66 @@ export const MaterialSchema = z
     emissiveIntensity: z.number().min(0).default(0),
     opacity: z.number().min(0).max(1).default(1),
     map: IdSchema.optional(),
+    /** Flat colours, no shading: the map (or colour) shows as authored. */
+    unlit: z.boolean().optional(),
+    /** The map has an alpha channel: transparent pixels are cut out. */
+    transparent: z.boolean().optional(),
+    // Physical material controls; any of them makes the material a MeshPhysicalMaterial.
+    clearcoat: z.number().min(0).max(1).optional(),
+    transmission: z.number().min(0).max(1).optional(),
+    ior: z.number().min(1).max(2.333).optional(),
+    thickness: z.number().min(0).optional(),
+  })
+  .strict();
+
+/** Seconds on the layer's clock the object exists for; outside it the object is hidden. */
+export const LifeSchema = z.object({ start: z.number().min(0), end: z.number().min(0) }).strict();
+
+/** Image frames shown in turn on the object's map (a card flipbook). */
+export const FlipbookSchema = z
+  .object({ frames: z.array(IdSchema).min(2).max(48), fps: z.number().positive().max(60).default(12), loop: z.boolean().default(false) })
+  .strict();
+
+/**
+ * One object drawn as `count` instanced copies whose pose is a closed-form function of time and `seed`,
+ * so a seek draws exactly the frame play would. Positions in world units, `spin` in degrees per second,
+ * `stagger` in seconds, `growFrames` in frames at `fps`. Omitted fields take the motion's defaults.
+ */
+export const Swarm3DSchema = z
+  .object({
+    count: z.number().int().min(1).max(400),
+    seed: z.number().int(),
+    motion: z.enum(['fall', 'burst', 'orbit', 'drift', 'pour']),
+    emitter: z
+      .object({
+        shape: z.enum(['point', 'box', 'sphere', 'ring']),
+        center: Vec3Schema,
+        size: Vec3Schema.optional(),
+        radius: z.number().positive().optional(),
+      })
+      .strict(),
+    direction: Vec3Schema.optional(),
+    spread: z.number().min(0).max(180).optional(),
+    speed: z.number().min(0).optional(),
+    gravity: z.number().min(0).optional(),
+    drag: z.number().min(0).optional(),
+    spin: z.number().min(0).optional(),
+    sizeJitter: z.number().min(0).max(0.9).optional(),
+    stagger: z.number().min(0).optional(),
+    growFrames: z.number().int().min(0).max(30).optional(),
+    orbit: z
+      .object({ radius: z.number().positive(), angularSpeed: z.number(), height: z.number().min(0).optional(), bob: z.number().min(0).optional() })
+      .strict()
+      .optional(),
+    drift: z
+      .object({ velocity: Vec3Schema.optional(), amplitude: Vec3Schema.optional(), frequency: z.number().positive().optional() })
+      .strict()
+      .optional(),
+    bounce: z.boolean().optional(),
+    /** Frame rate `growFrames` is counted at. */
+    fps: z.number().positive().default(30),
+    /** The object's life in seconds; `pour` spreads its copies over most of it by default. */
+    duration: z.number().min(0).optional(),
   })
   .strict();
 
@@ -123,6 +212,16 @@ export const Object3DSchema = z
     material: MaterialSchema.default({}),
     castShadow: z.boolean().default(true),
     animation: Animation3DSchema.optional(),
+    life: LifeSchema.optional(),
+    /**
+     * Scales the built object uniformly so its largest side is `fit` world units, then stands it on
+     * y = 0 centred in x and z (the object's origin is its base).
+     */
+    fit: z.number().positive().optional(),
+    /** Faces the camera every frame; rotation.z still rolls it. */
+    billboard: z.boolean().optional(),
+    flipbook: FlipbookSchema.optional(),
+    swarm: Swarm3DSchema.optional(),
   })
   .strict()
   .superRefine((object, ctx) => {
@@ -204,6 +303,15 @@ export const Lighting3DSchema = z
   .object({
     preset: LightingPresetSchema.default('studio'),
     environment: LightingEnvironmentSchema.optional(),
+    // Overrides of the preset's key, fill and rim lights and ambient. Each is also a `lighting` tween target
+    // (keyAzimuth, keyElevation, keyIntensity, fillIntensity, rimIntensity, ambient), applied to the rig every frame.
+    keyAzimuth: z.number().optional(),
+    keyElevation: z.number().optional(),
+    keyIntensity: z.number().min(0).optional(),
+    keyColor: ColorSchema.optional(),
+    fillIntensity: z.number().min(0).optional(),
+    rimIntensity: z.number().min(0).optional(),
+    ambient: z.number().min(0).optional(),
   })
   .strict()
   .transform((lighting) => ({
@@ -218,6 +326,10 @@ export const Shadow3DSchema = z
     enabled: z.boolean().default(true),
     opacity: z.number().min(0).max(1).default(0.35),
     y: z.number().default(0),
+    /** 0 (hard) to 1 (soft): the key light's shadow blur radius. */
+    softness: z.number().min(0).max(1).optional(),
+    /** Catcher size in world units [x, z]; omitted, it is fitted to the objects. */
+    size: z.tuple([z.number().positive(), z.number().positive()]).optional(),
   })
   .strict();
 
@@ -233,11 +345,15 @@ export const ThreeLayerSchema = z
     lights: z.array(Light3DSchema).max(6).default([]),
     shadow: Shadow3DSchema.default({}),
     objects: z.array(Object3DSchema).min(1).max(50),
+    /** Tone-mapping exposure (ACES input scale). */
+    exposure: z.number().positive().max(4).default(1),
   })
   .strict();
 
 export type Light3D = z.output<typeof Light3DSchema>;
 export type Material = z.output<typeof MaterialSchema>;
+
+export type Swarm3D = z.output<typeof Swarm3DSchema>;
 export type Animation3D = z.output<typeof Animation3DSchema>;
 export type Object3D = z.output<typeof Object3DSchema>;
 export type Camera3D = z.output<typeof Camera3DSchema>;

@@ -29,7 +29,10 @@ export function aepToMotion(comp: AepCompositionJson, opts: { resolveUrl?(src: s
     }
   };
   collect(comp.precomps);
-  const converted = convertLayers(comp.layers, comp.assets, comp.precomps, comp.fps, comp.theme, opts);
+  const converted = convertLayers(comp.layers, comp.assets, comp.precomps, comp.fps, comp.theme, {
+    ...opts,
+    compSize: { width: comp.width, height: comp.height },
+  });
   const { warnings, audio } = converted;
   let { layers } = converted;
   if (layers.length === 0) {

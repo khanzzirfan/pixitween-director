@@ -136,7 +136,9 @@ describe('convertProp', () => {
 
   it('converts a counter prop to a gltf object', () => {
     const { object, warnings } = convertProp(prop(), ctx);
-    expect(object!.geometry).toMatchObject({ type: 'gltf', asset: 'counter', height: 0.6 });
+    // Sized like the library's stage prop: largest side = size, standing on its base.
+    expect(object!.geometry).toMatchObject({ type: 'gltf', asset: 'counter' });
+    expect(object!.fit).toBe(0.6);
     expect(object!.position).toEqual([1.5, 0, 0]);
     expect(warnings).toEqual([]);
   });

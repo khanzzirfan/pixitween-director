@@ -16,6 +16,8 @@ type Vec3 = [number, number, number];
 export interface StageContext {
   assets: AepAssetMap;
   fps: number;
+  /** The world's in-point (frames): members' keyframes are composition frames, tweened on the world's clock. */
+  worldInPoint?: number;
 }
 
 export interface ConvertWorldResult {
@@ -69,7 +71,7 @@ export function convertActor(
   const target = `object:${id}`;
 
   const [x, z, facing] = first(actor.marks) as Vec3;
-  const tweens = objectTweens(actor.marks, ['position.x', 'position.z', 'rotation.y'], ctx.fps, actor.inPoint, target);
+  const tweens = objectTweens(actor.marks, ['position.x', 'position.z', 'rotation.y'], ctx.fps, ctx.worldInPoint ?? 0, target);
 
   const clips = actor.clips ?? [];
   const [clip, ...dropped] = clips;
@@ -104,7 +106,18 @@ export function convertActor(
 type AepProp3DLayer = Extract<AepLayer, { kind: 'prop3d' }>;
 const MAX_OBJECTS = 50;
 
-/** prop3d -> one object (glTF or primitive). `attach` has no bone support yet: place at the actor + [0.25, 0.9h, 0]. */
+// Defaults of the reacthub-pixitweenjs stage3d prop these films were made on.
+const PROP_DEFAULT_SIZE = 0.4;
+const PROP_ROUGHNESS = 0.35;
+const PROP_METALNESS = 0.05;
+const PROP_SIDE = '#d8d8d8';
+
+/**
+ * prop3d -> one object, built like the library's stage prop: sized so its largest side is `size` and
+ * standing on its base (`fit`), a turned body for packaging primitives, an extruded contour, or an image
+ * card (unlit, facing the camera, flipbook frames); a swarm is the same object as instanced copies.
+ * `attach` has no bone support yet: place at the actor + [0.25, 0.9h, 0].
+ */
 export function convertProp(
   prop: AepProp3DLayer,
   ctx: StageContext,
@@ -113,34 +126,60 @@ export function convertProp(
   const warnings: string[] = [];
   const id = sanitizeId(prop.id);
   const target = `object:${id}`;
+  const clock = ctx.worldInPoint ?? 0;
   const { source } = prop;
-
-  if (source.type === 'card' || source.type === 'extrude') {
-    warnings.push(`prop ${prop.id}: ${source.type} source is not supported yet; prop dropped`);
-    return { tweens: [], warnings };
-  }
-  if (prop.material || prop.swarm || prop.billboard || prop.lit) {
-    warnings.push(`prop ${prop.id}: material / swarm / billboard / lit are not supported yet`);
-  }
+  const mat = prop.material;
+  const side = prop.textures?.side ?? PROP_SIDE;
+  const sizeOf = (assetId: string | undefined): { w: number; h: number } | undefined => {
+    const asset = assetId ? ctx.assets[assetId] : undefined;
+    return asset && 'width' in asset && 'height' in asset && typeof asset.width === 'number' && typeof asset.height === 'number'
+      ? { w: asset.width, h: asset.height }
+      : undefined;
+  };
 
   let geometry: Object3D['geometry'];
-  let color = '#cccccc';
+  let color = side;
+  let map: string | undefined;
+  let unlit = false;
+  let transparent = false;
+  let flipbook: Object3D['flipbook'];
+  const isCard = source.type === 'card';
   if (source.type === 'gltf') {
-    geometry = { type: 'gltf', asset: sanitizeId(source.assetId), height: prop.size } as Object3D['geometry'];
-  } else {
-    const w = source.proportions?.width ?? 1;
-    const h = prop.size ?? source.proportions?.height ?? 1;
-    if (source.shape === 'box') {
-      geometry = { type: 'box', size: [w, h, source.proportions?.depth ?? w] };
-    } else {
-      if (source.shape !== 'can') warnings.push(`prop ${prop.id}: primitive '${source.shape}' drawn as a can`);
-      geometry = { type: 'cylinder', radiusTop: w / 2, radiusBottom: w / 2, height: h };
+    geometry = { type: 'gltf', asset: sanitizeId(source.assetId) } as Object3D['geometry'];
+    color = '#ffffff';
+  } else if (source.type === 'card') {
+    const frames = source.frames?.length ? source.frames : prop.textures?.front ? [prop.textures.front] : [];
+    if (frames.length === 0) {
+      warnings.push(`prop ${prop.id}: card needs textures.front or source.frames; prop dropped`);
+      return { tweens: [], warnings };
     }
+    const dims = sizeOf(frames[0]);
+    geometry = { type: 'plane', size: [dims ? dims.w / dims.h : 1, 1] };
+    map = sanitizeId(frames[0]);
+    unlit = prop.lit !== true;
+    transparent = true;
+    color = '#ffffff';
+    if (frames.length > 1) flipbook = { frames: frames.map(sanitizeId), fps: source.fps ?? 12, loop: source.loop ?? false };
+  } else if (source.type === 'extrude') {
+    // The depth is read once, at the prop's in-point.
+    const depth = sampleAt(source.depth, prop.inPoint, 100);
+    geometry = { type: 'extrude', contour: source.contour, depth: Math.max(depth, 1e-6), bevel: source.bevel, sideColor: side };
+    if (prop.textures?.front) map = sanitizeId(prop.textures.front);
+  } else if (source.shape === 'box') {
+    const w = source.proportions?.width ?? 1;
+    const h = source.proportions?.height ?? 1;
+    geometry = { type: 'box', size: [w, h, source.proportions?.depth ?? w] };
+    if (prop.textures?.front || prop.textures?.label) warnings.push(`prop ${prop.id}: a box's front image is not supported yet; drawn in its side colour`);
+  } else {
+    geometry = { type: 'lathe', shape: source.shape, width: source.proportions?.width ?? 1, height: source.proportions?.height ?? 1 };
+    const label = prop.textures?.label ?? prop.textures?.front;
+    if (label) map = sanitizeId(label);
   }
-  if (prop.textures?.side) color = prop.textures.side;
+  // `material.color` tints only a surface without an image.
+  if (mat?.color && !map) color = mat.color;
 
   let position: Vec3 = prop.position !== undefined ? (first(prop.position) as Vec3) : [0, 0, 0];
-  let tweens = objectTweens(prop.position, ['position.x', 'position.y', 'position.z'], ctx.fps, prop.inPoint, target);
+  let tweens = objectTweens(prop.position, ['position.x', 'position.y', 'position.z'], ctx.fps, clock, target);
   if (prop.attach) {
     const { actor: actorId, bone } = prop.attach;
     warnings.push(`prop ${prop.id}: attach to bone '${bone}' of actor ${actorId} is not supported yet; placed near the actor`);
@@ -151,23 +190,89 @@ export function convertProp(
     }
     tweens = [];
   }
-  const scaleValue = prop.scale !== undefined ? first(prop.scale) : 1;
-  if (prop.scale !== undefined && isKeyframed(prop.scale)) warnings.push(`prop ${prop.id}: animated scale is not supported yet; using the first value`);
-  tweens.push(...objectTweens(prop.rotation, ['rotation.x', 'rotation.y', 'rotation.z'], ctx.fps, prop.inPoint, target));
+  const billboard = isCard && (prop.billboard ?? true);
+  // A billboard takes its turn from the camera; only its roll (z) is authored.
+  if (!billboard) tweens.push(...objectTweens(prop.rotation, ['rotation.x', 'rotation.y', 'rotation.z'], ctx.fps, clock, target));
+  else if (prop.rotation !== undefined && isKeyframed(prop.rotation)) warnings.push(`prop ${prop.id}: an animated card roll is not supported yet; using the first value`);
+  tweens.push(...objectTweens(prop.scale, ['scale.x', 'scale.y', 'scale.z'], ctx.fps, clock, target));
+  if (!unlit) {
+    tweens.push(...objectTweens(mat?.roughness, ['material.roughness'], ctx.fps, clock, target));
+    tweens.push(...objectTweens(mat?.metalness, ['material.metalness'], ctx.fps, clock, target));
+  }
+
+  let swarm: Object3D['swarm'];
+  if (prop.swarm) {
+    swarm = { ...prop.swarm, fps: ctx.fps, duration: Math.max(0, (prop.outPoint - prop.inPoint) / 30) } as Object3D['swarm'];
+  }
 
   const object = {
     id,
     geometry,
     position,
     rotation: prop.rotation !== undefined ? (first(prop.rotation) as Vec3) : [0, 0, 0],
-    scale: scaleValue,
-    material: { ...GLTF_MATERIAL, color: source.type === 'gltf' ? '#ffffff' : color },
-    castShadow: prop.castShadow ?? true,
+    scale: prop.scale !== undefined ? (first(prop.scale) as Vec3) : 1,
+    material: {
+      color,
+      roughness: mat?.roughness !== undefined ? first(mat.roughness) : PROP_ROUGHNESS,
+      metalness: mat?.metalness !== undefined ? first(mat.metalness) : PROP_METALNESS,
+      emissive: '#000000',
+      emissiveIntensity: 0,
+      opacity: mat?.opacity ?? 1,
+      map,
+      unlit,
+      transparent,
+      // The library's props are always physical (clearcoat 0 by default).
+      clearcoat: unlit ? undefined : (mat?.clearcoat ?? 0),
+      transmission: mat?.transmission,
+      ior: mat?.ior,
+      thickness: mat?.thickness,
+    },
+    castShadow: prop.castShadow ?? !isCard,
+    fit: prop.size ?? PROP_DEFAULT_SIZE,
+    life: { start: Math.max(0, (prop.inPoint - clock) / ctx.fps), end: Math.max(0, (prop.outPoint - clock) / ctx.fps) },
+    billboard: billboard || undefined,
+    flipbook,
+    swarm,
   } as unknown as Object3D;
   return { object, tweens, warnings };
 }
 
-export function convertWorld(world: AepStage3DLayer, members: AepLayer[], ctx: StageContext): ConvertWorldResult {
+/** A scalar animatable's value at composition frame `frame` (hold keys and out-handle easing as the library sampled them). */
+function sampleAt(value: AepAnimatable<number> | undefined, frame: number, fallback: number): number {
+  if (value === undefined) return fallback;
+  if (!isKeyframed(value)) return value;
+  const keys = value;
+  if (frame <= keys[0].t) return keys[0].v;
+  const last = keys[keys.length - 1];
+  if (frame >= last.t) return last.v;
+  for (let i = 0; i < keys.length - 1; i++) {
+    const a = keys[i];
+    const b = keys[i + 1];
+    if (frame < a.t || frame > b.t) continue;
+    if (a.hold) return a.v;
+    const raw = b.t > a.t ? (frame - a.t) / (b.t - a.t) : 0;
+    return a.v + (b.v - a.v) * (a.easeOut ? cubicBezierAt(a.easeOut, raw) : raw);
+  }
+  return last.v;
+}
+
+function cubicBezierAt([x1, y1, x2, y2]: readonly number[], x: number): number {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  let t = x;
+  for (let i = 0; i < 8; i++) {
+    const u = 1 - t;
+    const xt = 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t;
+    const dxt = 3 * u * u * x1 + 6 * u * t * (x2 - x1) + 3 * t * t * (1 - x2);
+    if (Math.abs(dxt) < 1e-9) break;
+    t = Math.min(1, Math.max(0, t - (xt - x) / dxt));
+  }
+  const u = 1 - t;
+  return 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t;
+}
+
+export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerCtx: StageContext): ConvertWorldResult {
+  const ctx: StageContext = { ...outerCtx, worldInPoint: world.inPoint };
   const { base, tweens: baseTweens, warnings } = mapBaseLayer(world, ctx.fps);
   const id = sanitizeId(world.id);
 
@@ -185,17 +290,41 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], ctx: S
     if ((PRESETS as readonly string[]).includes(preset)) lightingPreset = preset;
     else warnings.push(`layer ${world.id}: unknown lighting preset '${String(preset)}'; using 'studio'`);
   }
+  // The key (aim, level, colour), fill, rim and ambient follow their keyframes, as the library's world
+  // sampled them every frame.
   const lights = world.lights;
-  if (lights && (lights.key || lights.fill || lights.rim || lights.ambient !== undefined || lights.spots?.length)) {
-    warnings.push(`layer ${world.id}: lights key/fill/rim/ambient/spots overrides are not supported yet; using the preset`);
-  }
+  const lighting: Record<string, unknown> = {};
+  const lightTweens: ConvertedTween[] = [];
+  const lightValue = (value: AepAnimatable<number> | undefined, prop: 'keyAzimuth' | 'keyElevation' | 'keyIntensity' | 'fillIntensity' | 'rimIntensity' | 'ambient') => {
+    if (value === undefined) return;
+    lighting[prop] = first(value);
+    lightTweens.push(...propertyTweens(value, { fps: ctx.fps, inPoint: world.inPoint, props: [prop] }).tweens.map((t) => ({ ...t, ...{ target: 'lighting' } })));
+  };
+  lightValue(lights?.key?.azimuth, 'keyAzimuth');
+  lightValue(lights?.key?.elevation, 'keyElevation');
+  lightValue(lights?.key?.intensity, 'keyIntensity');
+  lightValue(lights?.fill?.intensity, 'fillIntensity');
+  lightValue(lights?.rim?.intensity, 'rimIntensity');
+  lightValue(lights?.ambient, 'ambient');
+  if (lights?.key?.color) lighting.keyColor = lights.key.color;
+  if (lights?.spots?.length) warnings.push(`layer ${world.id}: lights.spots are not supported yet`);
 
   const style = world.style;
   if (style?.shading === 'toon' || style?.outline) {
     warnings.push(`layer ${world.id}: toon shading / outline is not supported yet; using standard shading`);
   }
-  if (world.camera.focus) warnings.push(`layer ${world.id}: camera.focus is not supported yet`);
   if (world.set?.fog) warnings.push(`layer ${world.id}: set.fog is not supported yet`);
+
+  // Depth of field: the library's circle-of-confusion pass, focus distance keyframed on the world.
+  const effects: Array<{ id: string; type: 'stageDof'; params: Record<string, number> }> = [];
+  const focusTweens: ConvertedTween[] = [];
+  const focus = world.camera.focus;
+  if (focus && (focus.aperture ?? 0) > 0) {
+    effects.push({ id: 'dof', type: 'stageDof', params: { aperture: focus.aperture ?? 0, focusDistance: first(focus.distance) } });
+    focusTweens.push(
+      ...propertyTweens(focus.distance, { fps: ctx.fps, inPoint: world.inPoint, props: ['focusDistance'] }).tweens.map((t) => ({ ...t, ...{ target: 'effect:dof' } })),
+    );
+  }
 
   const objects: Object3D[] = [];
   const set = world.set;
@@ -292,30 +421,43 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], ctx: S
     ...actorTweens,
     ...cameraTweens(world.camera.position, ['position.x', 'position.y', 'position.z'], ctx.fps, world.inPoint),
     ...cameraTweens(fovValue, ['fov'], ctx.fps, world.inPoint),
+    ...lightTweens,
+    ...focusTweens,
   ].map((t) => ({ repeat: 0, yoyo: false, ...t }));
   if (tweens.length > 64) warnings.push(`layer ${world.id}: ${tweens.length} tweens exceed the engine limit of 64`);
 
+  // The library's floor: a shadow-only catcher at 0.55 under `ground: "none"`, darkened by the key
+  // light's shadow strength (the world's shadow opacity), over the whole ground size.
   const shadowOpacity = world.shadow?.opacity !== undefined ? first(world.shadow.opacity) : 0.55;
+  if (world.shadow?.opacity !== undefined && isKeyframed(world.shadow.opacity)) warnings.push(`layer ${world.id}: animated shadow opacity is not supported yet; using the first value`);
+  const catcherOpacity = ground === 'none' ? 0.55 * shadowOpacity : shadowOpacity;
   const layer = {
     ...base,
     id,
     anchor: [0.5, 0.5] as [number, number],
-    effects: [],
     tweens: tweens.slice(0, 64),
     type: 'three' as const,
     width: clampSize(width),
     height: clampSize(height),
     background: 'transparent' as const,
+    effects,
     camera: {
       position: first(world.camera.position) as Vec3,
       lookAt: first(world.camera.target) as Vec3,
       fov: first(fovValue),
-      near: 0.1,
+      near: 0.05,
       far: 200,
     },
-    lighting: { preset: lightingPreset, environment: lights?.environment },
+    lighting: { preset: lightingPreset, environment: lights?.environment, ...lighting },
     lights: [],
-    shadow: { enabled: shadowOpacity > 0, opacity: shadowOpacity, y: 0 },
+    shadow: {
+      enabled: shadowOpacity > 0,
+      opacity: catcherOpacity,
+      y: 0,
+      softness: world.shadow?.softness ?? 0.5,
+      size: set?.groundSize ?? DEFAULT_GROUND_SIZE,
+    },
+    exposure: world.style?.exposure ?? 1,
     objects,
   } as unknown as ThreeLayer;
 

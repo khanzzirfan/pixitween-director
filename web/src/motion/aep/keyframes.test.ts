@@ -24,8 +24,20 @@ describe('easeFor', () => {
     expect(easeFor({ t: 0, v: 0, easeOut: [0, 0, 0.58, 1] }, { t: 18, v: 1 })).toBe('cubic(0,0,0.58,1)');
   });
 
-  it('prefers k1.easeIn end handle over k0.easeOut end handle', () => {
-    expect(easeFor({ t: 0, v: 0, easeOut: [0, 0, 0.58, 1] }, { t: 18, v: 1, easeIn: [0.2, 0.3, 0.9, 0.8] })).toBe('cubic(0,0,0.9,0.8)');
+  it('eases by k0.easeOut alone, like the reacthub-pixitweenjs sampler (k1.easeIn is not read)', () => {
+    expect(easeFor({ t: 0, v: 0, easeOut: [0, 0, 0.58, 1] }, { t: 18, v: 1, easeIn: [0.2, 0.3, 0.9, 0.8] })).toBe('cubic(0,0,0.58,1)');
+    expect(easeFor({ t: 0, v: 0 }, { t: 18, v: 1, easeIn: [0.2, 0.3, 0.9, 0.8] })).toBe('none');
+  });
+
+  it('turns a hold key into an instant tween at the next key', () => {
+    const result = propertyTweens(
+      [
+        { t: 0, v: 0, hold: true },
+        { t: 30, v: 1 },
+      ],
+      { fps: 30, inPoint: 0, props: ['alpha'] },
+    );
+    expect(result.tweens).toEqual([{ at: 1, duration: 0, from: { alpha: 0 }, to: { alpha: 1 }, ease: 'none' }]);
   });
 });
 

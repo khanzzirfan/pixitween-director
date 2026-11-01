@@ -23,6 +23,8 @@ import type { ConvertedTween } from './keyframes';
 
 export interface ConvertLayersOptions {
   resolveUrl?: (src: string) => string;
+  /** The composition these layers belong to (text anchors are read against its size). */
+  compSize?: { width: number; height: number };
 }
 
 export interface ConvertLayersResult {
@@ -54,7 +56,7 @@ export function convertLayers(
 
     switch (layer.kind) {
       case 'shape': {
-        const result = convertShape(layer, fps, theme);
+        const result = convertShape(layer, fps, theme, opts.compSize);
         warnings.push(...result.warnings);
         emitted.push(result.layer);
         break;
@@ -66,7 +68,7 @@ export function convertLayers(
         break;
       }
       case 'text': {
-        const result = convertText(layer, fps, theme);
+        const result = convertText(layer, fps, theme, opts.compSize);
         warnings.push(...result.warnings);
         emitted.push(result.layer);
         break;
@@ -95,7 +97,10 @@ export function convertLayers(
           warnings.push(`layer ${layer.id}: precomp '${layer.compId}' has no inline layers`);
           break;
         }
-        const nestedResult = convertLayers(nested.layers, nested.assets, nested.precomps, nested.fps, nested.theme ?? theme, opts);
+        const nestedResult = convertLayers(nested.layers, nested.assets, nested.precomps, nested.fps, nested.theme ?? theme, {
+          ...opts,
+          compSize: { width: nested.width, height: nested.height },
+        });
         warnings.push(...nestedResult.warnings);
         audio.push(...nestedResult.audio);
         if (nestedResult.layers.length === 0) {

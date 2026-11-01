@@ -95,13 +95,32 @@ function toEngineTweens(tweens: ConvertedTween[]): TextLayer['tweens'] {
   return tweens.map((tween) => ({ ...tween, repeat: 0, yoyo: false }));
 }
 
-export function convertText(layer: AepTextLayer, fps: number, theme?: AepThemeMap): ConvertTextResult {
+/**
+ * A text layer has no intrinsic size of its own, so the reacthub-pixitweenjs player read its anchor
+ * against the composition: anchor / comp size is the fraction of the text's own box that sits on
+ * the position. The usual [W/2, H/2] therefore centres the text on its position.
+ */
+function textAnchor(layer: AepTextLayer, compSize: { width: number; height: number } | undefined): [number, number] {
+  if (!compSize || !(compSize.width > 0) || !(compSize.height > 0)) return [0.5, 0.5];
+  const [ax, ay] = firstValue(layer.transform.anchor) as number[];
+  return [ax / compSize.width, ay / compSize.height];
+}
+
+export function convertText(
+  layer: AepTextLayer,
+  fps: number,
+  theme?: AepThemeMap,
+  compSize?: { width: number; height: number },
+): ConvertTextResult {
   const { base, tweens, warnings } = mapBaseLayer(layer, fps);
+  if (isKeyframed(layer.transform.anchor)) warnings.push(`layer ${layer.id}: animated anchor is not supported yet; using the first value`);
 
   const textLayer: TextLayer = {
     ...base,
+    // The fractional anchor below places the text; a pixel pivot would override it.
+    pivot: undefined,
     id: sanitizeId(layer.id),
-    anchor: [0.5, 0.5],
+    anchor: textAnchor(layer, compSize),
     effects: [],
     tweens: toEngineTweens(tweens),
     type: 'text',

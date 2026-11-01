@@ -26,28 +26,32 @@ test('desktop: no page scroll, player and filmstrip in view, panels resize and r
   expect(box.y + box.height).toBeLessThanOrEqual(900);
   await expect(page.locator('[data-scene-chip]').first()).toBeInViewport();
 
-  // dragging the left handle changes the left panel width, and a reload keeps it
-  const left = page.locator('[data-panel][id="left"]');
-  const before = (await left.boundingBox())!.width;
+  // the tab panel sits on the left next to the rail, the chat always on the right
+  const tabs = page.locator('[data-panel][id="tabs"]');
+  const desk = page.locator('[data-panel][id="desk"]');
+  expect((await tabs.boundingBox())!.x).toBeLessThan((await desk.boundingBox())!.x);
+
+  // dragging the first handle changes the left panel width, and a reload keeps it
+  const before = (await tabs.boundingBox())!.width;
   const handle = page.locator('[data-panel-resize-handle-id]').first();
   const h = (await handle.boundingBox())!;
   await page.mouse.move(h.x + h.width / 2, h.y + 200);
   await page.mouse.down();
   await page.mouse.move(h.x + h.width / 2 + 120, h.y + 200, { steps: 6 });
   await page.mouse.up();
-  const after = (await left.boundingBox())!.width;
+  const after = (await tabs.boundingBox())!.width;
   expect(after).toBeGreaterThan(before + 60);
   await page.waitForTimeout(400); // the panel library saves the layout on a short debounce
   await page.reload();
-  await expect(left).toBeVisible();
-  await expect.poll(async () => Math.abs((await left.boundingBox())!.width - after), { timeout: 5000 }).toBeLessThan(3);
+  await expect(tabs).toBeVisible();
+  await expect.poll(async () => Math.abs((await tabs.boundingBox())!.width - after), { timeout: 5000 }).toBeLessThan(3);
 
   // the stepper follows the status, and the active rail tab collapses the left panel
   await expect(page.locator('.sh-steps li[aria-current="step"]')).toHaveText(/Export/);
   await page.getByTestId('rail-plan').click();
-  await expect.poll(async () => (await left.boundingBox())?.width ?? 0).toBeLessThan(4);
+  await expect.poll(async () => (await tabs.boundingBox())?.width ?? 0).toBeLessThan(4);
   await page.getByTestId('rail-plan').click();
-  await expect.poll(async () => (await left.boundingBox())?.width ?? 0).toBeGreaterThan(150);
+  await expect.poll(async () => (await tabs.boundingBox())?.width ?? 0).toBeGreaterThan(150);
 });
 
 test('phone: no sideways scroll and the bottom tab bar is visible', async ({ page }) => {

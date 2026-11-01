@@ -4,12 +4,12 @@ import { type MotionDoc } from '../../schema/doc';
 import { type Animation3D, type Light3D, type ThreeLayer } from '../../schema/layer3d';
 import { disposeObject3D } from './dispose';
 import { loadGltf, type LoadedGltf } from './gltf';
-import { applyEnvironment, createLightingRig, disposeLightingRig, resolveLightingConfig } from './lighting';
+import { applyEnvironment, applyLightingRig, createLightingRig, disposeLightingRig, resolveLightingConfig } from './lighting';
 import { loadFont } from '../text/font';
 import { loadTexture } from './materials';
 import type { Text3DResult } from '../text/build';
 import { buildObject, type BuiltObject, type ObjectBuildContext } from './object';
-import { createShadowCatcher, fitShadowCamera } from './shadow';
+import { coverShadowCamera, createShadowCatcher, fitShadowCamera } from './shadow';
 
 // A `three` layer turned into a ready scene: camera, lights (preset rig + extras), the objects
 // (each a wrapper Group) and the shadow catcher. ThreeNode only has to draw it and scrub time.
@@ -41,9 +41,16 @@ export interface ThreeRig {
   lights: Map<string, THREE.Light>;
   shadow: THREE.Mesh | null;
   mixers: RigMixer[];
+  /** The `lighting` tween target: the preset rig's key (azimuth, elevation, intensity), fill and rim intensity, and ambient. */
+  lightingTarget: Record<LightingTweenProp, number>;
+  /** Runs the objects' per-frame work (life, billboard, flipbook, swarm) for the layer clock. */
+  tick: (localSec: number) => void;
   warnings: string[];
   dispose: () => void;
 }
+
+export const LIGHTING_TWEEN_PROPS = ['keyAzimuth', 'keyElevation', 'keyIntensity', 'fillIntensity', 'rimIntensity', 'ambient'] as const;
+export type LightingTweenProp = (typeof LIGHTING_TWEEN_PROPS)[number];
 
 const SHADOW_SIZE_MARGIN = 2.6;
 const DEFAULT_SHADOW_SIZE = 20;
@@ -64,8 +71,27 @@ export function buildScene(layer: ThreeLayer, ctx: SceneContext = {}): ThreeRig 
   const lookAt = new THREE.Vector3(layer.camera.lookAt[0], layer.camera.lookAt[1], layer.camera.lookAt[2]);
   camera.lookAt(lookAt);
 
-  const lightingConfig = resolveLightingConfig(layer.lighting.preset, {}, layer.lighting.environment);
+  const { keyAzimuth, keyElevation, keyIntensity, keyColor, fillIntensity, rimIntensity, ambient } = layer.lighting;
+  const lightingConfig = resolveLightingConfig(
+    layer.lighting.preset,
+    { keyAzimuth, keyElevation, keyIntensity, keyColor, fillIntensity, rimIntensity },
+    layer.lighting.environment,
+  );
+  if (ambient !== undefined) lightingConfig.ambientIntensity = ambient;
   const lighting = createLightingRig(lightingConfig);
+  // The `lighting` tween target: writing a field re-aims and re-levels the rig, like a sampled preset.
+  const lightingTarget = {} as Record<LightingTweenProp, number>;
+  for (const prop of LIGHTING_TWEEN_PROPS) {
+    const field = prop === 'ambient' ? 'ambientIntensity' : prop;
+    Object.defineProperty(lightingTarget, prop, {
+      enumerable: true,
+      get: () => lightingConfig[field],
+      set: (value: number) => {
+        lightingConfig[field] = value;
+        applyLightingRig(lighting, lightingConfig);
+      },
+    });
+  }
   scene.add(lighting.group);
   if (ctx.renderer) applyEnvironment(scene, lightingConfig, ctx.renderer);
 
@@ -106,14 +132,23 @@ export function buildScene(layer: ThreeLayer, ctx: SceneContext = {}): ThreeRig 
 
   let shadow: THREE.Mesh | null = null;
   if (layer.shadow.enabled) {
-    const size = box.isEmpty()
-      ? DEFAULT_SHADOW_SIZE
-      : Math.max(box.max.x - box.min.x, box.max.z - box.min.z, 1e-3) * SHADOW_SIZE_MARGIN;
-    const center = box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3());
-    shadow = createShadowCatcher({ opacity: layer.shadow.opacity, y: layer.shadow.y, size });
-    shadow.position.set(center.x, layer.shadow.y, center.z);
+    const fixed = layer.shadow.size;
+    if (fixed) {
+      // A fixed stage floor: the catcher covers it, centred on the origin, and the key light's
+      // shadow camera covers the whole floor (objects move across it over the film).
+      shadow = createShadowCatcher({ opacity: layer.shadow.opacity, y: layer.shadow.y, size: fixed[0], depth: fixed[1] });
+      if (layer.lighting.preset !== 'none') coverShadowCamera(lighting.key, Math.max(fixed[0], fixed[1]) / 2);
+    } else {
+      const size = box.isEmpty()
+        ? DEFAULT_SHADOW_SIZE
+        : Math.max(box.max.x - box.min.x, box.max.z - box.min.z, 1e-3) * SHADOW_SIZE_MARGIN;
+      const center = box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3());
+      shadow = createShadowCatcher({ opacity: layer.shadow.opacity, y: layer.shadow.y, size });
+      shadow.position.set(center.x, layer.shadow.y, center.z);
+      if (layer.lighting.preset !== 'none') fitShadowCamera(lighting.key, box);
+    }
     scene.add(shadow);
-    if (layer.lighting.preset !== 'none') fitShadowCamera(lighting.key, box);
+    if (layer.shadow.softness !== undefined) lighting.key.shadow.radius = 1 + layer.shadow.softness * 6;
   }
 
   const dispose = () => {
@@ -133,7 +168,13 @@ export function buildScene(layer: ThreeLayer, ctx: SceneContext = {}): ThreeRig 
     scene.clear();
   };
 
-  return { scene, camera, restPosition, lookAt, objects, texts, lights, shadow, mixers, warnings, dispose };
+  const ticking = built.filter((object) => object.tick);
+  const tick = (localSec: number): void => {
+    for (const object of ticking) object.tick?.(localSec, camera);
+  };
+  tick(0);
+
+  return { scene, camera, restPosition, lookAt, objects, texts, lights, shadow, mixers, lightingTarget, tick, warnings, dispose };
 }
 
 function buildLight(spec: Light3D): { light: THREE.Light; target: THREE.Object3D | null } {
@@ -179,6 +220,7 @@ export async function preloadThreeAssets(layer: ThreeLayer, doc: MotionDoc): Pro
   const fontIds = new Set<string>();
   for (const object of layer.objects) {
     if (object.material.map !== undefined) textureIds.add(object.material.map);
+    for (const frame of object.flipbook?.frames ?? []) textureIds.add(frame);
     if (object.geometry.type === 'gltf') gltfIds.add(object.geometry.asset);
     if (object.geometry.type === 'text3d') fontIds.add(object.geometry.font);
   }

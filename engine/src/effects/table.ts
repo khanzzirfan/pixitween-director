@@ -25,6 +25,8 @@ import type { EffectScope, EffectType } from '../schema';
 import { GlowEffect } from './custom/glow';
 import { DropShadowEffect } from './custom/dropShadow';
 import { OutlineEffect2D } from './custom/outline';
+import { GaussianBlurPass } from './custom/gaussianBlur';
+import { StageDofPass } from './custom/stageDof';
 
 // One table from an effect type to its constructor and tweenable fields, so adding an effect is one
 // entry (engine/docs/05-effects.md, "The effect table"). Every field name is checked against
@@ -406,6 +408,36 @@ const blur: EffectDef<KawaseBlurPass> = {
   },
 };
 
+const GAUSSIAN_BLUR_DEFAULTS = { strength: 8 };
+
+/** pixi.js BlurFilter look (the AEP `gaussian-blur` effect): `strength` is the filter's strength in px. */
+const gaussianBlur: EffectDef<GaussianBlurPass> = {
+  type: 'gaussianBlur',
+  scope: 'any',
+  defaults: GAUSSIAN_BLUR_DEFAULTS,
+  create: (params) => new GaussianBlurPass(num({ ...GAUSSIAN_BLUR_DEFAULTS, ...params }.strength)),
+  tweenable: {
+    strength: field((e) => e.strength, (e, v) => (e.strength = v)),
+  },
+};
+
+const STAGE_DOF_DEFAULTS = { aperture: 0.3, focusDistance: 1 };
+
+/** The stage world's depth of field (circle-of-confusion gather); focusDistance in world units. */
+const stageDof: EffectDef<StageDofPass> = {
+  type: 'stageDof',
+  scope: 'three',
+  defaults: STAGE_DOF_DEFAULTS,
+  create: (params, { camera }) => {
+    const p = { ...STAGE_DOF_DEFAULTS, ...params };
+    return new StageDofPass(camera, num(p.aperture), num(p.focusDistance));
+  },
+  tweenable: {
+    aperture: field((e) => e.aperture, (e, v) => (e.aperture = v)),
+    focusDistance: field((e) => e.focusDistance, (e, v) => (e.focusDistance = v)),
+  },
+};
+
 const GLOW_DEFAULTS = { color: '#ffffff', strength: 2, distance: 10 };
 
 const glow: EffectDef<GlowEffect> = {
@@ -498,6 +530,8 @@ export const EFFECTS: Partial<Record<EffectType, EffectDef>> = {
   dotScreen,
   tiltShift,
   blur,
+  gaussianBlur,
+  stageDof,
   dof,
   glow,
   dropShadow,
@@ -517,6 +551,8 @@ export function effectReach(spec: { type: EffectType; params?: Record<string, Pa
       return num(p.thickness, OUTLINE_DEFAULTS.thickness);
     case 'blur':
       return 32;
+    case 'gaussianBlur':
+      return GaussianBlurPass.reach(num(p.strength, GAUSSIAN_BLUR_DEFAULTS.strength));
     default:
       return 0;
   }
@@ -532,4 +568,4 @@ export function registerEffect(def: EffectDef): void {
 }
 
 /** True for effect types implemented as a Pass (run before the EffectPass) rather than an Effect. */
-export const PASS_EFFECTS: ReadonlySet<EffectType> = new Set<EffectType>(['blur']);
+export const PASS_EFFECTS: ReadonlySet<EffectType> = new Set<EffectType>(['blur', 'gaussianBlur', 'stageDof']);

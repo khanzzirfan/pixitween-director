@@ -14,7 +14,7 @@ import { resolveUnitTargets } from './text/targets';
 import { parseUnitTarget } from '../schema/scalars';
 import { disposeObject3D } from './build/dispose';
 import { clipTime } from './build/gltf';
-import { buildScene, preloadThreeAssets, type PreloadedThreeAssets, type ThreeRig } from './build/scene';
+import { buildScene, LIGHTING_TWEEN_PROPS, preloadThreeAssets, type PreloadedThreeAssets, type ThreeRig } from './build/scene';
 
 // A `three` layer as a MotionNode (engine/docs/04-three.md): the rig renders through its effect chain
 // (ACES last) into a WebGLRenderTarget on the player's one renderer, shown on a plane in the stage.
@@ -31,7 +31,7 @@ export interface ThreeNode extends MotionNode {
 // A layer whose rig cannot be built without loading (a glTF or a textured material) needs an async
 // pass; a primitive-only layer builds its rig synchronously, so its targets resolve immediately.
 function needsAsyncAssets(layer: ThreeLayer): boolean {
-  return layer.objects.some((object) => object.geometry.type === 'gltf' || object.geometry.type === 'text3d' || object.material.map !== undefined);
+  return layer.objects.some((object) => object.geometry.type === 'gltf' || object.geometry.type === 'text3d' || object.material.map !== undefined || object.flipbook !== undefined);
 }
 
 /** `pathRef` throws for a missing segment; a tween target never wants that, so a bad path is null. */
@@ -244,6 +244,18 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
   const planeMaterial = new THREE.MeshBasicMaterial({ map: target.texture, transparent: true, toneMapped: false });
   configure2DMaterial(planeMaterial);
   applyBlendMode(planeMaterial, layer.blendMode);
+  // The rig's output is already multiplied by alpha, and its tone mapping and colour encoding ran on that
+  // premultiplied colour (as the reacthub-pixitweenjs offscreen renderer's did, which is what gives
+  // glass and soft edges their look). It is added over what is behind it as it is, not multiplied
+  // by alpha a second time; the other blend modes keep their own factors.
+  if (!layer.blendMode || layer.blendMode === 'normal') {
+    planeMaterial.blending = THREE.CustomBlending;
+    planeMaterial.blendEquation = THREE.AddEquation;
+    planeMaterial.blendSrc = THREE.OneFactor;
+    planeMaterial.blendDst = THREE.OneMinusSrcAlphaFactor;
+    planeMaterial.blendSrcAlpha = THREE.OneFactor;
+    planeMaterial.blendDstAlpha = THREE.OneMinusSrcAlphaFactor;
+  }
   const plane = new THREE.Mesh(planeGeometry, planeMaterial);
   plane.name = `${layer.id}:plane`;
   plane.position.set(width / 2, -height / 2, 0);
@@ -292,6 +304,40 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
   // which is permanent (compileTweens resolves once, up front) — so each requested effect param gets a
   // stable object whose accessors re-check the live `chain` on every GSAP tick, not just at this call.
   const lazyEffectProxies = new Map<string, Record<string, ParamValue>>();
+
+  const lightingProxy = {} as Record<string, number>;
+  for (const prop of LIGHTING_TWEEN_PROPS) {
+    Object.defineProperty(lightingProxy, prop, {
+      enumerable: true,
+      get: () => rig?.lightingTarget[prop] ?? 0,
+      set: (value: number) => {
+        if (rig) rig.lightingTarget[prop] = value;
+      },
+    });
+  }
+
+  // The layer's exposure scales the scene before the ACES curve (three's tone mapping exposure, which
+  // the chain's tone mapping reads); the shared renderer gets its own value back afterwards.
+  const renderChain = (built: EffectChain, r: THREE.WebGLRenderer | null): void => {
+    if (!r) {
+      built.render(r as unknown as THREE.WebGLRenderer);
+      return;
+    }
+    const previous = r.toneMappingExposure;
+    r.toneMappingExposure = layer.exposure;
+    // A transparent layer draws over a clear alpha of 0, as the library's offscreen renderer always did:
+    // three's glass (transmission) pass reads the renderer's clear alpha, and a transparent one makes it
+    // see a pale backdrop instead of the stage's own clear colour.
+    const clearColor = r.getClearColor(new THREE.Color());
+    const clearAlpha = r.getClearAlpha();
+    if (layer.background === 'transparent') r.setClearColor(0x000000, 0);
+    try {
+      built.render(r);
+    } finally {
+      r.toneMappingExposure = previous;
+      r.setClearColor(clearColor, clearAlpha);
+    }
+  };
 
   function resolveEffectTarget(id: string, prop: string): TargetRef | null {
     const spec = layer.effects.find((e) => e.id === id);
@@ -379,6 +425,12 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
         return wrapper ? resolveObjectTarget(wrapper, prop) : null;
       }
 
+      if (targetName === 'lighting') {
+        if (!(LIGHTING_TWEEN_PROPS as readonly string[]).includes(prop)) return null;
+        // Stable across the async rig build: the accessors find the live rig on every write.
+        return { obj: lightingProxy, key: prop, kind: 'number' };
+      }
+
       const lightPrefix = 'light:';
       if (targetName.startsWith(lightPrefix)) {
         const light = rig?.lights.get(targetName.slice(lightPrefix.length));
@@ -421,10 +473,13 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
         lastFov = rig.camera.fov;
         rig.camera.updateProjectionMatrix();
       }
+      // Life, swarms, flipbooks and billboards; billboards need the camera's final orientation.
+      rig.camera.updateMatrixWorld(true);
+      rig.tick(localSec);
 
       try {
         // A test chain ignores the renderer; a real one always has it.
-        chain.render(renderer as THREE.WebGLRenderer);
+        renderChain(chain, renderer);
         settleReady();
       } catch (error) {
         reportError(error);
@@ -508,7 +563,7 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
     // for a while (a paused player that never seeks again after an async asset resolves). Render
     // once here too, so `ready` settles as soon as the rig is actually drawable, not just built.
     try {
-      chain.render(renderer);
+      renderChain(chain, renderer);
       settleReady();
     } catch (error) {
       reportError(error);

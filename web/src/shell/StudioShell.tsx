@@ -82,36 +82,37 @@ export function StudioShell(p: StudioShellProps) {
   }, [p.defaultTab]);
   const [sideOpen, setSideOpen] = useState(true);
   const [help, setHelp] = useState(false);
-  const left = useRef<ImperativePanelHandle>(null);
-  const right = useRef<ImperativePanelHandle>(null);
+  // the tab panel (storyboard, panels, …) sits on the left next to the rail, the chat always on the right
+  const desk = useRef<ImperativePanelHandle>(null);
+  const tabsPanel = useRef<ImperativePanelHandle>(null);
 
   const tabs: ShellTab[] = wide ? p.tabs : [...p.tabs, { id: 'chat', label: 'Chat', icon: 'chat', content: p.side }];
 
-  const toggleLeft = useCallback(() => {
+  const toggleTabs = useCallback(() => {
     if (!wide) return;
-    attempt(() => (collapsed(left.current) ? left.current?.expand() : left.current?.collapse()));
+    attempt(() => (collapsed(tabsPanel.current) ? tabsPanel.current?.expand() : tabsPanel.current?.collapse()));
   }, [wide]);
-  const toggleSide = useCallback(() => {
-    attempt(() => (collapsed(right.current) ? right.current?.expand() : right.current?.collapse()));
+  const toggleDesk = useCallback(() => {
+    attempt(() => (collapsed(desk.current) ? desk.current?.expand() : desk.current?.collapse()));
   }, []);
 
   const select = useCallback(
     (id: string) => {
       picked.current = true;
-      if (wide && id === active && left.current && !collapsed(left.current)) {
-        attempt(() => left.current?.collapse());
+      if (wide && id === active && tabsPanel.current && !collapsed(tabsPanel.current)) {
+        attempt(() => tabsPanel.current?.collapse());
         return;
       }
       setActive(id);
-      if (wide && collapsed(left.current)) attempt(() => left.current?.expand());
+      if (wide && collapsed(tabsPanel.current)) attempt(() => tabsPanel.current?.expand());
       setOpen(true);
     },
     [wide, active],
   );
 
   // keep the latest handlers for the key listener without re-subscribing
-  const keys = useRef({ select, toggleLeft, toggleSide, tabs, onTogglePlay: p.onTogglePlay });
-  keys.current = { select, toggleLeft, toggleSide, tabs, onTogglePlay: p.onTogglePlay };
+  const keys = useRef({ select, toggleDesk, toggleTabs, tabs, onTogglePlay: p.onTogglePlay });
+  keys.current = { select, toggleDesk, toggleTabs, tabs, onTogglePlay: p.onTogglePlay };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
@@ -119,8 +120,8 @@ export function StudioShell(p: StudioShellProps) {
       if (/^[1-9]$/.test(e.key)) {
         const t = k.tabs[Number(e.key) - 1];
         if (t) k.select(t.id);
-      } else if (e.key === '[') k.toggleLeft();
-      else if (e.key === ']') k.toggleSide();
+      } else if (e.key === '[') k.toggleTabs();
+      else if (e.key === ']') k.toggleDesk();
       else if (e.key === '?') setHelp((h) => !h);
       else if (e.key === 'Escape') setHelp(false);
       else if (e.key === ' ' && k.onTogglePlay && !(e.target as HTMLElement | null)?.closest?.('button, a, [role="tab"], summary')) {
@@ -209,7 +210,7 @@ export function StudioShell(p: StudioShellProps) {
           <Icon name={dark ? 'sun' : 'moon'} />
         </button>
         {wide && (
-          <button type="button" className={`sh-icon-btn${sideOpen ? ' is-on' : ''}`} aria-label={`${sideOpen ? 'Hide' : 'Show'} ${p.sideTitle}`} aria-pressed={sideOpen} title={`${p.sideTitle} (])`} onClick={toggleSide}>
+          <button type="button" className={`sh-icon-btn${sideOpen ? ' is-on' : ''}`} aria-label={`${sideOpen ? 'Hide' : 'Show'} ${p.sideTitle}`} aria-pressed={sideOpen} title={`${p.sideTitle} (])`} onClick={toggleDesk}>
             <Icon name="chat" />
           </button>
         )}
@@ -230,16 +231,16 @@ export function StudioShell(p: StudioShellProps) {
         <div className="sh-body">
           {rail}
           <PanelGroup direction="horizontal" autoSaveId="studio-main" className="sh-group">
-            <Panel ref={left} id="left" order={1} defaultSize={27} minSize={18} maxSize={45} collapsible collapsedSize={0} onCollapse={() => setOpen(false)} onExpand={() => setOpen(true)} className="sh-left">
+            <Panel ref={tabsPanel} id="tabs" order={1} defaultSize={27} minSize={18} maxSize={45} collapsible collapsedSize={0} onCollapse={() => setOpen(false)} onExpand={() => setOpen(true)} className="sh-left">
               <div className="sh-panel-head">{current?.label}</div>
               <div className="sh-panes">{panes}</div>
             </Panel>
-            <PanelResizeHandle className="sh-handle" hitAreaMargins={{ coarse: 12, fine: 6 }} aria-label="Resize left panel" />
+            <PanelResizeHandle className="sh-handle" hitAreaMargins={{ coarse: 12, fine: 6 }} aria-label="Resize tab panel" />
             <Panel id="stage" order={2} minSize={30} className="sh-center">
               {stageBlock}
             </Panel>
-            <PanelResizeHandle className="sh-handle" hitAreaMargins={{ coarse: 12, fine: 6 }} aria-label="Resize side panel" />
-            <Panel ref={right} id="side" order={3} defaultSize={26} minSize={18} maxSize={45} collapsible collapsedSize={0} onCollapse={() => setSideOpen(false)} onExpand={() => setSideOpen(true)} className="sh-right">
+            <PanelResizeHandle className="sh-handle" hitAreaMargins={{ coarse: 12, fine: 6 }} aria-label={`Resize ${p.sideTitle}`} />
+            <Panel ref={desk} id="desk" order={3} defaultSize={26} minSize={18} maxSize={45} collapsible collapsedSize={0} onCollapse={() => setSideOpen(false)} onExpand={() => setSideOpen(true)} className="sh-right">
               <div className="sh-panel-head">{p.sideTitle}</div>
               <div className="sh-side">{p.side}</div>
             </Panel>

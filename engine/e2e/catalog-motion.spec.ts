@@ -8,12 +8,13 @@ import { expect, test } from "@playwright/test";
 // Films come from FILMS=a,b (default: every film json in the catalogue folder); results are written to debug/app/e2e/results.json.
 
 const OUT = path.resolve("debug/app/e2e");
-const CATALOG = path.resolve("web/public/cartoon/catalog");
+const CATALOG_NAME = process.env.CATALOG ?? "catalog";
+const CATALOG = path.resolve("web/public/cartoon", CATALOG_NAME);
 mkdirSync(OUT, { recursive: true });
 
 const wanted = process.env.FILMS?.split(",");
 const films = readdirSync(CATALOG)
-  .filter((f) => f.endsWith(".json") && f !== "index.json")
+  .filter((f) => f.endsWith(".json") && f !== "index.json" && f !== "boards.json")
   .map((file) => ({ id: file.replace(/\.json$/, ""), file }))
   .filter((f) => !wanted || wanted.includes(f.id));
 
@@ -27,21 +28,21 @@ for (const film of films) {
     page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
     page.on("pageerror", (e) => errors.push(e.message));
 
-    await page.goto(`/aep-motion.html?src=/cartoon/catalog/${film.file}`);
+    await page.goto(`/aep-motion.html?src=/cartoon/${CATALOG_NAME}/${film.file}`);
     await page.waitForFunction(() => document.querySelector("canvas") || document.querySelector('[data-testid="error"]'), null, { timeout: 30_000 });
     expect(await page.locator('[data-testid="error"]').count()).toBe(0);
     const ready = await page.evaluate(() => (window as any).__aepMotion.ready());
     expect(ready, "player ready").toBe(true);
 
     const warnings: string[] = await page.evaluate(() => (window as any).__aepMotion.warnings());
-    const skipped = warnings.filter((w) => /skipped/i.test(w));
+    const skipped = warnings.filter((w) => /skipped|prop dropped|layer dropped/i.test(w));
 
     const shots: Record<number, string> = {};
     const pngs: Buffer[] = [];
     for (const pct of [25, 75]) {
       await page.evaluate((f) => (window as any).__aepMotion.seekFraction(f), pct / 100);
       await page.waitForTimeout(400);
-      const file = path.join(OUT, `${film.id}-${pct}.png`);
+      const file = path.join(OUT, `${CATALOG_NAME}-${film.id}-${pct}.png`);
       const buf = await page.locator("canvas").first().screenshot({ path: file });
       pngs.push(buf);
       shots[pct] = file;

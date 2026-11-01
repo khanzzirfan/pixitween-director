@@ -52,14 +52,13 @@ export function isKeyframed<T>(value: AepAnimatable<T>): value is AepKeyframe<T>
 }
 
 /**
- * Ease for the tween between two keyframes: `none` with no handles, otherwise the cubic-bezier
- * built from `k0.easeOut`'s start and `k1.easeIn`'s end (falling back to `k0.easeOut`'s end).
+ * Ease for the tween between two keyframes: the cubic-bezier of `k0.easeOut` (all four handles), or
+ * `none` without one. `k1.easeIn` is not read: the reacthub-pixitweenjs sampler these films were made
+ * on eases a segment by its first key's out-handle alone, and a converted film must move the same way.
  */
-export function easeFor(k0: AepKeyframe<unknown>, k1: AepKeyframe<unknown>): string {
-  if (!k0.easeOut && !k1.easeIn) return 'none';
-  const out: AepEaseHandle = k0.easeOut ?? [0, 0, 1, 1];
-  const [x1, y1] = out;
-  const [x2, y2] = k1.easeIn ? [k1.easeIn[2], k1.easeIn[3]] : [out[2], out[3]];
+export function easeFor(k0: AepKeyframe<unknown>, _k1: AepKeyframe<unknown>): string {
+  if (!k0.easeOut) return 'none';
+  const [x1, y1, x2, y2]: AepEaseHandle = k0.easeOut;
   return `cubic(${round4(x1)},${round4(y1)},${round4(x2)},${round4(y2)})`;
 }
 
@@ -81,6 +80,18 @@ export function propertyTweens(value: AepAnimatable<AepPropertyValue>, options: 
     const k0 = value[i];
     const k1 = value[i + 1];
     if (k1.t === k0.t) continue; // zero-length pair is skipped
+
+    if (k0.hold) {
+      // A hold key keeps its value until the next key, then jumps: one instant tween at the next key.
+      tweens.push({
+        at: Math.max(0, round((k1.t - inPoint) / fps)),
+        duration: 0,
+        from: zipProps(k0.v, props),
+        to: zipProps(k1.v, props),
+        ease: 'none',
+      });
+      continue;
+    }
 
     const at = Math.max(0, round((k0.t - inPoint) / fps));
     const duration = round((k1.t - k0.t) / fps);

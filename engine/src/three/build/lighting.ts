@@ -172,6 +172,8 @@ export function applyLightingRig(rig: LightingRig, config: LightingConfig): void
   rig.ambient.intensity = config.ambientIntensity;
 
   rig.key.intensity = config.keyIntensity;
+  rig.fill.intensity = config.fillIntensity;
+  rig.rim.intensity = config.rimIntensity;
   rig.key.color.set(config.keyColor);
   setDirectionalPosition(rig.key, config.keyAzimuth, config.keyElevation);
 

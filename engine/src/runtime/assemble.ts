@@ -125,10 +125,14 @@ export function assemble(doc: MotionDoc, ctx: AssembleContext): Assembly {
       const visible = isVisible(timeSec, node.start, node.end, doc.duration);
       node.display.visible = visible;
       if (!visible) continue;
-      isolations.get(node.id)?.update(timeSec, frame);
       node.update?.(timeSec, frame);
     }
     applyOpacityTree(topNodes);
+    // An isolated layer is drawn into its target only now, once its content holds this frame's state
+    // (opacity included); drawn earlier it would show the previous frame.
+    for (const node of nodes) {
+      if (node.display.visible) isolations.get(node.id)?.update(timeSec, frame);
+    }
 
     if (stageChain) stageChain.render(rendererOrStub);
     else ctx.renderer?.render(stage, camera);

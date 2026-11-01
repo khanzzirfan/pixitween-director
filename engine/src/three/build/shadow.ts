@@ -35,11 +35,13 @@ export interface ShadowCatcherOptions {
   opacity: number;
   y: number;
   size: number;
+  /** Depth along z; defaults to `size` (a square catcher). */
+  depth?: number;
 }
 
 /** A large horizontal plane that receives the key light's shadow with a soft radial edge. */
 export function createShadowCatcher(options: ShadowCatcherOptions): THREE.Mesh {
-  const geometry = new THREE.PlaneGeometry(options.size, options.size);
+  const geometry = new THREE.PlaneGeometry(options.size, options.depth ?? options.size);
   const material = new THREE.ShadowMaterial({ opacity: options.opacity, transparent: true });
   material.onBeforeCompile = patchShadowEdgeFade;
   const mesh = new THREE.Mesh(geometry, material);
@@ -66,4 +68,22 @@ export function fitShadowCamera(light: THREE.DirectionalLight, box: THREE.Box3):
   camera.near = Math.max(0.1, distance - radius * 1.5);
   camera.far = distance + radius * 1.5;
   camera.updateProjectionMatrix();
+}
+/**
+ * Point the key light's shadow camera at a fixed square floor of half size `half` (a stage that objects
+ * travel across), with a large map so the shadow stays sharp enough at that coverage.
+ */
+export function coverShadowCamera(light: THREE.DirectionalLight, half: number): void {
+  const camera = light.shadow.camera;
+  const bound = half * 1.1;
+  camera.left = -bound;
+  camera.right = bound;
+  camera.top = bound;
+  camera.bottom = -bound;
+  camera.near = 0.5;
+  camera.far = 40;
+  camera.updateProjectionMatrix();
+  light.shadow.mapSize.set(2048, 2048);
+  light.shadow.bias = -0.0005;
+  light.shadow.normalBias = 0.02;
 }

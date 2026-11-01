@@ -58,6 +58,13 @@ vi.mock('postprocessing', () => {
   class ScanlineEffect extends Effect {}
   class DotScreenEffect extends Effect {}
   class TiltShiftEffect extends Effect {}
+  class Pass {
+    renderToScreen = false;
+    needsDepthTexture = false;
+    fullscreenMaterial: unknown = null;
+    dispose(): void {}
+    setSize(): void {}
+  }
   class KawaseBlurPass {
     scale = 1;
     renderToScreen = false;
@@ -149,6 +156,7 @@ vi.mock('postprocessing', () => {
     DotScreenEffect,
     TiltShiftEffect,
     KawaseBlurPass,
+    Pass,
     CopyPass,
     KernelSize: { MEDIUM: 2 },
   };

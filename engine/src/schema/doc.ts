@@ -249,6 +249,9 @@ function applyCrossFieldRules(doc: ParsedDoc, ctx: z.RefinementCtx): void {
         if (object.geometry.type === 'text3d') {
           checkAsset(assets, object.geometry.font, 'font', [...path, 'objects', index, 'geometry', 'font'], ctx);
         }
+        object.flipbook?.frames.forEach((frame, f) => {
+          checkAsset(assets, frame, 'image', [...path, 'objects', index, 'flipbook', 'frames', f], ctx);
+        });
         if (object.material.map !== undefined) {
           checkAsset(assets, object.material.map, 'image', [...path, 'objects', index, 'material', 'map'], ctx);
         }

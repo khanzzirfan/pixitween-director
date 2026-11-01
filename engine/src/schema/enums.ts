@@ -81,6 +81,8 @@ export const EFFECT_SCOPES = {
   dropShadow: '2d',
   outline: '2d',
   dof: 'three',
+  gaussianBlur: 'any',
+  stageDof: 'three',
 } as const satisfies Record<string, EffectScope>;
 
 export type EffectType = keyof typeof EFFECT_SCOPES;

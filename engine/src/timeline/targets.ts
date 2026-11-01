@@ -65,18 +65,23 @@ export const OBJECT_PROPS: readonly string[] = [
 
 export const LIGHT_PROPS: readonly string[] = ['intensity', 'color', 'position.x', 'position.y', 'position.z'];
 
+/** The preset rig's key, fill and rim lights and ambient (`lighting`), as the layer's lighting overrides name them. */
+export const LIGHTING_PROPS: readonly string[] = ['keyAzimuth', 'keyElevation', 'keyIntensity', 'fillIntensity', 'rimIntensity', 'ambient'];
+
 type TargetForm =
   | { kind: 'layer' }
   | { kind: 'camera' }
+  | { kind: 'lighting' }
   | { kind: 'object' | 'light' | 'effect'; id: string }
   | { kind: 'unknown'; raw: string };
 
 const ID_TARGETS = ['object', 'light', 'effect'] as const;
 
-/** `undefined` -> the layer itself; `camera`; `<prefix>:<id>` (object, light, effect). */
+/** `undefined` -> the layer itself; `camera`; `lighting`; `<prefix>:<id>` (object, light, effect). */
 function parseTarget(raw: string | undefined): TargetForm {
   if (raw === undefined) return { kind: 'layer' };
   if (raw === 'camera') return { kind: 'camera' };
+  if (raw === 'lighting') return { kind: 'lighting' };
   const colon = raw.indexOf(':');
   if (colon > 0) {
     const prefix = raw.slice(0, colon);
@@ -111,6 +116,8 @@ function allowlistFor(form: TargetForm, layer: Layer): { props: readonly string[
       return three ? { props: OBJECT_PROPS, checkProps: true } : null;
     case 'light':
       return three ? { props: LIGHT_PROPS, checkProps: true } : null;
+    case 'lighting':
+      return three ? { props: LIGHTING_PROPS, checkProps: true } : null;
     case 'effect':
       // Effect param names are the effect table's job, so only the target itself is checked here.
       return { props: [], checkProps: false };
