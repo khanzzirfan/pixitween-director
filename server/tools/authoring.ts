@@ -7,7 +7,6 @@ import {
   addLayer, addScene, newFilmComposition, removeLayer, removeScene, reorderLayer, sceneInfo, setCamera, setKeyframes, setSceneDuration,
   setText, setTransform, swapScenes,
 } from '../authoring/api';
-import { loadEnv } from '../env';
 import { readDirector } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
 import { filmCutout } from './product-cutout';
@@ -137,8 +136,6 @@ export const tools: ToolDef[] = [
     'setCamera',
     'Give a scene a camera move: static, dolly-in, pan, orbit or parallax. strength 0 to 1. Call it last in a scene; calling again replaces it.',
     z.object({ sceneId: z.string(), move: z.enum(['static', 'dolly-in', 'pan', 'orbit', 'parallax']), strength: z.number().min(0).max(1).optional() }),
-    (ctx, a) => loadEnv().CARTOON_MODE && a.move !== 'static'
-      ? Promise.resolve<ToolResult>({ ok: false, error: "setCamera: this film has a locked camera, only 'static' is allowed. Move the characters or the light instead" })
-      : runAuthoring(ctx, `setCamera ${a.sceneId}`, (c) => ({ next: setCamera(c, a.sceneId, a.move, a.strength), data: { sceneId: a.sceneId } })),
+    (ctx, a) => runAuthoring(ctx, `setCamera ${a.sceneId}`, (c) => ({ next: setCamera(c, a.sceneId, a.move, a.strength), data: { sceneId: a.sceneId } })),
   ),
 ];

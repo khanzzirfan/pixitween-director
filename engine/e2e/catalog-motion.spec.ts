@@ -35,7 +35,7 @@ for (const film of films) {
     expect(ready, "player ready").toBe(true);
 
     const warnings: string[] = await page.evaluate(() => (window as any).__aepMotion.warnings());
-    const skipped = warnings.filter((w) => /skipped|prop dropped|layer dropped/i.test(w));
+    const skipped = warnings.filter((w) => /skipped|dropped|not supported/i.test(w));
 
     const shots: Record<number, string> = {};
     const pngs: Buffer[] = [];

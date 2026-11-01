@@ -73,4 +73,13 @@ describe('convertText', () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('glow');
   });
+
+  it("reads the anchor against the composition: [W/2, H/2] centres the text on its position", () => {
+    const layer = headlineLayer({ transform: { position: [540, 320], anchor: [540, 960], scale: [1, 1], rotation: 0, opacity: 1 } });
+    const { layer: out } = convertText(layer, 30, undefined, { width: 1080, height: 1920 });
+    expect(out.anchor).toEqual([0.5, 0.5]);
+    expect(out.pivot).toBeUndefined();
+    const left = convertText(headlineLayer({ transform: { ...layer.transform, anchor: [0, 0] } }), 30, undefined, { width: 1080, height: 1920 });
+    expect(left.layer.anchor).toEqual([0, 0]);
+  });
 });

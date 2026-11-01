@@ -59,4 +59,38 @@ describe('buildGeometry', () => {
     expect(size.y).toBeCloseTo(3, 6);
     expect(size.z).toBeCloseTo(0, 6);
   });
+
+  it('lathe can: width and height set the body, v follows the real height fraction', () => {
+    const geometry = buildGeometry({ type: 'lathe', shape: 'can', width: 1, height: 3.08 });
+    const size = boundingSize(geometry);
+    expect(size.x).toBeCloseTo(1, 2);
+    expect(size.y).toBeCloseTo(3.08, 6);
+    const uv = geometry.getAttribute('uv');
+    for (let i = 0; i < uv.count; i++) {
+      expect(uv.getY(i)).toBeGreaterThanOrEqual(0);
+      expect(uv.getY(i)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('extrude: flips the y-down contour, centres it, and extrudes depth about z = 0', () => {
+    const contour: Array<[number, number]> = [[0, 0], [100, 0], [100, 50], [0, 50]];
+    const geometry = buildGeometry({ type: 'extrude', contour, depth: 20 });
+    const size = boundingSize(geometry);
+    expect(size.x).toBeCloseTo(100, 5);
+    expect(size.y).toBeCloseTo(50, 5);
+    expect(size.z).toBeCloseTo(20, 5);
+    const box = geometry.boundingBox as THREE.Box3;
+    expect((box.min.x + box.max.x) / 2).toBeCloseTo(0, 5);
+    expect((box.min.z + box.max.z) / 2).toBeCloseTo(0, 5);
+    // y is flipped: the contour's first point (top-left in image space) ends up above the centre.
+    const position = geometry.getAttribute('position');
+    let topLeft = false;
+    for (let i = 0; i < position.count; i++) if (Math.abs(position.getX(i) + 50) < 1e-6 && Math.abs(position.getY(i) - 25) < 1e-6) topLeft = true;
+    expect(topLeft).toBe(true);
+  });
+
+  it('extrude: two material groups, caps then sides', () => {
+    const geometry = buildGeometry({ type: 'extrude', contour: [[0, 0], [1, 0], [1, 1]], depth: 1, bevel: 0.1 });
+    expect(geometry.groups.map((g) => g.materialIndex)).toEqual([0, 1]);
+  });
 });

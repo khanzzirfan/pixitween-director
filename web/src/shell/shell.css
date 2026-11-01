@@ -163,6 +163,27 @@
 .sh-side .chat-composer { margin: 0; }
 .sh-side .chat-composer textarea { min-height: 58px; }
 .sh-side .chat-actions { margin: 0; }
+.sh-side .new-film-fallback { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.sh-side .backend-badge { padding-bottom: 8px; }
+.sh-side .crew-error { margin: 0; }
+
+/* the new-film chat: roomy bubbles, a full-width composer and an obvious upload target */
+.sh-side .intake { gap: 12px; }
+.sh-side .intake .notes { gap: 10px; padding: 2px 2px 0; }
+.sh-side .intake .bubble { max-width: 94%; font-size: 13.5px; line-height: 1.5; }
+.sh-side .intake .bubble.crew { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border)); }
+.sh-side .intake .composer { gap: 8px; }
+.sh-side .intake .composer-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.sh-side .intake .name-input { grid-column: 1 / -1; width: 100%; min-width: 0; }
+.sh-side .intake .composer-row { padding: 8px 8px 8px 12px; border-radius: 18px; }
+.sh-side .intake .composer-row textarea { min-height: 22px; font-size: 13.5px; }
+.sh-side .intake.is-drag { outline: 2px dashed var(--accent); outline-offset: -6px; border-radius: 14px; }
+.sh-side .dropzone { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: 14px; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); color: var(--text); text-align: left; transition: border-color .15s, background .15s; }
+.sh-side .dropzone:hover, .sh-side .intake.is-drag .dropzone { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.sh-side .dropzone-glyph { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); font-size: 18px; font-weight: 700; }
+.sh-side .dropzone-copy { display: grid; gap: 1px; min-width: 0; }
+.sh-side .dropzone-copy b { font-size: 13px; }
+.sh-side .dropzone-copy small { color: var(--muted); font-size: 11.5px; }
 .local-mode-toggle { font-size: 12px; }
 .sh .local-mode-toggle label { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
 .sh .slot .local-mode-toggle input[type='checkbox'] { width: auto; margin: 0; }

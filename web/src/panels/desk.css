@@ -1,0 +1,72 @@
+/* The Director's desk placeholder before a film exists. Uses the shell's theme tokens. */
+.desk {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 4px;
+  max-width: 380px;
+}
+.desk h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+.desk-mark {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.desk-mark span {
+  width: 14px;
+  height: 14px;
+  border-radius: 5px;
+  background: var(--accent);
+}
+.desk-intro {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.desk-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.desk-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.desk-steps b {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 750;
+}
+.desk-steps strong {
+  color: var(--text);
+  font-weight: 650;
+}
+.desk-cta {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+}

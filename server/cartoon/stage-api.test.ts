@@ -1,20 +1,10 @@
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import { addLayer, addScene, newFilmComposition, registerAsset } from '../authoring/api';
 import { AuthoringError } from '../authoring/errors';
 import { readDirector } from '../authoring/meta';
 import type { Comp, Obj } from '../authoring/types';
 import { lightValidate } from '../engine/light-validator';
-import { makeTestFilm } from '../test-utils/film';
-import { allTools, runTool } from '../tools/registry';
 import { addStage, cueClip, moveActor, placeActor, placeProduct3D, placeProp, setLightCue } from './stage-api';
-
-const saved = { ...process.env };
-beforeEach(() => {
-  process.env.CARTOON_MODE = 'true';
-});
-afterEach(() => {
-  process.env = { ...saved };
-});
 
 function base(): Comp {
   let c: Comp = newFilmComposition({ aspect: '16:9', title: 'Pip', palette: ['#111827'] });
@@ -133,33 +123,4 @@ it('calling addStage again keeps the members and the light', () => {
   expect(ids(c).filter((i) => i === 's1:world')).toHaveLength(1);
   expect(ids(c)).toContain('s1:hero');
   expect(layers(c).find((l) => l.kind === 'stage3d')!.lights.preset).toBe('night');
-});
-
-// ---- tools ----
-it('lists the stage tools only while CARTOON_MODE is on', () => {
-  const names = () => allTools().map((x) => x.name);
-  process.env.CARTOON_MODE = 'false';
-  for (const n of ['addStage', 'placeActor', 'cueClip', 'moveActor', 'placeProp', 'placeStageProduct', 'setLightCue']) expect(names()).not.toContain(n);
-  process.env.CARTOON_MODE = 'true';
-  for (const n of ['addStage', 'placeActor', 'cueClip', 'moveActor', 'placeProp', 'placeStageProduct', 'setLightCue']) expect(names()).toContain(n);
-});
-
-it('builds a shot through the tools, commits it, and refuses a camera move', async () => {
-  const t = await makeTestFilm();
-  const r0 = await t.films.commit(t.filmId, base(), 'director');
-  expect(r0.ok).toBe(true);
-  const run = (name: string, args: unknown) => runTool(t.ctx, name, args);
-  expect((await run('addStage', { sceneId: 's1', backdropAssetId: 'backdrop' })).ok).toBe(true);
-  expect((await run('placeActor', { sceneId: 's1', actorId: 'hero', assetId: 'hero-model', mark: [0, 0, 0] })).ok).toBe(true);
-  expect((await run('cueClip', { sceneId: 's1', actorId: 'hero', clip: 'Wave', atSec: 1 })).ok).toBe(true);
-  expect((await run('moveActor', { sceneId: 's1', actorId: 'hero', toMark: [1, 0, 30], atSec: 1.5, durationSec: 1 })).ok).toBe(true);
-  expect((await run('placeStageProduct', { sceneId: 's1', shape: 'can', size: 0.2, attach: { actor: 'hero', bone: 'RightHand' } })).ok).toBe(true);
-  expect((await run('setLightCue', { sceneId: 's1', cue: 'dawn' })).ok).toBe(true);
-  const film = await t.films.get(t.filmId);
-  expect(engineOk(film.composition as Comp)).toBe(true);
-  const cam = await run('setCamera', { sceneId: 's1', move: 'dolly-in' });
-  expect(cam.ok).toBe(false);
-  expect((await run('setCamera', { sceneId: 's1', move: 'static' })).ok).toBe(true);
-  const bad = await run('placeActor', { sceneId: 's1', actorId: 'x', assetId: 'nope', mark: [0, 0, 0] });
-  expect(bad.ok).toBe(false);
 });

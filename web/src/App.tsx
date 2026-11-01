@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useFilm } from './api/useFilm';
 import { FixturePage } from './dev/FixturePage';
+import BackendBadge from './panels/BackendBadge';
 import Chat from './panels/Chat';
+import Desk from './panels/Desk';
 import ExportPanel from './panels/ExportPanel';
 import Gallery from './panels/Gallery';
 import GenerateApproval from './panels/GenerateApproval';
@@ -43,7 +45,7 @@ function Director({ filmId }: { filmId: string | null }) {
   const costs = events.reduce((n, e) => (e.type === 'cost' ? n + e.usd : n), 0);
 
   const tabs: ShellTab[] = [
-    { id: 'new', label: 'New', icon: 'plus', content: <Slot name="new-film"><NewFilm {...panelProps} /></Slot> },
+    { id: 'new', label: 'Desk', icon: 'plus', content: <Slot name="new-film"><Desk /></Slot> },
     { id: 'plan', label: 'Plan', icon: 'list', badge: scenes.length || undefined, content: <Slot name="storyboard"><Storyboard {...panelProps} /></Slot> },
     { id: 'review', label: 'Review', icon: 'eye', content: <Slot name="review"><Review {...panelProps} getPlayer={getPlayer} /></Slot> },
     { id: 'generate', label: 'Generate', icon: 'bolt', content: <Slot name="generate"><GenerateApproval {...panelProps} /></Slot> },
@@ -67,8 +69,10 @@ function Director({ filmId }: { filmId: string | null }) {
       defaultTab={film ? 'plan' : 'new'}
       stage={<Slot name="player"><Player ref={playerRef} composition={film?.composition ?? null} /></Slot>}
       strip={<Filmstrip scenes={scenes} selected={selected} onSelect={jump} />}
-      side={<Slot name="chat"><Chat {...panelProps} player={playerRef.current} comp={film?.composition} /></Slot>}
-      sideTitle="Director's desk"
+      side={filmId === null
+        ? <Slot name="chat"><BackendBadge events={events} /><NewFilm {...panelProps} /></Slot>
+        : <Slot name="chat"><Chat {...panelProps} player={playerRef.current} comp={film?.composition} /></Slot>}
+      sideTitle={filmId === null ? 'Make a new film' : "Director's desk"}
       onTogglePlay={() => document.querySelector<HTMLButtonElement>('[data-testid="slot-player"] .player-controls button')?.click()}
       headerRight={film && costs > 0 ? <span className="sh-cost" title="Spent on this film">${costs.toFixed(2)}</span> : undefined}
     />

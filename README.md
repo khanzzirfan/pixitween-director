@@ -88,7 +88,7 @@ With no keys, `DIRECTOR_FAKE=1 npm run dev` runs the whole crew offline with scr
 | Command | What it does |
 |---------|--------------|
 | `npm run typecheck`, `npm run lint`, `npm test` | the offline gates: types, lint, unit tests |
-| `npm run e2e`, `npm run e2e:crew`, `npm run e2e:cartoon` | the browser flows: the single director, the crew with four builders at once, and the toy-studio cartoon crew |
+| `npm run e2e`, `npm run e2e:crew` | the browser flows: the single director and the crew with four builders at once (the toy-studio cartoon crew is deprecated; the showcase is catalogue product films only) |
 | `npm run engine:cli` | the Motion agent CLI (`explain`, `qa`, `edit`, `undo`, `presets`, `effects`, `targets`), one JSON object per call |
 | `npm run engine:e2e` | the Motion engine's own browser flows, from `engine/playwright.config.ts` |
 | `npm run dev:server`, `npm run dev:web` | the API alone (port 8787), or the web app alone (port 5173) |

@@ -206,7 +206,7 @@ export interface CinematicBoard {
 const boardJson = (b: CinematicBoard) => ({ concept: b.concept, mood: b.mood, ...(b.tone ? { tone: b.tone } : {}), ...(b.key ? { key: b.key } : {}), elements: b.elements, beats: b.sheet.beats });
 
 /** The prompt that asks Muse (looking at the product photo) for a board. `violations` is set on the retry. */
-export function boardPrompt(o: { title: string; brand?: string; category?: string; seconds: number; violations?: string[]; previous?: CinematicBoard }): { system: string; user: string } {
+export function boardPrompt(o: { title: string; brief?: string; brand?: string; category?: string; seconds: number; violations?: string[]; previous?: CinematicBoard }): { system: string; user: string } {
   const R = SHEET_RULES;
   return {
     system: [
@@ -221,9 +221,10 @@ export function boardPrompt(o: { title: string; brand?: string; category?: strin
       'use "solid" for a small physical object that can fall, fly or orbit (a bean, a slice, a leaf); glass:true for clear things drawn by the engine as glass (ice, sugar, droplets): they need no picture. use "card" for something flat and photographic that always faces the camera (a splash, a swirl, steam, smoke, powder); a card may be a sequence of 1 to 6 stages in "pieces" (a splash growing then falling). sizeM is metres: a solid 0.01-0.08, a card 0.15-0.5 (the product is 0.16 m tall). "look" describes one piece, or each stage in order.',
       `size is one of ${SHOT_SIZES.join(', ')}. move is one of ${MOVES.join(', ')}. action is one of: ${ACTION_HELP}. A solid may fall, burst, orbit or drift; a card may only splash or swirl.`,
       `Shots: ${R.minBeats}-${R.maxBeats} shots, ${R.minTotal}-${R.maxTotal} s in all; the first shot is a hook of at most ${R.firstMax} s; every shot but the last lasts ${R.minBeat}-${R.maxBeat} s; the last shot is a hold of ${R.holdMin * 100}-${R.holdMax * 100}% of the film, with no element, where the price rests;`,
+      'DIRECTOR\'S CRAFT. The client\'s brief may be short and cold; you are the director, so turn it into a film with a point of view: keep every fact it gives (price, claim, mood words, platform) and add what a great commercial adds: a clear idea, one consistent look (one light, one colour world, one lens language) from the first shot to the last, camera moves with intent (push to build desire, orbit to show form, pull to reveal, dolly-zoom once for the turn), ingredient action that echoes the product\'s story, rhythm that builds to one peak, and a quiet last hold where the price lands. Never contradict the brief.',
       'most moving shots push in; alternate sizes (never three of the same size in a row); include a macro on the label (no element in it) and at least one wide; use the dolly-zoom once, as the reveal, never first; give at least two shots an element, and use every element you list.',
     ].join('\n'),
-    user: [`Product: ${o.title}${o.brand ? ` by ${o.brand}` : ''}${o.category ? ` (${o.category})` : ''}.`, `Aim for about ${o.seconds} seconds.`, ...(o.violations?.length ? ['Your last board broke these rules; fix them and keep everything else about it as it is:', ...o.violations.map((x) => `- ${x}`)] : []), ...(o.previous && o.violations?.length ? ['Your last board:', JSON.stringify(boardJson(o.previous))] : [])].join('\n'),
+    user: [...(o.brief?.trim() ? [`The client's brief, in their own words (take its facts, add your craft): ${o.brief.trim().slice(0, 600)}`] : []), `Product: ${o.title}${o.brand ? ` by ${o.brand}` : ''}${o.category ? ` (${o.category})` : ''}.`, `Aim for about ${o.seconds} seconds.`, ...(o.violations?.length ? ['Your last board broke these rules; fix them and keep everything else about it as it is:', ...o.violations.map((x) => `- ${x}`)] : []), ...(o.previous && o.violations?.length ? ['Your last board:', JSON.stringify(boardJson(o.previous))] : [])].join('\n'),
   };
 }
 
@@ -281,7 +282,7 @@ export function reviewBoard(board: CinematicBoard): { board: CinematicBoard; vio
  * rules AND the board that broke them when the first fails the checker (so Muse mends it instead of starting over), else the floor board. About
  * $0.005 a call. Without a photo it asks with the words alone. `prior` starts from a board already known (a saved one that fails the checker).
  */
-export async function planBoard(ctx: ToolCtx, o: { title: string; brand?: string; category?: string; photo?: Buffer; seconds?: number; prior?: { board: CinematicBoard; violations: string[] } }): Promise<PlannedBoard> {
+export async function planBoard(ctx: ToolCtx, o: { title: string; brief?: string; brand?: string; category?: string; photo?: Buffer; seconds?: number; prior?: { board: CinematicBoard; violations: string[] } }): Promise<PlannedBoard> {
   const seconds = o.seconds ?? 8;
   let violations: string[] = o.prior?.violations ?? [];
   let previous: CinematicBoard | undefined = o.prior?.board;

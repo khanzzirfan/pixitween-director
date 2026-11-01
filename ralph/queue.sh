@@ -26,7 +26,7 @@ while true; do
   if [ ! -f "ralph/prd-$name.json" ]; then log "MISSING $name"; continue; fi
   before=$(passes "$name")
   log "START $name ($before)"
-  ralph-tui run --prd "./ralph/prd-$name.json" --iterations 0 --headless --model sonnet >> "debug/ralph/$name.log" 2>&1
+  ralph-tui run --prd "./ralph/prd-$name.json" --iterations 0 --headless --model minimax/minimax-m3.1-flash >> "debug/ralph/$name.log" 2>&1
   code=$?
   after=$(passes "$name")
   log "END $name exit=$code passes=$after"

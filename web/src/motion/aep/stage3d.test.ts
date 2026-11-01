@@ -159,4 +159,88 @@ describe('convertProp', () => {
     expect(layer.objects.length).toBeLessThanOrEqual(50);
     expect(warnings.filter((w) => /at most 50/.test(w))).toHaveLength(1);
   });
+
+  it('sizes a packaging primitive by its height and wraps the label on a lathe body', () => {
+    const can = prop({
+      id: 'cine:product',
+      role: 'product',
+      source: { type: 'primitive', shape: 'can', proportions: { width: 1, height: 3.08 } },
+      textures: { label: 'ast_label', side: '#e8e0ce' },
+      size: 0.16,
+      material: { roughness: 0.3, metalness: 0.6, clearcoat: 0.8 },
+    });
+    const { object, warnings } = convertProp(can, { assets: { ast_label: { type: 'image' as const, src: '/x', width: 2048, height: 1024 } }, fps: 30 });
+    expect(object!.geometry).toEqual({ type: 'lathe', shape: 'can', width: 1, height: 3.08 });
+    expect(object!.fit).toBe(0.16);
+    expect(object!.material).toMatchObject({ map: 'ast_label', roughness: 0.3, metalness: 0.6, clearcoat: 0.8 });
+    expect(warnings).toEqual([]);
+  });
+
+  it('keeps an extruded contour with its front image, side colour and a life window', () => {
+    const bean = prop({
+      id: 'cine:ing0-coffee-bean',
+      inPoint: 12,
+      outPoint: 51,
+      source: { type: 'extrude', contour: [[0, 0], [10, 0], [10, 20]], depth: 6, bevel: 1 },
+      textures: { front: 'ast_front', side: '#7f5d4e' },
+      size: 0.025,
+      swarm: { count: 30, seed: 41, motion: 'burst', emitter: { shape: 'point', center: [0, 0.08, 0] }, growFrames: 6 },
+    });
+    const { object, warnings } = convertProp(bean, ctx);
+    expect(object!.geometry).toMatchObject({ type: 'extrude', depth: 6, bevel: 1, sideColor: '#7f5d4e' });
+    expect(object!.material.map).toBe('ast_front');
+    expect(object!.life).toEqual({ start: 0.4, end: 1.7 });
+    expect(object!.swarm).toMatchObject({ count: 30, seed: 41, motion: 'burst', growFrames: 6, fps: 30 });
+    expect(warnings).toEqual([]);
+  });
+
+  it('turns a card into an unlit, camera-facing plane with its flipbook', () => {
+    const splash = prop({
+      id: 'cine:ing4-brew-splash',
+      source: { type: 'card', frames: ['ast_f1', 'ast_f2'], fps: 24 },
+      size: 0.38,
+      position: [0, 0.01, 0.06],
+      lit: false,
+    });
+    const frames = { ast_f1: { type: 'image' as const, src: '/a', width: 543, height: 568 }, ast_f2: { type: 'image' as const, src: '/b', width: 375, height: 586 } };
+    const { object } = convertProp(splash, { assets: frames, fps: 30 });
+    expect(object!.geometry).toMatchObject({ type: 'plane' });
+    expect(object!.billboard).toBe(true);
+    expect(object!.material).toMatchObject({ unlit: true, transparent: true, map: 'ast_f1' });
+    expect(object!.flipbook).toEqual({ frames: ['ast_f1', 'ast_f2'], fps: 24, loop: false });
+    expect(object!.castShadow).toBe(false);
+  });
+});
+
+describe('convertWorld lighting, focus and shadow', () => {
+  const cine = () =>
+    ({
+      ...world(),
+      camera: { position: [0, 0.4, 1], target: [0, 0.08, 0], fov: 14, focus: { distance: [{ t: 0, v: 1.2 }, { t: 30, v: 0.4 }], aperture: 0.3 } },
+      set: { ground: 'none', wall: false },
+      shadow: { opacity: 0.45, softness: 0.7 },
+      style: { shading: 'pbr', exposure: 0.95 },
+      lights: {
+        preset: 'studio',
+        key: { azimuth: [{ t: 0, v: -70 }, { t: 24, v: 45 }], elevation: 55, color: '#bcd6ff' },
+        rim: { intensity: [{ t: 0, v: 0.6 }, { t: 30, v: 1.4 }] },
+      },
+    }) as unknown as AepStage3DLayer;
+
+  it('applies key / rim keyframes through the lighting target, with no override warning', () => {
+    const { layer, warnings } = convertWorld(cine(), [], ctx);
+    expect(layer.lighting).toMatchObject({ keyAzimuth: -70, keyColor: '#bcd6ff', rimIntensity: 0.6 });
+    const lighting = layer.tweens.filter((t) => t.target === 'lighting');
+    expect(lighting.map((t) => Object.keys(t.to)[0]).sort()).toEqual(['keyAzimuth', 'rimIntensity']);
+    expect(warnings.join(' ')).not.toMatch(/overrides|focus/);
+  });
+
+  it('keyframes the depth of field and keeps exposure and the stage shadow floor', () => {
+    const { layer } = convertWorld(cine(), [], ctx);
+    expect(layer.effects).toEqual([{ id: 'dof', type: 'stageDof', params: { aperture: 0.3, focusDistance: 1.2 } }]);
+    expect(layer.tweens.some((t) => t.target === 'effect:dof' && 'focusDistance' in t.to)).toBe(true);
+    expect(layer.exposure).toBe(0.95);
+    expect(layer.shadow).toMatchObject({ softness: 0.7, size: [10, 8], enabled: true });
+    expect(layer.camera.near).toBe(0.05);
+  });
 });

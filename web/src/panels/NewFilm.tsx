@@ -16,7 +16,7 @@ const messageOf = (e: unknown) =>
         ? e.message
         : 'Unable to create film.';
 
-/** Crew mode starts a film by chatting; off, or when the question fails, the classic form. */
+/** The whole new-film experience (chat intake, or the classic form when crew mode is off). */
 export default function NewFilm(props: PanelProps) {
   // undefined until the server has answered: the form waits invisibly, so nobody sees it flash before the chat
   const [crewOn, setCrewOn] = useState<boolean | undefined>(undefined);
@@ -29,18 +29,8 @@ export default function NewFilm(props: PanelProps) {
     };
   }, []);
   // one wrapper in both cases, so a form someone already started typing in is not remounted when the answer arrives
-  if (crewOn !== true) return <div style={crewOn === undefined ? { opacity: 0 } : undefined} aria-busy={crewOn === undefined}><ClassicNewFilm {...props} /></div>;
-  return (
-    <section>
-      <div className="panel-heading">
-        <div>
-          <span className="eyebrow">START WITH AN IDEA</span>
-          <h2>Make a new film</h2>
-        </div>
-      </div>
-      <ChatIntake />
-    </section>
-  );
+  if (crewOn !== true) return <div className="new-film-fallback" style={crewOn === undefined ? { opacity: 0 } : undefined} aria-busy={crewOn === undefined}><ClassicNewFilm {...props} /></div>;
+  return <ChatIntake />;
 }
 
 function ClassicNewFilm(_props: PanelProps) {

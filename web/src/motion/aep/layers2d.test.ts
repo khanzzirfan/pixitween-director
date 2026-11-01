@@ -95,3 +95,20 @@ describe('convertImage + convertAssets', () => {
     expect(assets[sanitizeId('track')]).toBeUndefined();
   });
 });
+
+describe('convertShape effects', () => {
+  const blurred = (effects: unknown) => ({ ...wakeBgLayer(), effects }) as unknown as AepShapeLayer;
+
+  it("maps gaussian-blur to the engine's gaussianBlur, scaled from the player's 960 px stage to the comp", () => {
+    const { layer, warnings } = convertShape(blurred([{ name: 'gaussian-blur', params: { blurriness: 88.32 } }]), 30, undefined, { width: 1080, height: 1920 });
+    expect(layer.effects).toEqual([{ id: 'fx0', type: 'gaussianBlur', enabled: true, params: { strength: 88.32 * 2 } }]);
+    expect(warnings).toEqual([]);
+  });
+
+  it('reports and drops an effect it cannot convert', () => {
+    const { layer, warnings } = convertShape(blurred([{ name: 'glow', params: {} }]), 30);
+    expect(layer.effects).toEqual([]);
+    expect(warnings.join(' ')).toMatch(/unsupported effect 'glow'/);
+  });
+});
+

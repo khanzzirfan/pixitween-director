@@ -52,7 +52,7 @@ function StageCheck() {
   const [ready, setReady] = useState('waiting for the engine…');
   const [errors, setErrors] = useState<string[]>([]);
   const [report, setReport] = useState<string[]>([]);
-  // ?film=live plays the film the s16-block live script wrote (public/cartoon/live-film.json) instead of the hand-made one
+  // ?film=live plays the film the s16-block live script wrote (public/cartoon/live-film.json, retired) instead of the hand-made one
   const [live, setLive] = useState<AepCompositionJson | null>(null);
   const filmParam = new URLSearchParams(window.location.search).get('film');
   const wantsLive = filmParam === 'live' || filmParam === 'spike';

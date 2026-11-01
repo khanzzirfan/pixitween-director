@@ -28,6 +28,7 @@ export function ChatIntake() {
   const [needPasscode, setNeedPasscode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [drag, setDrag] = useState(false);
   const recorder = useRecorder();
   const file = useRef<HTMLInputElement>(null);
   const composer = useRef<HTMLDivElement>(null);
@@ -41,6 +42,16 @@ export function ChatIntake() {
 
   const hasMessage = !!text.trim() || !!recorder.blob;
   const canSend = !!product && hasMessage && !busy;
+
+  const choose = (next: File | null | undefined) => {
+    if (!next) return;
+    if (next.type && !next.type.startsWith('image/')) {
+      setError('That file is not an image — choose a PNG, JPG or WEBP.');
+      return;
+    }
+    setError('');
+    setProduct(next);
+  };
 
   async function send() {
     if (!canSend || !product) return;
@@ -76,7 +87,21 @@ export function ChatIntake() {
   }
 
   return (
-    <div className="thread intake">
+    <div
+      className={`thread intake${drag ? ' is-drag' : ''}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDrag(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDrag(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDrag(false);
+        choose(e.dataTransfer.files?.[0]);
+      }}
+    >
       <div className="notes" role="log" aria-live="polite" aria-label="Conversation">
         <div className="bubble crew"><p>{OPENER}</p></div>
         {preview && (
@@ -102,6 +127,15 @@ export function ChatIntake() {
         </label>
       )}
       {(error || recorder.error) && <p role="alert" className="crew-error">{error || recorder.error}</p>}
+      {!product && (
+        <button type="button" className="dropzone" onClick={() => file.current?.click()}>
+          <span className="dropzone-glyph" aria-hidden="true">+</span>
+          <span className="dropzone-copy">
+            <b>Drop a product photo</b>
+            <small>PNG, JPG or WEBP · or click to choose</small>
+          </span>
+        </button>
+      )}
       <div ref={composer}>
         <Composer
           value={text}
@@ -121,7 +155,17 @@ export function ChatIntake() {
           }
           tools={
             <>
-              <input ref={file} hidden aria-label="Product photo" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setProduct(e.target.files?.[0] ?? null)} />
+              <input
+                ref={file}
+                hidden
+                aria-label="Product photo"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  choose(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
               <button type="button" className="tool" aria-label="Attach a photo" onClick={() => file.current?.click()}>📎</button>
               {recorder.state === 'recording' ? (
                 <button type="button" className="tool rec" aria-label="Stop recording" onClick={recorder.stop}>■ {recorder.seconds}s</button>

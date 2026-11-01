@@ -11,6 +11,7 @@ import { readDirector, writeDirector } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
 import { setSceneMode } from '../generate/mode';
 import { runRules } from '../review/rules';
+import { cinematicCut } from './cinematic-cut';
 import { finishFilm as applyFinish } from './finish-film';
 import type { Board } from './board';
 import { TERMINAL } from './board';
@@ -204,7 +205,9 @@ export async function finishGate(crew: CrewCtx, ctx: ToolCtx): Promise<FinishGat
 export async function finishFilm(crew: CrewCtx, ctx: ToolCtx, summary: string): Promise<ToolResult> {
   const gate = await finishGate(crew, ctx);
   if (!gate.pass) return fail(gate.block.join(', '));
-  await applyFinish(crew.films, crew.filmId, ctx.assets);
+  // a round product gets the cinematic cut (real camera, ingredient splashes, animated price card); anything else keeps the 2D finish
+  const cinematic = process.env.CINEMATIC_CUT === '0' ? false : await cinematicCut(ctx, (line) => crew.emit({ type: 'showrunner.say', kind: 'note', text: line })).catch(() => false);
+  if (!cinematic) await applyFinish(crew.films, crew.filmId, ctx.assets);
   await crew.films.update(crew.filmId, { status: 'ready' });
   crew.emit({ type: 'film.status', status: 'ready' });
   const text = gate.accepted.length ? `${summary} accepted: ${gate.accepted.join(', ')}` : summary;

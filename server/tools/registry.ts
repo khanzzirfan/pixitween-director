@@ -6,7 +6,6 @@ import { loadEnv } from '../env';
 import { tools as generate } from './generate';
 import { tools as product3d } from './product3d';
 import { tools as review } from './review';
-import { tools as stage } from './stage';
 
 export { makeToolCtx } from '../http/deps';
 export type { AppDeps, ToolCtxDeps } from '../http/deps';
@@ -69,7 +68,7 @@ export function createRegistry(arrays: ToolDef[][], gated: Array<{ on: () => boo
   };
 }
 
-const registry = createRegistry([authoring, art, review, edit, generate], [{ on: () => loadEnv().PRODUCT_3D, tools: product3d }, { on: () => loadEnv().CARTOON_MODE, tools: stage }]);
+const registry = createRegistry([authoring, art, review, edit, generate], [{ on: () => loadEnv().PRODUCT_3D, tools: product3d }]);
 export const allTools = (): ToolDef[] => registry.all();
 export const getTool = (name: string): ToolDef | undefined => registry.get(name);
 export const runTool = (ctx: ToolCtx, name: string, args: unknown): Promise<ToolResult> => registry.run(ctx, name, args);
