@@ -3,11 +3,11 @@ import type { Lineup } from '@shared/lineup';
 import { makeTestDeps } from '../../test-utils/deps';
 
 let inFlight = 0;
-let overlap = false;
+let maxInFlight = 0;
 const order: string[] = [];
 const runCrew = vi.fn(async (id: string) => {
   order.push(id);
-  if (++inFlight > 1) overlap = true;
+  maxInFlight = Math.max(maxInFlight, ++inFlight);
   await new Promise((r) => setTimeout(r, 10));
   inFlight--;
 });
@@ -23,7 +23,7 @@ beforeEach(() => {
   process.env.DIRECTOR_FAKE = '1';
   process.env.CREW_ENABLED = 'true';
   inFlight = 0;
-  overlap = false;
+  maxInFlight = 0;
   order.length = 0;
 });
 afterEach(() => {
@@ -47,7 +47,7 @@ const settled = async (app: ReturnType<typeof createApp>, id: string): Promise<L
   throw new Error('line-up did not finish');
 };
 
-it('a catalogue is one crew film per product, run strictly one after another', async () => {
+it('a catalogue is one crew film per product, started in feed order, LINEUP_CONCURRENCY at a time', async () => {
   const form = new FormData();
   form.set('demo', 'feed-6');
   form.set('brief', 'warm and fast');
@@ -57,8 +57,8 @@ it('a catalogue is one crew film per product, run strictly one after another', a
   expect(filmIds.length).toBeGreaterThan(1);
   const lineup = await settled(app, lineupId);
   expect(lineup.items.every((i) => i.state === 'done')).toBe(true);
-  expect(order).toEqual(filmIds); // the feed's order, one at a time
-  expect(overlap).toBe(false);
+  expect(order).toEqual(filmIds); // started in the feed's order
+  expect(maxInFlight).toBe(2); // LINEUP_CONCURRENCY, default 2
   const first = await deps.films.get(filmIds[0]!);
   expect(first.crew).toBe(true);
   expect(first.brief.text).toContain('warm and fast');
@@ -79,25 +79,27 @@ it('a failed film does not stop the next one', async () => {
   expect(order).toEqual(filmIds.slice(1)); // the failing film threw before it was recorded; every other one still ran
 });
 
-it('stop ends the film in progress and leaves the rest unstarted', async () => {
-  let release: () => void = () => undefined;
-  runCrew.mockImplementationOnce((id: string) => {
+it('stop ends the films in progress and leaves the rest unstarted', async () => {
+  // LINEUP_CONCURRENCY defaults to 2: hold both slots' films until after the stop
+  const releases: Array<() => void> = [];
+  const hold = (id: string) => {
     order.push(id);
     return new Promise<void>((r) => {
-      release = () => r();
+      releases.push(() => r());
     });
-  });
+  };
+  runCrew.mockImplementationOnce(hold).mockImplementationOnce(hold);
   const form = new FormData();
   form.set('demo', 'feed-6');
   const { app, res } = await start(form);
   const { lineupId, filmIds } = (await res.json()) as { lineupId: string; filmIds: string[] };
-  for (let i = 0; i < 50 && order.length < 1; i++) await new Promise((r) => setTimeout(r, 20));
+  for (let i = 0; i < 50 && order.length < 2; i++) await new Promise((r) => setTimeout(r, 20));
   const stop = await app.request(`/api/lineups/${lineupId}/stop`, { method: 'POST' });
   expect(stop.status).toBe(200);
   expect(await stop.json()).toMatchObject({ ok: true, stopped: true });
-  release();
+  for (const release of releases) release();
   const lineup = await settled(app, lineupId);
-  expect(order).toEqual([filmIds[0]]);
+  expect(order).toEqual(filmIds.slice(0, 2));
   expect(lineup.items.every((i) => i.state === 'stopped')).toBe(true);
   expect((await app.request(`/api/lineups/${lineupId}/stop`)).status).toBe(404);
   expect((await app.request(`/api/lineups/${lineupId}/stop`, { method: 'POST' })).status).toBe(200);

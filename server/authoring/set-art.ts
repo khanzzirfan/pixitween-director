@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-import { VOCAB } from './cinematic-rules';
+import { LIGHT, VOCAB } from './cinematic-rules';
 import { shade } from './retail-clip';
 import { tint } from './variant-film';
 
@@ -44,7 +44,7 @@ interface Recipe {
 // what should be seen in the ordinary shots (the sun, the clouds, the sea) sits in that third, y from 0.55 to 1.
 const RECIPES: Record<SetLook, Recipe> = {
   beach: {
-    top: '#3f9fe8', horizon: '#d5efff', band: { color: '#1b95d1', foam: true, height: 0.09 }, ground: '#d8b878',
+    top: '#2f8fe0', horizon: '#9fd6f5', band: { color: '#1b95d1', foam: true, height: 0.09 }, ground: '#d2ad6c',
     glow: { x: 0.72, y: 0.66, color: '#fff3c4', r: 0.3 },
     blobs: [[0.18, 0.62, 0.07, '#ffffff', 0.6], [0.42, 0.7, 0.05, '#ffffff', 0.5], [0.9, 0.5, 0.08, '#ffffff', 0.5]],
   },
@@ -127,6 +127,8 @@ export async function renderBackdrop(o: { look: SetLook; ratio: number; tone?: T
       parts.push(`<circle cx="${x}" cy="${y}" r="${(1.5 + hash(i * 3 + 2) * 2.5).toFixed(1)}" fill="#fff" fill-opacity="${(0.4 + hash(i) * 0.6).toFixed(2)}"/>`);
     }
   }
+  // the corners darken, so the eye stays on the centre, where the product is
+  parts.push(`<defs><radialGradient id="vig" cx="0.5" cy="0.6" r="0.75"><stop offset="0.55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="${LIGHT[o.key ?? 'mid'].vignette}"/></radialGradient></defs><rect width="${W}" height="${H}" fill="url(#vig)"/>`);
   // soften the picture: it is far away, and hard edges would flicker under the lens blur
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join('')}</svg>`;
   const png = await sharp(Buffer.from(svg)).blur(1.5).png().toBuffer();

@@ -9,8 +9,10 @@ films and line films, a wall of tiles) was removed; its notes remain in `docs/le
 2. `POST /api/lineups` (`server/http/handlers/lineups.ts`) reads the feed and makes one film per product: the product's
    photo as the hero asset, and a brief built from the feed's title, category, brand and price, then the owner's words.
    A product whose photo cannot be found has no film and is marked failed.
-3. The films run one after another with the same crew as a single film (`runCrew`, or the single director when the crew
-   is off). The next film starts when the last one ends, ready or failed. A failed film never stops the line-up.
+3. The films run with the same crew as a single film (`runCrew`, or the single director when the crew is off),
+   `LINEUP_CONCURRENCY` at a time (default 2), started in line-up order: a free slot takes the next product. A failed
+   film never stops the line-up. Each line-up film runs on tighter limits than a single film, because the owner waits for
+   all of them: `LINEUP_FILM_DEADLINE_MS` (6 min), `LINEUP_MAX_FIXES_PER_SCENE` (1) and `LINEUP_MAX_AUTO_CRITIQUES` (1).
 4. The line-up (`shared/lineup.ts`, stored by `server/lineup/store.ts` under `<data>/lineups/`) only keeps the order and
    each product's state: waiting, making, done, failed. `GET /api/lineups/:id` reads it.
 

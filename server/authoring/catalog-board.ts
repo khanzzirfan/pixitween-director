@@ -1,6 +1,7 @@
 import type { Buffer } from 'node:buffer';
 import { z } from 'zod';
 import type { ToolCtx } from '@shared/tools';
+import { TEXT_RULES } from './cinematic-rules';
 import { CRAFT } from './reference-deck';
 
 // The catalog board: what one product's hero film is made of, for any product shape (a surfboard, a towel, a can), played in 2D
@@ -103,7 +104,7 @@ export function checkCatalogBoard(b: CatalogBoard): string[] {
   if (b.shots.filter((s) => s.cut !== 'hard').length > 3) out.push('use whip or flash cuts on at most three shots');
   const pushes = b.shots.filter((s) => s.move === 'push').length;
   if (pushes < Math.ceil(n * 0.3)) out.push('push in on at least a third of the shots (push-in is the default move)');
-  if (b.tagline.trim().split(/\s+/).length > 6) out.push('the tagline is at most six words');
+  if (b.tagline.trim().split(/\s+/).length > TEXT_RULES.taglineWords) out.push(`the tagline is at most ${TEXT_RULES.taglineWords} words`);
   return out;
 }
 
@@ -144,7 +145,7 @@ export function catalogBoardPrompt(p: BoardProduct, o: { hasPlate: boolean; viol
       'HOW THE BEST ADS ARE CUT (measured on eight real 9:16 product ads; take the craft, not the things):',
       `- ${CRAFT}`,
       'YOUR TASK. Look at the photo. Find the ONE idea of this product (a feeling, a contrast, a moment it belongs to) and write it as the concept. Then write the shot list that tells it, every shot with a reason (the note). Reply with JSON only, in this shape:',
-      '{"concept":"one sentence","mood":"a few words","tone":"warm|cool|neutral","key":"low|mid|high","tagline":"at most six words","shots":[{"size","move","seconds","phase","entrance","cut","world","air","text","note"}]}',
+      `{"concept":"one sentence","mood":"a few words","tone":"warm|cool|neutral","key":"low|mid|high","tagline":"at most ${TEXT_RULES.taglineWords} words","shots":[{"size","move","seconds","phase","entrance","cut","world","air","text","note"}]}`,
       `size: ${CB_SIZES.join(', ')} (wide = the product small in a big world; macro = the product fills the frame, a detail close-up).`,
       `move: ${CB_MOVES.join(', ')} (push in is the default; pull out is the payoff, once; sway tilts the product gently; dolly-zoom grows the world while the product holds its size, once, late, as the reveal).`,
       `entrance: ${CB_ENTRANCES.join(', ')} (how the product arrives: use drop or tumble on the hook, slide or tumble once or twice more, none when the shot continues).`,
@@ -154,7 +155,7 @@ export function catalogBoardPrompt(p: BoardProduct, o: { hasPlate: boolean; viol
       'text: the words on screen in that shot, at most five, written like an ad: a hook line on the first shot, one benefit or feeling in the middle, never the price or the product name (they land on the last shot by themselves). Most shots have no text. Never in the last shot.',
       `tone (key light colour) and key (low = dark world, one bright product; high = bright and airy) come from the idea and the photo's colours.`,
       `phase: ${CB_PHASES.join(', ')}. Rules: ${R.minShots}-${R.maxShots} shots, ${R.minTotal}-${R.maxTotal} s in all. The first shot is the hook (at most ${R.firstMax} s, already moving). Every shot but the last lasts ${R.minShot}-${R.maxShot} s and the cut rate speeds up through the middle. Exactly one peak at 35-80% of the film. The last shot is the close: move hold or a slow push, ${R.holdMin * 100}-${R.holdMax * 100}% of the film, no text, no air. Include one wide and one macro. Two shots in a row differ in size or move; never three of one size in a row. Push in on at least a third of the shots.`,
-      'tagline: the end-card line for THIS product and its idea, at most six words, no price, no brand name; its last word is the strong one.',
+      `tagline: the end-card line for THIS product and its idea, at most ${TEXT_RULES.taglineWords} words, no price, no brand name; its last word is the strong one.`,
       'Never name a real brand, a real person or a place you cannot see; the brand on screen is the shop\'s own.',
     ].join('\n'),
     user: [
@@ -187,7 +188,7 @@ export function floorCatalogBoard(p: BoardProduct, o: { hasPlate: boolean } = { 
       mood: 'bright, quick, clean',
       tone: 'neutral',
       key: 'mid',
-      tagline: sale ? 'Grab it while it lasts' : `Made for your ${word} days`,
+      tagline: sale ? 'Grab it, quick' : `Your ${word} days`,
       shots: [
         { size: 'wide', move: 'push', seconds: 1.0, phase: 'hook', entrance: 'drop', cut: 'hard', world: wide, air: sale ? 'confetti' : 'dust', text: sale ? 'Sale on now' : 'Meet your new favourite', note: 'hook: it drops into a big world and we dive in' },
         { size: 'macro', move: 'push', seconds: 0.7, phase: 'build', entrance: 'none', cut: 'flash', world: 'field', air: 'none', note: 'the detail fills the frame' },
@@ -202,7 +203,7 @@ export function floorCatalogBoard(p: BoardProduct, o: { hasPlate: boolean } = { 
       mood: 'low-key, glowing',
       tone: 'warm',
       key: 'low',
-      tagline: sale ? 'Less to pay, more to love' : 'Your moment starts here',
+      tagline: sale ? 'Pay less, love more' : 'Your moment starts here',
       shots: [
         { size: 'macro', move: 'pull', seconds: 0.9, phase: 'hook', entrance: 'none', cut: 'flash', world: 'halo', air: 'bokeh', text: 'Look closer', note: 'hook: out of the detail' },
         { size: 'wide', move: 'push', seconds: 1.0, phase: 'build', entrance: 'tumble', cut: 'whip', world: 'field', air: 'dust', note: 'it tumbles in small and we push' },
@@ -217,7 +218,7 @@ export function floorCatalogBoard(p: BoardProduct, o: { hasPlate: boolean } = { 
       mood: 'energetic, colourful',
       tone: 'cool',
       key: 'high',
-      tagline: sale ? 'Big price drop, small window' : 'Bring on the good days',
+      tagline: sale ? 'Big drop, small window' : 'Bring on good days',
       shots: [
         { size: 'medium', move: 'push', seconds: 0.8, phase: 'hook', entrance: 'slide', cut: 'hard', world: 'field', air: sale ? 'confetti' : 'dust', text: sale ? 'Sale!' : 'Ready?', note: 'hook: it slides in and we push' },
         { size: 'macro', move: 'push', seconds: 0.6, phase: 'build', entrance: 'none', cut: 'whip', world: 'halo', air: 'none', note: 'detail' },

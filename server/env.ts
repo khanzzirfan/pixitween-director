@@ -74,6 +74,13 @@ const schema = z.object({
   CREW_FILM_DEADLINE_MS: int(720000, 1000, 3600000),
   CREW_BUILD_MAX_TURNS: int(4, 1, 6),
   CREW_IDLE_END_MS: int(90000, 30000, 3600000),
+  // How many times a scene is critiqued on its own after a build or fix. Each round can start another fix.
+  CREW_MAX_AUTO_CRITIQUES: int(3, 1, 5),
+  // A CSV line-up: how many product films run at once, and the tighter limits each of those films gets.
+  LINEUP_CONCURRENCY: int(2, 1, 4),
+  LINEUP_FILM_DEADLINE_MS: int(360000, 60000, 3600000),
+  LINEUP_MAX_FIXES_PER_SCENE: int(1, 1, 10),
+  LINEUP_MAX_AUTO_CRITIQUES: int(1, 1, 5),
 });
 
 export const ENV_KEYS = Object.keys(schema.shape);

@@ -7,6 +7,8 @@ The board prompt teaches Muse from this book, the checker holds Muse to it, and 
 ## The rules
 
 - A film is 5 to 10 shots and 6 to 12 s in all.
+- The floor is 16 by 30 m so it fills the bottom of the frame when the hook's camera starts far back, and the product drops in from 30 cm, so the very first picture has the product in it.
+- The camera stays at least 3 cm above the floor, even at a low angle, so the floor is never seen from below.
 - The first shot is the hook: at most 1.5 s, already moving, and it pushes in from 1.7 times its final distance.
 - Every shot but the last lasts 0.4 to 2.5 s.
 - The last shot is a hold of 12% to 37% of the film, with no element and no words: the price, name and tagline land there.
@@ -15,10 +17,12 @@ The board prompt teaches Muse from this book, the checker holds Muse to it, and 
 - At most 2 whips (each at most 1 s, never first or last), 1 rack focus, 2 trucks, 2 cranes, 1 dolly-zoom (never first; a macro dolly-zoom is framed as a close).
 - Two shots in a row differ in size, angle or move; never three of one size in a row.
 - Exactly one shot is the peak, at 35% to 80% of the film.
-- Include a wide shot and a label macro; no element and no words in the macro.
+- Include a wide shot and a label macro; no element and no words in the macro. On a flat cut-out the macro's camera is aimed at the label: the spot of the picture with the most small sharp detail (a logo, printed text), kept inside the product.
 - A cut lands while the camera is moving: the shot before leaves, and the shot after enters, at at least 50% of its mean speed (a hold and the end of a whip are exempt).
 - The tremor is 1% of the camera distance, at most 3 keys a shot, and is dropped when the world's 62-tween budget has no room.
-- At most 3 shots carry words, each 2 to 5 words and about 4 words a second at most; never a price or a number; the tagline is at most 6 words.
+- At most 2 shots carry words, each 2 to 4 words and about 3 words a second at most; never a price or a number; the tagline is at most 4 words. The end card says at most 3 things: with a tagline the name, the tagline and the price, without one the brand, the name and the price.
+- With a set the high camera looks down 14 degrees, so the horizon and the sea stay in the frame; a glass piece is at most 1.7999999999999998 cm, and a burst flies up and away from the lens. Ice is a clear cube with its corners rounded to 22% of its side and a wet shine; spray is clear round drops, never cubes.
+- A set is lit like the reference ads, by the board's key level: a mid key is one key at 4, a rim of 1.5 (2.4 in the end hold) that outlines the product, fill 0.35; a low key keeps the mood (key 3.4, fill 0.2, a 45% vignette) and a high key opens up (fill 0.6). The cut-out's side face is lifted 40% toward white so no black outline shows, and the backdrop's horizon is never near white.
 - In the end hold the product stands at most 64% of the frame's height (the shot before it, whose framing the hold keeps, is held to the same), so the name, tagline and price never sit on it.
 - A flat, wide product never fills more than 90% of the frame's width, and a flat cut-out turns at most 30 degrees either way.
 - The rendered film must move: a moving shot's picture changes at least 0.40% a step (0.1 s), the price hold at least 0.20%, and at least 85% of the film is live.

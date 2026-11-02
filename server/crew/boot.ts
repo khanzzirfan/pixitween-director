@@ -18,7 +18,12 @@ export async function recoverCrewFilms(deps: AppDeps): Promise<string[]> {
   for (const film of await deps.films.list()) {
     if (!film.crew) continue;
     const persist = createCrewPersist(dir, film.id);
-    const jobs = await persist.loadBoard();
+    // a board this build cannot read (written by another branch: an unknown job kind) must not stop the films after it from recovering
+    const jobs = await persist.loadBoard().catch((e: unknown) => {
+      console.error(`crew restart: skipped film ${film.id}, its board cannot be read:`, e instanceof Error ? e.message.split('\n')[0] : e);
+      return undefined;
+    });
+    if (!jobs) continue;
     const open = jobs.filter((j) => !TERMINAL.includes(j.status));
     const midFilm = film.status === 'planning' || film.status === 'building';
     if (!open.length && !midFilm) continue;

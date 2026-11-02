@@ -50,3 +50,9 @@ it('orbit and parallax', () => {
   expect(par.scale[1].v[0]).toBeGreaterThan(par.scale[0].v[0]);
 });
 it('rejects unknown scenes', () => expect(() => setCamera(mugScene(), 'nope', 'pan')).toThrow(/unknown_scene/));
+it('the parallax weight comes from the role, not the draw order: a product placed again (z 13) moves like the first one', () => {
+  const c = mugScene();
+  ((c.meta as Obj).director as Obj).layers['s1:product'].z = 13;
+  const s = layer(setCamera(c, 's1', 'dolly-in'), 's1:product').transform.scale;
+  close(s[1].v[0], 1.09604);
+});

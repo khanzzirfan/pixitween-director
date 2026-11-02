@@ -50,10 +50,17 @@ export interface CrewOptions {
   workers?: Partial<Record<JobKind, WorkerFn>>;
 }
 
+/** Per-film limits that override the env for one session (a line-up film runs on a tighter clock). */
+export interface FilmLimits {
+  deadlineMs?: number;
+  maxFixes?: number;
+  maxCritiques?: number;
+}
+
 export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
   const sessions = new Map<string, CrewSession>();
 
-  async function start(filmId: string, opts: { resume?: boolean } = {}): Promise<CrewSession> {
+  async function start(filmId: string, opts: { resume?: boolean; limits?: FilmLimits } = {}): Promise<CrewSession> {
     const existing = sessions.get(filmId);
     if (existing) return existing;
 
@@ -84,6 +91,7 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
       board: () => board,
       scheduler: () => crew.scheduler,
       inbox,
+      maxCritiques: opts.limits?.maxCritiques ?? env.CREW_MAX_AUTO_CRITIQUES,
       onError: (e) => toolCtx.emit({ type: 'error', where: 'crew.chain', message: e instanceof Error ? e.message : String(e) }),
     });
     board = createBoard({
@@ -108,7 +116,7 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     let children: string[] = [];
     void deps.films.list().then((all) => (children = all.filter((f) => f.parentId === filmId).map((f) => f.id))).catch(() => undefined);
 
-    const deadline = createDeadline(o.deadlineMs ?? env.CREW_FILM_DEADLINE_MS);
+    const deadline = createDeadline(opts.limits?.deadlineMs ?? o.deadlineMs ?? env.CREW_FILM_DEADLINE_MS);
     const scheduler = createScheduler({
       board,
       deadline,
@@ -119,7 +127,7 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
       persist,
       log: (line) => console.log(line),
     });
-    crew = { filmId, films: deps.films, board, scheduler, budget, inbox, emit: toolCtx.emit, source: 'showrunner', takesMax: env.CREW_TAKES_MAX, maxFixes: env.CREW_MAX_FIXES_PER_SCENE, removedIds: new Set(), toolCtx, makeToolCtx: deps.makeToolCtx, subscriberCount: (id) => deps.bus.subscriberCount(id), turn: newTurn(), snapshots: { load: (id) => persist.loadSnapshot(id) }, takes: { pick: (args) => takes.pick(crew, args) } };
+    crew = { filmId, films: deps.films, board, scheduler, budget, inbox, emit: toolCtx.emit, source: 'showrunner', takesMax: env.CREW_TAKES_MAX, maxFixes: opts.limits?.maxFixes ?? env.CREW_MAX_FIXES_PER_SCENE, removedIds: new Set(), toolCtx, makeToolCtx: deps.makeToolCtx, subscriberCount: (id) => deps.bus.subscriberCount(id), turn: newTurn(), snapshots: { load: (id) => persist.loadSnapshot(id) }, takes: { pick: (args) => takes.pick(crew, args) } };
 
     const model = o.model ?? env.SHOWRUNNER_MODEL;
     const backend = o.backend ?? fake?.backend ?? pickBackend('showrunner', { onFallback: (i) => toolCtx.emit({ type: 'error', where: 'showrunner', message: `${i.from} unavailable (${i.reason}); this turn used ${i.to}` }) });
@@ -204,9 +212,9 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     start,
     get: (filmId: string) => sessions.get(filmId),
     /** Runs a new film to the end of its session. Never rejects: a failure becomes status failed and an error event. */
-    async runCrew(filmId: string): Promise<void> {
+    async runCrew(filmId: string, limits?: FilmLimits): Promise<void> {
       try {
-        await (await start(filmId)).done;
+        await (await start(filmId, limits ? { limits } : {})).done;
       } catch (e) {
         try {
           deps.makeToolCtx(filmId).emit({ type: 'error', where: 'showrunner', message: e instanceof Error ? e.message : String(e) });
@@ -237,9 +245,9 @@ export async function ensureCrewSession(filmId: string): Promise<CrewSession> {
   return bound.get(filmId) ?? bound.start(filmId, { resume: true });
 }
 
-export async function runCrew(filmId: string): Promise<void> {
+export async function runCrew(filmId: string, limits?: FilmLimits): Promise<void> {
   if (!bound) throw new Error('crew not bound');
-  return bound.runCrew(filmId);
+  return bound.runCrew(filmId, limits);
 }
 
 /** Sends a user message to a crew film's showrunner. `showrunner.heard` goes out first, so the UI shows it before any model call. */

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
 import { checkBeatSheet, defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
-import { ELEVATION, FILL, FOV_BASE, FOV_WIDE, LIMITS, PRODUCT_H, PUSH_FROM, buildCinematicFilm, cutSpeeds, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
+import { ELEVATION, FILL, FOV_BASE, FOV_WIDE, LIMITS, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
+import { CAMERA, LIGHT, MATERIALS } from './cinematic-rules';
+import { SPACE_EM } from './text-width';
 import { FLOOR, floorElements, glassAsset, type IngredientAsset } from './ingredients';
 import type { Obj } from './types';
 
@@ -33,6 +35,30 @@ const layers = (c: any): Obj[] => c.precomps.cine.layers;
 const world = (c: any): Obj => layers(c).find((l) => l.kind === 'stage3d')!;
 const props = (c: any): Obj[] => layers(c).filter((l) => l.kind === 'prop3d');
 const tanHalf = (fov: number) => Math.tan((fov * Math.PI) / 360);
+
+describe('a set keeps the horizon in the frame, and the ice out of the lens', () => {
+  const beat = (size: any, move: any, seconds: number, extra: object = {}): any => ({ size, move, seconds, angle: 'eye', phase: 'build', product: 'still', ...extra });
+  it('a high shot looks down less when the plan is given a lower high angle, and no other angle changes', () => {
+    const s: BeatSheet = { beats: [beat('wide', 'push', 1, { phase: 'hook', angle: 'low' }), beat('close', 'push', 1, { angle: 'high' }), beat('medium', 'hold', 2, { phase: 'close' })] };
+    const steep = planCamera(s, 30);
+    const soft = planCamera(s, 30, { highEl: 14 });
+    expect(soft.beats[1]!.to.el).toBe(14);
+    expect(steep.beats[1]!.to.el).toBe(ELEVATION.high);
+    expect(soft.beats[0]!.to.el).toBe(ELEVATION.low);
+  });
+  const set = { look: 'beach' as const, air: 'none' as const, backdrop: { ...pic('ast_back', 1500, 1024) }, ground: '#d8b878' };
+  const iceSheet: BeatSheet = { beats: sheet.beats.map((b, n) => (n === 1 ? { ...b, ingredient: { kind: 'ice', action: 'burst' as const } } : b)) };
+  const ice = (c: any): any => props(c).find((p) => /ice burst/.test(String(p.name)));
+  it('a burst flies up and away from the camera, never toward it', () => {
+    const c = buildCinematicFilm(input({ set, sheet: iceSheet, ingredients: { ice: { ...glassAsset(FLOOR.ice!), sizeM: 0.04 } } }));
+    expect(ice(c)).toBeDefined();
+    expect(ice(c).swarm.direction[2]).toBeLessThanOrEqual(0);
+  });
+  it('a glass piece is never bigger than the rule book allows', () => {
+    const c = buildCinematicFilm(input({ set, sheet: iceSheet, ingredients: { ice: { ...glassAsset(FLOOR.ice!), sizeM: 0.04 } } }));
+    expect(ice(c).size).toBeLessThanOrEqual(0.018);
+  });
+});
 
 describe('the end hold leaves room for the text', () => {
   const beat = (size: any, move: any, seconds: number, extra: object = {}): any => ({ size, move, seconds, angle: 'eye', phase: 'build', product: 'still', ...extra });
@@ -152,6 +178,8 @@ describe('buildCinematicFilm', () => {
     expect(beans.textures.front).toBe('ast_bean');
     const ice = props(c).find((p: any) => p.id.includes('-ice')) as any;
     expect(ice.material.transmission).toBe(1);
+    expect(ice.material.clearcoat).toBe(1);
+    expect(ice.source.round).toBe(MATERIALS.iceRound);
     expect(ice.swarm.motion).toBe('orbit');
     const splash = props(c).find((p: any) => p.id.includes('-splash')) as any;
     expect(splash.source).toMatchObject({ type: 'card', fps: 24 });
@@ -234,7 +262,7 @@ describe('what the board says reaches the film', () => {
     const c = buildCinematicFilm(input({ sheet: s })) as any;
     const can = props(c).find((l) => l.role === 'product')!;
     const f = planCamera(s, c.fps).beats;
-    const high = can.position.find((k: any) => k.v[1] > 0.5);
+    const high = can.position.find((k: any) => k.v[1] >= CAMERA.dropFrom);
     expect(high.t).toBe(f[1]!.start);
     expect(can.position[0].v[1]).toBe(0);
     const macro = f.find((b) => b.size === 'macro')!;
@@ -350,17 +378,89 @@ describe('a flat product (a cut-out that is not a round pack)', () => {
 
 describe('a set: backdrop on the wall, a floor and air', () => {
   const art = (id: string, w = 1500, h = 1024) => ({ id, src: `/api/assets/${id}`, width: w, height: h });
-  const withSet = (air: 'none' | 'dust' | 'bokeh' | 'spray') =>
-    input({ set: { look: 'beach', air, backdrop: art('ast_back'), ground: '#d8b878', dot: art('ast_dot', 128, 128) } });
+  const withSet = (air: 'none' | 'dust' | 'bokeh' | 'spray', key?: 'low' | 'mid' | 'high') =>
+    input({ ...(key ? { key } : {}), set: { look: 'beach', air, backdrop: art('ast_back'), ground: '#d8b878', dot: art('ast_dot', 128, 128) } });
 
   it('puts the backdrop on a 4 m wall 3.2 m behind, with a coloured floor, and registers the picture', () => {
     const c = buildCinematicFilm(withSet('none')) as any;
     const w = world(c) as any;
-    expect(w.set).toEqual({ ground: '#d8b878', groundSize: [16, 12], wall: { distance: 3.2, height: 4 }, backdrop: 'ast_back' });
+    expect(w.set).toEqual({ ground: '#d8b878', groundSize: [...CAMERA.groundSize], wall: { distance: 3.2, height: 4 }, backdrop: 'ast_back' });
     expect(c.assets.ast_back).toBeDefined();
     expect(c.precomps.cine.assets.ast_back).toBeDefined();
     const v = lightValidate(c);
     expect(v.ok, v.ok ? '' : JSON.stringify(v.issues)).toBe(true);
+  });
+  it('the macro aims at the label: offset toward it, never so far that the frame leaves the product', () => {
+    const [x, y] = macroOffset([0.9, 0.1], 0.3, 0.3, 9 / 16);
+    expect(x).toBeGreaterThan(0);
+    expect(y).toBeGreaterThan(0);
+    const frameH = PRODUCT_H / FILL.macro;
+    expect(Math.abs(x)).toBeLessThanOrEqual((0.3 - frameH * (9 / 16)) / 2 + 1e-3);
+    expect(Math.abs(y)).toBeLessThanOrEqual((0.3 - frameH) / 2 + 1e-3);
+    expect(macroOffset([0.5, 0.5], 0.3, 0.3, 9 / 16)).toEqual([0, 0]);
+    expect(macroOffset([0.9, 0.1], 0.05, 0.05, 9 / 16)).toEqual([0, 0]);
+  });
+  it('a turned product shows its width foreshortened, so the sideways aim shrinks with the turn', () => {
+    const [flat] = macroOffset([0.95, 0.5], 0.5, 0.3, 9 / 16);
+    const [turned] = macroOffset([0.95, 0.5], 0.5, 0.3, 9 / 16, 30);
+    expect(turned).toBeLessThan(flat);
+    expect(turned).toBeGreaterThan(0);
+  });
+  it('a flat product with a label spot gets a macro that moves the camera and its target there, and back after', () => {
+    const flatSheet = { beats: sheet.beats };
+    const c = buildCinematicFilm(input({ sheet: flatSheet, shape: 'other', contour: [[0, 0], [100, 0], [100, 200], [0, 200]], productAspect: 2, focus: [0.9, 0.1] } as any)) as any;
+    const target = (world(c) as any).camera.target;
+    expect(Array.isArray(target[0]) || typeof target[0] === 'object').toBe(true);
+    const aim = target.find((k: any) => k.v[0] !== 0);
+    expect(aim).toBeDefined();
+    expect(target.at(-1).v[0]).toBe(0);
+    const plain = buildCinematicFilm(input({ sheet: flatSheet, shape: 'other', contour: [[0, 0], [100, 0], [100, 200], [0, 200]], productAspect: 2 } as any)) as any;
+    expect((world(plain) as any).camera.target).toEqual([0, PRODUCT_Y, 0]);
+  });
+  it('a set is lit by the board\'s key level: a low key keeps its mood, a high key opens up', () => {
+    const lights = (key: 'low' | 'mid' | 'high') => (world(buildCinematicFilm(withSet('none', key))) as any).lights;
+    for (const k of ['low', 'mid', 'high'] as const) {
+      const l = lights(k);
+      expect(l.key.intensity).toBe(LIGHT[k].key);
+      expect(l.fill.intensity).toBe(LIGHT[k].fill);
+      expect(l.ambient).toBe(LIGHT[k].ambient);
+      expect(l.rim.intensity.at(-1).v).toBe(LIGHT[k].rimEnd);
+    }
+    expect(lights('low').fill.intensity).toBeLessThan(lights('high').fill.intensity);
+  });
+  it('the words of a line sit one space apart and stay inside the frame', () => {
+    const c = buildCinematicFilm(input({ title: 'Wave Rider Longboard Pro', brand: undefined } as any)) as any;
+    const texts = layers(c).filter((l: any) => l.kind === 'text' && l.transform.position?.[0]?.v);
+    const rows = new Map<number, any[]>();
+    for (const l of texts) {
+      const [x, y] = l.transform.position[0].v;
+      // a text layer's position is the centre of its box
+      rows.set(y, [...(rows.get(y) ?? []), { x: x - l.style.boxWidth / 2, w: l.style.boxWidth, size: l.style.size }]);
+    }
+    const lines = [...rows.values()].filter((r) => r.length >= 2);
+    expect(lines.length).toBeGreaterThan(0);
+    for (const line of lines) {
+      line.sort((a, b) => a.x - b.x);
+      expect(line[0].x).toBeGreaterThanOrEqual(0);
+      expect(line.at(-1).x + line.at(-1).w).toBeLessThanOrEqual(1080);
+      for (let n = 1; n < line.length; n++) expect(line[n].x - (line[n - 1].x + line[n - 1].w)).toBeCloseTo(SPACE_EM * line[n].size, 0);
+    }
+  });
+  it('the camera never goes below the floor, even at a low angle', () => {
+    const cam = planCamera({ beats: sheet.beats.map((b) => ({ ...b, angle: 'low' })) }, 30);
+    for (const k of cam.position) expect((k.v as number[])[1]!).toBeGreaterThanOrEqual(CAMERA.minCameraHeight);
+  });
+  it('the floor reaches behind the hook camera, so the bottom of the first picture is floor', () => {
+    const cam = planCamera({ beats: sheet.beats }, 30);
+    const z = (cam.position[0]!.v as number[])[2]!;
+    expect(Math.abs(z)).toBeLessThan(CAMERA.groundSize[1] / 2);
+  });
+  it('the product is in the first picture: it drops in from no higher than the rule book says', () => {
+    const c = buildCinematicFilm(withSet('none')) as any;
+    const can = props(c).find((p: any) => p.role === 'product') as any;
+    const first = can.position[0];
+    expect(first.t).toBe(0);
+    expect(first.v[1]).toBeLessThanOrEqual(CAMERA.dropFrom);
   });
   it('without a set the world is bare and the 2D halo stays; with one the halo goes', () => {
     const bare = buildCinematicFilm(input()) as any;
@@ -380,6 +480,13 @@ describe('a set: backdrop on the wall, a floor and air', () => {
     const peak = planCamera({ beats: sheet.beats }, 30).beats[4]!;
     expect(spray.swarm.motion).toBe('burst');
     expect(spray.inPoint).toBe(peak.start);
+  });
+  it('spray is clear round drops, never cubes', () => {
+    const c = buildCinematicFilm(input({ sheet: { beats: sheet.beats.map((b, k) => ({ ...b, phase: k === 4 ? 'peak' : b.phase })) }, set: { look: 'beach', air: 'spray', backdrop: art('ast_back'), ground: '#d8b878' } })) as any;
+    const spray = props(c).find((p) => p.id === 'cine:air-spray') as any;
+    expect(spray.source.round).toBe(MATERIALS.dropRound);
+    expect(spray.material.color).not.toBe('#fff6e4');
+    expect(spray.material.clearcoat).toBe(1);
   });
   it('bokeh is four soft lights, single cards (a swarm cannot be a card), drifting', () => {
     const lights = props(buildCinematicFilm(withSet('bokeh'))).filter((p) => (p.id as string).startsWith('cine:air-bokeh')) as any[];

@@ -1,5 +1,5 @@
 // A line-up: a catalogue made the way one film is made. Every product is its own crew film (the same showrunner,
-// builders and critic), and the films run one after another. The line-up only remembers the order and who is where.
+// builders and critic), and LINEUP_CONCURRENCY films run at once, in order. The line-up only remembers the order and who is where.
 import { z } from 'zod';
 import { productSchema } from './catalog';
 

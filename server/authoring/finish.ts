@@ -1,5 +1,10 @@
 import { parsePrice } from '@shared/catalog';
+import { setCamera } from './camera';
+import { isAnimated } from './keyframes';
 import { addLayer } from './layers';
+import { readDirector } from './meta';
+import { separateText } from './text-collide';
+import { priceBadges, priorBadges } from './price-badge';
 import type { Comp, Obj } from './types';
 
 // Deterministic finishing pass for a built film (S17 polish): contact shadow under the product, a warm grade,
@@ -15,6 +20,52 @@ export interface FinishOptions {
   musicLevel?: number;
   /** The film's brief: a price named in it that no text layer shows is added to the last scene. */
   brief?: string;
+  /** The colour of the wipe that carries each cut (the style bible's lead colour). */
+  accent?: string;
+}
+
+/** Frames each half of a cut's wipe takes: the panel covers the end of one shot and uncovers the start of the next. */
+export const WIPE_FRAMES = 7;
+const CAMERA_ROLES = new Set(['bg', 'product', 'product3d', 'subject', 'clip']);
+
+/** A shot the director left static gets a slow push, unless a layer the camera would move is already animated by hand. */
+function pushStaticShots(c: Comp): Comp {
+  let out = c;
+  const meta = readDirector(c);
+  for (const [sceneId, scene] of Object.entries(meta.scenes)) {
+    if (scene.mode === 'generate' || scene.camera?.move !== 'static') continue;
+    const layers = ((c.precomps as Record<string, Obj>)[scene.precompId]?.layers ?? []) as Obj[];
+    const handAnimated = layers.some((l) => CAMERA_ROLES.has(meta.layers[l.id]?.role ?? '') && (isAnimated(l.transform?.position) || isAnimated(l.transform?.scale)));
+    if (!handAnimated) out = setCamera(out, sceneId, 'dolly-in', scene.camera.strength ?? 0.5);
+  }
+  return out;
+}
+
+/** A panel in the accent colour that sweeps across the frame, left to right: in over the last frames of a shot, out over the first frames of the next. */
+function wipeLayer(sceneId: string, w: number, h: number, frames: number, colour: string, half: 'out' | 'in'): Obj {
+  const pw = w * 1.15;
+  const from = half === 'out' ? -pw / 2 : w / 2;
+  const to = half === 'out' ? w / 2 : w + pw / 2;
+  const t0 = half === 'out' ? Math.max(0, frames - WIPE_FRAMES) : 0;
+  return {
+    kind: 'shape',
+    id: `${PREFIX}${sceneId}:wipe-${half}`,
+    name: `wipe ${half}`,
+    inPoint: t0,
+    outPoint: half === 'out' ? frames : Math.min(frames, WIPE_FRAMES + 1),
+    path: { kind: 'rect', size: [pw, h * 1.1] },
+    fill: colour,
+    transform: {
+      position: [
+        { t: t0, v: [from, h / 2], easeOut: half === 'out' ? [0.55, 0, 1, 0.45] : [0, 0.55, 0.45, 1] },
+        { t: t0 + WIPE_FRAMES, v: [to, h / 2] },
+      ],
+      anchor: [pw / 2, (h * 1.1) / 2],
+      scale: [1, 1],
+      rotation: 0,
+      opacity: 1,
+    },
+  };
 }
 
 const isFinish = (l: Obj): boolean => typeof l.id === 'string' && l.id.startsWith(PREFIX);
@@ -126,7 +177,9 @@ function flashLayer(sceneId: string, w: number, h: number, frames: number): Obj 
 }
 
 export function finishComposition(c: Comp, o: FinishOptions = {}): Comp {
-  const out = ensurePrice(structuredClone(c), o.brief);
+  // a second finish redraws the badges an earlier one drew, though the copy no longer names their price
+  const prior = priorBadges(c);
+  let out = ensurePrice(structuredClone(c), o.brief);
   const director = (out.meta?.director ?? {}) as Obj;
   const roles = (director.layers ?? {}) as Record<string, { role?: string }>;
   const colour = o.grade ?? '#ffb870';
@@ -146,6 +199,19 @@ export function finishComposition(c: Comp, o: FinishOptions = {}): Comp {
     layers.splice(at < 0 ? layers.length : at, 0, ...extra);
     p.layers = layers;
   }
+
+  // the wrapped type may now collide, and a static shot is a still: settle both before the cuts are laid on top
+  out = pushStaticShots(separateText(out).comp);
+  out = priceBadges(out, { prior, refit: fitText, ...(o.accent ? { accent: o.accent } : {}) });
+  const order = Object.values(readDirector(out).scenes)
+    .filter((s) => (out.precomps as Record<string, Obj>)[s.precompId])
+    .sort((a, b) => a.startFrame - b.startFrame);
+  order.forEach((s, i) => {
+    const p = (out.precomps as Record<string, Obj>)[s.precompId]!;
+    // the wipe is the top layer: it covers the type too, so the whole frame cuts
+    if (i < order.length - 1) (p.layers as Obj[]).push(wipeLayer(s.precompId, p.width, p.height, p.durationInFrames, o.accent ?? '#ffffff', 'out'));
+    if (i > 0) (p.layers as Obj[]).push(wipeLayer(s.precompId, p.width, p.height, p.durationInFrames, o.accent ?? '#ffffff', 'in'));
+  });
 
   const top = (out.layers as Obj[]).filter((l) => !isFinish(l));
   if (o.musicAssetId) {

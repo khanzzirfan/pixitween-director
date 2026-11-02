@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
 import { boardPrompt, checkBeatSheet, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
+import { TEXT_RULES } from './cinematic-rules';
 import { floorElements } from './ingredients';
 import { EXAMPLES, pickExamples, referenceDeck } from './reference-deck';
 
@@ -153,11 +154,15 @@ describe('parseBoard', () => {
 });
 
 describe('parseBoard tagline', () => {
-  it('keeps a tagline to the rule book\'s word count', () => {
+  it('drops a tagline over the rule book\'s word count instead of cutting it mid-phrase', () => {
     const board = floorBoard({ title: 'Beach Towel', category: 'summer' });
     const raw = { concept: 'c', mood: 'm', tagline: 'Ride every wave all summer long with us', elements: board.elements, beats: board.sheet.beats };
     const r = parseBoard(raw);
-    expect(r.ok && r.board.tagline?.split(' ').length).toBe(6);
+    expect(r.ok && r.board.tagline).toBeUndefined();
+    expect(r.ok && r.notes.join('|')).toMatch(/tagline/);
+    const fits = parseBoard({ ...raw, tagline: 'Ride   every wave' });
+    expect(fits.ok && fits.board.tagline).toBe('Ride every wave');
+    expect(TEXT_RULES.taglineWords).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -412,14 +417,14 @@ describe('the words on a board', () => {
     expect(base.beats.some((b) => b.text)).toBe(false);
     expect(checkBeatSheet(withText({ 0: 'Pack the car', 3: 'Feel the summer' }), els3)).toEqual([]);
   });
-  it('allows three shots with words, never the last or a macro', () => {
-    expect(checkBeatSheet(withText({ 0: 'One', 1: 'Two', 3: 'Three', 4: 'Four' }), els3).join('|')).toMatch(/at most 3 shots carry text/);
+  it('allows only the rule book\'s few shots with words, never the last or a macro', () => {
+    expect(checkBeatSheet(withText({ 0: 'One', 1: 'Two', 3: 'Three' }), els3).join('|')).toMatch(new RegExp(`at most ${TEXT_RULES.maxShots} shots carry text`));
     expect(checkBeatSheet(withText({ 6: 'Buy it now' }), els3).join('|')).toMatch(/last shot carries no text/);
     const macro = base.beats.findIndex((b) => b.size === 'macro');
     expect(checkBeatSheet(withText({ [macro]: 'Look closer' }), els3).join('|')).toMatch(/label macro; keep words out/);
   });
-  it('holds the words to what a shot can say: five at most, about four a second', () => {
-    expect(checkBeatSheet(withText({ 0: 'one two three four five six' }), els3).join('|')).toMatch(/at most 5 words/);
+  it('holds the words to what a shot can say: the rule book\'s most, and about three a second', () => {
+    expect(checkBeatSheet(withText({ 0: 'one two three four five six' }), els3).join('|')).toMatch(new RegExp(`at most ${TEXT_RULES.maxWords} words`));
     const short = { beats: base.beats.map((b, i) => (i === 1 ? { ...b, seconds: 0.6, text: 'one two three four' } : b)) };
     expect(checkBeatSheet(short, els3).join('|')).toMatch(/can take only 2 words/);
   });

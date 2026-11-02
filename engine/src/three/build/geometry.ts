@@ -1,5 +1,6 @@
 // Ported from reacthub-pixitweenjs src/components/AepComposition/model3d/geometry.ts (MIT).
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { type Geometry3D } from '../../schema/layer3d';
 
 // Primitive geometries for `three` layers. Every builder returns a BufferGeometry in model units
@@ -14,13 +15,16 @@ export type PrimitiveGeometry = Exclude<Geometry3D, { type: 'gltf' | 'text3d' }>
 const SPHERE_WIDTH_SEGMENTS = 48;
 const SPHERE_HEIGHT_SEGMENTS = 32;
 const CYLINDER_RADIAL_SEGMENTS = 48;
+const ROUND_SEGMENTS = 3;
 const TORUS_RADIAL_SEGMENTS = 32;
 const TORUS_TUBULAR_SEGMENTS = 96;
 
 export function buildGeometry(spec: PrimitiveGeometry): THREE.BufferGeometry {
   switch (spec.type) {
     case 'box':
-      return new THREE.BoxGeometry(spec.size[0], spec.size[1], spec.size[2]);
+      return spec.round
+        ? new RoundedBoxGeometry(spec.size[0], spec.size[1], spec.size[2], ROUND_SEGMENTS, spec.round * Math.min(...spec.size))
+        : new THREE.BoxGeometry(spec.size[0], spec.size[1], spec.size[2]);
     case 'sphere':
       return new THREE.SphereGeometry(spec.radius, SPHERE_WIDTH_SEGMENTS, SPHERE_HEIGHT_SEGMENTS);
     case 'cylinder':

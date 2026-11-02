@@ -4,13 +4,15 @@
 >
 > Built for the Meta Global AI Developer Hackathon (27 Oct – 4 Nov 2026) · Track: Startups · Theme: Build for Your World
 
+<!-- OWNER:gif -->
+
 <p align="center">
   <img src="docs/images/showrunner-map.gif" alt="Crew map during a real run: the Showrunner node at the centre sends jobs as coloured packets to Builders 1 to 4, the Critic and Continuity, while the film on the right fills in scene by scene" width="100%">
 </p>
 
 <p align="center"><em>The crew map, replayed from a real run at 4× speed. The <b>Muse Wonder showrunner</b> sits at the centre with you, the director, on its left. Each packet is a job: builds and fixes go out to the four <b>Muse Spark builders</b>, and frames go to the <b>critic</b> and <b>continuity</b> checks, whose findings come back as fixes. On the right, the film fills in as each scene lands.</em></p>
 
-**Live:** <!-- OWNER:live-url --> · **Demo video (3 min):** <!-- OWNER:video-url --> · **Code:** <!-- OWNER:repo-url -->
+**Live:** <!-- OWNER:live-url --> · **Demo video (3 min):** <!-- OWNER:video-url --> · **Code:** <!-- OWNER:repo-url --> · **Team:** <!-- OWNER:team -->
 
 ## How it all works, in one picture
 
@@ -34,7 +36,7 @@ No key, or don't want to spend? [Free offline mode](#no-key-free-offline-mode) r
 
 ---
 
-## What it makes
+## What it does
 
 Every frame below is from a real run of the app on the demo feed in [`fixtures/catalog/feed-summer-surf.csv`](fixtures/catalog/feed-summer-surf.csv). The product photos are free stock photos ([credits](fixtures/catalog/surf/CREDITS.md)), and *Saltline* is a made-up brand.
 
@@ -51,6 +53,12 @@ Every frame below is from a real run of the app on the demo feed in [`fixtures/c
 
 Each film is a composition of layers, not a rendered video: a set painted by Muse Image, the product cut out by SAM 3.1, and the title and price set from the feed. The browser plays it on a GSAP timeline. Because it is data, an edit changes only what it touches, every version can be undone, and the title and price are always exactly the feed's.
 
+## Demo
+
+- **Live gallery:** <!-- OWNER:live-url -->. Open any crew film and press **Watch it being made** to see the crew work. It needs no passcode and costs nothing.
+- **Video (3 min):** <!-- OWNER:video-url -->
+- **Offline, with no keys:** run `npx tsx scripts/demo-film.ts load data-fake`, then `npm run dev:fake`. The gallery lists *Morning Ritual*, a film recorded with the fake crew, and its replay plays.
+
 ---
 
 ## How it works, step by step
@@ -66,7 +74,7 @@ Each film is a composition of layers, not a rendered video: a set painted by Mus
 </p>
 <p align="center"><em>The Crew view mid-run: each lane shows its jobs, timings and cost in cents. On the right the showrunner explains what it is doing: "Fixing contrast and the off-screen headline…"</em></p>
 
-### Meta models used
+## Meta models used
 
 | Model | Id | What it does here | Call site |
 |-------|----|-------------------|-----------|
@@ -160,11 +168,11 @@ Open **Review** to see what the critic and the rules found, each finding tied to
 
 ## 4. Turn a whole catalog into ads
 
-The catalog flow makes one film per product, one after another.
+The catalog flow makes one film per product, two at a time by default (`LINEUP_CONCURRENCY`, 1–4), in feed order.
 
 1. Press **New film**.
 2. Drop the demo feed [`fixtures/catalog/feed-summer-surf.csv`](fixtures/catalog/feed-summer-surf.csv) into the chat. Its photos are in the repository, so nothing else is needed. You can also press **Try an example** for a smaller feed.
-3. Press **Make film**. A tab appears for each product, and the studio follows the crew from one to the next.
+3. Press **Make film**. A tab appears for each product, and the studio follows the crew as each film finishes. **Stop** halts the films in progress and starts no more.
 
 Your own feed needs these columns:
 
@@ -233,10 +241,17 @@ npx tsx scripts/demo-film.ts load data-fake
 |---------|--------------|
 | `npm run dev` | API on :8787 and studio on :5173 |
 | `npm run dev:fake` | the whole app offline, on ports 8790 and 5180 and folder `data-fake`: scripted crew, no keys, no spend |
-| `npm run dev:nowatch` | the same as `dev`, but editing `server/**` cannot restart the server mid-film |
+| `npm run dev:nowatch`, `npm run dev:server:nowatch` | the same as `dev` (or the API alone), but editing `server/**` cannot restart the server mid-film |
+| `npm run dev:server`, `npm run dev:web` | the API alone (port 8787), or the studio alone (port 5173) |
 | `npm run typecheck`, `npm run lint`, `npm test` | the offline gates: types, lint, unit tests (no network) |
 | `npm run e2e`, `npm run e2e:crew` | browser flows with the fake director and the fake crew |
-| `npm run build`, `npm run check:bundle`, `npm start` | build the studio, check the bundle holds no keys, run the server as the container does |
+| `npm run build`, `npm run check:bundle`, `npm run start` | build the studio, check the bundle holds no keys, run the server as the container does |
+| `npm run db:import -- [DATA_DIR]` | import old file-based data under `DATA_DIR` into `DATA_DIR/director.db` (the server also does this on boot) |
+| `npm run db:export-events -- <filmId> [DATA_DIR]` | write one film's events as JSONL to stdout, the format the report scripts read |
+| `npm run corpus:films`, `npm run corpus:report` | load the analysed reference films and their craft lessons into `director.db`, then report which lessons were used and how those films ended |
+| `npm run engine:cli` | the Motion agent CLI (`explain`, `qa`, `edit`, `undo`, `presets`, `effects`, `targets`), one JSON object per call |
+| `npm run engine:e2e` | the Motion engine's own browser flows, from `engine/playwright.config.ts` |
+| `npm run r8:fixtures` | regenerate the engine's R8 test fixtures (`fixtures/r8`) |
 | `npm run live -- <name> [--yes]` | live checks that spend money; a dry run unless `--yes` is passed |
 
 Optional settings in `.env`: `PRODUCT_3D=true` turns on 3D product shots, `CREW_FILM_BUDGET_USD` sets the budget per film, and `DIRECTOR_PASSCODE` puts a passcode on a public deployment.
@@ -272,7 +287,7 @@ flowchart LR
 
 <!-- OWNER:cost-table -->
 
-Every Meta call is recorded as a `cost` event in the film's event log. `npx tsx scripts/cost-per-film.ts <events.jsonl>` prints a film's full record, and `npm run db:export-events` writes the logs out from the database. The crew has a budget per film (`CREW_FILM_BUDGET_USD`, default 1.50) and refuses new jobs once it is spent.
+Every Meta call is recorded as a `cost` event in the film's event log. `npx tsx scripts/cost-per-film.ts <events.jsonl>` prints a film's full record, and `npm run db:export-events -- <filmId>` writes a film's log out from the database. The crew has a budget per film (`CREW_FILM_BUDGET_USD`, default 1.50) and refuses new jobs once it is spent.
 
 Planning prices, from the vendor pages on 27 Oct 2026:
 
@@ -287,20 +302,20 @@ Replays and 3D scenes cost nothing.
 
 - **Meta has no video- or speech-generation model** (checked 27 Oct). Motion comes from the browser timeline, and there is no voice-over.
 - **Muse Spark's video review is coarse.** It sees sampled stills and hears no audio, so review uses frames as images plus measured rules, and catalog clips are checked from their JSON before anything is rendered.
-- **Voice Transcribe sometimes repeats words** ("our our") and gives turn-level timestamps only. The text goes to the showrunner as it is.
-- **Muse Image returns 1920×1280 when asked for 1536×1024, and has no transparent output**, so every transparent layer comes from SAM.
+- **Voice Transcribe repeats some words** ("our our") and gives turn-level timestamps only. The text goes to the showrunner as it is.
+- **Muse Image returns 1920x1280 when asked for 1536x1024, and has no transparent output**, so every transparent layer comes from SAM.
 - **3D product shots show the front of the product** as photographed, and turn at most 35° either side. Soft packaging should stay in 2D motion.
 - **A film is not always clean.** Some finished films still show issues the critic flagged (for example, text cropped at the edge) when the time or budget ran out before the fix landed. The Review tab lists them.
 
 ## Built during the hackathon
 
-Everything here was written during the event; the git history starts on 28 Oct 2026. It was built with AI coding agents (Ralph TUI and Claude Code) from PRDs kept in `ralph/`.
+Everything here was written during the event; the git history starts on 28 Oct 2026. It was built with AI coding agents (Ralph TUI and Claude Code) from PRDs kept in `ralph/`: 14 PRDs for the first build, then 10 more for the crew, the replay, the 3D product shots and the studio shell. What is new and what existed before the event: [`docs/new-vs-existing.md`](docs/new-vs-existing.md).
 
 **Pre-existing dependencies:**
 
 | Dependency | What it is | How we use it |
 |------------|-----------|---------------|
-| [`reacthub-pixitweenjs`](https://www.npmjs.com/package/reacthub-pixitweenjs) | our own timeline engine, published on npm before the hackathon under its own source-available licence | the player that renders the composition JSON the agents write; installed from npm, never copied or edited here. Gaps are tracked in [`docs/todos/ENGINE-NEEDS.md`](docs/todos/ENGINE-NEEDS.md) |
+| [`reacthub-pixitweenjs`](https://www.npmjs.com/package/reacthub-pixitweenjs) | our own timeline engine, published on npm before the hackathon under its own source-available licence (free for individuals, non-profits and organisations under €1M revenue) | the player that renders the composition JSON the agents write; installed from npm, never copied or edited here. Gaps are tracked in [`docs/todos/ENGINE-NEEDS.md`](docs/todos/ENGINE-NEEDS.md) |
 | `@meta-sam/parser` | Meta's parser for SAM output, under the SAM License | reading SAM 3.1 results |
 | Third-party libraries | React, Three.js, GSAP, Hono, sharp, zod, better-sqlite3 and others | see `package.json`; licences are in the packages |
 

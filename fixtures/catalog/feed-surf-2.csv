@@ -1,0 +1,3 @@
+id,title,price,sale_price,currency,image_link,category,link,brand
+swim-goggles,Clear Water Swim Goggles,18.00,14.00,USD,fixtures/catalog/surf/swim-goggles.jpg,swim summer,/p/swim-goggles,Saltline
+sun-cooler,Ice Cold Beach Cooler,59.00,,USD,fixtures/catalog/surf/sun-cooler.jpg,beach summer drinks,/p/sun-cooler,Saltline

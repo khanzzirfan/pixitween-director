@@ -243,6 +243,16 @@ describe('convertWorld lighting, focus and shadow', () => {
     expect(warnings.join(' ')).not.toMatch(/overrides|focus/);
   });
 
+  it('an animated camera target becomes lookAt tweens, with no warning', () => {
+    const w = { ...cine(), camera: { position: [0, 0.4, 1], target: [{ t: 0, v: [0, 0.08, 0] }, { t: 10, v: [0.04, 0.12, 0] }], fov: 14 } } as unknown as AepStage3DLayer;
+    const { layer, warnings } = convertWorld(w, [], ctx);
+    expect(warnings.join(' ')).not.toMatch(/camera.target/);
+    expect(layer.camera.lookAt).toEqual([0, 0.08, 0]);
+    const look = layer.tweens.filter((t) => t.target === 'camera' && Object.keys(t.to).some((k) => k.startsWith('lookAt')));
+    expect(look).toHaveLength(1);
+    expect(look[0]!.to).toMatchObject({ 'lookAt.x': 0.04, 'lookAt.y': 0.12 });
+  });
+
   it('keyframes the depth of field and keeps exposure and the stage shadow floor', () => {
     const { layer } = convertWorld(cine(), [], ctx);
     expect(layer.effects).toEqual([{ id: 'dof', type: 'stageDof', params: { aperture: 0.3, focusDistance: 1.2 } }]);

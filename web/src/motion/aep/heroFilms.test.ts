@@ -112,6 +112,33 @@ describe('a film with every camera move keeps the world within the engine limits
     });
 });
 
+describe('a handheld film whose macro is aimed at the label keeps the world within the engine limits', () => {
+  for (const n of [7, 10, 12])
+    it(`${n} shots`, () => {
+      const moves = ['push', 'truck', 'crane', 'whip', 'rack', 'orbit', 'pull', 'truck', 'crane'];
+      const beats = Array.from({ length: n - 1 }, (_, i) => ({ size: (i === 2 ? 'macro' : (['wide', 'medium', 'close'] as const)[i % 3]!) as 'wide' | 'medium' | 'close' | 'macro', move: moves[i % moves.length] as any, seconds: 0.8, angle: (['low', 'eye', 'high'] as const)[i % 3]!, phase: (i === 0 ? 'hook' : 'build') as any, product: (i === 0 ? 'drop' : i % 2 ? 'turn' : 'still') as any }));
+      beats.push({ size: 'medium', move: 'hold', seconds: 2, angle: 'eye', phase: 'close', product: 'still' } as any);
+      const comp = buildCinematicFilm({
+        aspect: '9:16',
+        sheet: { beats },
+        texture: { id: 'ast_front', src: '/api/assets/ast_front', width: 100, height: 340, kind: 'front' },
+        shape: 'other',
+        contour: [[0, 0], [100, 0], [100, 300], [50, 340], [0, 300]],
+        side: '#d8d8d8',
+        productAspect: 3.4,
+        focus: [0.85, 0.15],
+        title: 'Longboard',
+        price: 29,
+        accent: '#d08a1c',
+        handheld: true,
+      });
+      const target = (comp as any).precomps.cine.layers.find((l: any) => l.kind === 'stage3d').camera.target;
+      expect(typeof target[0]).toBe('object');
+      const out = aepToMotion(comp as unknown as AepCompositionJson);
+      expect(out.warnings.filter((w) => /exceed|dropped|not supported/.test(w))).toEqual([]);
+    });
+});
+
 describe('a 3D hero film with words and a tagline converts', () => {
   for (const aspect of ['9:16', '16:9', '1:1'] as const)
     it(aspect, () => {

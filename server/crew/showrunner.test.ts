@@ -292,6 +292,26 @@ describe('job chains', () => {
     expect(pushed.map((p) => p.text)).toEqual(['build-scene s1 failed: model said no']);
   });
 
+  it('maxCritiques caps the automatic critiques per scene; continuity still runs after every write', async () => {
+    const inbox = { push: () => undefined, drain: async () => [], size: () => 0, close: () => undefined };
+    // eslint-disable-next-line prefer-const
+    let board!: ReturnType<typeof createBoard>;
+    // eslint-disable-next-line prefer-const
+    let scheduler!: ReturnType<typeof createScheduler>;
+    const onUpdate = createJobChains({ board: () => board, scheduler: () => scheduler, inbox, maxCritiques: 1 });
+    board = createBoard({ filmId: 'film_aaaaaaaaaaaa', emit: (e) => onUpdate(e.job), persist: () => undefined });
+    scheduler = createScheduler({ board, maxWorkers: 4, runWorker: async () => ({ summary: 'ok' }) });
+    for (const kind of ['build-scene', 'fix'] as const) {
+      await scheduler.dispatch({ kind, sceneId: 's1', origin: 'auto', brief: 'b', reason: 'r' });
+      await scheduler.idle();
+      await settle();
+      await scheduler.idle();
+    }
+    const kinds = board.list().map((j) => j.kind);
+    expect(kinds.filter((k) => k === 'critique')).toHaveLength(1);
+    expect(kinds.filter((k) => k === 'continuity')).toHaveLength(2);
+  });
+
   it('a late patch on a finished job does not chain again', async () => {
     const pushed: InboxItem[] = [];
     const inbox = { push: (i: InboxItem) => pushed.push(i), drain: async () => [], size: () => 0, close: () => undefined };

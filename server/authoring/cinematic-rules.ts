@@ -81,21 +81,72 @@ export const MOVE_RULES = {
 
 /** The words on screen. */
 export const TEXT_RULES = {
-  maxShots: 3,
-  maxWords: 5,
+  maxShots: 2,
+  maxWords: 4,
   /** a shot can say about this many words a second, and always at least `minWords` */
-  wordsPerSecond: 4,
+  wordsPerSecond: 3,
   minWords: 2,
-  taglineWords: 6,
+  taglineWords: 4,
+  /** the end card says at most this many things: with a tagline it is the name, the tagline and the price (the brand was in the opening); without, the brand, the name and the price */
+  endCardItems: 3,
 } as const;
 
 /** The camera's numbers (metres, degrees, shares). */
+/** One light recipe for one key level of the board. */
+export interface LightRecipe {
+  /** the key's strength: the studio preset's 3.2 is raised so the lit side is clearly brighter than the shade side */
+  key: number;
+  /** fill and ambient: low, so the shade side keeps its shape */
+  fill: number;
+  ambient: number;
+  /** the rim while the product lands and turns, and in the end hold */
+  rim: number;
+  rimEnd: number;
+  /** the backdrop's corners darken by this much (0 none), so the eye goes to the centre where the product is */
+  vignette: number;
+}
+
+/**
+ * The light of a set, taken from the reference ads: one strong key from one side, a rim that outlines the product, little fill, so the product
+ * is the brightest, most contrasty thing in the frame and its edges glint. (The studio preset's fill of 1.1 flattens a product into its beach.)
+ * It follows the board's key level: a low key stays moody (less fill, a dark vignette), a high key is open and bright.
+ */
+export const LIGHT = {
+  low: { key: 3.4, fill: 0.2, ambient: 0.05, rim: 1.8, rimEnd: 2.6, vignette: 0.45 } satisfies LightRecipe,
+  mid: { key: 4, fill: 0.35, ambient: 0.1, rim: 1.5, rimEnd: 2.4, vignette: 0.3 } satisfies LightRecipe,
+  high: { key: 4, fill: 0.6, ambient: 0.2, rim: 1.2, rimEnd: 2, vignette: 0.18 } satisfies LightRecipe,
+  /** the cut-out's side face is lifted toward white by this share, so the thin edge is not a black outline */
+  sideLift: 0.4,
+  /** the contact shadow under the product: darker than the default so it sits on the floor */
+  shadow: 0.6,
+  /** a set's exposure is scaled by this: the stronger key would otherwise burn the floor to cream */
+  exposure: 0.85,
+} as const;
+
+/** How the small things in the air look. Ice is a clear cube with soft melted corners and a wet shine; a drop is a clear ball. */
+export const MATERIALS = {
+  /** ice: corner radius as a share of the shortest side (0 sharp, 0.5 a ball) */
+  iceRound: 0.22,
+  ice: { color: '#d8f1ff', roughness: 0.12, transmission: 1, ior: 1.31, thickness: 0.05, clearcoat: 1 },
+  /** spray: a drop is a ball (round 0.5), clear and wet, never a cream cube */
+  dropRound: 0.5,
+  drop: { color: '#eaf7ff', roughness: 0.04, metalness: 0, opacity: 0.8, clearcoat: 1 },
+} as const;
+
 export const CAMERA = {
   /** a push starts this many times further than it arrives: the hook comes in hard (the references push 40-90 %), later pushes ease in */
   pushFromHook: 1.7,
   pushFromLater: 1.3,
   /** a push in a wide shot dives harder: the product is small in a big world, and a 30 % push barely changes the picture (the motion check found it) */
   pushFromWide: 1.9,
+  /** the floor's width and depth, metres: the hook's camera starts far back (further than the old 6 m the floor reached toward it), and the floor must still fill the bottom of the frame */
+  groundSize: [16, 30],
+  /** a hold starts this many times further than it ends and creeps in; the end card is never a still picture (the motion check wants the hold alive) */
+  holdCreep: 1.35,
+  /** the camera never goes lower than this above the floor, metres: a single-sided floor seen from below (a low angle far back) is not drawn, and the bottom of the frame shows the empty field */
+  minCameraHeight: 0.03,
+  /** the product drops in from this high above its place, metres: it is in the frame from the first picture (the old 0.6 m left the first frame empty) */
+  dropFrom: 0.3,
   /** a truck slides this share of the distance either side */
   truckShare: 0.3,
   /** a whip starts this many degrees round */
@@ -108,6 +159,13 @@ export const CAMERA = {
   tweenBudget: 62,
   /** the speed a cut leaves and enters at, as a share of the shot's mean speed: never from a stop */
   minCutSpeed: 0.5,
+  /** with a set, a high camera looks down this many degrees: steeper and the frame holds only floor, the horizon and the sea leave it */
+  highAngleSet: 14,
+  /** the most a glass piece (ice, a droplet) measures, metres: bigger and a close camera sees a wall of see-through shards */
+  glassMax: 0.018,
+  /** a burst's direction toward the lens (negative: away from it) and its spread, degrees: it flies up and away, never into the lens */
+  burstToward: -0.6,
+  burstSpread: 40,
   /** the most a flat cut-out may turn either way, degrees: it shows only its front */
   flatSwingMax: 30,
   /** the end hold's product stands at most this share of the frame's height, so the name and tagline above it and the price beside it have room */
@@ -137,9 +195,12 @@ export function ruleSentences(): string[] {
   const M = MOVE_RULES;
   const T = TEXT_RULES;
   const C = CAMERA;
+  const L = LIGHT.mid;
   const pct = (x: number) => `${Math.round(x * 100)}%`;
   return [
     `A film is ${S.minBeats} to ${S.maxBeats} shots and ${S.minTotal} to ${S.maxTotal} s in all.`,
+    `The floor is ${C.groundSize[0]} by ${C.groundSize[1]} m so it fills the bottom of the frame when the hook's camera starts far back, and the product drops in from ${C.dropFrom * 100} cm, so the very first picture has the product in it.`,
+    `The camera stays at least ${C.minCameraHeight * 100} cm above the floor, even at a low angle, so the floor is never seen from below.`,
     `The first shot is the hook: at most ${S.firstMax} s, already moving, and it pushes in from ${C.pushFromHook} times its final distance.`,
     `Every shot but the last lasts ${S.minBeat} to ${S.maxBeat} s.`,
     `The last shot is a hold of ${pct(S.holdMin)} to ${pct(S.holdMax)} of the film, with no element and no words: the price, name and tagline land there.`,
@@ -148,10 +209,12 @@ export function ruleSentences(): string[] {
     `At most ${M.whipMax} whips (each at most ${M.whipSeconds} s, never first or last), ${M.rackMax} rack focus, ${M.truckMax} trucks, ${M.craneMax} cranes, ${M.dollyMax} dolly-zoom (never first; a macro dolly-zoom is framed as a close).`,
     `Two shots in a row differ in size, angle or move; never three of one size in a row.`,
     `Exactly one shot is the peak, at ${pct(S.peakFrom)} to ${pct(S.peakTo)} of the film.`,
-    `Include a wide shot and a label macro; no element and no words in the macro.`,
+    `Include a wide shot and a label macro; no element and no words in the macro. On a flat cut-out the macro's camera is aimed at the label: the spot of the picture with the most small sharp detail (a logo, printed text), kept inside the product.`,
     `A cut lands while the camera is moving: the shot before leaves, and the shot after enters, at at least ${pct(C.minCutSpeed)} of its mean speed (a hold and the end of a whip are exempt).`,
     `The tremor is ${pct(C.shakeAmount)} of the camera distance, at most ${C.shakeKeysMax} keys a shot, and is dropped when the world's ${C.tweenBudget}-tween budget has no room.`,
-    `At most ${T.maxShots} shots carry words, each ${T.minWords} to ${T.maxWords} words and about ${T.wordsPerSecond} words a second at most; never a price or a number; the tagline is at most ${T.taglineWords} words.`,
+    `At most ${T.maxShots} shots carry words, each ${T.minWords} to ${T.maxWords} words and about ${T.wordsPerSecond} words a second at most; never a price or a number; the tagline is at most ${T.taglineWords} words. The end card says at most ${T.endCardItems} things: with a tagline the name, the tagline and the price, without one the brand, the name and the price.`,
+    `With a set the high camera looks down ${C.highAngleSet} degrees, so the horizon and the sea stay in the frame; a glass piece is at most ${C.glassMax * 100} cm, and a burst flies up and away from the lens. Ice is a clear cube with its corners rounded to ${pct(MATERIALS.iceRound)} of its side and a wet shine; spray is clear round drops, never cubes.`,
+    `A set is lit like the reference ads, by the board's key level: a mid key is one key at ${L.key}, a rim of ${L.rim} (${L.rimEnd} in the end hold) that outlines the product, fill ${L.fill}; a low key keeps the mood (key ${LIGHT.low.key}, fill ${LIGHT.low.fill}, a ${pct(LIGHT.low.vignette)} vignette) and a high key opens up (fill ${LIGHT.high.fill}). The cut-out's side face is lifted ${pct(LIGHT.sideLift)} toward white so no black outline shows, and the backdrop's horizon is never near white.`,
     `In the end hold the product stands at most ${pct(C.maxHoldHeight)} of the frame's height (the shot before it, whose framing the hold keeps, is held to the same), so the name, tagline and price never sit on it.`,
     `A flat, wide product never fills more than ${pct(C.maxWidthShare)} of the frame's width, and a flat cut-out turns at most ${C.flatSwingMax} degrees either way.`,
     `The rendered film must move: a moving shot's picture changes at least ${(MOTION_RULES.minShot * 100).toFixed(2)}% a step (${MOTION_RULES.stepSec} s), the price hold at least ${(MOTION_RULES.minHold * 100).toFixed(2)}%, and at least ${pct(MOTION_RULES.minLive)} of the film is live.`,

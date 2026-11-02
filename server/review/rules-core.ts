@@ -24,7 +24,8 @@ export async function runRulesCore(
     const layers = inner.layers as any[];
     const metas = d.layers ?? {};
     const products = layers.filter((l) => metas[l.id]?.role === 'product' || metas[l.id]?.role === 'product3d');
-    const texts = layers.filter((l) => l.kind === 'text');
+    // text the director placed; the finish's own type (the price badge) sits on its own backing and has no director entry
+    const texts = layers.filter((l) => l.kind === 'text' && metas[l.id]);
     const samples = sampleSceneFrames(scene.durationFrames, 4);
     const box = (id: string, f: number) => layerBoxAt(comp, id, f, { measuredTextBox: o.deps?.measuredTextBoxes?.[id] });
     if (!products.length) {

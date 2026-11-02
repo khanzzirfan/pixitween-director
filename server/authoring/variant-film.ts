@@ -6,6 +6,7 @@ import { readDirector, sceneMeta, writeDirector } from './meta';
 import type { ClipAsset, Rect } from './retail-clip';
 import { shade } from './retail-clip';
 import { addScene } from './scenes';
+import { SPACE_EM, textEm } from './text-width';
 import { setKeyframes } from './transform';
 import type { Aspect, Comp, Obj } from './types';
 
@@ -90,22 +91,21 @@ export function shape(c: Comp, sceneId: string, box: Rect, fill: string, z: numb
 
 /**
  * Words laid out on one line, centred on cx, each its own text layer so they can arrive one after another. Returns the ids in
- * reading order. Widths are estimated (about 0.56 em per character, 0.6 when bold), the same estimate the retail clip uses.
+ * reading order. Widths come from the font's real advance widths (text-width.ts), and the gap is one space, so the line reads as one line of text.
  */
 export function words(c: Comp, sceneId: string, text: string, o: { cx: number; cy: number; maxW: number; size: number; color: string; boldLast?: boolean; z: number }): { c: Comp; ids: string[] } {
   const ws = text.split(/\s+/).filter(Boolean);
-  const em = (w: string, bold: boolean) => w.length * (bold ? 0.6 : 0.56);
-  const total = (s: number) => ws.reduce((a, w, n) => a + em(w, !!o.boldLast && n === ws.length - 1) * s, 0) + (ws.length - 1) * 0.3 * s;
+  const total = (s: number) => ws.reduce((a, w, n) => a + textEm(w, !!o.boldLast && n === ws.length - 1) * s, 0) + (ws.length - 1) * SPACE_EM * s;
   const size = Math.max(12, Math.min(o.size, Math.floor((o.size * o.maxW) / Math.max(1, total(o.size)))));
   let x = o.cx - total(size) / 2;
   const ids: string[] = [];
   ws.forEach((w, n) => {
     const bold = !!o.boldLast && n === ws.length - 1;
-    const width = em(w, bold) * size;
+    const width = textEm(w, bold) * size;
     const t = add(c, sceneId, { role: 'caption', kind: 'text', text: w, z: o.z, style: { size, weight: bold ? 800 : 500, color: o.color, align: 'center' }, box: { x, y: o.cy - size * 0.6, w: width, h: size * 1.2 } });
     c = t.c;
     ids.push(t.id);
-    x += width + 0.3 * size;
+    x += width + SPACE_EM * size;
   });
   return { c, ids };
 }

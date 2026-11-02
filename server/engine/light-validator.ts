@@ -127,7 +127,12 @@ function validateComp(c: unknown, path: string, issues: CompositionIssue[]): voi
     }
     if (l.kind === 'prop3d' && typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version) && !versionAtLeast(version, CINEMATIC_MIN_VERSION)) {
       const src = isObj(l.source) ? l.source : undefined;
-      if (l.swarm !== undefined || l.material !== undefined || src?.type === 'card') issues.push({ path: lp, message: `prop3d swarm, material and card need schema >= 1.12.0 (got ${version})` });
+      if (l.swarm !== undefined || l.material !== undefined || src?.type === 'card' || src?.round !== undefined) issues.push({ path: lp, message: `prop3d swarm, material, card and source.round need schema >= 1.12.0 (got ${version})` });
+    }
+    if (l.kind === 'prop3d' && isObj(l.source) && l.source.round !== undefined) {
+      const round = l.source.round;
+      if (l.source.type !== 'primitive' || l.source.shape !== 'box') issues.push({ path: `${lp}.source.round`, message: `prop3d '${String(l.id)}' round is only valid for a box` });
+      else if (typeof round !== 'number' || !(round >= 0 && round <= 0.5)) issues.push({ path: `${lp}.source.round`, message: `round is a corner radius from 0 to 0.5 of the box's shortest side` });
     }
     if (l.kind === 'prop3d' && isObj(l.source) && l.source.type === 'card') {
       const frames = Array.isArray(l.source.frames) ? l.source.frames : [];

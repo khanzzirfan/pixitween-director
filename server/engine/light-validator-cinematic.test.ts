@@ -70,6 +70,22 @@ describe('light validator, cinematic stage (schema 1.12.0)', () => {
     layers(d).push(prop('card', { source: { type: 'card', frames: ['ast_nope', 'ast_nope2'] } }));
     expect(issues(d)).toMatch(/unknown assetId 'ast_nope'/);
   });
+  it('a rounded box needs 1.12.0, a round between 0 and 0.5, and a box', () => {
+    const ok = base();
+    layers(ok).push(prop('ice', { source: { type: 'primitive', shape: 'box', round: 0.2 } }));
+    expect(issues(ok)).toBe('');
+    const low = base();
+    low.version = '1.11.0';
+    low.precomps.cine.version = '1.11.0';
+    layers(low).push(prop('ice', { source: { type: 'primitive', shape: 'box', round: 0.2 } }));
+    expect(issues(low)).toMatch(/source\.round need schema >= 1\.12\.0/);
+    const big = base();
+    layers(big).push(prop('ice', { source: { type: 'primitive', shape: 'box', round: 0.9 } }));
+    expect(issues(big)).toMatch(/corner radius from 0 to 0\.5/);
+    const can = base();
+    layers(can).push(prop('ice', { source: { type: 'primitive', shape: 'can', round: 0.2 } }));
+    expect(issues(can)).toMatch(/round is only valid for a box/);
+  });
   it('rejects a swarm, a material and a card below 1.12.0', () => {
     for (const extra of [{ swarm: { count: 4 } }, { material: { roughness: 0.2 } }]) {
       const c = base();
@@ -77,7 +93,7 @@ describe('light validator, cinematic stage (schema 1.12.0)', () => {
       c.precomps.cine.version = '1.11.0';
       // the animated camera also fails; the prop's own message is what this test looks for
       layers(c).push(prop('x', extra));
-      expect(issues(c)).toMatch(/swarm, material and card need schema >= 1\.12\.0/);
+      expect(issues(c)).toMatch(/swarm, material, card and source\.round need schema >= 1\.12\.0/);
     }
   });
 });

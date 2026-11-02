@@ -29,6 +29,13 @@ describe('recoverCrewFilms', () => {
     expect(deps.events.filter((e) => e.type === 'error').map((e) => (e as { where: string }).where)).toContain('crew.restart');
   });
 
+  it('jobs of a kind this build has retired are left out of the board, and the rest recovers', async () => {
+    const deps = await makeTestDeps();
+    const id = await crewFilm(deps, { jobs: [{ ...job('j1', 'done'), kind: 'cast-character' } as unknown as Job, job('j2', 'running')], composition: true });
+    expect(await recoverCrewFilms(deps)).toEqual([id]);
+    expect((await createCrewPersist(deps.dataDir!, id).loadBoard()).map((j) => [j.id, j.status])).toEqual([['j2', 'failed']]);
+  });
+
   it('awaiting-frames fails with restart too', async () => {
     const deps = await makeTestDeps();
     const id = await crewFilm(deps, { jobs: [job('j1', 'awaiting-frames')] });
