@@ -97,10 +97,10 @@ it('README runs only npm scripts that exist, and its limitations carry the verif
   expect(section(t, 'Cost per film')).toContain('`cost` event');
 });
 
-it('README never calls the engine open source or Apache-2.0', () => {
+it('README credits our own engine in engine/, not the retired npm player', () => {
   const t = read('README.md');
-  expect(t).not.toMatch(/open[- ]source[^.\n]*(engine|reacthub)|(engine|reacthub)[^.\n]*open[- ]source/i);
-  expect(t).toContain('source-available');
+  expect(t).not.toContain('reacthub-pixitweenjs');
+  expect(t).toContain('[`engine/`](engine/README.md)');
 });
 
 it('the public documents never link into a folder that is not committed', () => {

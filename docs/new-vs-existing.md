@@ -66,7 +66,7 @@ The live checks are `npm run live -- <name>`. These exist: `s02-smoke`, `s03-dir
 
 ```bash
 git log --reverse --format='%ad %s' --date=short | head -3   # the first commit is 2026-10-28
-grep reacthub-pixitweenjs package.json package-lock.json    # the engine is a registry dependency, pinned by the lockfile
+git log --reverse --format='%ad' --date=short -- engine | head -1   # the engine in engine/ was written during the event
 git log --stat -- server | tail                              # the server was written commit by commit
 npx tsx scripts/preflight-submission.ts                      # the submission checks
 ```

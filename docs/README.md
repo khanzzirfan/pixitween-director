@@ -1,6 +1,6 @@
 # Docs index
 
-MuseReels makes photoreal 9:16 product ads, and a Catalog Crew that turns a CSV feed into one retail clip per product. The engine is `reacthub-pixitweenjs` (0.3.5 as of 31 Oct 2026). Deadline for the hackathon submission: Wed 4 Nov 2026, 21:00 EST.
+MuseReels makes photoreal 9:16 product ads, and a Catalog Crew that turns a CSV feed into one retail clip per product. The player is our own Motion engine in `engine/` (GSAP + Three.js). Deadline for the hackathon submission: Wed 4 Nov 2026, 21:00 EST.
 
 ## Where to start
 
