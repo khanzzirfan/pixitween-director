@@ -1,0 +1,261 @@
+{
+  "name": "App A2: AEP → MotionDoc converter for 2D films (keyframes, transform, shape, text, image, precomp, audio)",
+  "branchName": "ralph/a2-aep-2d",
+  "description": "A pure converter in web/src/motion/aep/ that turns a director AepCompositionJson into a MotionDoc for the Motion engine: frame keyframes become seconds tweens with cubic eases, transforms map with pixel pivots, shape/text/image/precomp layers convert, audio becomes cues. 3D layers become warnings here (A3 converts them). Tested on every stored film.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Keyframe helpers: frames to seconds, keyframes to tweens, bezier pair to cubic ease",
+      "description": "As a developer working on the converter, I want one tested function that turns an AEP property into a start value and tweens so that every layer kind animates the same way.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md sections 'Time' and 'Keyframes → tweens', shared/aep/transform.ts (keyframe shape: t, v, easeOut, easeIn) and engine/src/schema/parts.ts (Tween).",
+        "Create web/src/motion/aep/keyframes.ts exporting isKeyframed(value), easeFor(k0, k1): string ('none' or 'cubic(x1,y1,x2,y2)' with numbers rounded to 4 decimals), and propertyTweens(value, { fps, inPoint, props }) returning { initial, tweens } where props names the MotionDoc keys per component (e.g. ['x','y'] for position, ['alpha'] for opacity).",
+        "A vector keyframe splits into one tween per component in the same fromTo; at is clamped to ≥ 0; a zero-length pair is skipped.",
+        "Create web/src/motion/aep/keyframes.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "propertyTweens([{t:0,v:0,easeOut:[0,0,0.58,1]},{t:18,v:1}], { fps: 30, inPoint: 0, props: ['alpha'] }) gives initial { alpha: 0 } and one tween { at: 0, duration: 0.6, from: { alpha: 0 }, to: { alpha: 1 }, ease: 'cubic(0,0,0.58,1)' }",
+        "A position pair [960,561.6] -> [960,563.76] over frames 0..120 at 30 fps gives one tween with from { x: 960, y: 561.6 }, to { x: 960, y: 563.76 }, duration 4",
+        "A constant 0.5 gives initial { alpha: 0.5 } and no tweens; three keyframes give two tweens back to back",
+        "With inPoint 30 a keyframe at t 45 starts the tween at 0.5 s",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "frontend",
+        "converter"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Base transform and layer timing",
+      "description": "As a developer working on the converter, I want every AEP layer's transform, timing and blend mode mapped once so that each layer kind only adds its own fields.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md 'Base transform' and engine/src/schema/layers2d.ts (LayerBaseShape including pivot from R7).",
+        "Create web/src/motion/aep/transform.ts exporting baseLayer(aepLayer, { fps, offsetFrames }) returning { id, start, end, x, y, pivot, scale, rotation, alpha, blendMode, tweens } using propertyTweens for position, scale (uniform when x = y in every keyframe, else scaleX/scaleY), rotation and opacity; unknown blend modes become 'normal' with a warning pushed to a passed warnings array.",
+        "Create web/src/motion/aep/transform.test.ts using a layer copied from a stored film."
+      ],
+      "acceptanceCriteria": [
+        "A layer with inPoint 0, outPoint 120 at 30 fps gives start 0 and end 4",
+        "transform { position: [960,540], anchor: [960,540], scale: [1,1], rotation: 0, opacity: 1 } gives x 960, y 540, pivot [960, 540], scale 1, rotation 0, alpha 1 and no tweens",
+        "A keyframed scale [0.9964,0.9964] -> [1.09604,1.09604] gives one tween on 'scale'; a non-uniform keyframed scale gives scaleX and scaleY",
+        "blendMode 'overlay' gives 'normal' and one warning naming the layer id",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "frontend",
+        "converter"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Shape and image layers, and the asset table",
+      "description": "As a developer working on the converter, I want rectangles, ellipses and images converted with their assets so that backgrounds, cards and product photos appear.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md 'Layers' and shared/aep/layer.ts (shape path, fill, stroke; image assetId) and shared/aep/asset.ts.",
+        "Create web/src/motion/aep/layers2d.ts exporting convertShape and convertImage, and web/src/motion/aep/assets.ts exporting convertAssets(comp, resolveUrl) mapping image assets to { type: 'image', url } and model assets to { type: 'gltf', url } (ids kept; MotionDoc ids must match its IdSchema, so map invalid ids through a stable sanitiser and keep the mapping).",
+        "Create web/src/motion/aep/layers2d.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "The stored 'wake:bg' rect (size [1920,1080], fill '#F2E6CC') converts to a shape rect 1920x1080 fill '#F2E6CC' with pivot [960,540]",
+        "An image layer with assetId 'ast_87a5…' converts to an image layer whose asset exists in the converted assets with the asset's src as url",
+        "An asset id that fails the engine IdSchema is sanitised the same way everywhere it is referenced",
+        "Audio assets are not in the converted asset table",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "frontend",
+        "converter"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Text layers with style and drop shadow",
+      "description": "As a developer working on the converter, I want headlines and prices converted with their font, size, weight, wrap and shadow so that titles read as designed.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md 'Layers' (text row), shared/aep/layer.ts and shared/aep/effect.ts (text style and the drop-shadow effect) and engine/src/schema/layers2d.ts (TextStyleSchema).",
+        "Add convertText to web/src/motion/aep/layers2d.ts: style.font → fontFamily, size → fontSize (clamped to 4..512), weight → fontWeight string, fill, align, boxWidth → wordWrapWidth, lineHeight, letterSpacing, stroke; a 'drop-shadow' effect → style.dropShadow (distance, direction → angle, softness → blur, opacity → alpha, color); other effects → warning.",
+        "Add tests to web/src/motion/aep/layers2d.test.ts using the stored 'Slow mornings' text layer shape."
+      ],
+      "acceptanceCriteria": [
+        "{ source: 'Slow mornings', style: { font: 'Inter, system-ui, sans-serif', size: 76, fill: '#ffffff', weight: 700, align: 'center', boxWidth: 1536 } } converts to text 'Slow mornings' with fontSize 76, fontWeight '700', align 'center', wordWrapWidth 1536",
+        "A drop-shadow effect { distance: 4, direction: 180, softness: 8, opacity: 0.35, color: '#000000' } becomes dropShadow { distance: 4, angle: 180, blur: 8, alpha: 0.35, color: '#000000' }",
+        "An unknown effect name adds one warning and does not throw",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "frontend",
+        "converter"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Precomps to groups, layer order, audio cues, unsupported kinds",
+      "description": "As a developer working on the converter, I want scenes (precomps) nested as groups in the right draw order, with music as cues, so that a whole multi-scene film converts.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md 'Layers' (precomp, audio, video rows and the layer-order note) and shared/aep/composition.ts (precomps map).",
+        "Create web/src/motion/aep/convert.ts exporting convertLayers(layers, ctx) that reverses each list (AEP top first → MotionDoc back first), converts precomp layers into groups whose children are the precomp's converted layers (times relative to the precomp), collects audio layers into AudioCue[] with absolute seconds, and skips video, model3d, stage3d, actor3d and prop3d with one warning each (A3 converts them).",
+        "A group must have at least one child: an empty precomp is skipped with a warning.",
+        "Add web/src/motion/aep/convert.test.ts on a small hand-made composition with two precomps."
+      ],
+      "acceptanceCriteria": [
+        "A comp with layers [title, bg] gives MotionDoc layers [bg, title]",
+        "A precomp layer at inPoint 120 to 240 becomes a group with start 4 and end 8 and its children have start 0",
+        "An audio layer at frames 0..720 with level 0.7 becomes one cue { startSec: 0, endSec: 24, level: 0.7 }",
+        "A stage3d layer adds exactly one warning naming its id",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003",
+        "US-004"
+      ],
+      "labels": [
+        "frontend",
+        "converter"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "aepToMotion entry point and the stored-film golden test",
+      "description": "As a developer working on the player, I want one aepToMotion(comp) call that returns a valid MotionDoc for every stored film so that the swap can rely on it.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md (the signature at the top) and engine/src/schema/doc.ts (parseMotionDoc) and engine/src/timeline/targets.ts (validateTargets).",
+        "Create web/src/motion/aep/index.ts exporting aepToMotion(comp, opts) returning { doc, warnings, audio }: version 1, width/height/fps from the comp, duration = durationInFrames / fps, background = bgColor, assets, layers; the result is run through parseMotionDoc and validateTargets and any error becomes a thrown Error listing the paths (a converter bug, not a film problem).",
+        "Create web/src/motion/aep/films.test.ts that loads the newest version of every film under data/films (node:fs; skip when the folder is missing) and asserts aepToMotion succeeds for each, printing the warning counts per film.",
+        "Fix converter bugs the golden test finds; for a film feature that cannot be converted add a warning instead."
+      ],
+      "acceptanceCriteria": [
+        "aepToMotion on every stored film (newest version) returns a doc that parseMotionDoc accepts and validateTargets reports no errors for",
+        "The test prints one line per film with its layer count and warning count, and notes records the totals",
+        "aepToMotion never throws for unsupported layer kinds; it throws only when its own output fails parseMotionDoc",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "frontend",
+        "converter"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Dev page: a stored film converted and played on the Motion engine",
+      "description": "As a project owner, I want /aep-motion.html?film=<id> to play a stored film on the new engine so that I can compare it with the studio player.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md (MotionRuntime / MotionPlayer) and engine/src/react (the player component), and web/three-check.html with web/src/dev/three-check.tsx (the stub pattern).",
+        "Create web/aep-motion.html and web/src/dev/aep-motion.tsx: fetch /api/films/<id> (the composition of its head version, through the dev server's /api proxy), run aepToMotion, mount the engine's MotionPlayer, and show the warnings list, layer count and a seek slider.",
+        "If the engine's MotionPlayer does not exist yet (R4 not merged), write notes 'blocked: needs prd-r4-runtime' and leave the page showing the converted JSON and warnings only.",
+        "Open the page for the newest film in data/films with headless Chromium, save screenshots at 10 %, 50 % and 90 % to debug/app/ and record what you saw in notes."
+      ],
+      "acceptanceCriteria": [
+        "The page loads with no console errors and shows the warning count and layer count for the film",
+        "With MotionPlayer available, the screenshots at 10 %, 50 % and 90 % differ and show the film's background, text and images",
+        "notes names the film id used and the screenshot files",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006"
+      ],
+      "labels": [
+        "frontend",
+        "ui"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/10-aep-adapter.md"
+    ],
+    "readFirst": [
+      "engine/docs/10-aep-adapter.md (all except the 3D and Player sections)",
+      "engine/docs/01-schema.md (the MotionDoc), engine/src/schema/layers2d.ts and engine/src/schema/doc.ts",
+      "shared/aep/layer.ts, shared/aep/transform.ts, shared/aep/composition.ts (the AEP side)",
+      "one stored film: the newest data/films/*/versions/*.json"
+    ],
+    "requires": [
+      "prd-r7-aep-gaps"
+    ],
+    "owns": [
+      "web/src/motion/aep/*",
+      "web/aep-motion.html",
+      "web/src/dev/aep-motion.tsx"
+    ],
+    "sharedEdits": [],
+    "profile": "adopt",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; use the stored films under data/films/*/versions/*.json (read with node:fs) and assets under web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/10-aep-adapter.md and engine/docs/README.md before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "The app's composition format is AepCompositionJson from `@shared/aep` (our own copy of the schema). Never import `reacthub-pixitweenjs`, `pixi.js`, `@pixi/*` or `pixi-filters` in new code.",
+      "Use the engine through `@engine/*` (engine/src). Do not edit engine/ except the files in metadata.sharedEdits; if the engine lacks something, add a row to docs/todos/ENGINE-NEEDS.md, use a workaround and say so in notes.",
+      "Edit only the files the story names, their tests, and metadata.sharedEdits. Do not change server/ behaviour, agent prompts or stored films.",
+      "No `@ts-nocheck` and no `@ts-ignore`. `@ts-expect-error` only with a reason on the same line.",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic; check drawing in the browser. Never weaken a test to make it pass.",
+      "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
+      "Record only real results. Never invent measurements or test output.",
+      "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+      "The converter is pure: no DOM, no fetch, no three. It imports only types and parse helpers from @engine/schema and @shared/aep."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner opens http://localhost:5173/aep-motion.html?film=<id> for two stored films and compares them with the studio player."
+    ]
+  }
+}

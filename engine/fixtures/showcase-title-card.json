@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 5,
+  "background": "#07070c",
+  "assets": {},
+  "effects": [
+    { "id": "grade", "type": "brightnessContrast", "params": { "brightness": 0.03, "contrast": 0.16 } }
+  ],
+  "layers": [
+    {
+      "id": "backdrop",
+      "type": "shape",
+      "shape": "rect",
+      "width": 1920,
+      "height": 1080,
+      "fill": "#0b1020",
+      "x": 960,
+      "y": 540,
+      "enter": { "name": "fadeIn", "duration": 0.5 },
+      "exit": { "name": "fadeOut", "duration": 0.5 },
+      "end": 5
+    },
+    {
+      "id": "glow-disc",
+      "type": "shape",
+      "shape": "ellipse",
+      "width": 780,
+      "height": 780,
+      "fill": "#f97316",
+      "alpha": 0.2,
+      "x": 960,
+      "y": 470,
+      "enter": { "name": "zoomIn", "duration": 0.9 },
+      "loop": { "name": "pulse", "duration": 1.4 },
+      "exit": { "name": "fadeOut", "duration": 0.6 },
+      "end": 5
+    },
+    {
+      "id": "rule",
+      "type": "shape",
+      "shape": "rect",
+      "width": 1080,
+      "height": 6,
+      "radius": 3,
+      "fill": "#fbbf24",
+      "x": 960,
+      "y": 690,
+      "enter": { "name": "slideInRight", "duration": 0.7 },
+      "exit": { "name": "slideOutRight", "duration": 0.6 },
+      "end": 5
+    },
+    {
+      "id": "title",
+      "type": "text",
+      "text": "MOTION",
+      "x": 960,
+      "y": 460,
+      "style": {
+        "fontSize": 190,
+        "fontWeight": "900",
+        "align": "center",
+        "fill": "#f8fafc",
+        "letterSpacing": 14
+      },
+      "effects": [
+        {
+          "id": "chroma",
+          "type": "chromaticAberration",
+          "params": { "offsetX": 0.008, "offsetY": 0.008 }
+        },
+        {
+          "id": "shadow",
+          "type": "dropShadow",
+          "params": { "color": "#000000", "alpha": 0.75, "distance": 14, "blur": 22, "angle": 90 }
+        }
+      ],
+      "enter": { "name": "dropIn", "duration": 0.9 },
+      "exit": { "name": "fadeOutUp", "duration": 0.6 },
+      "tweens": [
+        {
+          "target": "effect:chroma",
+          "at": 0.9,
+          "duration": 2.1,
+          "ease": "sine.inOut",
+          "from": { "offsetX": 0.008, "offsetY": 0.008 },
+          "to": { "offsetX": 0, "offsetY": 0 }
+        },
+        {
+          "target": "effect:chroma",
+          "at": 3.6,
+          "duration": 0.35,
+          "ease": "power2.in",
+          "from": { "offsetX": 0, "offsetY": 0 },
+          "to": { "offsetX": 0.005, "offsetY": 0.005 }
+        },
+        {
+          "target": "effect:chroma",
+          "at": 3.95,
+          "duration": 0.5,
+          "ease": "sine.out",
+          "from": { "offsetX": 0.005, "offsetY": 0.005 },
+          "to": { "offsetX": 0, "offsetY": 0 }
+        }
+      ],
+      "end": 5
+    },
+    {
+      "id": "subtitle",
+      "type": "text",
+      "text": "one JSON document · GSAP + Three.js",
+      "x": 960,
+      "y": 796,
+      "style": {
+        "fontSize": 34,
+        "fontWeight": "500",
+        "align": "center",
+        "fill": "#94a3b8",
+        "letterSpacing": 4
+      },
+      "enter": { "name": "fadeInUp", "duration": 0.7 },
+      "loop": { "name": "sway", "duration": 2.4, "params": { "degrees": 2 } },
+      "exit": { "name": "fadeOut", "duration": 0.5 },
+      "end": 5
+    },
+    {
+      "id": "credit",
+      "type": "text",
+      "text": "MOTION ENGINE",
+      "x": 960,
+      "y": 916,
+      "style": {
+        "fontSize": 22,
+        "fontWeight": "600",
+        "align": "center",
+        "fill": "#475569",
+        "letterSpacing": 10
+      },
+      "enter": { "name": "fadeIn", "duration": 0.6 },
+      "exit": { "name": "fadeOut", "duration": 0.4 },
+      "end": 5
+    }
+  ]
+}

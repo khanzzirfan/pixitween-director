@@ -1,0 +1,1 @@
+{ "_handAuthored": true, "jobId": "job_test_1", "status": "done", "progress": 1, "resultUrl": "https://clip.example.test/out.mp4?sig=abc", "resultUrlExpiresAt": "2026-11-02T03:00:00Z", "error": null, "creditsCharged": 25 }

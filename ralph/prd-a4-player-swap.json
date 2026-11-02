@@ -1,0 +1,236 @@
+{
+  "name": "App A4: the studio Player on the Motion engine (same PlayerHandle, audio, capture, selection)",
+  "branchName": "ralph/a4-player-swap",
+  "description": "Rebuilds web/src/player on the Motion engine: the composition goes through aepToMotion and plays on MotionRuntime, behind VITE_ENGINE (motion by default at the end). The PlayerHandle contract (canvas, play, pause, seek, time, whenReady) stays, audio cues play in sync, review capture and export keep working, and canvas selection gets layer bounds from the engine.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "MotionStage: convert, load and play one composition on MotionRuntime",
+      "description": "As a developer working on the studio, I want a component that takes an AepCompositionJson and plays it on the Motion engine so that the Player can switch to it.",
+      "steps": [
+        "Read engine/docs/06-runtime-player.md (MotionRuntime and MotionPlayer API) and engine/src/runtime and engine/src/react.",
+        "Create web/src/motion/player/MotionStage.tsx: converts with aepToMotion (resolveUrl keeps /api/assets urls), mounts a MotionRuntime on a canvas sized like the current Player (longest side 960, doc resolution kept for capture), exposes play, pause, seek(sec), getTime, getCanvas, whenReady(timeoutSec) through a ref, and reports warnings through an onWarnings prop.",
+        "Create web/src/motion/player/MotionStage.test.tsx with the runtime replaced by a fake (vi.mock of the engine runtime module) checking the calls."
+      ],
+      "acceptanceCriteria": [
+        "Rendering MotionStage with a stored film's composition calls the runtime load with a doc whose width and height match the composition",
+        "ref.seek(2) calls the runtime seek with 2 and ref.getTime() returns the runtime's time",
+        "A composition that aepToMotion rejects shows an error message instead of throwing",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "frontend",
+        "player"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Audio cues in sync with the clock",
+      "description": "As a viewer, I want the film's music to play with the picture so that the new player sounds like the old one.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md (AudioCue) and the clock API of MotionRuntime.",
+        "Create web/src/motion/player/audio.ts exporting createAudioSync(cues, { createAudio }) with play(t), pause(), seek(t), dispose(): each cue gets an HTMLAudioElement (injectable for tests), volume = level, playing only while startSec <= t < endSec at currentTime = t - startSec; resync when drift exceeds 0.15 s.",
+        "Use it from MotionStage (play/pause/seek follow the runtime).",
+        "Create web/src/motion/player/audio.test.ts with fake audio elements."
+      ],
+      "acceptanceCriteria": [
+        "seek(5) on a cue 0..24 s sets currentTime 5; play(5) calls play() once; pause() pauses every element",
+        "A cue 10..20 s is paused at t 5 and plays from currentTime 2 at t 12",
+        "dispose() pauses and releases every element",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "frontend",
+        "player"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Player.tsx switches engines with VITE_ENGINE and keeps PlayerHandle",
+      "description": "As a panel that holds a PlayerHandle, I want the same handle from the new engine so that chat, review, export and the crew UI keep working.",
+      "steps": [
+        "Read web/src/player/Player.tsx, PlayerBridge.tsx and Player.test.tsx.",
+        "Add VITE_ENGINE ('motion' | 'library', default 'library' in this story) to web/src/vite-env.d.ts and web/.env.example; in Player.tsx render MotionStage plus the existing Controls (rewired to the MotionStage ref) when it is 'motion', and the library path otherwise.",
+        "The motion handle implements getCanvas, getApp (returns null), play, pause, seek, getTime and whenReady.",
+        "Extend Player.test.tsx with a motion case (MotionStage mocked) checking the handle methods."
+      ],
+      "acceptanceCriteria": [
+        "With VITE_ENGINE=motion the Player renders MotionStage and its handle's seek(3) reaches MotionStage's seek with 3",
+        "With VITE_ENGINE=library the existing Player tests pass unchanged",
+        "Controls' play/pause and slider drive the motion handle",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "frontend",
+        "player"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Review capture and export work with a null getApp",
+      "description": "As a developer working on the review loop, I want frame capture to work on the new engine so that the critic still sees frames.",
+      "steps": [
+        "Read web/src/capture/driver.ts (uses player.getApp() for Pixi extract) and capture.test.ts.",
+        "When getApp() is null, capture from player.getCanvas() after seek and whenReady (the engine renders with preserveDrawingBuffer), using canvas.toBlob; keep the Pixi path for the library engine.",
+        "Add a capture.test.ts case with a fake handle whose getApp returns null."
+      ],
+      "acceptanceCriteria": [
+        "captureScene with a handle whose getApp() is null seeks each time, waits for whenReady and returns one blob per time from the canvas",
+        "Existing capture tests pass unchanged",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "frontend",
+        "capture"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Canvas selection on the motion engine",
+      "description": "As a user editing by clicking the canvas, I want a click to select the layer under the pointer on the new engine so that chat edits keep their target.",
+      "steps": [
+        "Read web/src/selection/useCanvasSelect.ts, pixiTarget.ts, SelectionOverlay.tsx and the engine's node list (runtime nodes, each with display and size).",
+        "Create web/src/selection/motionTarget.ts exporting hitTest(nodes, x, y, time) returning the front-most visible node id whose display bounds (Box3 of the display projected to stage pixels) contain the point, and boundsOf(node) for the overlay; expose the runtime nodes from MotionStage through the handle (optional getNodes()).",
+        "Use it in useCanvasSelect when the handle has getNodes; keep pixiTarget for the library engine.",
+        "Create web/src/selection/motionTarget.test.ts with plain THREE objects."
+      ],
+      "acceptanceCriteria": [
+        "Two overlapping 100x100 nodes: a click inside both returns the front one; a click outside both returns null",
+        "A hidden node (display.visible false) is never hit",
+        "Existing selection tests pass",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "frontend",
+        "selection"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Default to the motion engine; browser check of the studio",
+      "description": "As a project owner, I want the studio to use the new engine by default so that the demo runs on Three.js.",
+      "steps": [
+        "Read web/src/vite-env.d.ts and web/.env.example.",
+        "Make 'motion' the default when VITE_ENGINE is unset.",
+        "Open http://localhost:5173/ on a stored film (gallery → film) with headless Chromium, play two seconds, seek to the middle, save screenshots to debug/app/ and record console errors (none expected) in notes."
+      ],
+      "acceptanceCriteria": [
+        "With no VITE_ENGINE set the Player mounts MotionStage (test)",
+        "The studio screenshot shows the film's frame drawn by the motion engine and the console has no errors",
+        "notes names the film id and the screenshots",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004",
+        "US-005"
+      ],
+      "labels": [
+        "frontend",
+        "player",
+        "ui"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/10-aep-adapter.md",
+      "engine/docs/06-runtime-player.md"
+    ],
+    "readFirst": [
+      "engine/docs/10-aep-adapter.md (section Player) and engine/docs/06-runtime-player.md",
+      "web/src/player/Player.tsx, PlayerBridge.tsx, useCompositionReady.ts and Player.test.tsx",
+      "web/src/capture/driver.ts (how review capture uses PlayerHandle) and web/src/selection/useCanvasSelect.ts, pixiTarget.ts",
+      "engine/src/runtime/* and engine/src/react/* (built by R4)"
+    ],
+    "requires": [
+      "prd-r4-runtime",
+      "prd-a2-aep-2d"
+    ],
+    "owns": [
+      "web/src/player/*",
+      "web/src/motion/player/*",
+      "web/src/selection/*"
+    ],
+    "sharedEdits": [
+      "web/src/capture/driver.ts",
+      "web/src/capture/capture.test.ts",
+      "web/.env.example",
+      "web/src/vite-env.d.ts"
+    ],
+    "profile": "adopt",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; use the stored films under data/films/*/versions/*.json (read with node:fs) and assets under web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/10-aep-adapter.md and engine/docs/README.md before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "The app's composition format is AepCompositionJson from `@shared/aep` (our own copy of the schema). Never import `reacthub-pixitweenjs`, `pixi.js`, `@pixi/*` or `pixi-filters` in new code.",
+      "Use the engine through `@engine/*` (engine/src). Do not edit engine/ except the files in metadata.sharedEdits; if the engine lacks something, add a row to docs/todos/ENGINE-NEEDS.md, use a workaround and say so in notes.",
+      "Edit only the files the story names, their tests, and metadata.sharedEdits. Do not change server/ behaviour, agent prompts or stored films.",
+      "No `@ts-nocheck` and no `@ts-ignore`. `@ts-expect-error` only with a reason on the same line.",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic; check drawing in the browser. Never weaken a test to make it pass.",
+      "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
+      "Record only real results. Never invent measurements or test output.",
+      "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+      "Keep the PlayerHandle method names and their meaning (seconds at the boundary). getApp() may return null on the motion engine; every caller must cope with null.",
+      "Keep the library path working behind VITE_ENGINE=library until A5; do not delete it here."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner opens the studio on a stored film with VITE_ENGINE=motion, plays, seeks, and runs one review capture."
+    ]
+  }
+}

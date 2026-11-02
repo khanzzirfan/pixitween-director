@@ -1,0 +1,3 @@
+id,title,price,sale_price,currency,image_link,category,link,brand
+perfume-rose-gold,Rose Gold Orchid Eau de Parfum 100ml,59.00,49.00,USD,fixtures/catalog/perfume/Habik-Women-Lattafa.JPEG,fragrance perfume women,/p/perfume-rose-gold,Maison Verre
+perfume-forest-green,Forest Oud Eau de Toilette 125ml,95.00,,USD,fixtures/catalog/perfume/ralph-01.png,fragrance perfume men,/p/perfume-forest-green,Maison Verre

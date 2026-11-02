@@ -1,0 +1,397 @@
+{
+  "name": "PixiTween Director S12c: crew workers (builders, blind critic, continuity, takes)",
+  "branchName": "ralph/s12c-crew-workers",
+  "description": "The workers the scheduler runs: scene builders for build, rebuild, restyle, edit, fix and revert jobs (Spark, or Glimmer on the local lane), scoped to one scene and abortable; the blind critic that asks the browser for frames; cross-scene continuity checks; and takes as child films with thumbnails, scores and a splice on pick.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "buildScene options: extraSystem, toolFilter, signal",
+      "description": "As a builder worker, I want to give buildScene the style bible, the job brief, a tool list and an abort signal so that crew builds reuse S3b's tested loop.",
+      "steps": [
+        "Read server/agent/build-scene.ts and server/agent/prompts/director.ts (buildScenePrompt).",
+        "Edit server/agent/build-scene.ts: BuildSceneOptions gains extraSystem?: string (appended to the system prompt), toolFilter?: (tool) => boolean (replacing the EDIT_ONLY filter when given) and signal?: AbortSignal (checked before each model turn and each tool call; passed to chatWithTools). When aborted, return with stalled false and a new field aborted: true.",
+        "Edit server/agent/prompts/director.ts only if buildScenePrompt needs an extra parameter for extraSystem.",
+        "Extend server/agent/director.test.ts or add server/agent/build-scene.options.test.ts with makeFakeBackend."
+      ],
+      "acceptanceCriteria": [
+        "With extraSystem 'STYLE BIBLE x', the first message sent to the backend contains 'STYLE BIBLE x'",
+        "A signal aborted after the first turn stops before the second model call and the result has aborted true",
+        "Without the new options, all existing director and build-scene tests pass unchanged",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "agent"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Scene scope guard for worker tool calls",
+      "description": "As a scheduler, I want a builder to touch only its own scene so that parallel builders never step on each other.",
+      "steps": [
+        "Read server/tools/registry.ts (runTool) and design.md section 5.8.",
+        "Create server/crew/workers/scope.ts exporting scopedRunTool(sceneId) => (ctx, name, args) that rejects args with sceneId !== the job's scene, or layerId not starting with '<sceneId>:', returning { ok: false, error: 'out of scope: this job owns scene <id> only' }, and otherwise calls runTool.",
+        "Create server/crew/workers/scope.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "scopedRunTool('s2') with args { layerId: 's1:headline' } returns ok false and the exact error 'out of scope: this job owns scene s2 only'",
+        "scopedRunTool('s2') with { sceneId: 's2', … } reaches runTool (spy called once)",
+        "A tool with neither sceneId nor layerId in its args is allowed",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Builder worker for build, rebuild, restyle, edit, fix and revert",
+      "description": "As a crew, I want one builder worker that handles every scene-writing job kind so that the showrunner's briefs become timeline changes.",
+      "steps": [
+        "Read design.md sections 5.8 and 6.4, server/crew/prompts.ts (renderBibleBlock, renderJobBlock), server/crew/scene-snapshot.ts and server/agent/build-scene.ts.",
+        "Create server/crew/workers/builder.ts exporting runBuilderJob({ deps, job, signal, film }): build-scene uses buildScene with the bible + job block, the default tools and scopedRunTool; rebuild-scene first removes the scene's non-camera layers with the authoring core inside one mutate; restyle-scene, edit and fix use all tools including edit-only; revert restores the snapshot of the previous done writing job on that scene with no model. Returns { summary, version, costUsd }.",
+        "Set ctx.source to 'director' for build kinds and 'chat' for edit, fix and restyle; record Spark cost with ctx.ledger as today.",
+        "Create server/crew/workers/builder.test.ts with makeTestFilm and makeFakeBackend."
+      ],
+      "acceptanceCriteria": [
+        "A build-scene job whose fake backend makes 3 valid calls returns a summary containing '3 tool calls, 3 ok'",
+        "A rebuild-scene job on a scene with 4 layers leaves only the layers the fake backend adds (plus camera)",
+        "A revert job restores the scene to the snapshot of its last done job with zero backend calls",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-002"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Local lane: edit jobs on Glimmer in Local mode",
+      "description": "As a user in Local mode, I want edit jobs to run on Muse Glimmer and show on the local lane so that open weights do visible work.",
+      "steps": [
+        "Read server/llm/router.ts (pickBackend('edit', { local })), server/llm/local-mode.ts and server/crew/workers/builder.ts.",
+        "Edit server/crew/workers/builder.ts: edit and fix jobs use pickBackend('edit', { local: getLocalMode() }); when the backend id is 'glimmer', set job.worker 'local', job.model to GLIMMER_MODEL and emit crew.agent with lane 'local'.",
+        "Extend server/crew/workers/builder.test.ts with local mode on and a fake Glimmer backend."
+      ],
+      "acceptanceCriteria": [
+        "With local mode on, an edit job's emitted crew.agent event has lane 'local' and the job's worker is 'local'",
+        "With local mode off, the same job runs on the Spark fake and lane 'builder'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Critic worker: capture request and the frames bridge",
+      "description": "As a critic, I want the browser to send me frames of a finished scene so that I judge what is really on screen.",
+      "steps": [
+        "Read design.md section 5.9, server/review/sample.ts, server/http/handlers/review.ts and server/review/loop.ts.",
+        "Create server/crew/workers/critic.ts exporting runCriticJob({ deps, job, signal }) and a waiting map: it computes times with sample.ts for the scene, emits capture.request { requestId, filmId, sceneId, timesSec }, sets the job 'awaiting-frames', and awaits resolveCapture(requestId, frames, textBoxes) or CREW_CAPTURE_TIMEOUT_MS.",
+        "Edit server/http/handlers/review.ts: when the multipart body carries requestId and it is waiting, call resolveCapture and reply { review: 'crew' } instead of starting runReview.",
+        "Create server/crew/workers/critic.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "runCriticJob emits one capture.request whose timesSec all fall inside the scene's start and end",
+        "POST /frames with that requestId resolves the job and does not call runReview (spy)",
+        "With fake timers and no frames, the job ends done after CREW_CAPTURE_TIMEOUT_MS with summary 'no browser connected; rules only'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Blind review prompt and findings to the inbox",
+      "description": "As a showrunner, I want the critic to report only what is visible so that its findings are independent evidence.",
+      "steps": [
+        "Read server/review/visual.ts (the frame-review prompt), design.md section 6.5 and server/crew/workers/critic.ts.",
+        "Edit server/review/visual.ts: add a blind option that builds the prompt from frames, measured text boxes and rule facts only, with the two extra sentences of design 6.5. Without the option the prompt is unchanged.",
+        "Edit server/crew/workers/critic.ts: after frames arrive, run the deterministic rules, then pickReviewer().reviewImages with blind: true; emit review.finding events and push one inbox item { from: 'critic', jobId, text } listing the findings with second and kind.",
+        "Extend server/crew/workers/critic.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "For a scene with intent 'golden sunrise over the counter', the blind prompt string contains neither 'golden' nor 'sunrise' nor 'counter'",
+        "Two fake findings produce two review.finding events and one inbox item from 'critic'",
+        "Existing visual.ts tests pass unchanged without the blind option",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "backend",
+        "crew",
+        "prompts"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Continuity checks across scenes",
+      "description": "As a showrunner, I want cross-scene consistency checked by code so that the film looks like one film.",
+      "steps": [
+        "Read design.md section 5.12, server/review/rules.ts and server/review/geometry.ts.",
+        "Create server/crew/continuity.ts exporting runContinuity(comp, assets, bible) returning runRules' findings plus product-scale-drift (same shotType, height fraction differs by more than 35 %), palette-drift (RGB distance over 48 from every bible colour) and type-drift (headline font or weight differs from bible.type), each with severity warn, and a runContinuityJob worker that pushes new findings to the inbox from 'continuity'.",
+        "Create server/crew/continuity.test.ts with fixtures/s12c/continuity-*.json compositions."
+      ],
+      "acceptanceCriteria": [
+        "Two hero scenes with product height fractions 0.40 and 0.60 give one product-scale-drift finding; 0.40 and 0.50 give none",
+        "A headline fill '#ff0000' with bible palette ['#1f2937', '#f59e0b'] gives palette-drift; '#f5a00e' does not",
+        "A second run with no new findings pushes nothing to the inbox",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Takes as child films, hidden from the gallery",
+      "description": "As a user, I want three takes of a scene built side by side so that I can choose the best one.",
+      "steps": [
+        "Read design.md section 5.10, server/store/film-store.ts (create, parentId) and server/http/read-routes.ts.",
+        "Create server/crew/takes.ts exporting createTakes({ deps }) with start(job) which creates N child films (parentId, same brief, crew false) whose first commit is the parent's composition, and queues one rebuild-scene job per child with filmId = child id, takeOf = job.id, takeLabel A/B/C and the fixed variation hints of the design appended to the brief.",
+        "Edit server/http/read-routes.ts: GET /api/films leaves out films with parentId.",
+        "Create server/crew/takes.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "A take job with takes 3 creates 3 child films with parentId set and 3 rebuild jobs labelled A, B and C",
+        "Take B's brief ends with 'bolder: closer framing, a stronger camera move'",
+        "GET /api/films lists the parent and none of its children",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Take thumbnails and scores",
+      "description": "As a user, I want a thumbnail and a score per take so that the choice is quick.",
+      "steps": [
+        "Read server/generate/flatten.ts and server/media/image.ts (flatten) and design.md section 5.10 steps 3 and 4.",
+        "Edit server/crew/takes.ts: when a take's rebuild job ends done, flatten the child's scene plate and product cut-out at their mid-scene boxes into a 640-px-wide PNG asset (role 'frame'), score it 0-10 as 10 minus 2 per deterministic rule finding minus 1 per blind-critic finding (floor 0), and emit take.ready.",
+        "Extend server/crew/takes.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "A finished take emits take.ready with a thumbAssetId whose asset is a PNG 640 px wide",
+        "A take with one rule finding and one critic finding scores 7",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-008"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "pickTake splices the chosen scene into the parent",
+      "description": "As a showrunner or the user, I want picking a take to replace the scene in the real film so that the choice takes effect.",
+      "steps": [
+        "Read server/crew/scene-snapshot.ts (spliceScene) and server/crew/showrunner-tools.ts (the injected takes.pick).",
+        "Edit server/crew/takes.ts: pick(parentId, takeFilmId) checks the child's parentId, runs films.mutate(parent, c => spliceScene(c, sceneId, childComp), 'director', 'take <label>'), and queues continuity and critique on the parent scene.",
+        "Extend server/crew/takes.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "After pick, the parent's scene precomp deep-equals the child's and the other parent scenes are unchanged",
+        "pick with a film whose parentId is another film returns ok false with error 'not a take of this film'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-009"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Worker registry wired into runCrew",
+      "description": "As a scheduler, I want each job kind mapped to its worker so that the crew runs real work.",
+      "steps": [
+        "Read server/crew/run-crew.ts (the injectable worker registry) and the workers in server/crew/workers/.",
+        "Create server/crew/workers/registry.ts exporting createWorkerRegistry(deps) mapping build-scene, rebuild-scene, restyle-scene, edit, fix and revert to runBuilderJob, critique to runCriticJob, continuity to runContinuityJob and take to takes.start, and register it as runCrew's default.",
+        "Add server/crew/workers/registry.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "createWorkerRegistry(deps)['restyle-scene'] is runBuilderJob and ['critique'] is runCriticJob",
+        "A fake crew film (S12b fake showrunner) run with the real registry and fake Meta ends 'ready' with continuity and critique jobs done for every scene",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004",
+        "US-006",
+        "US-007",
+        "US-010"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Turn off the S5b auto-review on crew films",
+      "description": "As a critic, I want to be the only reviewer of a crew film so that no scene is reviewed and billed twice.",
+      "steps": [
+        "Read server/http/handlers/review.ts and design.md section 5.9 (last paragraph).",
+        "Edit server/http/handlers/review.ts: a POST /frames without requestId on a film with crew true returns 409 { error: 'crew_reviews' } and starts nothing.",
+        "Extend the review handler test."
+      ],
+      "acceptanceCriteria": [
+        "POST /frames without requestId on a crew film returns 409 crew_reviews and runReview is not called",
+        "POST /frames on a non-crew film behaves as before",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "backend",
+        "http"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/09-crew-swarm.md",
+      "docs/hackathon/steps/step-12-crew-swarm/design.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (sections 3a, 4a and 7)",
+      "docs/hackathon/steps/step-12-crew-swarm/design.md (sections 5.8 to 5.12, 6.4, 6.5)",
+      "docs/hackathon/steps/step-05-self-review-loop/design.md (frame sampling, rules and the review prompt)"
+    ],
+    "requires": [
+      "prd-s12a-crew-core"
+    ],
+    "owns": [
+      "server/crew/workers/builder.ts",
+      "server/crew/workers/scope.ts",
+      "server/crew/workers/critic.ts",
+      "server/crew/workers/registry.ts",
+      "server/crew/continuity.ts",
+      "server/crew/takes.ts",
+      "fixtures/s12c/*"
+    ],
+    "sharedEdits": [
+      "server/agent/build-scene.ts",
+      "server/agent/prompts/director.ts",
+      "server/http/handlers/review.ts",
+      "server/review/visual.ts",
+      "server/http/read-routes.ts"
+    ],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "For engine behaviour (composition JSON, Player, timeline, layer kinds) read docs/engine/README.md before writing code; never edit or copy engine source.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "Shared edits are small and stated: build-scene.ts gains optional extraSystem, toolFilter and signal options (defaults keep today's behaviour); review.ts resolves a waiting critique when POST /frames carries a matching requestId; visual.ts gains a blind option; read-routes.ts hides films with parentId from GET /api/films.",
+      "The critic's prompt must never contain the storyboard, a scene intent, a job brief or the style bible."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-4 (shared with S12d): in the browser with the engine fix installed, a crew film's critique jobs receive captured frames (no 'no browser connected' summaries) and one take request shows three thumbnails."
+    ]
+  }
+}

@@ -5,6 +5,7 @@ web/dist/
 .env.*
 !.env.example
 data/
+data-fake/
 debug/
 .ralph-tui/iterations/
 .ralph-tui/session*.json
@@ -19,3 +20,10 @@ docs/hackathon
 
 opencode.json
 docs/learn-improve
+docs/misc
+data-s*
+data-s20-cine/
+data=s19-hero3d/
+
+## commandcode
+.commandcode/

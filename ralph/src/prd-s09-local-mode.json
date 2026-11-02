@@ -9,6 +9,7 @@
       "docs/hackathon/steps/step-09-open-weight-lane/contract-issues.md"
     ],
     "readFirst": [
+      "docs/engine/README.md (engine behaviour: composition JSON, Player slot props, layer kinds, effects, validation; read before writing code that touches the engine)",
       "docs/hackathon/06-contracts.md (LlmBackend, ToolDef, FilmEvent, authoring core API)",
       "docs/hackathon/steps/step-09-open-weight-lane/design.md (sections 3, 5, 6, 7 and 11: routing, Glimmer rules, verified Ollama facts)",
       "docs/hackathon/steps/step-09-open-weight-lane/contract-issues.md (which gaps the contract update resolved; what remains)",

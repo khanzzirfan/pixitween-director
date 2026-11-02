@@ -1,0 +1,187 @@
+{
+  "name": "Engine M2: tween compiler and presets",
+  "branchName": "ralph/m2-timeline",
+  "description": "Compiles a layer's tweens and its enter, exit and loop presets onto the MotionClock's GSAP timeline, deterministically, through the TargetRef contract from M1. Tested on plain objects; no Pixi or Three needed.",
+  "metadata": {
+    "profile": "motion",
+    "specs": [
+      "engine/docs/02-timeline.md"
+    ],
+    "readFirst": [
+      "engine/docs/README.md (decisions D4-D7)",
+      "engine/docs/02-timeline.md (all of it)",
+      "engine/src/core/paths.ts, clock.ts, engine/src/schema/parts.ts, enums.ts (from M1)",
+      "engine/docs/port-map.md (rows for M2)",
+      "tmp/reacthub-pixitweenjs/src/utils/gsapEffects/ and hooks/usePixiAnimation.tsx"
+    ],
+    "requires": [
+      "prd-m1-foundation"
+    ],
+    "owns": [
+      "engine/src/timeline/*"
+    ],
+    "extraGuardrails": [],
+    "manualGates": []
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "compileTweens for numbers and degrees, plus primeTimeline",
+      "description": "As an engine developer, I want tweens compiled to fromTo calls on the master timeline so that any seek order gives the same values.",
+      "steps": [
+        "Read engine/docs/02-timeline.md sections 'Tween compiler' and 'Determinism tests the compiler must pass', and tmp/reacthub-pixitweenjs/src/hooks/usePixiAnimation.tsx (the comments on immediateRender and overwrite).",
+        "Create engine/src/timeline/compile.ts exporting Resolve, CompileResult, compileTweens(tl, tweens, opts) and primeTimeline(tl, timeSec) for 'number' and 'deg' kinds: resolve keys, group by TargetRef.obj, read missing from values at compile time, convert degrees, add fromTo with immediateRender false at layerStart + at, use set for duration 0, never set overwrite.",
+        "Unresolvable target or property: push an error string naming the layer id, tween index and property, and skip that tween.",
+        "Create engine/src/timeline/compile.test.ts implementing every determinism test listed in the spec on plain objects with a MotionClock from engine/src/core/clock.ts."
+      ],
+      "acceptance": [
+        "Tween at 1, duration 2, to { x: 100 } on { x: 0 } (layer start 0, ease 'none'): seek 0 -> 0, seek 2 -> 50, seek 3 -> 100, seek 0.5 -> 0, seek 2 -> 50",
+        "Two tweens on x ([0,1] 0->100 then [2,3] 100->0, ease 'none'): seek 2.5 -> 50, seek 0.5 -> 50, seek 2.5 -> 50",
+        "from { alpha: 0 } to { alpha: 1 } at 0: after primeTimeline(tl, 0), alpha is 0",
+        "to { rotation: 90 } with a 'deg' TargetRef ends at Math.PI / 2 (within 1e-9)",
+        "A tween whose resolve returns null is skipped and CompileResult.errors has one message containing the layer id and the property name",
+        "Layer start 2 and tween at 1 places the tween at timeline time 3"
+      ],
+      "labels": [
+        "timeline"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Colour tweens, repeat and yoyo",
+      "description": "As an author, I want to tween colours given as hex strings and repeat tweens so that fills, tints and lights can change colour over time.",
+      "steps": [
+        "Read engine/docs/02-timeline.md 'Tween compiler' step 3 (colour proxy) and engine/src/core/paths.ts (setColor, getColor).",
+        "Extend engine/src/timeline/compile.ts: 'color' kind tweens a proxy { v: fromHex } to { v: toHex } at the same time and duration, calling ref.setColor(proxy.v) on update; missing from uses ref.getColor(); duration 0 calls setColor once via set + onComplete or a callback at that time.",
+        "Pass repeat and yoyo through to GSAP for every kind.",
+        "Add tests to engine/src/timeline/compile.test.ts for colours, repeat and yoyo, and for a colour set (duration 0) before and after its time."
+      ],
+      "acceptance": [
+        "A colour tween '#000000' -> '#ffffff' over [0, 2] with ease 'none': at seek 1 setColor last received a grey whose channels are each 127 or 128",
+        "Seeking back to 0 after the colour tween sets '#000000' again",
+        "A tween of x 0 -> 10 over 1 s with repeat 1 and yoyo true is at 10 at t = 1 and back at 0 at t = 2"
+      ],
+      "labels": [
+        "timeline"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "validateTargets: static check of every tween target against the allowlist",
+      "description": "As an author, I want wrong tween targets reported at load time with a path so that a typo is found before playback.",
+      "steps": [
+        "Read engine/docs/02-timeline.md section 'Target paths' (the allowlist table).",
+        "Create engine/src/timeline/targets.ts exporting LAYER_PROPS (per layer type: the base props plus tint for image and fill for text and shape), CAMERA_PROPS, OBJECT_PROPS, LIGHT_PROPS and validateTargets(doc) returning Array<{ path: string; message: string }>.",
+        "validateTargets checks: the target form is allowed for the layer type (camera, object:, light:, postfx: only on three layers; filter: on any layer); the referenced id exists (objects, lights including key, fill, rim, ambient, filters, postFx); for layer, camera, object and light targets every to and from key is in the allowlist. Filter and postFx param names are not checked here (the compiler reports them).",
+        "Create engine/src/timeline/targets.test.ts."
+      ],
+      "acceptance": [
+        "A tween with target 'camera' on a text layer gives one error with path 'layers[0].tweens[0].target'",
+        "'object:nope' on a three layer without that object gives an error; 'light:key' is accepted on a three layer with no extra lights",
+        "to { 'rotation.w': 1 } on 'object:can' gives an error naming 'rotation.w'; to { 'rotation.y': 90, 'material.color': '#ff0000' } passes",
+        "All four m1 fixtures in engine/fixtures validate with zero errors"
+      ],
+      "labels": [
+        "timeline"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-004",
+      "title": "Enter presets as pure Tween builders",
+      "description": "As an author, I want named entrances (fades, slides, zoom, pop, rotate, drop) so that a layer can arrive well with one line of JSON.",
+      "steps": [
+        "Read engine/docs/02-timeline.md section 'Presets' and the enter rows of its table, then the matching effects in tmp/reacthub-pixitweenjs/src/utils/gsapEffects/ (fadeEffects.ts, slideEffects.ts, zoomEffects.ts, backEffects.ts, bounceEffects.ts, rotateEffects.ts, animationConfigs.ts) for curves and eases.",
+        "Create engine/src/timeline/presets.ts exporting PresetContext, PresetKind, PresetDef and a PRESETS record; implement every enter preset in the table as build(ctx, ref, at, duration) returning Tween objects (layer-local times, from and to values, eases), honouring ref.ease and ref.params overrides.",
+        "Create engine/src/timeline/presets.test.ts: for each enter preset, compile its tweens onto a clock against a plain object with the base values and assert the state at the start (off-base or transparent) and at the end (exactly the base values)."
+      ],
+      "acceptance": [
+        "Every enter preset ends with x, y, alpha, rotation, scaleX and scaleY equal to ctx.base (within 1e-6) at at + duration",
+        "slideInLeft with size.width 300 and base x 500 starts at x 200 and alpha 0",
+        "popIn uses a back.out ease and starts at scale 0",
+        "A preset given ref.duration 2 ends at at + 2; with no ref.duration it uses defaultDuration from the table"
+      ],
+      "labels": [
+        "timeline",
+        "presets"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Exit presets",
+      "description": "As an author, I want named exits so that a layer can leave cleanly before its end.",
+      "steps": [
+        "Read the exit rows of the presets table in engine/docs/02-timeline.md and the matching FADE_OUT, ZOOM_OUT and slide-out effects in tmp/reacthub-pixitweenjs/src/utils/gsapEffects/.",
+        "Add fadeOut, fadeOutUp, fadeOutDown, slideOutLeft, slideOutRight and zoomOut to PRESETS in engine/src/timeline/presets.ts.",
+        "Add tests to engine/src/timeline/presets.test.ts: base state at the exit's start, gone (alpha 0) at its end."
+      ],
+      "acceptance": [
+        "Every exit preset starts at ctx.base values and ends with alpha 0",
+        "slideOutRight with size.width 300 and base x 500 ends at x 800",
+        "zoomOut ends with scaleX and scaleY at 0.3 x base"
+      ],
+      "labels": [
+        "timeline",
+        "presets"
+      ],
+      "dependsOn": [
+        "US-004"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Loop presets, placement and expandPresets (including 3D object loops)",
+      "description": "As an author, I want spin, float, pulse and sway that fill the time between enter and exit and end at rest so that idle motion never pops.",
+      "steps": [
+        "Read engine/docs/02-timeline.md 'Presets' (placement rules, the spin, float, pulse and sway paragraphs, and 'Loop presets on 3D objects') and SPIN_360 plus the DEFAULT/MIN/MAX_LOOP_ROTATIONS_PER_SEC constants in tmp/reacthub-pixitweenjs/src/constants/animation.ts.",
+        "Add spin, float, pulse and sway to PRESETS following the exact tween shapes in the spec (n whole periods, yoyo with repeat 2n - 1, sway quarter/half/quarter).",
+        "Create expandPresets(layer, ctx) in engine/src/timeline/presets.ts: places enter at 0, exit at layerLength - exit duration, loop between them, retargets spin, float and sway to 'object:<id>' when ref.target is set (rotation.y, position.y with amplitude default 0.05, rotation.z), and returns { tweens, errors } (unknown preset, target on a non-loop preset).",
+        "Add tests: spin over a 10 s span at 0.25 turns per second, float ends at base, sway ends at base, n = 0 adds nothing, retargeting to an object."
+      ],
+      "acceptance": [
+        "A layer of length 10 with enter fadeIn (0.6 s), exit fadeOut (0.5 s) and loop spin at 0.25 turns/s: the loop tween starts at 0.6, covers 2 periods (8 s), and rotation at 8.6 is base + 720 degrees",
+        "float and sway leave the target exactly at base at the end of their span; pulse leaves scale at base",
+        "A loop span shorter than one period produces no tweens and no error",
+        "loop { name: 'spin', target: 'object:can' } produces tweens with target 'object:can' on 'rotation.y'; enter { name: 'fadeIn', target: 'object:can' } produces an error",
+        "turnsPerSecond 5 is clamped to 1"
+      ],
+      "labels": [
+        "timeline",
+        "presets"
+      ],
+      "dependsOn": [
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Timeline public index and an end-to-end compile test on a fixture",
+      "description": "As a runtime author (m7), I want one import for the timeline API and proof that a whole fixture compiles so that wiring it up is mechanical.",
+      "steps": [
+        "Read engine/src/timeline/*.ts written in US-001 to US-006 and engine/docs/06-runtime-player.md step 7 of load(doc).",
+        "Create engine/src/timeline/index.ts re-exporting compileTweens, primeTimeline, Resolve, CompileResult, validateTargets, the allowlists, PRESETS, expandPresets and the preset types.",
+        "Create engine/src/timeline/fixture.test.ts: parse engine/fixtures/basic-2d.json, build a plain-object fake node per layer (x, y, alpha, rotation, scale { x, y }, a 'fill' colour holder) with a resolve built from LAYER_PROPS, expand presets with size 200x100, compile everything on a MotionClock, prime, and check values at three times."
+      ],
+      "acceptance": [
+        "fixture.test.ts compiles basic-2d.json with zero compile errors",
+        "For a layer in basic-2d.json with an enter preset, its fake node's alpha is 0 at the layer's start and equals its base alpha after the enter duration",
+        "Seeking the fixture to 40 %, then 0, then 40 % again gives identical values on every fake node"
+      ],
+      "labels": [
+        "timeline"
+      ],
+      "dependsOn": [
+        "US-002",
+        "US-003",
+        "US-006"
+      ]
+    }
+  ]
+}

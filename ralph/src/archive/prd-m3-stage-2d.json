@@ -1,0 +1,154 @@
+{
+  "name": "Engine M3: 2D stage (assets, image, text, shape, group nodes)",
+  "branchName": "ralph/m3-stage-2d",
+  "description": "Builds the 2D MotionNodes on Pixi v8 directly (no @pixi/react): image, text, shape and group, plus image asset loading, visibility windows and the createNode dispatcher the runtime uses. Drawing is checked later on the lab page (M7).",
+  "metadata": {
+    "profile": "motion",
+    "specs": [
+      "engine/docs/03-stage-2d.md"
+    ],
+    "readFirst": [
+      "engine/docs/README.md (decisions D1, D4, D11)",
+      "engine/docs/03-stage-2d.md (all of it)",
+      "engine/src/core/types.ts, transform.ts, paths.ts, engine/src/schema/layers2d.ts (from M1)",
+      "engine/docs/port-map.md (rows for M3)"
+    ],
+    "requires": [
+      "prd-m1-foundation"
+    ],
+    "owns": [
+      "engine/src/pixi/*"
+    ],
+    "extraGuardrails": [],
+    "manualGates": []
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "isVisible: the layer time window",
+      "description": "As a runtime author, I want one pure visibility rule so that layers appear and disappear on exact times with no tween tricks.",
+      "steps": [
+        "Read engine/docs/03-stage-2d.md section 'Visibility' and the idea in tmp/reacthub-pixitweenjs/src/components/PixiSequence/PixiSequence.tsx (do not copy its tweens).",
+        "Create engine/src/pixi/visibility.ts exporting isVisible(timeSec, start, end, docDuration).",
+        "Create engine/src/pixi/visibility.test.ts."
+      ],
+      "acceptance": [
+        "isVisible(1, 1, 2, 6) is true, isVisible(2, 1, 2, 6) is false, isVisible(0.999, 1, 2, 6) is false",
+        "isVisible(6, 0, 6, 6) is true (last frame) and isVisible(6, 0, 5, 6) is false"
+      ],
+      "labels": [
+        "stage2d"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "loadImageAssets with per-asset errors",
+      "description": "As a runtime author, I want all image assets loaded in parallel with failures reported per asset so that one broken image does not stop the doc.",
+      "steps": [
+        "Read engine/docs/03-stage-2d.md section 'Assets' and tmp/reacthub-pixitweenjs/src/utils/loadSpriteTexture.ts.",
+        "Create engine/src/pixi/assets.ts exporting loadImageAssets(doc, load?) and unloadImageAssets(doc, unload?), where load defaults to Assets.load from pixi.js and is injectable for tests; gltf assets are skipped.",
+        "Create engine/src/pixi/assets.test.ts with an injected fake loader (one success, one rejection, one gltf asset)."
+      ],
+      "acceptance": [
+        "With assets { a: image ok, b: image failing, c: gltf }, textures has only 'a', errors has one entry with assetId 'b', and the loader was called twice",
+        "Both images are requested before either resolves (the loader is called for both before the first promise settles)"
+      ],
+      "labels": [
+        "stage2d"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "shapeNode: rect and ellipse with fill tweens",
+      "description": "As an author, I want rectangles and ellipses with an animatable fill so that I can build cards, bars and backgrounds.",
+      "steps": [
+        "Read engine/docs/03-stage-2d.md sections 'The MotionNode contract', 'Base transform' and 'Node types', and engine/src/core/transform.ts.",
+        "Create engine/src/pixi/nodes/shapeNode.ts exporting createShapeNode: NodeFactory. Draw with Graphics (roundRect when radius > 0, ellipse centred in the width x height box), fill and optional stroke; size() is width x height; apply applyBaseTransform; ready resolves at once.",
+        "resolveTarget: undefined target -> resolveBaseTarget, plus 'fill' as a colour TargetRef whose setColor redraws the Graphics; anything else -> null.",
+        "start and end are absolute: parentStart + layer.start and parentStart + layer.end.",
+        "Create engine/src/pixi/nodes/shapeNode.test.ts (real pixi.js Graphics in jsdom)."
+      ],
+      "acceptance": [
+        "A rect layer 200x100 at x 300, y 200 with anchor [0.5, 0.5] gives display position (300, 200), pivot (100, 50) and size() { width: 200, height: 100 }",
+        "resolveTarget(undefined, 'fill') returns kind 'color' and getColor() returns the layer's fill; setColor('#ff0000') then getColor() returns '#ff0000'",
+        "resolveTarget('camera', 'fov') returns null",
+        "With parentStart 2 and layer start 1, end 3 the node's start is 3 and end is 5"
+      ],
+      "labels": [
+        "stage2d"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-004",
+      "title": "imageNode: sprite sized from the layer, tint tweens, missing texture",
+      "description": "As an author, I want image layers sized by width or height with the aspect kept so that plates and cut-outs drop in correctly.",
+      "steps": [
+        "Read engine/docs/03-stage-2d.md 'Node types' (image row and the missing texture paragraph).",
+        "Create engine/src/pixi/nodes/imageNode.ts exporting createImageNode: NodeFactory using ctx.textures.get(layer.asset); size from width/height with the aspect kept when one is missing; natural size when neither; tint from the layer; 'tint' colour target in addition to base targets.",
+        "When the texture is missing: display is an empty Container, size() is { width: 0, height: 0 }, and ready rejects with Error('motion: image asset <id> did not load').",
+        "Create engine/src/pixi/nodes/imageNode.test.ts with a Texture made from a small canvas-free source (for example new Texture({ source: new TextureSource({ width: 400, height: 200 }) }) or Texture.WHITE scaled), whichever works in jsdom."
+      ],
+      "acceptance": [
+        "For a 400x200 texture, layer width 200 gives a 200x100 sprite; layer height 50 gives 100x50; neither gives 400x200",
+        "resolveTarget(undefined, 'tint') returns a colour ref that changes the sprite's tint",
+        "A layer whose asset has no texture gives a node whose ready rejects with a message containing the asset id, and creating it does not throw"
+      ],
+      "labels": [
+        "stage2d"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "textStyleFrom and textNode with font loading",
+      "description": "As an author, I want text layers with stroke, shadow, wrap and alignment so that titles and captions look designed.",
+      "steps": [
+        "Read engine/docs/03-stage-2d.md 'Node types' (text row, textStyleFrom and Fonts paragraphs) and tmp/reacthub-pixitweenjs/src/utils/textStyleV8.ts.",
+        "Create engine/src/pixi/nodes/textStyle.ts exporting textStyleFrom(style) returning Pixi v8 TextStyleOptions (stroke object, dropShadow with angle in radians, wordWrap when wordWrapWidth is set, align, lineHeight, letterSpacing).",
+        "Create engine/src/pixi/nodes/textNode.ts exporting createTextNode: NodeFactory. The Text object is created inside ready after document.fonts.load for the first family (skipped when document.fonts is missing or rejects); until then display is an empty Container that the Text is added to. size() is the Text's measured size (0x0 before ready). Targets: base plus 'fill' (colour).",
+        "Create engine/src/pixi/nodes/textStyle.test.ts (pure; do not construct Text in jsdom)."
+      ],
+      "acceptance": [
+        "textStyleFrom({ fontSize: 80, stroke: { color: '#000000', width: 4 }, wordWrapWidth: 600 }) returns fontSize 80, stroke { color: '#000000', width: 4 }, wordWrap true, wordWrapWidth 600",
+        "dropShadow angle 90 maps to Math.PI / 2 and alpha, blur and distance pass through",
+        "textNode.ts compiles under strict TypeScript and is exercised in the browser by m7 (record in notes that text drawing is browser-verified only)"
+      ],
+      "labels": [
+        "stage2d"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "groupNode and createNode dispatcher",
+      "description": "As a runtime author, I want one createNode call that builds any 2D layer, including nested groups with offset times, and accepts a three factory from outside.",
+      "steps": [
+        "Read engine/docs/03-stage-2d.md sections 'Node types' (group row) and 'createNode'.",
+        "Create engine/src/pixi/nodes/groupNode.ts exporting createGroupNode(layer, ctx, parentStart, create) that builds children with create(child, ctx, absoluteStart), adds their displays in order, pivot 0, size() from the union of children's local bounds, ready = Promise.all of children (rejecting if any rejects), destroy destroys children.",
+        "Create engine/src/pixi/createNode.ts exporting createNode(layer, ctx, parentStart = 0, factories?) dispatching on type; three uses factories.three; a missing factory throws Error('motion: no node factory for <type>').",
+        "Create engine/src/pixi/index.ts re-exporting isVisible, loadImageAssets, unloadImageAssets, createNode, the four factories and textStyleFrom.",
+        "Create engine/src/pixi/createNode.test.ts with a nested group of shapes and a fake three factory."
+      ],
+      "acceptance": [
+        "A group starting at 2 with a child shape starting at 1 gives a child node with start 3; a grandchild in a nested group starting at 0.5 inside it gets start 3.5",
+        "The group's display has its children's displays in layer order",
+        "createNode on a three layer without factories.three throws an error naming 'three'; with a fake factory it returns that factory's node",
+        "Destroying the group calls destroy on every child node (spied)"
+      ],
+      "labels": [
+        "stage2d"
+      ],
+      "dependsOn": [
+        "US-004",
+        "US-005"
+      ]
+    }
+  ]
+}

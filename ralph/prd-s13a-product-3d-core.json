@@ -1,0 +1,439 @@
+{
+  "name": "PixiTween Director S13a: 3D product core (photo-true label, contour, model3d layer authoring, tools)",
+  "branchName": "ralph/s13a-product-3d-core",
+  "description": "Everything server-side and pure for 3D product shots: the PRODUCT_3D flag, a zod mirror of the engine's model3d layer, light-validator support, the cylinder label unwrap, side colour, box faces, the contour of a SAM mask, the prepare step with its cache, the pure placeProduct3D / turnProduct / lightProduct functions, their tools, and review rules that treat the 3D product as the product. Needs no engine change to build or test.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "PRODUCT_3D flag and the label asset role",
+      "description": "As a builder of 3D shots, I want a feature flag and an asset role for the textures I make so that 3D can ship dark until the engine supports it.",
+      "steps": [
+        "Read server/env.ts, .env.example, shared/composition.ts (AssetRef.role) and shared/events.ts (assetRefSchema).",
+        "Edit server/env.ts: add PRODUCT_3D (boolean, default false). Add it to .env.example with the comment 'true once reacthub-pixitweenjs with model3d (0.3.0-alpha.5 or newer) is installed'.",
+        "Edit shared/composition.ts and shared/events.ts: add 'label' to the AssetRef role union and to assetRefSchema's role enum.",
+        "Extend server/env.test.ts and shared events tests."
+      ],
+      "acceptanceCriteria": [
+        "loadEnv() with PRODUCT_3D unset returns PRODUCT_3D false; PRODUCT_3D=true returns true",
+        "An art.asset event whose asset role is 'label' parses with filmEventSchema",
+        "All existing tests pass unchanged",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "shared",
+        "config"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "zod mirror of the model3d layer subset we write",
+      "description": "As a tool author, I want a local schema for model3d layers so that this repo validates what it writes before the engine is installed.",
+      "steps": [
+        "Read ~/Documents/code/trolio/reacthub-pixitweenjs/docs-site/docs/aep/model3d-integration.md (the full contract, with recipes) and src/types/aep/layer.ts (aepModel3DLayerSchema); keyframes are { t, v, easeIn?, easeOut?, hold? } where easeIn and easeOut are cubic-bezier [x1,y1,x2,y2] tuples (src/types/aep/transform.ts).",
+        "Create server/product3d/types.ts with zod schemas for the subset in design.md section 4: viewport, source (primitive with the six shapes, extrude with contour and depth, gltf), textures, material, view (rotation, position, scale as animatable), lighting (preset, key {azimuth, elevation, intensity, color}, fill, rim, environment), shadow, camera, bounds; export Model3DLayer and SHAPES.",
+        "Create server/product3d/types.test.ts with the design's JSON example (valid), one with an unknown key (invalid) and one extrude with 2 contour points (invalid)."
+      ],
+      "acceptanceCriteria": [
+        "The design section 4 example layer parses",
+        "A layer with source { type: 'extrude', contour: [[0,0],[1,1]] } fails with a message naming contour",
+        "An extra top-level key 'spin' fails (strict)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "product3d"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Light validator accepts model3d layers",
+      "description": "As a FilmStore.commit, I want model3d layers validated so that a bad 3D layer is rejected before it reaches the browser.",
+      "steps": [
+        "Read server/engine/light-validator.ts and its tests, and server/product3d/types.ts.",
+        "Edit server/engine/light-validator.ts: add 'model3d' to KINDS; for that kind, check it with the server/product3d/types.ts schema and that textures.label, textures.front and gltf assetId name assets declared in the comp; require the comp version to be at least 1.4.0 when a model3d layer is present.",
+        "Add fixtures/s13a/valid-model3d.json and fixtures/s13a/model3d-old-version.json and extend the validator tests."
+      ],
+      "acceptanceCriteria": [
+        "valid-model3d.json passes lightValidate",
+        "model3d-old-version.json (version 1.3.0) fails with a message containing '1.4.0' (the engine's minimum for model3d)",
+        "A model3d layer whose textures.label names an undeclared asset fails with a message containing 'assetId'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "backend",
+        "product3d"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Synthetic test images and body-band detection",
+      "description": "As a unwrap, I want to find the straight body of a round product so that only the label area is unwrapped.",
+      "steps": [
+        "Read design.md section 5.2 step 1 and 2.",
+        "Create server/product3d/test-images.ts (sharp) that renders an RGBA test can (a vertical-striped rectangle with rounded top and bottom bands and a shoulder) and a test bottle (a narrow neck above a body), and returns { rgba, width, height }.",
+        "Create server/product3d/unwrap.ts exporting findBodyBand(alpha: Uint8Array, width, height): { top, bottom, cx, r } | null using the ±4 % median-width rule.",
+        "Create server/product3d/unwrap.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "On the test can, findBodyBand returns top and bottom within 3 px of the drawn body and r within 1 px of half the body width",
+        "On the test bottle, the band excludes the neck rows",
+        "On a triangle silhouette it returns null",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "product3d"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Cylinder label unwrap",
+      "description": "As a 3D can or bottle, I want my label texture made from the real photo so that the product looks right when it turns.",
+      "steps": [
+        "Read design.md section 5.2 steps 3 to 5 and server/product3d/unwrap.ts.",
+        "Edit server/product3d/unwrap.ts: export unwrapCylinder(rgba, width, height, band, o: { outWidth = 2048, outHeight = 1024, thetaMaxDeg = 70, featherDeg = 12, side: [r,g,b] }): Uint8Array (RGBA) with u = angle, bilinear sampling inside the arc, side colour outside with a linear feather.",
+        "Extend server/product3d/unwrap.test.ts using the striped test can."
+      ],
+      "acceptanceCriteria": [
+        "Unwrapping the striped test can gives stripe boundaries evenly spaced in u within 2 % of the stripe period inside |theta| <= 60 degrees",
+        "Pixels at theta = 120 degrees equal the side colour exactly; pixels at theta = 76 degrees are a blend of side and label",
+        "The output buffer length is 2048 * 1024 * 4",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ],
+      "labels": [
+        "backend",
+        "product3d"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Side colour from the body edges",
+      "description": "As a unwrap, I want a side colour that matches the product's edges so that the unseen sides join without a seam.",
+      "steps": [
+        "Read design.md section 5.4.",
+        "Create server/product3d/colour.ts exporting sideColour(rgba, width, height, band): [r, g, b]: median Lab of the 8 % of body columns nearest each edge, the larger cluster when the two sides differ by Delta E > 12, converted back to sRGB.",
+        "Create server/product3d/colour.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "A body with both edge strips #1f2937 returns a colour within Delta E 2 of #1f2937",
+        "A body with a 10 % left strip of red and a 30 % right strip of navy returns navy",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ],
+      "labels": [
+        "backend",
+        "product3d"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Box faces from the front cut-out",
+      "description": "As a 3D box, I want my front face from the photo and plausible sides so that a carton turns convincingly.",
+      "steps": [
+        "Read design.md section 5.2 (box paragraph).",
+        "Create server/product3d/box.ts exporting boxFaces(rgba, width, height, side): { front: Uint8Array; frontSize; sides: [r,g,b]; top: [r,g,b] } where top is 5 % lighter than side in Lab L.",
+        "Create server/product3d/box.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "boxFaces of a 300x400 test image returns front of length 300*400*4 and frontSize { width: 300, height: 400 }",
+        "top's Lab L is between 4.5 and 5.5 higher than side's",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006"
+      ],
+      "labels": [
+        "backend",
+        "product3d"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Contour of a SAM mask for extruded cut-outs",
+      "description": "As a odd-shaped product, I want an outline polygon of my mask so that I can be extruded into a thick cut-out.",
+      "steps": [
+        "Read design.md section 5.3 and server/meta/sam.ts (SamObject alpha is a full-frame 8-bit mask). The engine takes the contour inline in source.extrude.contour, in the cut-out's own pixels with y down, 3 to 2000 points.",
+        "Create server/product3d/contour.ts exporting maskContour(alpha, width, height, o: { maxSide = 512, threshold = 127, epsilon = 1.5, maxPoints = 400 }): Array<[number, number]> (marching squares, largest outer ring, Douglas-Peucker, scaled back to the input size so points are in the mask's own pixels, y down, clockwise).",
+        "Create server/product3d/contour.test.ts with a synthetic star and a synthetic mug with a handle hole."
+      ],
+      "acceptanceCriteria": [
+        "The polygon area of the synthetic mug contour is within 1 % of the mask's outer-ring pixel area and has at most 400 points",
+        "The star contour has at least 10 points and every point lies within 2 px of the mask edge",
+        "An empty mask returns []",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "product3d"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "prepare: from the product cut-out to 3D texture assets, cached",
+      "description": "As a placeProduct3D, I want one call that turns the film's product cut-out into the right texture assets so that each film does the image work once.",
+      "steps": [
+        "Read server/art/cutout.ts (how the S4 cut-out asset is stored), server/store/asset-store.ts and server/product3d/*.ts.",
+        "Create server/product3d/prepare.ts exporting prepareProduct3D(ctx, { cutoutAssetId, shape }): Promise<{ shape: effective shape, label?: AssetRef, front?: AssetRef, contour?: Array<[number,number]> (in the cropped front image's pixels), side: string, proportions }>: can/bottle/jar/tube use findBodyBand + unwrapCylinder (falling back to extrude when the band is null), box uses boxFaces, pouch and other use maskContour with the cut-out as front. Store PNGs with roles 'label' or 'cutout'; for the extrude path also store the cut-out cropped to the contour's bounding box as the front image (the engine maps front over that box). The contour itself is returned inline and is not an asset. Cache by cutoutAssetId + shape in memory and in the asset meta.",
+        "Create server/product3d/prepare.test.ts with makeTestFilm and the test images."
+      ],
+      "acceptanceCriteria": [
+        "prepareProduct3D for the test can stores one asset with role 'label' and returns shape 'can'",
+        "prepareProduct3D for a triangle silhouette with shape 'can' returns shape 'other' with a contour and a front image cropped to the contour's bounding box (fallback)",
+        "A second call with the same cutoutAssetId and shape stores no new asset",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005",
+        "US-007",
+        "US-008"
+      ],
+      "labels": [
+        "backend",
+        "product3d"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Pure placeProduct3D",
+      "description": "As a scene builder, I want one pure function that puts the 3D product into a scene so that the layer is always well-formed.",
+      "steps": [
+        "Read design.md section 5.5, docs/hackathon/06-contracts.md section 3a (ids, meta.director) and server/authoring/api.ts (addLayer, registerAsset).",
+        "Create server/product3d/presets.ts with the defaults (sway 18, tilt 4, shadow 0.35/0.6, fov 30, fit 1.3, the four lighting preset names).",
+        "Create server/product3d/authoring.ts exporting placeProduct3D(comp, { sceneId, box, shape, labelAssetId?, frontAssetId?, contour?, side, proportions?, preset?, sway?, z? }): a new comp with layer '<sceneId>:product3d' replacing '<sceneId>:product' at the same z if present, meta.director role 'product3d', texture assets registered in the scene precomp, rotation keys from scene start to end, and root version raised to 1.9.0 (the engine's AEP_SCHEMA_VERSION; 1.4.0 is only the minimum). Keyframes use easeIn/easeOut cubic-bezier handles, never a name.",
+        "Create server/product3d/authoring.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "On a comp with s1:product at box {x:760,y:300,w:400,h:600}, placeProduct3D replaces it with s1:product3d whose transform position is [960, 600] and whose viewport is 800x1200",
+        "The result passes lightValidate and the root version is '1.9.0'",
+        "The rotation keys go from [4, -18, 0] at the scene's first frame to [4, 18, 0] at its last",
+        "The input comp is not mutated",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "backend",
+        "product3d"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Pure turnProduct and lightProduct",
+      "description": "As a chat edit, I want to turn the product or change its light in one call so that 'turn it more' and 'light from the window' are instant.",
+      "steps": [
+        "Read design.md section 5.5 (last paragraph) and server/product3d/authoring.ts.",
+        "Edit server/product3d/authoring.ts: export turnProduct(comp, layerId, { from?, to?, tilt?, speed? }) clamping |from| and |to| to 35 and returning { comp, clamped: boolean }, and lightProduct(comp, layerId, { preset?, azimuth?, elevation?, intensity? }).",
+        "Extend server/product3d/authoring.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "turnProduct with to 50 returns clamped true and a last rotation key of [4, 35, 0]",
+        "lightProduct with preset 'window' sets lighting.preset 'window' and leaves view unchanged",
+        "Both throw AuthoringError with code 'not_model3d' for a layer that is not model3d",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-010"
+      ],
+      "labels": [
+        "backend",
+        "product3d"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "product3d tools, registry and the Local-mode denylist",
+      "description": "As a director, the crew and chat, I want placeProduct3D, turnProduct and lightProduct as tools so that the models can use 3D.",
+      "steps": [
+        "Read server/tools/authoring.ts (tool wrapper pattern with FilmStore.mutate), server/tools/registry.ts and server/llm/router.ts (LOCAL_EDIT_DENYLIST).",
+        "Create server/tools/product3d.ts: placeProduct3D (args sceneId, box?, preset?, sway?; reads productShape and the scene's cut-out from meta.director, runs prepareProduct3D before mutate, then placeProduct3D inside mutate), turnProduct and lightProduct (pure inside mutate). Descriptions say what each changes in plain words.",
+        "Edit server/tools/registry.ts: include the three tools only when PRODUCT_3D is true. Edit server/llm/router.ts: add placeProduct3D to LOCAL_EDIT_DENYLIST.",
+        "Create server/tools/product3d.test.ts with makeTestFilm."
+      ],
+      "acceptanceCriteria": [
+        "With PRODUCT_3D=false, allTools() has no tool named placeProduct3D; with true it has all three",
+        "placeProduct3D on a scene with a product cut-out commits one version containing s1:product3d",
+        "turnProduct on a scene without a model3d layer returns ok false with an error naming the layer",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001",
+        "US-009",
+        "US-011"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Review rules treat the 3D product as the product",
+      "description": "As a critic and continuity, I want the 3D product's box used for text-over-product and safe-area checks so that 3D scenes are reviewed like 2D ones.",
+      "steps": [
+        "Read server/review/geometry.ts and server/review/rules.ts.",
+        "Edit server/review/geometry.ts: when finding a scene's product box, use the layer with meta.director role 'product3d' (its transform box) if there is no 'product' layer.",
+        "Extend server/review/rules.test.ts with a fixture scene whose headline overlaps a product3d box by 30 %."
+      ],
+      "acceptanceCriteria": [
+        "runRules on the fixture reports one text-over-product finding for that scene",
+        "Scenes without product3d give the same findings as before (existing tests pass)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-010"
+      ],
+      "labels": [
+        "backend",
+        "review"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/steps/step-13-product-3d/requirements.md",
+      "docs/hackathon/steps/step-13-product-3d/design.md",
+      "~/Documents/code/trolio/reacthub-pixitweenjs/docs/director-uplift/02-model3d-layer/requirements.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/06-contracts.md (sections 3a, 4a and section 8, decisions D-24 to D-27)",
+      "docs/hackathon/steps/step-13-product-3d/design.md (sections 4 and 5)",
+      "~/Documents/code/trolio/reacthub-pixitweenjs/docs/director-uplift/02-model3d-layer/requirements.md (the model3d layer schema this repo writes a subset of; read-only, in the engine checkout)"
+    ],
+    "requires": [
+      "prd-s03b-director-agent",
+      "prd-s04-art-layers",
+      "prd-s05a-review-rules"
+    ],
+    "owns": [
+      "server/product3d/types.ts",
+      "server/product3d/unwrap.ts",
+      "server/product3d/colour.ts",
+      "server/product3d/box.ts",
+      "server/product3d/contour.ts",
+      "server/product3d/prepare.ts",
+      "server/product3d/authoring.ts",
+      "server/product3d/presets.ts",
+      "server/product3d/test-images.ts",
+      "server/tools/product3d.ts",
+      "fixtures/s13a/*"
+    ],
+    "sharedEdits": [
+      "server/env.ts",
+      ".env.example",
+      "shared/composition.ts",
+      "shared/events.ts",
+      "server/engine/light-validator.ts",
+      "server/tools/registry.ts",
+      "server/llm/router.ts",
+      "server/review/geometry.ts"
+    ],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "For engine behaviour (composition JSON, Player, timeline, layer kinds) read docs/engine/README.md before writing code; never edit or copy engine source.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "server/product3d/unwrap.ts, colour.ts, box.ts, contour.ts, authoring.ts and presets.ts are pure: Buffers or plain arrays in, Buffers or plain objects out, no network, no Date.now(). sharp may be used only in prepare.ts and test-images.ts.",
+      "Never fetch or bundle any stock 3D model, HDRI or texture. Every texture comes from the film's own product cut-out.",
+      "Shared edits are small and stated: env.ts adds PRODUCT_3D; composition.ts and events.ts add the asset roles 'label' and 'contour'; light-validator.ts accepts kind 'model3d'; registry.ts adds the product3d tools when PRODUCT_3D is true; router.ts adds placeProduct3D to LOCAL_EDIT_DENYLIST; geometry.ts treats role 'product3d' as the product."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "Covered by S13b MG-1 (`npm run live -- s13-3d`, about $0.40)."
+    ]
+  }
+}

@@ -1,0 +1,362 @@
+{
+  "name": "PixiTween Director S15a: catalog core (feed, slots, variant and rebind jobs)",
+  "branchName": "ralph/s15a-catalog-core",
+  "description": "Backend for Catalog Crew: import a product feed, mark the master film's layers as slots, and build one variant child film per product with deterministic jobs (SAM cut-out + slot binding, no LLM). Leaves the showrunner tools and price check to S15b and the UI and Publish to S15c.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Catalog contracts: product, catalog, variant and catalog events",
+      "description": "As a catalog builder, I want typed product, catalog and variant records and catalog events so that the server and the studio agree on one shape.",
+      "steps": [
+        "Read shared/crew.ts (jobSchema), shared/events.ts (the FilmEvent union and the base fields) and docs/hackathon/catalog-crew-plan.md section 3 Data.",
+        "Create shared/catalog.ts exporting zod schemas and types: productSchema { id (1-64 chars, [A-Za-z0-9_-]), title (1-120), price (number >= 0), salePrice? (number >= 0), currency (ISO 4217, 3 upper-case letters), imageUrl (string), imageAssetId? , category (1-40, default 'all'), url? }.",
+        "In shared/catalog.ts add variantStatusSchema = enum ['queued','building','checking','ready','flagged','failed'] and variantSchema { productId, filmId?, status, version?, priceCheck?: { ok: boolean, read?: string, note?: string }, mp4Url?, error? }.",
+        "In shared/catalog.ts add catalogSchema { id (/^cat_[a-f0-9]{12}$/), masterFilmId, createdAt, products: productSchema[] (1-200), variants: Record<productId, variantSchema>, looks?: Record<category, { platePrompt: string, plateAssetId?: string, note?: string }> } and export CATALOG_ID_RE.",
+        "Edit shared/events.ts: add catalog.created { catalogId, count }, catalog.variant { catalogId, variant }, catalog.product { catalogId, product } to the FilmEvent union, using the existing base fields.",
+        "Edit shared/composition.ts: add optional slots?: Record<string, 'image' | 'title' | 'price' | 'salePrice' | 'badge'> and catalogId?: string to FilmState, with a comment that slots map layer ids to product fields.",
+        "Add shared/catalog.test.ts covering a valid catalog, a bad currency, a duplicate-free id check helper uniqueProductIds(products) and the new events parsing through the FilmEvent schema."
+      ],
+      "acceptanceCriteria": [
+        "productSchema.parse({ id: 'p1', title: 'Mug', price: 12, currency: 'USD', imageUrl: 'x.png' }) returns category 'all'",
+        "productSchema.safeParse with currency 'usd' fails",
+        "uniqueProductIds([{id:'a'},{id:'a'}]) returns false and uniqueProductIds([{id:'a'},{id:'b'}]) returns true",
+        "A catalog.variant event with status 'flagged' parses through the FilmEvent schema",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "contracts"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "CSV feed parser with price and currency normalisation",
+      "description": "As a merchant, I want to upload a plain CSV export of my products so that the crew knows every product's title, price, photo and category.",
+      "steps": [
+        "Read shared/catalog.ts (productSchema) and an existing pure helper with tests, for example server/crew/storyboard-ops.ts.",
+        "Create server/catalog/feed.ts exporting parseFeedCsv(text: string): { products: Product[]; errors: { row: number; message: string }[] }. Accept a header row with columns id, title, price, sale_price, currency, image_url (or image_link), category, url in any order, case-insensitive.",
+        "In parseFeedCsv support quoted fields with commas and doubled quotes, CRLF and LF line endings, and skip empty lines.",
+        "Export parsePrice(raw: string): { amount: number; currency?: string } | null that accepts '12.99', '12,99', '$12.99', '12.99 USD', 'USD 12.99' and '1,299.00'; currency symbols $, €, £ map to USD, EUR, GBP.",
+        "Rows that fail productSchema go to errors with their 1-based row number and are left out of products; duplicate ids keep the first row and report the rest.",
+        "Create fixtures/s15a/feed-10.csv and fixtures/s15a/feed-30.csv with invented products in 3 categories (mugs, candles, bottles), image_url values pointing at files in fixtures/s15a/images/, and one row with a bad price in feed-30.csv.",
+        "Add server/catalog/feed.test.ts covering both fixture files and the parsePrice cases."
+      ],
+      "acceptanceCriteria": [
+        "parseFeedCsv(feed-10.csv) returns 10 products and 0 errors",
+        "parseFeedCsv(feed-30.csv) returns 29 products and exactly 1 error whose row number is the bad-price row",
+        "parsePrice('$12.99') returns { amount: 12.99, currency: 'USD' } and parsePrice('1,299.00') returns { amount: 1299 }",
+        "A quoted title containing a comma, \"Mug, large\", is kept whole",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Catalog store on disk with atomic variant updates",
+      "description": "As a catalog service, I want catalogs saved under DATA_DIR so that a restart keeps every product and variant status.",
+      "steps": [
+        "Read server/store/film-store.ts (how films are written under DATA_DIR and the write-then-rename pattern) and shared/catalog.ts.",
+        "Create server/catalog/store.ts exporting createCatalogStore({ dir }) with create({ masterFilmId, products }), get(id), list(), updateVariant(id, productId, patch), updateProduct(id, productId, patch) and setLook(id, category, look).",
+        "Write each catalog to <dir>/catalogs/<id>.json with write-to-temp then rename; serialise updates per catalog id with an in-memory promise chain so two updateVariant calls never lose a write.",
+        "create() makes id 'cat_' + 12 hex chars, sets every product's variant to { productId, status: 'queued' } and validates with catalogSchema; get() of an unknown id throws CatalogNotFoundError.",
+        "Create server/catalog/test-helpers.ts exporting makeTempCatalogStore() for tests (a temp dir removed after each test).",
+        "Add server/catalog/store.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "create() with 3 products returns a catalog whose 3 variants all have status 'queued' and an id matching CATALOG_ID_RE",
+        "20 concurrent updateVariant calls on different products of one catalog all persist (re-reading from disk shows 20 changed variants)",
+        "get('cat_000000000000') on an empty store throws CatalogNotFoundError",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Slots: tag the master film's product, title and price layers",
+      "description": "As a variant builder, I want the master film to say which layers hold the product photo, title and price so that every product can be bound without a model call.",
+      "steps": [
+        "Read server/authoring/api.ts (addLayer, setText, findLayer helpers), server/tools/art.ts (how placeProduct names the product layer) and shared/composition.ts (FilmState.slots from US-001).",
+        "Create server/catalog/slots.ts exporting autoTagSlots(comp): Record<layerId, SlotField>: every image layer created by placeProduct becomes 'image'; the first headline text layer of each scene becomes 'title'.",
+        "Export addPriceTag(comp, sceneId, opts?: { anchor?: 'bottom-left' | 'bottom-right' }): { comp, layerId } that adds a text layer '<sceneId>:price' with placeholder '$0.00' inside the 5% safe area, using the authoring api only.",
+        "Export ensureSlots(comp, existing?): { comp, slots } that runs autoTagSlots, adds a price tag to the last scene when no 'price' slot exists, and returns both; it is idempotent.",
+        "Export validateSlots(comp, slots): string[] listing slot layer ids that no longer exist in comp.",
+        "Add server/catalog/slots.test.ts using the S12e demo film composition in fixtures/s12e/demo-film/versions/9.json."
+      ],
+      "acceptanceCriteria": [
+        "autoTagSlots on the demo film tags at least one 'image' layer and one 'title' layer",
+        "ensureSlots called twice on the same composition returns the same slots and adds exactly one price layer",
+        "validateSlots returns ['s9:missing'] when slots name a layer 's9:missing' that the composition lacks",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Bind a product into a composition (pure)",
+      "description": "As a variant builder, I want one pure function that writes a product's title, price and photo into the slot layers so that variants and rebinds share the same code.",
+      "steps": [
+        "Read server/catalog/slots.ts, server/authoring/api.ts (setText and how an image layer references an asset) and shared/catalog.ts.",
+        "Create server/catalog/bind.ts exporting formatPrice(amount, currency, locale = 'en-US'): string using Intl.NumberFormat with style 'currency'.",
+        "Export bindProduct(comp, slots, product, opts: { imageAssetId?: string; locale?: string }): { comp, changed: string[] }: title slots get the product title (cut to 60 chars with an ellipsis), price slots get formatPrice(salePrice ?? price), salePrice slots get formatPrice(price) only when salePrice is set (otherwise the layer opacity becomes 0), image slots point at opts.imageAssetId when given.",
+        "Export bindTextOnly(comp, slots, product, locale?) that changes title and price slots only (used by rebind).",
+        "bindProduct never touches layers that are not slots; changed lists the layer ids whose value actually changed.",
+        "Add server/catalog/bind.test.ts with a small hand-made composition fixture in fixtures/s15a/bind-comp.json."
+      ],
+      "acceptanceCriteria": [
+        "formatPrice(12.5, 'USD') returns '$12.50' and formatPrice(12.5, 'EUR', 'de-DE') returns '12,50 €'",
+        "bindProduct with salePrice 9 and price 12 sets the price slot to '$9.00' and the salePrice slot to '$12.00'",
+        "Binding the same product twice returns changed [] the second time",
+        "A non-slot layer's JSON is byte-identical before and after bindProduct",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ],
+      "labels": [
+        "backend",
+        "tools"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Job kinds variant and rebind on the board",
+      "description": "As a job board, I want variant and rebind job kinds so that per-product work is scheduled, shown and costed like every other job.",
+      "steps": [
+        "Read shared/crew.ts (JOB_KINDS, WRITING_KINDS, JOB_PRIORITY, jobSchema), server/crew/scheduler.ts and server/env.ts.",
+        "Edit shared/crew.ts: add 'variant' and 'rebind' to JOB_KINDS, and add productId?: string and catalogId?: string to jobSchema. Rebind is a writing kind; variant is not (it writes only its own child film).",
+        "Edit JOB_PRIORITY so rebind runs right after user jobs and fixes, and variant runs after writing jobs but before takes.",
+        "Edit server/env.ts: CATALOG_MAX_WORKERS int(6, 1, 12) and CATALOG_MAX_PRODUCTS int(50, 1, 200); add both to .env.example with one-line comments.",
+        "Edit server/crew/scheduler.ts only if needed so variant jobs count against CATALOG_MAX_WORKERS instead of CREW_MAX_WORKERS (keep the existing limit for every other kind).",
+        "Add or extend tests in shared/crew.test.ts and server/crew/scheduler.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "jobSchema parses { kind: 'variant', productId: 'p1', catalogId: 'cat_…' } with the other required fields",
+        "With CREW_MAX_WORKERS=4 and CATALOG_MAX_WORKERS=6, the scheduler runs 6 variant jobs and 4 build-scene jobs at the same time in a scheduler test",
+        "JOB_PRIORITY({ origin: 'auto', kind: 'rebind' }) is lower than JOB_PRIORITY({ origin: 'auto', kind: 'variant' })",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "contracts"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Variant worker: child film per product with SAM cut-out and binding",
+      "description": "As a crew, I want a variant job to turn the master film into one product's film so that every product gets its own playable video without a model writing it.",
+      "steps": [
+        "Read server/crew/takes.ts buildTake (child film creation), server/tools/art.ts (cutout helper and its cache key), server/catalog/bind.ts and server/catalog/store.ts.",
+        "Create server/catalog/variant.ts exporting runVariantJob(job, signal, crew, deps?) that: loads the catalog and product; reads the master film; creates a child film with parentId = master id, catalogId, slots copied from the master, brief.productAssetId = the product image asset, title '<master title> · <product title>'.",
+        "In runVariantJob: cut the product out of its photo with the same SAM cutout helper placeProduct uses (cache key '<catalogId>:<productId>'), store the cut-out asset, then bindProduct with imageAssetId = the cut-out, then films.commit the bound composition with source 'director' and note 'variant <productId>'.",
+        "If the catalog has a look for the product's category with a plateAssetId, point the background plate layers of the child at that asset.",
+        "Run runRules on the child composition; update the variant to status 'checking' (findings 0) or 'flagged' (findings > 0) with the version, and emit catalog.variant on the master film.",
+        "On any error set the variant to 'failed' with a one-line error and emit catalog.variant; abort leaves the variant 'queued'.",
+        "Edit server/crew/workers/registry.ts to map 'variant' to runVariantJob.",
+        "Add server/catalog/variant.test.ts with the recorded SAM fixture (DIRECTOR_REPLAY=1) and a fake film store."
+      ],
+      "acceptanceCriteria": [
+        "A variant job for product p1 creates exactly one child film whose parentId is the master id and whose slots equal the master's",
+        "The child's title slot text equals the product title and its price slot equals formatPrice of the product price",
+        "A SAM failure sets the variant status to 'failed' and emits one catalog.variant event with that status",
+        "Two variant jobs for different products run concurrently without either film's composition containing the other product's title",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003",
+        "US-005",
+        "US-006"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Rebind worker and product edit propagation",
+      "description": "As a merchant, I want a price change in the feed to update that product's video in seconds so that the video never shows a stale price.",
+      "steps": [
+        "Read server/catalog/variant.ts, server/catalog/bind.ts (bindTextOnly) and server/crew/board.ts (how a job is queued).",
+        "Create server/catalog/rebind.ts exporting runRebindJob(job, signal, crew): loads the product and its variant film, applies bindTextOnly inside one films.mutate call, sets the variant version and status 'checking', and emits catalog.variant.",
+        "Export onProductChanged(crew, catalogId, productId, patch): updates the product in the store, emits catalog.product on the master film, and queues one rebind job (origin 'user') for that product unless one is already queued, in which case the queued one is superseded.",
+        "Edit server/crew/workers/registry.ts to map 'rebind' to runRebindJob.",
+        "Add server/catalog/rebind.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "onProductChanged with { price: 8 } queues exactly one rebind job and, after it runs, the variant film's price slot reads '$8.00'",
+        "Two onProductChanged calls in a row leave one queued rebind job (the first is superseded)",
+        "A rebind job makes no SAM call and no LLM call (the fakes record 0 calls)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-007"
+      ],
+      "labels": [
+        "backend",
+        "crew"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Catalog HTTP routes: import, read, edit product",
+      "description": "As a studio, I want routes to import a feed, read a catalog and edit a product so that the UI can drive Catalog Crew.",
+      "steps": [
+        "Read server/http/handlers/crew.ts (route style, passcode and error shapes), server/http/routes.ts and server/http/upload-limit.ts.",
+        "Create server/http/handlers/catalog.ts exporting registerCatalogRoutes(app, deps) with POST /api/catalogs (multipart: masterFilmId, feed CSV file, optional image files named like the CSV image_url basenames), GET /api/catalogs/:id, GET /api/films/:id/catalog (the catalog whose master is this film, or 404), PATCH /api/catalogs/:id/products/:productId (title, price, salePrice only).",
+        "POST /api/catalogs: parse with parseFeedCsv, reject over CATALOG_MAX_PRODUCTS with 413, store each product image in the asset store (uploaded file, or a file under fixtures/ when DIRECTOR_FAKE=1), create the catalog, ensure the master film's slots with ensureSlots and save them, emit catalog.created, and return { catalog, errors }.",
+        "Mutating routes use the same passcode check as the crew routes; GET routes do not.",
+        "Edit server/http/routes.ts to call registerCatalogRoutes.",
+        "Add server/http/handlers/catalog.test.ts with feed-10.csv."
+      ],
+      "acceptanceCriteria": [
+        "POST /api/catalogs with feed-10.csv returns 201 and a catalog with 10 queued variants",
+        "POST with 51 products and CATALOG_MAX_PRODUCTS=50 returns 413",
+        "PATCH /api/catalogs/:id/products/p1 with { price: 5 } returns 200 and queues one rebind job",
+        "PATCH with { imageUrl: 'x' } returns 400 naming the field that cannot be changed",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002",
+        "US-004",
+        "US-008"
+      ],
+      "labels": [
+        "backend",
+        "api"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/hackathon/catalog-crew-plan.md"
+    ],
+    "readFirst": [
+      "docs/hackathon/catalog-crew-plan.md (sections 2 and 3)",
+      "server/crew/takes.ts (how a child film is created from a parent with films.create + films.commit)",
+      "server/crew/workers/registry.ts and shared/crew.ts (job kinds and workers)",
+      "server/tools/art.ts (placeProduct and the SAM cutout helper) and server/tools/authoring.ts (setText, runAuthoring)"
+    ],
+    "requires": [
+      "prd-s12c-crew-workers",
+      "prd-s12f-crew-finish"
+    ],
+    "owns": [
+      "shared/catalog.ts",
+      "server/catalog/feed.ts",
+      "server/catalog/store.ts",
+      "server/catalog/slots.ts",
+      "server/catalog/bind.ts",
+      "server/catalog/variant.ts",
+      "server/catalog/rebind.ts",
+      "server/catalog/test-helpers.ts",
+      "server/http/handlers/catalog.ts",
+      "fixtures/s15a/*"
+    ],
+    "sharedEdits": [
+      "shared/events.ts",
+      "shared/crew.ts",
+      "shared/composition.ts",
+      "server/crew/workers/registry.ts",
+      "server/crew/scheduler.ts",
+      "server/http/routes.ts",
+      "server/env.ts",
+      ".env.example"
+    ],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "For engine behaviour (composition JSON, Player, timeline, layer kinds) read docs/engine/README.md before writing code; never edit or copy engine source.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "Variant and rebind jobs never call a language model. The only model call in this PRD is the SAM cut-out of a product photo, and tests use the recorded SAM fixture.",
+      "Slots live on FilmState (film.slots), never inside the composition JSON, so the engine schema is unchanged.",
+      "Catalog events are appended to the master film's event log so the existing replay can show the catalog build.",
+      "Fixture feeds use invented product names and plain placeholder product photos: no real brands."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner imports fixtures/s15a/feed-10.csv against a real master film and checks that 10 variant films open and play in the studio."
+    ]
+  }
+}

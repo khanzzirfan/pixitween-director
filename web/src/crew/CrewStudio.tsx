@@ -1,0 +1,144 @@
+// Owned by S12d, laid out by S14. The studio for a crew film, inside the shell: plan and crew on the left, the player and filmstrip in the middle, the conversation on the right.
+import { useCallback, useState, type ReactNode, type RefObject } from 'react';
+import type { FilmState } from '@shared/composition';
+import type { FilmEvent } from '@shared/events';
+import { api } from '../api/client';
+import { captureScene } from '../capture/driver';
+import Player, { type PlayerHandle } from '../player/Player';
+import { Filmstrip, sceneStarts } from '../shell/Filmstrip';
+import Review from '../panels/Review';
+import { railTabs, type RailId } from '../shell/rail';
+import { StudioBoard } from '../shell/StudioBoard';
+import { StudioShell } from '../shell/StudioShell';
+import { STEPS, stepFor } from '../shell/steps';
+import { BudgetMeter } from './BudgetMeter';
+import { ChatThread } from './ChatThread';
+import { recallIntake } from './intakeHandoff';
+import { CrewBoard } from './CrewBoard';
+import { filmBoard } from './filmBoard';
+import { LiveStoryboard } from './LiveStoryboard';
+import { ringFor } from './SceneCard';
+import { TakesPicker } from './TakesPicker';
+import { useCaptureRequests } from './useCaptureRequests';
+import { useCrew, useNow } from './useCrew';
+import '../lineup/lineup.css';
+import './crew.css';
+
+/** A replay: the studio shows the log played back, read-only. */
+export interface ReplayView {
+  bar: ReactNode;
+  /** the version on screen: the player is remounted when it changes */
+  version?: number;
+}
+
+/** A catalogue's film inside its line-up: the product tabs under the stage, a note above the chat, and a hold while it waits its turn. */
+export interface LineupView {
+  tabs: ReactNode;
+  note: ReactNode;
+  /** set while this product's film has not started: the chat says so and cannot start the crew early */
+  hold?: string;
+}
+
+export function CrewStudio({ film, events, playerRef, frozenNow, panels = {}, replay, lineup }: { film: FilmState; events: FilmEvent[]; playerRef: RefObject<PlayerHandle | null>; frozenNow?: number; panels?: Partial<Record<RailId, ReactNode>>; replay?: ReplayView; lineup?: LineupView }) {
+  const { crew, actions } = useCrew(film.id, events);
+  const liveNow = useNow(1000, frozenNow !== undefined);
+  const now = frozenNow ?? liveNow;
+  const getPlayer = useCallback(() => playerRef.current, [playerRef]);
+  const storyboard = crew.storyboard ?? film.storyboard;
+  const [selected, setSelected] = useState<string>();
+  // a replay never answers the critic's frame requests: it would post frames to a finished film
+  useCaptureRequests({ filmId: film.id, requests: replay ? [] : crew.captureRequests, storyboard, getPlayer });
+
+  const product = film.assets.find((a) => a.id === film.brief.productAssetId);
+  // what the user first sent: the copy from the intake chat, or the brief and photo stored on the film (a reload, a shared link)
+  const brief = recallIntake(film.id) ?? { text: film.brief?.text || film.brief?.transcript || '', photoUrl: product?.url };
+  const status = [...events].reverse().find((e) => e.type === 'film.status');
+  const filmStatus = status?.type === 'film.status' ? status.status : film.status;
+
+  const poster = useCallback(async () => {
+    const p = playerRef.current;
+    if (!p || !storyboard?.scenes[0]) return undefined;
+    const c = await captureScene(p, storyboard, storyboard.scenes[0].id, [0.1]);
+    const f = c.frames[0];
+    return f && !f.blank ? URL.createObjectURL(f.blob) : undefined;
+  }, [playerRef, storyboard]);
+
+  const play = () => {
+    playerRef.current?.seek(0);
+    playerRef.current?.play();
+  };
+
+  const scenes = storyboard?.scenes ?? [];
+  const togglePlay = () => document.querySelector<HTMLButtonElement>('[data-testid="slot-player"] .player-controls button')?.click();
+  const jobs = Object.values(crew.jobs);
+  const busy = Object.values(crew.lanes).filter((l) => l.state !== 'idle').length;
+  const jump = (sceneId: string) => {
+    setSelected(sceneId);
+    const at = sceneStarts(scenes)[scenes.findIndex((s) => s.id === sceneId)];
+    if (at !== undefined) playerRef.current?.seek(at);
+  };
+
+  const tabs = railTabs(
+    {
+      board: <StudioBoard {...filmBoard(film, crew, brief.text)} />,
+      plan: <LiveStoryboard crew={crew} now={now} onOps={replay ? undefined : (ops) => actions!.postStoryboard(ops)} />,
+      crew: (
+        <>
+          <CrewBoard crew={crew} now={now} onCancel={replay ? undefined : (id) => void actions!.cancelJob(id)} />
+          <TakesPicker crew={crew} onPick={replay ? undefined : (jobId, takeFilmId) => actions!.pickTake(jobId, takeFilmId)} />
+        </>
+      ),
+      review: <Review film={film} events={events} getPlayer={getPlayer} />,
+      ...panels,
+    },
+    { plan: scenes.length || undefined, crew: busy || undefined },
+  );
+
+  return (
+    <StudioShell
+      testId="crew-studio"
+      title={crew.storyboard?.title ?? film.title ?? 'Your film'}
+      status={filmStatus}
+      steps={STEPS}
+      step={stepFor(filmStatus)}
+      tabs={tabs}
+      defaultTab="plan"
+      stage={
+        <section className="slot stage" data-testid="slot-player">
+          {/* a finished film is remounted per version: the engine does not rebuild a mounted composition when its source changes, so the picture would stay on the first build */}
+          <Player key={replay ? `r${replay.version ?? 0}` : filmStatus === 'ready' ? `v${film.version}` : 'live'} ref={playerRef as RefObject<PlayerHandle>} composition={film.composition ?? null} />
+          {replay?.bar}
+        </section>
+      }
+      strip={
+        <>
+          {lineup?.tabs}
+          <Filmstrip scenes={scenes} selected={selected} onSelect={jump} ringOf={(id) => ringFor(jobs, id)} />
+        </>
+      }
+      side={
+        <div className="ln-side">
+          {lineup?.note}
+        <ChatThread
+          crew={crew}
+          now={now}
+          filmStatus={filmStatus}
+          aspect={film.aspect}
+          productUrl={product?.url}
+          getPoster={poster}
+          onPlay={play}
+          onSend={(message) => api.chat(film.id, { message })}
+          onVoice={(blob) => actions!.postVoice(blob)}
+          readOnly={!!replay}
+          brief={brief}
+          {...(lineup?.hold ? { waiting: lineup.hold, composerDisabled: true } : {})}
+        />
+        </div>
+      }
+      sideTitle={replay ? 'What the showrunner said' : 'Talk to the showrunner'}
+      headerRight={<BudgetMeter budget={crew.budget} credits={crew.credits} />}
+      headerRightTab="crew"
+      onTogglePlay={togglePlay}
+    />
+  );
+}

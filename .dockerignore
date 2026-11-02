@@ -1,0 +1,19 @@
+# Keeps secrets, local data and build junk out of the image. fixtures/ stays in: the demo feed and its photos are read at runtime.
+.env
+.env.*
+!.env.example
+data
+data-*
+debug
+node_modules
+dist
+web/dist
+.ralph-tui
+ralph
+test-results
+playwright-report
+.git
+.claude
+.commandcode
+.DS_Store
+*.log

@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 6,
+  "background": "#101418",
+  "assets": {},
+  "layers": [
+    {
+      "id": "panelA",
+      "type": "shape",
+      "shape": "rect",
+      "width": 700,
+      "height": 420,
+      "fill": "#3355ff",
+      "x": 480,
+      "y": 540,
+      "end": 6,
+      "effects": [
+        { "id": "bloom", "type": "bloom", "params": { "intensity": 0.6 } },
+        { "id": "vignette", "type": "vignette", "params": { "offset": 0.3 } },
+        { "id": "chroma", "type": "chromaticAberration", "params": { "offsetX": 0.001 } },
+        { "id": "noise", "type": "noise", "params": { "opacity": 0.1 } },
+        { "id": "brightContrast", "type": "brightnessContrast", "params": { "brightness": 0.05 } },
+        { "id": "hueSat", "type": "hueSaturation", "params": { "hue": 10 } },
+        { "id": "sepia", "type": "sepia", "params": { "intensity": 0.5 } },
+        { "id": "grayscale", "type": "grayscale", "params": { "opacity": 0.3 } }
+      ],
+      "tweens": [
+        { "target": "effect:bloom", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "intensity": 0.2 }, "to": { "intensity": 1.2 } },
+        { "target": "effect:vignette", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "darkness": 0.3 }, "to": { "darkness": 0.8 } },
+        { "target": "effect:chroma", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "offsetY": 0 }, "to": { "offsetY": 0.004 } },
+        { "target": "effect:noise", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "opacity": 0 }, "to": { "opacity": 0.25 } },
+        { "target": "effect:brightContrast", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "contrast": -0.2 }, "to": { "contrast": 0.2 } },
+        { "target": "effect:hueSat", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "saturation": -0.3 }, "to": { "saturation": 0.3 } },
+        { "target": "effect:sepia", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "intensity": 0 }, "to": { "intensity": 1 } },
+        { "target": "effect:grayscale", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "opacity": 0 }, "to": { "opacity": 0.6 } }
+      ]
+    },
+    {
+      "id": "panelB",
+      "type": "shape",
+      "shape": "rect",
+      "width": 700,
+      "height": 420,
+      "fill": "#ff8833",
+      "x": 1440,
+      "y": 540,
+      "end": 6,
+      "effects": [
+        { "id": "pixelate", "type": "pixelate", "params": { "granularity": 4 } },
+        { "id": "scanlines", "type": "scanlines", "params": { "density": 1.1 } },
+        { "id": "dotScreen", "type": "dotScreen", "params": { "scale": 1.2 } },
+        { "id": "tiltShift", "type": "tiltShift", "params": { "focusArea": 0.5 } },
+        { "id": "blur", "type": "blur", "params": { "scale": 0.5 } },
+        { "id": "glow", "type": "glow", "params": { "color": "#ffee88", "strength": 1.5 } },
+        { "id": "dropShadow", "type": "dropShadow", "params": { "color": "#000000", "distance": 8 } },
+        { "id": "outline", "type": "outline", "params": { "color": "#ffffff", "thickness": 2 } }
+      ],
+      "tweens": [
+        { "target": "effect:pixelate", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "granularity": 2 }, "to": { "granularity": 16 } },
+        { "target": "effect:scanlines", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "opacity": 0.1 }, "to": { "opacity": 0.5 } },
+        { "target": "effect:dotScreen", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "angle": 0 }, "to": { "angle": 90 } },
+        { "target": "effect:tiltShift", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "feather": 0.1 }, "to": { "feather": 0.5 } },
+        { "target": "effect:blur", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "scale": 0.2 }, "to": { "scale": 1.5 } },
+        { "target": "effect:glow", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "distance": 5 }, "to": { "distance": 24 } },
+        { "target": "effect:dropShadow", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "angle": 0 }, "to": { "angle": 180 } },
+        { "target": "effect:outline", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "alpha": 0.2 }, "to": { "alpha": 1 } }
+      ]
+    },
+    {
+      "id": "panelC",
+      "type": "shape",
+      "shape": "rect",
+      "width": 300,
+      "height": 300,
+      "fill": "#33cc99",
+      "x": 960,
+      "y": 540,
+      "end": 6,
+      "effects": [
+        { "id": "gaussianBlur", "type": "gaussianBlur", "params": { "strength": 2 } }
+      ],
+      "tweens": [
+        { "target": "effect:gaussianBlur", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "strength": 0 }, "to": { "strength": 6 } }
+      ]
+    }
+  ]
+}

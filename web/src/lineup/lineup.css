@@ -1,0 +1,17 @@
+.ln-tabs { flex: none; display: flex; gap: 6px; padding: 8px 14px 0; border-top: 1px solid var(--border); background: var(--surface); overflow-x: auto; scrollbar-width: thin; }
+.ln-tab { display: grid; grid-template-columns: auto 1fr; column-gap: 6px; align-items: baseline; text-align: left; font: inherit; font-size: 12px; padding: 6px 12px; border: 1px solid var(--border); border-bottom: 0; border-radius: 10px 10px 0 0; background: transparent; color: var(--muted); cursor: pointer; min-width: 120px; max-width: 180px; }
+.ln-tab small { grid-column: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.8; }
+.ln-tab:disabled { cursor: default; opacity: 0.5; }
+.ln-tab.is-on { color: var(--text); background: var(--bg, var(--surface)); border-color: var(--accent, #6d5efc); box-shadow: inset 0 2px 0 var(--accent, #6d5efc); }
+.ln-tab.is-making .ln-mark { color: var(--accent, #6d5efc); animation: ln-pulse 1.2s infinite; }
+.ln-tab.is-done .ln-mark { color: #3fb950; }
+.ln-tab.is-failed .ln-mark { color: #f85149; }
+.ln-name { font-weight: 650; }
+.ln-note { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 12px; font-size: 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.ln-jump { font: inherit; font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--accent, #6d5efc); background: transparent; color: inherit; cursor: pointer; }
+.ln-stop { font: inherit; font-size: 12px; font-weight: 650; margin-left: auto; padding: 3px 14px; border-radius: 999px; border: 1px solid #f85149; background: #f85149; color: #fff; cursor: pointer; }
+.ln-stop:disabled { opacity: 0.6; cursor: default; }
+.ln-tab.is-stopped .ln-mark { color: var(--muted); }
+.ln-side { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.ln-side > :last-child { flex: 1; min-height: 0; }
+@keyframes ln-pulse { 50% { opacity: 0.35; } }

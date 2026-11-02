@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "width": 1080,
+  "height": 1080,
+  "fps": 30,
+  "duration": 8,
+  "background": "#0a0713",
+  "assets": {
+    "robot": { "type": "gltf", "url": "/cartoon/characters/robot.glb" }
+  },
+  "layers": [
+    {
+      "id": "stage",
+      "type": "three",
+      "x": 540,
+      "y": 540,
+      "width": 1080,
+      "height": 1080,
+      "background": "#140c26",
+      "lighting": { "preset": "disco" },
+      "shadow": { "enabled": true, "opacity": 0.5, "y": 0 },
+      "camera": {
+        "position": [0, 1.45, 4.3],
+        "lookAt": [0, 1.15, 0],
+        "fov": 42,
+        "near": 0.05,
+        "far": 120,
+        "path": {
+          "curve": "smooth",
+          "keys": [
+            { "t": 0, "position": [0, 1.45, 4.3], "lookAt": [0, 1.15, 0], "fov": 42 },
+            { "t": 2, "position": [3.04, 1.6, 3.04], "lookAt": [0, 1.2, 0] },
+            { "t": 4, "position": [4.3, 1.5, 0], "lookAt": [0, 1.15, 0] },
+            { "t": 6, "position": [3.04, 1.35, -3.04], "lookAt": [0, 1.1, 0] },
+            { "t": 8, "position": [0, 1.45, -4.3], "lookAt": [0, 1.15, 0] }
+          ]
+        }
+      },
+      "objects": [
+        {
+          "id": "robot",
+          "geometry": { "type": "gltf", "asset": "robot", "height": 2.2 },
+          "position": [0, 0, 0],
+          "animation": { "clip": "Dance", "speed": 1, "loop": true }
+        },
+        {
+          "id": "speaker-l",
+          "geometry": { "type": "box", "size": [0.6, 2.4, 0.6] },
+          "position": [-2.4, 1.2, -2.6],
+          "material": { "color": "#3b1d6e", "roughness": 0.6, "metalness": 0.1 }
+        },
+        {
+          "id": "speaker-r",
+          "geometry": { "type": "box", "size": [0.6, 2.4, 0.6] },
+          "position": [-3.0, 1.2, 1.6],
+          "material": { "color": "#3b1d6e", "roughness": 0.6, "metalness": 0.1 }
+        },
+        {
+          "id": "orb",
+          "geometry": { "type": "sphere", "radius": 0.2 },
+          "position": [1.55, 1.9, 2.6],
+          "material": {
+            "color": "#f472b6",
+            "emissive": "#f472b6",
+            "emissiveIntensity": 2.4,
+            "roughness": 0.3
+          }
+        }
+      ],
+      "effects": [
+        { "id": "dof", "type": "dof", "params": { "focusDistance": 4.3, "focusRange": 0.7, "bokehScale": 4 } },
+        { "id": "vignette", "type": "vignette", "params": { "offset": 0.26, "darkness": 0.72 } }
+      ],
+      "end": 8
+    },
+    {
+      "id": "title",
+      "type": "text",
+      "text": "MIDNIGHT ROBOT",
+      "x": 540,
+      "y": 108,
+      "style": {
+        "fontSize": 62,
+        "fontWeight": "800",
+        "align": "center",
+        "fill": "#f5f3ff",
+        "letterSpacing": 8
+      },
+      "enter": { "name": "slideInUp", "duration": 0.7 },
+      "exit": { "name": "fadeOut", "duration": 0.6 },
+      "end": 8
+    },
+    {
+      "id": "subtitle",
+      "type": "text",
+      "text": "now playing · Dance",
+      "x": 540,
+      "y": 962,
+      "style": {
+        "fontSize": 30,
+        "fontWeight": "500",
+        "align": "center",
+        "fill": "#c4b5fd",
+        "letterSpacing": 5
+      },
+      "enter": { "name": "fadeInUp", "duration": 0.7 },
+      "exit": { "name": "fadeOut", "duration": 0.5 },
+      "end": 8
+    }
+  ]
+}
