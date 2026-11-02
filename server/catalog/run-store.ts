@@ -33,6 +33,8 @@ export interface RunStore {
   saveBuild(id: string, productId: string, input: unknown): Promise<void>;
   readBuild<T = unknown>(id: string, productId: string): Promise<T | undefined>;
   saveFilm(id: string, lineId: string, comp: AepCompositionJson): Promise<void>;
+  saveHero(id: string, productId: string, comp: AepCompositionJson): Promise<void>;
+  readHero(id: string, productId: string): Promise<AepCompositionJson | undefined>;
   readFilm(id: string, lineId: string): Promise<AepCompositionJson | undefined>;
 }
 
@@ -45,7 +47,7 @@ export function createRunStore({ dir }: RunStoreOptions): RunStore {
     return join(root, id);
   };
   const runFile = (id: string) => join(runDir(id), 'run.json');
-  const productFile = (id: string, productId: string, folder: 'clips' | 'build' | 'films') => {
+  const productFile = (id: string, productId: string, folder: 'clips' | 'build' | 'films' | 'heroes') => {
     if (!PRODUCT_ID_RE.test(productId)) throw new RangeError(`not a product id: ${productId}`);
     return join(runDir(id), folder, `${productId}.json`);
   };
@@ -179,5 +181,15 @@ export function createRunStore({ dir }: RunStoreOptions): RunStore {
     return locked(id, () => readJson<AepCompositionJson>(productFile(id, lineId, 'films')));
   };
 
-  return { create, get, list, updateRow, setRun, saveClip, readClip, saveBuild, readBuild, saveFilm, readFilm };
+  const saveHero = async (id: string, productId: string, comp: AepCompositionJson): Promise<void> => {
+    if (!PRODUCT_ID_RE.test(productId)) throw new RangeError(`not a product id: ${productId}`);
+    return locked(id, () => writeJson(productFile(id, productId, 'heroes'), comp));
+  };
+
+  const readHero = async (id: string, productId: string): Promise<AepCompositionJson | undefined> => {
+    if (!PRODUCT_ID_RE.test(productId)) throw new RangeError(`not a product id: ${productId}`);
+    return locked(id, () => readJson<AepCompositionJson>(productFile(id, productId, 'heroes')));
+  };
+
+  return { create, get, list, updateRow, setRun, saveClip, readClip, saveBuild, readBuild, saveFilm, readFilm, saveHero, readHero };
 }

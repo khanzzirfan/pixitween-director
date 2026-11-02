@@ -6,6 +6,7 @@ import sharp from 'sharp';
 import type { Aspect, AssetRef } from '@shared/composition';
 import type { AssetStore } from '@shared/ports';
 import type { ToolCtx } from '@shared/tools';
+import { floorBoard, planBoard, type CinematicBoard } from '../authoring/beatsheet';
 import type { LookId, OccasionId } from '../authoring/looks';
 import { cutout } from '../art/cutout';
 import { dominantAccent } from '../art/palette';
@@ -30,9 +31,27 @@ export interface CatalogPlate {
   usd: number;
 }
 
+/** What the director returned for one product's hero film. */
+export interface PlannedFilm {
+  board: CinematicBoard;
+  /** muse: Muse wrote it and it passed the checker; floor: Muse failed, so a floor board stands in. */
+  source: 'muse' | 'floor';
+  violations: string[];
+  usd: number;
+}
+
+/** What the director needs to know about a product. */
+export interface FilmProduct {
+  title: string;
+  brand?: string;
+  category: string;
+}
+
 /** The art a catalog run needs: one cut-out per photo, one plate per look. */
 export interface CatalogArt {
   cut(bytes: Buffer, noun: string): Promise<CatalogCut>;
+  /** The hero film's board: Muse looks at the photo and the campaign brief and directs it (about $0.005), or the fake's floor board. `flat` is a cut-out that is not a round pack. */
+  direct(photo: Buffer, product: FilmProduct, o: { brief?: string; flat: boolean }): Promise<PlannedFilm>;
   plate(look: LookId, occasion: OccasionId, noun: string, aspect: Aspect): Promise<CatalogPlate>;
 }
 
@@ -62,12 +81,28 @@ export function realArt(ctx: ToolCtx, assets: CatalogAssets): CatalogArt {
       const ref = await generateLookPlate(ctx, { look, occasion, productClass: `${noun}s`, aspect, sceneId: look });
       return { id: ref.id, width: ref.width ?? 0, height: ref.height ?? 0, usd: PRICE.museImageUsd };
     },
+    async direct(photo, product, o) {
+      const before = ctx.ledger.total(ctx.filmId);
+      const planned = await planBoard(ctx, {
+        title: product.title,
+        category: product.category,
+        ...(product.brand ? { brand: product.brand } : {}),
+        ...(o.brief ? { brief: o.brief } : {}),
+        photo,
+        seconds: 8,
+        flat: o.flat,
+      });
+      const usd = Math.round((ctx.ledger.total(ctx.filmId) - before) * 1e4) / 1e4;
+      return { board: planned.board, source: planned.source, violations: planned.violations, usd };
+    },
   };
 }
 
 /** The free art: a trim of the photo and a flat painted plate. No network, no spend. */
 export interface FakeCatalogArt extends CatalogArt {
-  calls: { cut: number; plate: number };
+  calls: { cut: number; plate: number; direct: number };
+  /** The brief and the flat flag of each direct call, in order. */
+  directed: Array<{ brief?: string; flat: boolean }>;
 }
 
 /** The flat plate the fake paints: a 9:16 canvas of one warm tone. */
@@ -76,9 +111,11 @@ const PLATE_HEIGHT = 1280;
 const PLATE_BACKGROUND = '#d9cbb5';
 
 export function fakeArt(assets: AssetStore): FakeCatalogArt {
-  const calls = { cut: 0, plate: 0 };
+  const calls = { cut: 0, plate: 0, direct: 0 };
+  const directed: Array<{ brief?: string; flat: boolean }> = [];
   return {
     calls,
+    directed,
     async cut(bytes, _noun) {
       calls.cut++;
       const trimmed = await sharp(bytes).trim().png().toBuffer();
@@ -102,6 +139,11 @@ export function fakeArt(assets: AssetStore): FakeCatalogArt {
         .toBuffer();
       const ref = await assets.put(png, 'image/png', { role: 'plate', sceneId: look });
       return { id: ref.id, width: PLATE_WIDTH, height: PLATE_HEIGHT, usd: 0 };
+    },
+    async direct(_photo, product, o) {
+      calls.direct++;
+      directed.push(o);
+      return { board: floorBoard({ title: product.title, category: product.category }), source: 'floor', violations: [], usd: 0 };
     },
   };
 }

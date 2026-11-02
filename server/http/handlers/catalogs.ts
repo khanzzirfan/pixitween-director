@@ -6,13 +6,14 @@ import { Buffer } from 'node:buffer';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import { parseFeed, shownPrice, type Product } from '@shared/catalog';
-import { isFinal, newCatalogId, summarize, type CatalogRun } from '@shared/catalog-run';
+import { BRIEF_MAX, isFinal, newCatalogId, summarize, type CatalogRun } from '@shared/catalog-run';
 import type { Aspect } from '@shared/composition';
 import type { ToolCtx } from '@shared/tools';
 import { LOOKS, type ClipLook } from '../../authoring/looks';
 import { fakeArt, realArt, type CatalogArt } from '../../catalog/art';
 import { createCutoutCache, createMemoryCutoutCache } from '../../catalog/photos';
 import { buildRow, type RowBuild } from '../../catalog/row';
+import { createBoardCache, createMemoryBoardCache, heroFilm } from '../../catalog/hero';
 import { buildLineFilms } from '../../catalog/line-film';
 import { createRunStore, type RunStore } from '../../catalog/run-store';
 import { runCatalog, type PlateRef, type PlateStore } from '../../catalog/runner';
@@ -165,6 +166,10 @@ export function registerCatalogRoutes(app: Hono, deps: AppDeps, opts: CatalogRou
     const aspect = wanted === null || wanted === '' ? '9:16' : String(wanted);
     if (!ASPECTS.includes(aspect as Aspect)) return c.json({ error: 'bad_aspect' }, 400);
 
+    const rawBrief = form.get('brief');
+    const brief = typeof rawBrief === 'string' ? rawBrief.trim() : '';
+    if (brief.length > BRIEF_MAX) return c.json({ error: 'brief_too_long', max: BRIEF_MAX }, 400);
+
     const fake = process.env.DIRECTOR_FAKE === '1';
     if (!opts.art && !fake && !loadEnv().metaApiKey) return c.json({ error: 'meta_key_missing' }, 503);
 
@@ -182,6 +187,7 @@ export function registerCatalogRoutes(app: Hono, deps: AppDeps, opts: CatalogRou
       filmId: film.id,
       aspect: aspect as Aspect,
       createdAt: new Date().toISOString(),
+      ...(brief ? { brief } : {}),
       state: 'running',
       costUsd: 0,
       rows: products.map((product) => ({ product, status: 'queued' })),
@@ -206,6 +212,7 @@ export function registerCatalogRoutes(app: Hono, deps: AppDeps, opts: CatalogRou
       assets: deps.assets,
       uploads,
       cutCache: fake ? createMemoryCutoutCache() : createCutoutCache(dataDir()),
+      boards: fake ? createMemoryBoardCache() : createBoardCache(dataDir()),
       plates,
       emit: (event) => ctx.emit(event),
     })
@@ -236,6 +243,12 @@ export function registerCatalogRoutes(app: Hono, deps: AppDeps, opts: CatalogRou
     const run = await runs().get(c.req.param('id'));
     if (!run) return c.json(notFound, 404);
     return c.json(await settle(run));
+  });
+
+  app.get('/api/catalogs/:id/heroes/:productId', async (c) => {
+    const film = await runs().readHero(c.req.param('id'), c.req.param('productId')).catch(() => undefined);
+    if (!film) return c.json(notFound, 404);
+    return c.json(film);
   });
 
   app.get('/api/catalogs/:id/films/:lineId', async (c) => {
@@ -294,17 +307,28 @@ export function registerCatalogRoutes(app: Hono, deps: AppDeps, opts: CatalogRou
     }
     await runs().saveClip(id, productId, result.comp);
     await runs().saveBuild(id, productId, result.build);
+    // the hero film carries the price too: its stored board is played again with the new one, for nothing
+    // a film that cannot be cut never fails the edit: the clip is already saved, and the old film stays until the next edit
+    let film: ReturnType<typeof heroFilm>;
+    try {
+      film = heroFilm(result.build, product);
+      if (film) await runs().saveHero(id, productId, film);
+    } catch (err) {
+      film = undefined;
+      console.error(`catalog ${id} row ${productId}: the hero film could not be rebuilt after the edit:`, err);
+    }
     const updated = await runs().updateRow(id, productId, {
       product,
       status: result.status,
       check: result.check,
       ms: Math.round(performance.now() - started),
+      ...(film && row.hero ? { hero: { ...row.hero, version: row.hero.version + 1 } } : {}),
     });
     // The line films that show this product carry its price too, so they are cut again (free, from the stored builds).
     const after = await runs().get(id);
     if (after?.films?.some((f) => f.productIds.includes(productId))) {
       try {
-        await runs().setRun(id, { films: await buildLineFilms(after, runs()) });
+        await runs().setRun(id, { films: await buildLineFilms(after, runs(), productId) });
       } catch (err) {
         console.error(`catalog ${id}: the line films could not be rebuilt after the edit:`, err);
       }

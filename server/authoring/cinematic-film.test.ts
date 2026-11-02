@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
-import { defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
-import { ELEVATION, FILL, FOV_BASE, FOV_WIDE, LIMITS, PRODUCT_H, buildCinematicFilm, framingDistance, planCamera, type CinematicInput } from './cinematic-film';
+import { checkBeatSheet, defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
+import { ELEVATION, FILL, FOV_BASE, FOV_WIDE, LIMITS, PRODUCT_H, PUSH_FROM, buildCinematicFilm, cutSpeeds, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
 import { FLOOR, floorElements, glassAsset, type IngredientAsset } from './ingredients';
 import type { Obj } from './types';
 
@@ -34,6 +34,19 @@ const world = (c: any): Obj => layers(c).find((l) => l.kind === 'stage3d')!;
 const props = (c: any): Obj[] => layers(c).filter((l) => l.kind === 'prop3d');
 const tanHalf = (fov: number) => Math.tan((fov * Math.PI) / 360);
 
+describe('the end hold leaves room for the text', () => {
+  const beat = (size: any, move: any, seconds: number, extra: object = {}): any => ({ size, move, seconds, angle: 'eye', phase: 'build', product: 'still', ...extra });
+  const sheet: BeatSheet = { beats: [beat('wide', 'push', 1, { phase: 'hook' }), beat('medium', 'truck', 1), beat('close', 'dolly-zoom', 1.2), beat('close', 'hold', 2.4, { phase: 'close' })] };
+  it('holds the dolly-zoom and the hold after it to the cap, and no other shot', () => {
+    const open = planCamera(sheet, 30);
+    const capped = planCamera(sheet, 30, { holdFill: 0.55 });
+    expect(open.beats[3]!.to.d).toBeCloseTo(framingDistance(FILL.close) * (Math.tan((FOV_BASE * Math.PI) / 360) / Math.tan((FOV_WIDE * Math.PI) / 360)), 1);
+    expect(capped.beats[2]!.from.d).toBeCloseTo(framingDistance(0.55), 3);
+    expect(capped.beats[2]!.from.d).toBeGreaterThan(open.beats[2]!.from.d);
+    expect(capped.beats[1]!.to.d).toBeCloseTo(open.beats[1]!.to.d, 6);
+  });
+});
+
 describe('planCamera', () => {
   const fps = 30;
   const plan = planCamera(sheet, fps);
@@ -49,10 +62,14 @@ describe('planCamera', () => {
     expect(holds).toBe(sheet.beats.length - 1);
     expect(plan.position.at(-1)!.hold).toBeUndefined();
   });
-  it('a push arrives at the distance that fills the size and starts 35 % further away', () => {
+  it('a push arrives at the distance that fills the size; the hook starts 70 % further away, a later push 30 %', () => {
     const b = plan.beats[0]!; // wide push
     expect(b.to.d).toBeCloseTo(framingDistance(FILL.wide), 4);
-    expect(b.from.d).toBeCloseTo(b.to.d * 1.35, 4);
+    expect(b.from.d).toBeCloseTo(b.to.d * PUSH_FROM.hook, 4);
+    const later = plan.beats.find((x, i) => i > 0 && x.move === 'push' && x.size !== 'wide')!;
+    expect(later.from.d).toBeCloseTo(later.to.d * PUSH_FROM.later, 4);
+    const wide = planCamera({ beats: [{ size: 'close', move: 'push', seconds: 1 }, { size: 'wide', move: 'push', seconds: 1 }, { size: 'medium', move: 'hold', seconds: 2 }] as BeatSheet['beats'] }, 30).beats[1]!;
+    expect(wide.from.d).toBeCloseTo(wide.to.d * PUSH_FROM.wide, 4);
     const macro = plan.beats.find((x) => x.size === 'macro')!;
     expect(macro.to.d).toBeLessThan(0.2);
   });
@@ -288,5 +305,319 @@ describe('the end card keeps clear of the product', () => {
   });
   it('frames the macro on the label band and the name above it, not just the band', () => {
     expect(FILL.macro).toBeLessThanOrEqual(1.6);
+  });
+});
+
+describe('a flat product (a cut-out that is not a round pack)', () => {
+  const contour: Array<[number, number]> = [[0, 0], [100, 0], [100, 400], [0, 400]];
+  const flat = (o: Partial<CinematicInput> = {}) => input({ shape: 'other', contour, texture: { ...pic('ast_front', 100, 400), kind: 'front' }, productAspect: 4, title: 'Wave Rider Longboard', brand: 'Saltline', ...o });
+  const product = (c: any): Obj => props(c).find((p) => p.role === 'product')!;
+
+  it('is its own outline, extruded, with the photo on its front', () => {
+    const p = product(buildCinematicFilm(flat()));
+    expect((p.source as Obj).type).toBe('extrude');
+    expect((p.source as Obj).contour).toEqual(contour);
+    expect((p.textures as Obj).front).toBe('ast_front');
+    const v = lightValidate(buildCinematicFilm(flat()));
+    expect(v.ok, v.ok ? '' : JSON.stringify(v.issues)).toBe(true);
+  });
+  it('never shows its back or its edge: the turn stays within 30 degrees', () => {
+    const p = product(buildCinematicFilm(flat()));
+    const yaws = (p.rotation as Array<{ v: number[] }>).map((k) => k.v[1]!);
+    expect(Math.max(...yaws.map(Math.abs))).toBeLessThanOrEqual(30);
+  });
+  it('swings to the other side on every turn, so no turn leaves it standing still', () => {
+    const turns = defaultBeatSheet(floorElements('Stone Mug', 'home')).beats.map((b, i) => (i > 0 && i < 6 && b.size !== 'macro' ? { ...b, product: 'turn' as const } : b));
+    const p = product(buildCinematicFilm(flat({ sheet: { beats: turns } })));
+    const keys = (p.rotation as Array<{ t: number; v: number[] }>).map((k) => k.v[1]!);
+    const moves = keys.slice(1).filter((y, n) => Math.abs(y - keys[n]!) > 1).length;
+    expect(moves).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...keys.map(Math.abs))).toBeLessThanOrEqual(30);
+  });
+  it('a wide product is sized by its width and lifted so its centre stays where the camera looks', () => {
+    const towel = product(buildCinematicFilm(flat({ productAspect: 0.5, texture: { ...pic('ast_front', 400, 200), kind: 'front' } })));
+    expect(towel.size as number).toBeCloseTo(PRODUCT_H * 0.9, 3);
+    const lifts = (towel.position as Array<{ v: number[] }>).map((k) => k.v[1]!);
+    expect(Math.min(...lifts)).toBeGreaterThan(0);
+  });
+  it('needs a contour', () => {
+    expect(() => buildCinematicFilm(flat({ contour: undefined }))).toThrow(/contour/);
+  });
+  it('fits every aspect', () => {
+    for (const aspect of ['9:16', '16:9', '1:1'] as const) expect(lightValidate(buildCinematicFilm(flat({ aspect }))).ok).toBe(true);
+  });
+});
+
+describe('a set: backdrop on the wall, a floor and air', () => {
+  const art = (id: string, w = 1500, h = 1024) => ({ id, src: `/api/assets/${id}`, width: w, height: h });
+  const withSet = (air: 'none' | 'dust' | 'bokeh' | 'spray') =>
+    input({ set: { look: 'beach', air, backdrop: art('ast_back'), ground: '#d8b878', dot: art('ast_dot', 128, 128) } });
+
+  it('puts the backdrop on a 4 m wall 3.2 m behind, with a coloured floor, and registers the picture', () => {
+    const c = buildCinematicFilm(withSet('none')) as any;
+    const w = world(c) as any;
+    expect(w.set).toEqual({ ground: '#d8b878', groundSize: [16, 12], wall: { distance: 3.2, height: 4 }, backdrop: 'ast_back' });
+    expect(c.assets.ast_back).toBeDefined();
+    expect(c.precomps.cine.assets.ast_back).toBeDefined();
+    const v = lightValidate(c);
+    expect(v.ok, v.ok ? '' : JSON.stringify(v.issues)).toBe(true);
+  });
+  it('without a set the world is bare and the 2D halo stays; with one the halo goes', () => {
+    const bare = buildCinematicFilm(input()) as any;
+    expect((world(bare) as any).set).toEqual({ ground: 'none', wall: false });
+    const names = (c: any) => layers(c).map((l) => l.name);
+    expect(layers(bare).filter((l) => l.kind === 'shape').length).toBeGreaterThan(layers(buildCinematicFilm(withSet('none'))).filter((l) => l.kind === 'shape').length);
+    expect(names(bare).length).toBeGreaterThan(0);
+  });
+  it('dust is one swarm of tiny specks round the product', () => {
+    const dust = props(buildCinematicFilm(withSet('dust'))).find((p) => p.id === 'cine:air-dust') as any;
+    expect(dust.swarm.motion).toBe('drift');
+    expect(dust.size).toBeLessThan(0.01);
+  });
+  it('spray bursts during the peak shot only', () => {
+    const c = buildCinematicFilm(input({ sheet: { beats: sheet.beats.map((b, k) => ({ ...b, phase: k === 4 ? 'peak' : b.phase })) }, set: { look: 'beach', air: 'spray', backdrop: art('ast_back'), ground: '#d8b878' } })) as any;
+    const spray = props(c).find((p) => p.id === 'cine:air-spray') as any;
+    const peak = planCamera({ beats: sheet.beats }, 30).beats[4]!;
+    expect(spray.swarm.motion).toBe('burst');
+    expect(spray.inPoint).toBe(peak.start);
+  });
+  it('bokeh is four soft lights, single cards (a swarm cannot be a card), drifting', () => {
+    const lights = props(buildCinematicFilm(withSet('bokeh'))).filter((p) => (p.id as string).startsWith('cine:air-bokeh')) as any[];
+    expect(lights).toHaveLength(4);
+    for (const l of lights) {
+      expect(l.source.type).toBe('card');
+      expect(l.swarm).toBeUndefined();
+      expect(l.position).toHaveLength(2);
+    }
+  });
+  it('stays inside the engine limits with every kind of air', () => {
+    for (const air of ['none', 'dust', 'bokeh', 'spray'] as const) {
+      const c = buildCinematicFilm(withSet(air));
+      expect(props(c).length).toBeLessThanOrEqual(LIMITS.props);
+      expect(props(c).reduce((n, p: any) => n + (p.swarm?.count ?? 1), 0)).toBeLessThan(LIMITS.instances);
+      expect(lightValidate(c).ok).toBe(true);
+    }
+  });
+  it('a set needs less exposure than the dark field', () => {
+    const exp = (c: any) => (world(c) as any).style.exposure as number;
+    expect(exp(buildCinematicFilm(withSet('none') as any))).toBeLessThanOrEqual(exp(buildCinematicFilm(input())));
+  });
+});
+
+describe('the camera moves beyond push and orbit', () => {
+  const beat = (move: any, size: any, extra: Record<string, unknown> = {}) => ({ size, move, seconds: 1, angle: 'eye', phase: 'build', product: 'still', ...extra });
+  const film = (moves: Array<[string, string]>) => ({
+    beats: [
+      ...moves.map(([m, sz], i) => beat(m, sz, i === 0 ? { phase: 'hook' } : {})),
+      { size: 'medium', move: 'hold', seconds: 2, phase: 'close', product: 'still' },
+    ] as BeatSheet['beats'],
+  });
+  const plan = planCamera(film([['push', 'wide'], ['truck', 'medium'], ['crane', 'close'], ['whip', 'medium'], ['rack', 'wide'], ['truck', 'close']]), 30);
+  const at = (n: number) => plan.beats[n]!;
+  const pos = (n: number, k: 'from' | 'to') => plan.position[n * 2 + (k === 'from' ? 0 : 1)]!.v;
+
+  it('a truck slides the camera sideways at one distance, and the next truck goes the other way', () => {
+    const [x0, , z0] = pos(1, 'from');
+    const [x1] = pos(1, 'to');
+    expect(Math.abs(x1 - x0)).toBeGreaterThan(0.1);
+    expect(Math.hypot(x0, z0)).toBeGreaterThan(at(1).to.d * 0.99);
+    expect(Math.sign(x1 - x0)).not.toBe(Math.sign(pos(5, 'to')[0] - pos(5, 'from')[0]));
+    expect(at(1).from.d).toBeCloseTo(at(1).to.d, 4);
+  });
+  it('a crane rises from the low angle to the high one, or falls, at the same distance', () => {
+    expect(Math.abs(at(2).to.el - at(2).from.el)).toBeGreaterThan(25);
+    expect(pos(2, 'to')[1]).not.toBeCloseTo(pos(2, 'from')[1], 2);
+  });
+  it('a whip starts far round and brakes: nearly all the swing happens early', () => {
+    expect(Math.abs(at(3).from.az)).toBeGreaterThanOrEqual(50);
+    expect(at(3).to.az).toBe(0);
+    const k = plan.position[3 * 2]!;
+    expect(k.easeOut?.[1]).toBeGreaterThan(0.8);
+  });
+  it('a rack starts the focus at the near lights and ends on the product', () => {
+    const a = plan.focus[4 * 2]!.v;
+    const b = plan.focus[4 * 2 + 1]!.v;
+    expect(a).toBeLessThan(b * 0.6);
+    expect(b).toBeCloseTo(at(4).to.d, 3);
+  });
+  it('every shot is a cut: the keys still come in pairs with hold between', () => {
+    expect(plan.position).toHaveLength(plan.beats.length * 2);
+    expect(plan.position.filter((k) => k.hold)).toHaveLength(plan.beats.length - 1);
+  });
+  it('a hold after a truck keeps the camera where the truck ended', () => {
+    const p = planCamera(film([['push', 'wide'], ['truck', 'medium']]), 30);
+    const end = p.position[3]!.v;
+    const holdStart = p.position[4]!.v;
+    expect(Math.abs(holdStart[0] - end[0])).toBeLessThan(Math.abs(end[0]) * 0.2 + 0.02);
+  });
+});
+
+describe('the checker holds the moves to the corpus', () => {
+  const base = defaultBeatSheet(floorElements('Stone Mug', 'home'));
+  const els2 = floorElements('Stone Mug', 'home');
+  const withMoves = (moves: string[]) => ({ beats: base.beats.map((b, i) => ({ ...b, move: (moves[i] ?? b.move) as any })) });
+  it('the floor sheet passes and uses a truck', () => {
+    expect(checkBeatSheet(base, els2)).toEqual([]);
+    expect(base.beats.some((b) => b.move === 'truck')).toBe(true);
+  });
+  it('asks for three different moves', () => {
+    const flat = withMoves(['push', 'push', 'push', 'push', 'push', 'push']).beats;
+    expect(checkBeatSheet({ beats: flat }, els2).join('|')).toMatch(/at least 3 different camera moves/);
+  });
+  it('asks for a truck or a crane, the moves that make parallax', () => {
+    const noSlide = withMoves(['push', 'push', 'orbit', 'push', 'pull', 'dolly-zoom']);
+    expect(checkBeatSheet(noSlide, els2).join('|')).toMatch(/include a truck or a crane/);
+  });
+  it('keeps the whip short and never first or last, the rack off the macro, and the first shot to a real hook', () => {
+    expect(checkBeatSheet(withMoves(['whip']), els2).join('|')).toMatch(/hook: push, orbit or truck, not whip/);
+    expect(checkBeatSheet(withMoves(['push', 'push', 'push', 'whip']), els2).join('|')).toMatch(/shot 4 is a whip/);
+    expect(checkBeatSheet(withMoves(['push', 'push', 'rack']), els2).join('|')).toMatch(/rack focus needs a wide, medium or close shot/);
+  });
+});
+
+describe('cuts carry the motion', () => {
+  const dflt = planCamera(sheet, 30);
+  it('every cut between two moving shots leaves and enters at speed, never from a stop', () => {
+    for (const c of cutSpeeds(dflt)) {
+      if (c.out !== null) expect(c.out, `leaving into shot ${c.shot + 1}`).toBeGreaterThanOrEqual(0.5);
+      if (c.in !== null) expect(c.in, `entering shot ${c.shot + 1}`).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+  it('a hold has no speed to carry, and neither does the end of a whip (it brakes on purpose)', () => {
+    const beats = [{ size: 'wide', move: 'push', seconds: 1 }, { size: 'medium', move: 'whip', seconds: 0.8 }, { size: 'close', move: 'push', seconds: 1 }, { size: 'medium', move: 'hold', seconds: 2 }] as BeatSheet['beats'];
+    const c = cutSpeeds(planCamera({ beats }, 30));
+    expect(c[1]!.out).toBeNull();
+    expect(c[2]!.in).toBeNull();
+    expect(c[0]!.in).toBeGreaterThan(2); // the whip enters very fast
+  });
+  it('the old ease-out stops dead at the end: that is what the through-ease replaces', () => {
+    expect(cutSpeeds(planCamera({ beats: [{ size: 'wide', move: 'push', seconds: 1 }, { size: 'medium', move: 'push', seconds: 1 }, { size: 'medium', move: 'hold', seconds: 2 }] as BeatSheet['beats'] }, 30))[0]!.out).toBeGreaterThan(0.5);
+  });
+  it('the product keeps turning through the cut', () => {
+    const turn = { beats: sheet.beats.map((b, i) => ({ ...b, product: i === 1 || i === 2 ? ('turn' as const) : b.product })) };
+    const c = buildCinematicFilm(input({ sheet: turn })) as any;
+    const p = props(c).find((x) => x.role === 'product') as any;
+    const ks = (p.rotation as Array<any>).filter((k) => k.easeOut);
+    expect(ks.length).toBeGreaterThan(1);
+    const turning = ks.filter((k) => k.easeOut[0] === 0.3 && k.easeOut[1] === 0.2);
+    expect(turning.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('the handheld tremor', () => {
+  const plan = planCamera(sheet, 30);
+  it('affords up to three keys a shot, fewer as the world fills up, none when it is full', () => {
+    expect(shakeKeysPerShot(7, 10)).toBe(3);
+    expect(shakeKeysPerShot(7, 20)).toBe(2);
+    expect(shakeKeysPerShot(7, 25)).toBe(1);
+    expect(shakeKeysPerShot(10, 40)).toBe(0);
+    expect(shakeKeysPerShot(0, 0)).toBe(3);
+  });
+  it('leaves every cut and hold exactly where the plan put it, and keeps position and lens keys on the same frames', () => {
+    const k = shakeCamera(plan, 2);
+    plan.beats.forEach((b) => {
+      const first = k.position.find((x) => x.t === b.start)!;
+      const lastKey = k.position.find((x) => x.t === b.end)!;
+      expect(first.v).toEqual(plan.position.find((x) => x.t === b.start)!.v);
+      expect(lastKey.v).toEqual(plan.position.find((x) => x.t === b.end)!.v);
+    });
+    expect(k.position.map((x) => x.t)).toEqual(k.fov.map((x) => x.t));
+    expect(k.position.filter((x) => x.hold)).toHaveLength(plan.beats.length - 1);
+    expect(k.focus).toEqual(plan.focus);
+  });
+  it('shakes the moves that can carry it, and leaves a dolly-zoom and a whip steady', () => {
+    const beats = [{ size: 'wide', move: 'push', seconds: 1.2 }, { size: 'medium', move: 'whip', seconds: 0.8 }, { size: 'close', move: 'dolly-zoom', seconds: 1 }, { size: 'medium', move: 'hold', seconds: 2 }] as BeatSheet['beats'];
+    const p = planCamera({ beats }, 30);
+    const k = shakeCamera(p, 2);
+    const inShot = (n: number) => k.position.filter((x) => x.t >= p.beats[n]!.start && x.t <= p.beats[n]!.end).length;
+    expect(inShot(0)).toBe(4);
+    expect(inShot(1)).toBe(2);
+    expect(inShot(2)).toBe(2);
+    expect(inShot(3)).toBe(4);
+  });
+  it('is small, the same every time, and nothing at zero keys', () => {
+    expect(shakeCamera(plan, 0)).toBe(plan);
+    const a = shakeCamera(plan, 2);
+    const b = shakeCamera(plan, 2);
+    expect(a).toEqual(b);
+    const mid = a.position.find((x) => x.t > plan.beats[0]!.start && x.t < plan.beats[0]!.end)!;
+    const planned = plan.position[0]!.v;
+    expect(Math.hypot(mid.v[0] - planned[0], mid.v[1] - planned[1])).toBeLessThan(0.3);
+  });
+  it('a handheld film has more camera keys than a locked one, and still validates', () => {
+    const locked = world(buildCinematicFilm(input())) as any;
+    const live = buildCinematicFilm(input({ handheld: true })) as any;
+    expect((world(live) as any).camera.position.length).toBeGreaterThan(locked.camera.position.length);
+    const v = lightValidate(live);
+    expect(v.ok, v.ok ? '' : JSON.stringify(v.issues)).toBe(true);
+  });
+});
+
+describe('copy that moves', () => {
+  const texts = (c: any): Obj[] => layers(c).filter((l) => l.kind === 'text');
+  const said = (c: any, w: string) => texts(c).filter((l) => l.source === w);
+  const withWords = (extra: Partial<CinematicInput> = {}, mark: Record<number, string> = { 0: 'Pack the car', 3: 'Feel summer' }) =>
+    input({ sheet: { beats: sheet.beats.map((b, i) => (mark[i] ? { ...b, text: mark[i] } : b)) }, tagline: 'Summer, packed.', ...extra });
+
+  it('a shot\'s words are one layer each, popping in with an overshoot, with a shadow', () => {
+    const c = buildCinematicFilm(withWords()) as any;
+    const pack = said(c, 'Pack');
+    expect(pack).toHaveLength(1);
+    const scale = (pack[0] as any).transform.scale as Array<{ t: number; v: number[] }>;
+    expect(Math.max(...scale.map((k) => k.v[0]!))).toBeCloseTo(1.12, 2);
+    expect(scale[0]!.v[0]).toBeCloseTo(0.6, 2);
+    expect(((pack[0] as any).effects as Obj[])[0]!.name).toBe('drop-shadow');
+  });
+  it('the words come one after another and are gone before the next shot', () => {
+    const c = buildCinematicFilm(withWords()) as any;
+    const t = (w: string) => ((said(c, w)[0] as any).transform.opacity as Array<{ t: number; v: number }>);
+    const arrive = (w: string) => t(w).find((k) => k.v === 1)!.t;
+    expect(arrive('car')).toBeGreaterThan(arrive('Pack'));
+    const plan = planCamera({ beats: sheet.beats }, 30);
+    const lastKey = t('car').at(-1)!;
+    expect(lastKey.v).toBe(0);
+    expect(lastKey.t).toBeLessThanOrEqual(plan.beats[0]!.end + 3);
+  });
+  it('lands the tagline under the name, after it, and clear of the product', () => {
+    const c = buildCinematicFilm(withWords()) as any;
+    const name = said(c, 'Cold')[0] as any;
+    const tag = said(c, 'packed.')[0] as any;
+    expect(tag).toBeDefined();
+    const y = (l: any) => (Array.isArray(l.transform.position) && typeof l.transform.position[0] === 'object' ? l.transform.position.at(-1).v[1] : l.transform.position[1]);
+    expect(tag.transform.opacity.find((k: any) => k.v === 1).t).toBeGreaterThan(name!.transform.opacity.find((k: any) => k.v === 1).t);
+    expect(y(tag)).toBeGreaterThan(y(name));
+  });
+  it('without a tagline or words there is nothing extra', () => {
+    const plain = buildCinematicFilm(input()) as any;
+    const rich = buildCinematicFilm(withWords()) as any;
+    expect(texts(rich).length).toBeGreaterThan(texts(plain).length);
+    expect(said(plain, 'packed.')).toHaveLength(0);
+  });
+  it('never puts words in the macro or the last shot, even if the sheet asks', () => {
+    const macro = sheet.beats.findIndex((b) => b.size === 'macro');
+    const c = buildCinematicFilm(withWords({}, { [macro]: 'Look closer', [sheet.beats.length - 1]: 'Buy now' })) as any;
+    expect(said(c, 'Look')).toHaveLength(0);
+    expect(said(c, 'Buy')).toHaveLength(0);
+  });
+  it('still validates', () => {
+    const v = lightValidate(buildCinematicFilm(withWords()));
+    expect(v.ok, v.ok ? '' : JSON.stringify(v.issues)).toBe(true);
+  });
+});
+
+describe('a wide product stays inside the frame', () => {
+  it('a cap on the fill makes the camera stand further back, except in the macro', () => {
+    const free = planCamera({ beats: [{ size: 'close', move: 'push', seconds: 1 }, { size: 'macro', move: 'push', seconds: 1 }, { size: 'medium', move: 'hold', seconds: 2 }] as BeatSheet['beats'] }, 30);
+    const capped = planCamera({ beats: [{ size: 'close', move: 'push', seconds: 1 }, { size: 'macro', move: 'push', seconds: 1 }, { size: 'medium', move: 'hold', seconds: 2 }] as BeatSheet['beats'] }, 30, { maxFill: 0.5 });
+    expect(capped.beats[0]!.to.d).toBeGreaterThan(free.beats[0]!.to.d * 1.4);
+    expect(capped.beats[1]!.to.d).toBeCloseTo(free.beats[1]!.to.d, 6);
+    expect(capped.beats[2]!.to.d).toBeCloseTo(free.beats[2]!.to.d, 6);
+  });
+  it('a wide flat product in a portrait frame is framed by its width, a tall one is not capped', () => {
+    const closeShot = { beats: sheet.beats.map((b) => ({ ...b, size: b.move === 'hold' ? b.size : ('close' as const) })) } as BeatSheet;
+    const wide = buildCinematicFilm(input({ sheet: closeShot, shape: 'other', contour: [[0, 0], [400, 0], [400, 170], [0, 170]], texture: { ...pic('ast_f', 400, 170), kind: 'front' }, productAspect: 0.43 })) as any;
+    const tall = buildCinematicFilm(input({ sheet: closeShot, shape: 'other', contour: [[0, 0], [100, 0], [100, 400], [0, 400]], texture: { ...pic('ast_f', 100, 400), kind: 'front' }, productAspect: 4 })) as any;
+    const dist = (c: any) => Math.hypot(...((world(c) as any).camera.position[1].v as number[]));
+    expect(dist(wide)).toBeGreaterThan(dist(tall) * 1.3);
   });
 });

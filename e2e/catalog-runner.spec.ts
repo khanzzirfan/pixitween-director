@@ -27,6 +27,10 @@ test('demo feed fills the wall, and a price edit updates the Stone Mug clip', as
   await stone.getByRole('button', { name: /Stone Mug/ }).click();
   await expect(page.locator('[data-testid="slot-player"] canvas').first()).toBeVisible();
 
+  // the row has a hero film (Muse's board, here the floor board on fake art); the edit is checked on the tile, which the
+  // software renderer of the test browser plays at speed (a real GPU plays the film at about 70 fps)
+  await expect(stone.getByRole('button', { name: 'Film' })).toHaveAttribute('aria-pressed', 'true');
+  await stone.getByRole('button', { name: 'Tile' }).click();
   await stone.getByLabel('on sale').uncheck();
   const price = stone.getByLabel('Price of Stone Mug');
   await price.fill('21');

@@ -147,3 +147,13 @@ describe('tagline from the line name', () => {
     expect(taglineFor(['Alpha', 'Beta'])).toBe('Pick your favourite');
   });
 });
+
+it('builds a line of five, whose end card is not a whole number of frames long', () => {
+  const five = Array.from({ length: 5 }, (_, n) => ({
+    product: { id: `p${n}`, src: `/api/assets/p${n}`, width: 300, height: 600 },
+    name: `Thing ${n}`,
+    color: '#336699',
+    price: 10 + n,
+  }));
+  expect(() => buildVariantFilm({ aspect: '9:16', brand: 'Saltline', tagline: 'Pick your favourite', accent: '#2b6cb0', variants: five })).not.toThrow();
+});

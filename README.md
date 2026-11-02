@@ -89,6 +89,7 @@ With no keys, `DIRECTOR_FAKE=1 npm run dev` runs the whole crew offline with scr
 | `npm run engine:cli` | the Motion agent CLI (`explain`, `qa`, `edit`, `undo`, `presets`, `effects`, `targets`), one JSON object per call |
 | `npm run engine:e2e` | the Motion engine's own browser flows, from `engine/playwright.config.ts` |
 | `npm run dev:server`, `npm run dev:web` | the API alone (port 8787), or the web app alone (port 5173) |
+| `npm run dev:fake` | the whole app offline on its own data folder (`data-fake`), ports 8790 and 5180: scripted art, no keys, no spend; the catalog demo button works here |
 | `npm run dev:nowatch`, `npm run dev:server:nowatch` | the same without file watching, so editing `server/**` cannot restart the server and kill a live film |
 | `npm run build`, `npm run check:bundle`, `npm run start` | build the web app, check it holds no keys, run the server as the container does |
 | `npm run live -- <name> [--yes]` | live checks that spend money: a dry run unless `--yes` is passed |

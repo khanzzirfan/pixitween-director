@@ -1,6 +1,7 @@
 // Owned by Catalog Crew C1 (US-010). The studio's catalog panel: a CSV and the photos it names,
 // or the demo feed, start a run. The run's own page is US-011; this panel starts it and opens it.
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { BRIEF_MAX } from '@shared/catalog-run';
 import { CatalogError, importCatalog, listCatalogs, type CatalogListEntry } from './api';
 
 type Aspect = '9:16' | '16:9' | '1:1';
@@ -50,6 +51,7 @@ export default function CatalogImport() {
   const [csv, setCsv] = useState<File | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const [aspect, setAspect] = useState<Aspect>('9:16');
+  const [brief, setBrief] = useState('');
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<PanelFailure | null>(null);
   const [runs, setRuns] = useState<CatalogListEntry[]>([]);
@@ -84,6 +86,7 @@ export default function CatalogImport() {
     if (csv) form.set('csv', csv);
     for (const photo of photos) form.append('photos', photo, photo.name);
     form.set('aspect', aspect);
+    if (brief.trim()) form.set('brief', brief.trim());
     void start(form);
   }
 
@@ -92,6 +95,7 @@ export default function CatalogImport() {
     const form = new FormData();
     form.set('demo', DEMO_FEED);
     form.set('aspect', aspect);
+    if (brief.trim()) form.set('brief', brief.trim());
     void start(form);
   }
 
@@ -117,6 +121,17 @@ export default function CatalogImport() {
           multiple
           accept="image/png,image/jpeg,image/webp"
           onChange={(e) => setPhotos(Array.from(e.target.files ?? []))}
+        />
+      </label>
+      <label>
+        Campaign brief (optional)
+        <textarea
+          aria-label="Campaign brief"
+          rows={3}
+          maxLength={BRIEF_MAX}
+          placeholder="Summer holiday sale: beach, surf, swim. Bright, fast, sunny."
+          value={brief}
+          onChange={(e) => setBrief(e.target.value)}
         />
       </label>
       <fieldset>

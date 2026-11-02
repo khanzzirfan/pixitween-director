@@ -12,7 +12,7 @@ import type { RunStore } from './run-store';
 /** The variant film plays at most this many acts; a bigger line is cut into films of this size. */
 const MAX_PER_FILM = 6;
 /** A variant's name on its act stays short enough to read in one look. */
-const NAME_WORDS = 3;
+const NAME_WORDS = 2;
 
 const slug = (s: string): string =>
   s
@@ -50,16 +50,25 @@ export function lineGroups(rows: readonly CatalogRow[]): Array<{ id: string; tit
   return out;
 }
 
-/** A variant name short enough for its act: the words its title does not share with the line, at most three. */
-const shortNames = (titles: string[]): string[] => variantNames(titles).map((n) => n.split(/\s+/).slice(0, NAME_WORDS).join(' '));
+/**
+ * A variant name short enough for its act: the words its title does not share with the line, at most two. The last words
+ * are kept, because a title ends on what the thing is ("Sun Stripe Beach Towel" is "Beach Towel").
+ */
+export const shortNames = (titles: string[]): string[] => variantNames(titles).map((n) => n.split(/\s+/).slice(-NAME_WORDS).join(' '));
 
 /**
  * Builds and saves the line films of a run from the builds its rows were made from, and returns what the run should list.
- * A row whose build is gone is left out of its line; a line left with fewer than two products gets no film.
+ * A row whose build is gone is left out of its line; a line left with fewer than two products gets no film. With `only`
+ * (a price edit), a line that does not hold that product and already has its film keeps it as it is.
  */
-export async function buildLineFilms(run: CatalogRun, store: RunStore): Promise<LineFilm[]> {
+export async function buildLineFilms(run: CatalogRun, store: RunStore, only?: string): Promise<LineFilm[]> {
   const films: LineFilm[] = [];
   for (const group of lineGroups(run.rows)) {
+    const kept = run.films?.find((f) => f.id === group.id);
+    if (only && kept && !group.rows.some((r) => r.product.id === only)) {
+      films.push(kept);
+      continue;
+    }
     const parts: Array<{ row: CatalogRow; build: RowBuild }> = [];
     for (const row of group.rows) {
       const build = await store.readBuild<RowBuild>(run.id, row.product.id);

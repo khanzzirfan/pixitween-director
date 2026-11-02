@@ -105,13 +105,22 @@ it('a restarted stream does not lose the events that come after it', async () =>
   expect(result.current.rows[0]?.status).toBe('ready');
 });
 
-it('the run is done when the run says so', async () => {
+it('the run is done when the run says so, and is read again for its line films', async () => {
   const { result, rerender } = renderHook(() => useCatalog(CATALOG));
   await waitFor(() => expect(result.current.rows).toHaveLength(3));
+  const done: CatalogRun = {
+    ...RUN,
+    state: 'done',
+    costUsd: 0.42,
+    films: [{ id: 'line-cans', title: 'cans', tagline: 'Pick your favourite', productIds: ['can-original', 'mug-stone'], version: 1 }],
+  };
+  fetchMock.mockImplementation(async () => new Response(JSON.stringify(done), { status: 200 }));
   stream = [{ filmId: FILM, at: '2026-11-01T10:00:02.000Z', type: 'catalog.done', catalogId: CATALOG, costUsd: 0.42, ms: 1200 }];
   rerender();
   await waitFor(() => expect(result.current.run?.state).toBe('done'));
   expect(result.current.run?.costUsd).toBe(0.42);
+  await waitFor(() => expect(result.current.run?.films?.map((f) => f.id)).toEqual(['line-cans']));
+  expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
 it('applyRow replaces a row right away', async () => {

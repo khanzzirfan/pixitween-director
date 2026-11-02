@@ -5,13 +5,15 @@
 import { shownPrice, type Product } from '@shared/catalog';
 import type { CatalogRow, CatalogRun } from '@shared/catalog-run';
 import type { AssetStore } from '@shared/ports';
+import { floorSet } from '../authoring/beatsheet';
 import { prepareRound } from '../authoring/catalog-clip';
 import { LOOKS, pickLook, type ClipLook, type OccasionId } from '../authoring/looks';
-import { newPrepareCache, type Prepared3D } from '../product3d/prepare';
+import { newPrepareCache, prepareProduct3D, type Prepared3D } from '../product3d/prepare';
 import type { CatalogArt } from './art';
 import { photoKey, resolvePhoto, type CutoutCache, type CutoutEntry } from './photos';
+import { boardKey, heroFilm, makeSetArt, type BoardCache } from './hero';
 import { buildLineFilms } from './line-film';
-import { buildRow, loadPlateMap, type RowBuild } from './row';
+import { buildRow, loadPlateMap, type RowBuild, type SetArt } from './row';
 import type { RowPatch, RunStore } from './run-store';
 
 /** The product class, by category: what SAM cuts out and what the plate's centre must not hold. */
@@ -65,6 +67,8 @@ export interface RunCatalogOptions {
   cutCache: CutoutCache;
   /** The plates already painted, by `<look>:<noun>`. */
   plates: PlateStore;
+  /** The boards Muse already wrote, so a repeat run directs nothing; without it every run asks Muse again. */
+  boards?: BoardCache;
   /** Where the wall hears about it. */
   emit: (event: CatalogEvent) => void;
   /** The clock, for a row's and the run's milliseconds. */
@@ -121,6 +125,10 @@ export async function runCatalog(o: RunCatalogOptions): Promise<void> {
   const cuts = new Map<string, CutoutEntry>();
   /** The wrapped label of each photo, when it has one. */
   const rounds = new Map<string, Prepared3D | undefined>();
+  /** What each photo's product wears in 3D: its wrapped label when it is a round pack, else its own outline, extruded. */
+  const solids = new Map<string, Prepared3D | undefined>();
+  /** The drawn sets of this run, by look and light. */
+  const sets = new Map<string, SetArt>();
 
   /** Saves the row and tells the wall about it. */
   const say = async (productId: string, patch: RowPatch): Promise<CatalogRow> => {
@@ -169,7 +177,10 @@ export async function runCatalog(o: RunCatalogOptions): Promise<void> {
           await cutCache.set(key, cut);
         }
         cuts.set(key, cut);
-        rounds.set(key, await prepareRound(assets, cut, nounOf(product), prep3d));
+        const round = await prepareRound(assets, cut, nounOf(product), prep3d);
+        rounds.set(key, round);
+        // a product with no outline to extrude has no 3D film; its 2D hero stands
+        solids.set(key, round ?? (await prepareProduct3D(assets, { cutoutAssetId: cut.id, shape: 'other' }, prep3d).catch(() => undefined)));
       }
 
       await say(product.id, { status: 'building' });
@@ -187,10 +198,11 @@ export async function runCatalog(o: RunCatalogOptions): Promise<void> {
       const plate = await plateFor(pick.look, pick.occasion, noun);
       const accent = cut.chroma > 0.05 ? cut.accent : FALLBACK_ACCENT;
 
+      const solid = solids.get(key);
       const build: RowBuild = {
         aspect: run.aspect,
         look: pick.look,
-        ...(prepared ? { prepared } : {}),
+        ...(solid ? { prepared: solid } : {}),
         ...(plate ? { plate: { id: plate.id, src: `/api/assets/${plate.id}`, width: plate.width, height: plate.height } } : {}),
         ...(plate ? { plateMap: loadPlateMap(plate.id) } : {}),
         product: { id: cut.id, src: `/api/assets/${cut.id}`, width: cut.width, height: cut.height },
@@ -206,7 +218,40 @@ export async function runCatalog(o: RunCatalogOptions): Promise<void> {
 
       const result = buildRow(build);
       await store.saveClip(run.id, product.id, result.comp);
-      await store.saveBuild(run.id, product.id, result.build);
+
+      // The hero film: Muse looks at the photo and directs it (the idea, the words, the shots); the board goes into the build so a
+      // price edit plays it again at $0. A film that cannot be made never fails the row: the tile is still there.
+      const saved: RowBuild = { ...result.build };
+      let hero: CatalogRow['hero'];
+      try {
+        const flat = solid?.shape === 'other';
+        const bKey = boardKey(key, product, flat, run.brief);
+        const kept = await o.boards?.get(bKey);
+        const planned = kept ? { ...kept, violations: [], usd: 0 } : await art.direct(
+          photo,
+          { title: product.title, category: product.category, ...(product.brand ? { brand: product.brand } : {}) },
+          { ...(run.brief ? { brief: run.brief } : {}), flat },
+        );
+        cost += planned.usd;
+        if (!kept && planned.source === 'muse') await o.boards?.set(bKey, { board: planned.board, source: planned.source });
+        // a board that names no set (Muse left it out, or an older one) gets the one its words suggest, so no film floats in nothing
+        saved.film = planned.board.set ? planned.board : { ...planned.board, set: floorSet(`${product.category} ${product.title} ${run.brief ?? ''}`) };
+        // the set's pictures are drawn by code: free, and a film without them still plays
+        try {
+          const art = await makeSetArt(assets, saved.film, run.aspect, sets);
+          if (art) saved.setArt = art;
+        } catch (e) {
+          console.error(`catalog ${run.id} row ${product.id}: no set art:`, e);
+        }
+        const comp = heroFilm(saved, product);
+        if (comp) {
+          await store.saveHero(run.id, product.id, comp);
+          hero = { concept: planned.board.concept, source: planned.source, version: 1 };
+        }
+      } catch (e) {
+        console.error(`catalog ${run.id} row ${product.id}: no hero film:`, e);
+      }
+      await store.saveBuild(run.id, product.id, saved);
       await say(product.id, {
         status: result.status,
         check: result.check,
@@ -214,6 +259,7 @@ export async function runCatalog(o: RunCatalogOptions): Promise<void> {
         why: pick.why,
         accent,
         ms: now() - rowStarted,
+        ...(hero ? { hero } : {}),
       });
     } catch (e) {
       await say(product.id, { status: 'failed', error: message(e).slice(0, ERROR_MAX) });
