@@ -1,8 +1,9 @@
 // Owned by S12e. Prints the crew's measured numbers from a film's event log, so the README and the video quote facts.
 // `npx tsx scripts/crew-report.ts <events.jsonl | film-id> [--json] [--data DIR]`
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { getDb } from '../server/db/open';
 import type { Job } from '../shared/crew';
 import type { FilmEvent } from '../shared/events';
 
@@ -139,12 +140,12 @@ export function formatReport(r: CrewReport): string {
   ].join('\n');
 }
 
-/** A path to a log, or a film id looked up in the data dir. */
+/** The log text for a path to an events.jsonl, or for a film id read from director.db in the data dir. */
 export function resolveLog(arg: string, dataDir: string): string {
-  if (existsSync(arg)) return arg;
-  const byId = join(dataDir, 'films', arg, 'events.jsonl');
-  if (existsSync(byId)) return byId;
-  throw new Error(`no log at ${arg} or ${byId}`);
+  if (existsSync(arg)) return readFileSync(arg, 'utf8');
+  const rows = getDb(dataDir).prepare('SELECT seq, event_json FROM events WHERE film_id = ? ORDER BY seq').all(arg) as { seq: number; event_json: string }[];
+  if (rows.length) return rows.map((r) => `{"seq":${r.seq},"event":${r.event_json}}`).join('\n');
+  throw new Error(`no log at ${arg} and no events for film ${arg} in ${dataDir}/director.db`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
@@ -157,6 +158,6 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     console.log('usage: tsx scripts/crew-report.ts <events.jsonl | film-id> [--json] [--data DIR]');
     process.exit(1);
   }
-  const report = buildReport(parseLog(readFileSync(resolveLog(target, data), 'utf8')));
+  const report = buildReport(parseLog(resolveLog(target, data)));
   console.log(flag('--json') ? JSON.stringify(report, null, 2) : formatReport(report));
 }

@@ -1,9 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, readdir, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 import type { AepCompositionJson } from '@shared/aep';
 import { FILM_ID_RE, type FilmState, type FilmVersion } from '@shared/composition';
 import type { FilmStore } from '@shared/ports';
+import { getDb, tx, type Db } from '../db/open';
 import type { CompositionValidator } from '../engine/validate';
 
 export class FilmNotFoundError extends Error {
@@ -13,8 +12,17 @@ export class FilmNotFoundError extends Error {
   }
 }
 
-type FilmFile = Omit<FilmState, 'composition' | 'costUsd' | 'clippyCredits'> & { head: number; maxVersion: number; redo: number[] };
-type VersionFile = FilmVersion & { parent: number | null };
+type FilmRow = {
+  id: string;
+  status: FilmState['status'];
+  created_at: string;
+  head: number;
+  max_version: number;
+  redo_json: string;
+  data_json: string;
+};
+/** The film's own fields, kept as one JSON column next to the queried ones (id, status, created_at, head, redo). */
+type FilmData = Omit<FilmState, 'id' | 'status' | 'createdAt' | 'version' | 'composition' | 'costUsd' | 'clippyCredits'>;
 
 export interface FilmStoreOptions {
   dir: string;
@@ -22,161 +30,189 @@ export interface FilmStoreOptions {
 }
 
 export function createFilmStore({ dir, validator }: FilmStoreOptions): FilmStore {
-  const root = join(dir, 'films');
-  const chains = new Map<string, Promise<unknown>>();
+  const db: Db = getDb(dir);
 
-  const filmDir = (id: string) => {
+  const checkId = (id: string) => {
     if (!FILM_ID_RE.test(id)) throw new FilmNotFoundError(String(id));
-    return join(root, id);
+  };
+  const readRow = (id: string): FilmRow => {
+    checkId(id);
+    const row = db.prepare('SELECT * FROM films WHERE id = ?').get(id) as FilmRow | undefined;
+    if (!row) throw new FilmNotFoundError(id);
+    return row;
+  };
+  const writeRow = (r: FilmRow) =>
+    db
+      .prepare('UPDATE films SET status = ?, head = ?, max_version = ?, redo_json = ?, data_json = ? WHERE id = ?')
+      .run(r.status, r.head, r.max_version, r.redo_json, r.data_json, r.id);
+  const versionRow = (id: string, n: number) => {
+    const v = db.prepare('SELECT * FROM film_versions WHERE film_id = ? AND version = ?').get(id, n) as
+      | {
+          version: number;
+          parent: number | null;
+          source: FilmVersion['source'];
+          note: string | null;
+          at: string;
+          composition_json: string;
+        }
+      | undefined;
+    if (!v) throw new FilmNotFoundError(id);
+    return v;
   };
 
-  /** Serialise every operation on one film (promise-chain mutex). */
-  function locked<T>(id: string, fn: () => Promise<T>): Promise<T> {
-    const prev = chains.get(id) ?? Promise.resolve();
-    const run = prev.then(fn, fn);
-    chains.set(id, run.catch(() => undefined));
-    return run;
+  function toState(
+    r: FilmRow,
+    pre?: { composition_json: string | null; usd: number; credits: number },
+  ): FilmState {
+    const t =
+      pre ??
+      (db.prepare('SELECT COALESCE(SUM(usd), 0) AS usd, COALESCE(SUM(credits), 0) AS credits FROM ledger WHERE film_id = ?').get(r.id) as {
+        usd: number;
+        credits: number;
+      });
+    const json = pre ? pre.composition_json : r.head > 0 ? versionRow(r.id, r.head).composition_json : null;
+    const composition = json ? (JSON.parse(json) as AepCompositionJson) : undefined;
+    return {
+      ...(JSON.parse(r.data_json) as FilmData),
+      id: r.id,
+      status: r.status,
+      createdAt: r.created_at,
+      version: r.head,
+      ...(composition ? { composition } : {}),
+      costUsd: t.usd,
+      clippyCredits: t.credits,
+    };
   }
 
-  async function writeJson(file: string, data: unknown) {
-    await mkdir(dirname(file), { recursive: true });
-    const tmp = `${file}.${randomBytes(4).toString('hex')}.tmp`;
-    await writeFile(tmp, JSON.stringify(data));
-    await rename(tmp, file);
-  }
-  async function readJson<T>(file: string, id: string): Promise<T> {
-    try {
-      return JSON.parse(await readFile(file, 'utf8')) as T;
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'ENOENT') throw new FilmNotFoundError(id);
-      throw e;
-    }
-  }
-  const readFilm = (id: string) => readJson<FilmFile>(join(filmDir(id), 'film.json'), id);
-  const readVersion = (id: string, n: number) => readJson<VersionFile>(join(filmDir(id), 'versions', `${n}.json`), id);
-
-  async function ledgerTotals(id: string): Promise<{ usd: number; credits: number }> {
-    let text = '';
-    try {
-      text = await readFile(join(filmDir(id), 'ledger.jsonl'), 'utf8');
-    } catch {
-      return { usd: 0, credits: 0 };
-    }
-    let usd = 0;
-    let credits = 0;
-    for (const line of text.split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const row = JSON.parse(line) as { usd?: number; credits?: number };
-        usd += row.usd ?? 0;
-        credits += row.credits ?? 0;
-      } catch {
-        // ignore a truncated final line
-      }
-    }
-    return { usd, credits };
-  }
-
-  async function toState(id: string, f: FilmFile): Promise<FilmState> {
-    const { head, maxVersion: _max, redo: _redo, ...rest } = f;
-    const { usd, credits } = await ledgerTotals(id);
-    const composition = head > 0 ? (await readVersion(id, head)).composition : undefined;
-    return { ...rest, version: head, ...(composition ? { composition } : {}), costUsd: usd, clippyCredits: credits };
-  }
-
-  async function commitLocked(id: string, next: AepCompositionJson, source: FilmVersion['source'], note?: string) {
+  function commitSync(id: string, next: AepCompositionJson, source: FilmVersion['source'], note?: string) {
     const v = validator.validate(next);
     if (!v.ok) return { ok: false as const, issues: v.issues };
-    const film = await readFilm(id);
-    const n = film.maxVersion + 1;
-    const version: VersionFile = {
-      version: n,
-      composition: next,
+    const film = readRow(id);
+    const n = film.max_version + 1;
+    db.prepare('INSERT INTO film_versions (film_id, version, parent, source, note, at, composition_json) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+      id,
+      n,
+      film.head > 0 ? film.head : null,
       source,
-      ...(note !== undefined ? { note } : {}),
-      at: new Date().toISOString(),
-      parent: film.head > 0 ? film.head : null,
-    };
-    await writeJson(join(filmDir(id), 'versions', `${n}.json`), version);
-    await writeJson(join(filmDir(id), 'film.json'), { ...film, head: n, maxVersion: n, version: n, redo: [] });
+      note ?? null,
+      new Date().toISOString(),
+      JSON.stringify(next),
+    );
+    writeRow({ ...film, head: n, max_version: n, redo_json: '[]' });
     return { ok: true as const, version: n };
   }
 
   return {
     async create(init) {
       const id = `film_${randomBytes(6).toString('hex')}`;
-      const film: FilmFile = {
-        ...init,
+      const { createdAt, ...rest } = init;
+      const data: FilmData = { ...rest, assets: init.assets ?? [] };
+      const row: FilmRow = {
         id,
         status: 'new',
-        version: 0,
-        assets: init.assets ?? [],
-        createdAt: init.createdAt ?? new Date().toISOString(),
+        created_at: createdAt ?? new Date().toISOString(),
         head: 0,
-        maxVersion: 0,
-        redo: [],
+        max_version: 0,
+        redo_json: '[]',
+        data_json: JSON.stringify(data),
       };
-      await locked(id, () => writeJson(join(filmDir(id), 'film.json'), film));
-      return toState(id, film);
+      db.prepare('INSERT INTO films (id, status, created_at, head, max_version, redo_json, data_json) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+        row.id,
+        row.status,
+        row.created_at,
+        row.head,
+        row.max_version,
+        row.redo_json,
+        row.data_json,
+      );
+      return toState(row);
     },
 
     async get(id) {
-      return locked(id, async () => toState(id, await readFilm(id)));
+      return toState(readRow(id));
     },
 
-    update(id, patch) {
-      return locked(id, async () => {
-        const film = await readFilm(id);
-        await writeJson(join(filmDir(id), 'film.json'), { ...film, ...patch });
+    async update(id, patch) {
+      tx(db, () => {
+        const row = readRow(id);
+        const { status, ...rest } = patch;
+        writeRow({
+          ...row,
+          status: status ?? row.status,
+          data_json: JSON.stringify({
+            ...(JSON.parse(row.data_json) as FilmData),
+            ...rest,
+          }),
+        });
       });
     },
 
     async list() {
-      const ids = await readdir(root).catch(() => [] as string[]);
-      const films = await Promise.all(ids.filter((i) => FILM_ID_RE.test(i)).map((i) => this.get(i).catch(() => undefined)));
-      return films.filter((f): f is FilmState => !!f).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      // one query: the head version and the ledger totals come with each film, not one lookup per film
+      const rows = db
+        .prepare(
+          `SELECT f.*, v.composition_json AS composition_json, COALESCE(l.usd, 0) AS usd, COALESCE(l.credits, 0) AS credits
+           FROM films f
+           LEFT JOIN film_versions v ON v.film_id = f.id AND v.version = f.head
+           LEFT JOIN (SELECT film_id, SUM(usd) AS usd, SUM(credits) AS credits FROM ledger GROUP BY film_id) l ON l.film_id = f.id
+           ORDER BY f.created_at DESC`,
+        )
+        .all() as (FilmRow & { composition_json: string | null; usd: number; credits: number })[];
+      return rows.map((r) => toState(r, { composition_json: r.composition_json, usd: r.usd, credits: r.credits }));
     },
 
-    versions(id) {
-      return locked(id, async () => {
-        const film = await readFilm(id);
-        const out: FilmVersion[] = [];
-        for (let n = 1; n <= film.maxVersion; n++) {
-          const { parent: _parent, ...v } = await readVersion(id, n);
-          out.push(v);
-        }
-        return out;
-      });
+    async versions(id) {
+      const film = readRow(id);
+      const rows = db.prepare('SELECT * FROM film_versions WHERE film_id = ? AND version <= ? ORDER BY version').all(id, film.max_version) as ReturnType<
+        typeof versionRow
+      >[];
+      return rows.map((v) => ({
+        version: v.version,
+        composition: JSON.parse(v.composition_json) as AepCompositionJson,
+        source: v.source,
+        ...(v.note !== null ? { note: v.note } : {}),
+        at: v.at,
+      }));
     },
 
-    commit: (id, next, source, note) => locked(id, () => commitLocked(id, next, source, note)),
+    async commit(id, next, source, note) {
+      return tx(db, () => commitSync(id, next, source, note));
+    },
 
-    mutate(id, fn, source, note) {
-      return locked(id, async () => {
-        const film = await toState(id, await readFilm(id));
-        const { next, data } = fn(film); // synchronous; a throw stores nothing and propagates
-        const r = await commitLocked(id, next, source, note);
+    async mutate(id, fn, source, note) {
+      return tx(db, () => {
+        const { next, data } = fn(toState(readRow(id))); // synchronous; a throw rolls the transaction back
+        const r = commitSync(id, next, source, note);
         return r.ok ? { ok: true as const, version: r.version, data } : r;
       });
     },
 
-    undo(id) {
-      return locked(id, async () => {
-        const film = await readFilm(id);
+    async undo(id) {
+      return tx(db, () => {
+        const film = readRow(id);
         if (film.head <= 0) return film.head;
-        const parent = (await readVersion(id, film.head)).parent;
+        const parent = versionRow(id, film.head).parent;
         if (parent === null) return film.head;
-        await writeJson(join(filmDir(id), 'film.json'), { ...film, head: parent, version: parent, redo: [...film.redo, film.head] });
+        writeRow({
+          ...film,
+          head: parent,
+          redo_json: JSON.stringify([...(JSON.parse(film.redo_json) as number[]), film.head]),
+        });
         return parent;
       });
     },
 
-    redo(id) {
-      return locked(id, async () => {
-        const film = await readFilm(id);
-        const target = film.redo.at(-1);
+    async redo(id) {
+      return tx(db, () => {
+        const film = readRow(id);
+        const redo = JSON.parse(film.redo_json) as number[];
+        const target = redo.at(-1);
         if (target === undefined) return film.head;
-        await writeJson(join(filmDir(id), 'film.json'), { ...film, head: target, version: target, redo: film.redo.slice(0, -1) });
+        writeRow({
+          ...film,
+          head: target,
+          redo_json: JSON.stringify(redo.slice(0, -1)),
+        });
         return target;
       });
     },

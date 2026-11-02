@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
 import { mugScene } from '../authoring/test-helpers';
@@ -27,7 +26,7 @@ describe('registration', () => {
 describe('proposeGenerate', () => {
   async function setup(mode: 'motion' | 'generate') {
     const t = await makeTestFilm({ composition: setSceneMode(mugScene(), 's1', mode) });
-    setGenerateServicesForTests({ approvals: createApprovalStore({ dir: () => t.dir }), clippy: undefined, balance: { read: async () => undefined } });
+    setGenerateServicesForTests({ approvals: createApprovalStore({ dataDir: t.dir }), clippy: undefined, balance: { read: async () => undefined } });
     return t;
   }
 
@@ -54,7 +53,7 @@ describe('revertScene', () => {
     const t = await makeTestFilm({ composition: original });
     const swapped = swapInClip(original, { sceneId: 's1', asset: { id: 'ast_ffffffffffffffffffffffffffffffff', url: '/api/assets/x' }, clipSec: 2.5, frame: { width: 1920, height: 1080 }, clipSize: { width: 1280, height: 720 } });
     await t.films.commit(t.filmId, swapped, 'generate');
-    const jobs = createJobStore({ filmsDir: join(t.dir, 'films') });
+    const jobs = createJobStore({ dataDir: t.dir });
     await jobs.save({ ...job('s1', 'done'), filmId: t.filmId, originalDurationSec: 4 });
 
     await revertScene(t.ctx, 's1', jobs);

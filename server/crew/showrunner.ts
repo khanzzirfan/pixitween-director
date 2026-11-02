@@ -27,6 +27,8 @@ export interface ShowrunnerDeps {
   extraPhotos?: Array<{ id: string; url: string }>;
   /** The hero photo's asset id, named in the first turn beside the extras. */
   heroPhotoId?: string;
+  /** Craft lessons (the corpus), added to the system message so a long session's folded history keeps them. */
+  lessons?: string;
   tools?: ToolDef[];
   /** Open findings for the board table. */
   findings?: () => Finding[];
@@ -168,7 +170,7 @@ export function createShowrunnerAgent(deps: ShowrunnerDeps, snapshot: Showrunner
   // loaded on first use: the registry pulls in every tool module, which a route registration does not need
   let registry: Registry | undefined;
   const getRegistry = async (): Promise<Registry> => (registry ??= (await import('../tools/registry')).createRegistry([tools]));
-  const history: ChatMessage[] = snapshot.messages?.length ? [...snapshot.messages] : [{ role: 'system', content: showrunnerSystem() }];
+  const history: ChatMessage[] = snapshot.messages?.length ? [...snapshot.messages] : [{ role: 'system', content: showrunnerSystem() + (deps.lessons ?? '') }];
   let turns = snapshot.turns ?? 0;
   let sentImage = snapshot.sentImage ?? false;
   let finished = snapshot.finished ?? false;

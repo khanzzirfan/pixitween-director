@@ -8,7 +8,7 @@ const F = 'film_aaaaaaaaaaaa';
 function setup() {
   const base = mkdtempSync(join(tmpdir(), 'appr-'));
   let t = Date.parse('2026-11-02T01:00:00Z');
-  const mk = () => createApprovalStore({ dir: (f) => join(base, f), now: () => new Date(t) });
+  const mk = () => createApprovalStore({ dataDir: base, now: () => new Date(t) });
   return { mk, advance: (min: number) => (t += min * 60_000) };
 }
 const code = (fn: () => unknown) => {

@@ -44,8 +44,10 @@ export class VisualParseError extends Error {
   }
 }
 
+/** Strict enough for Meta's json_schema mode: every object sets additionalProperties false, and every property is required. `args` is a JSON string because an open object is rejected. */
 export const VISUAL_SCHEMA = {
   type: 'object',
+  additionalProperties: false,
   required: ['sceneId', 'pass', 'issues', 'fixes'],
   properties: {
     sceneId: { type: 'string' },
@@ -54,7 +56,8 @@ export const VISUAL_SCHEMA = {
       type: 'array',
       items: {
         type: 'object',
-        required: ['image', 'atSec', 'kind', 'evidence'],
+        additionalProperties: false,
+        required: ['image', 'atSec', 'kind', 'where', 'evidence'],
         properties: {
           image: { type: 'integer' },
           atSec: { type: 'number' },
@@ -66,7 +69,12 @@ export const VISUAL_SCHEMA = {
     },
     fixes: {
       type: 'array',
-      items: { type: 'object', required: ['tool', 'args'], properties: { tool: { type: 'string' }, args: { type: 'object' } } },
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['tool', 'args'],
+        properties: { tool: { type: 'string' }, args: { type: 'string' } },
+      },
     },
   },
 };
@@ -141,7 +149,7 @@ export function buildVisualPrompt(o: {
       `Automatic checks already found: ${o.findings.length ? '' : 'none'}`,
       ...(o.findings.length ? [found] : []),
       ...(o.measured?.length ? ['Measured text boxes (pixels in the frame):', ...o.measured.map((m) => `- ${m}`)] : []),
-      'Report only clear visual faults: text that is hard to read, text covering the product, a cut-off subject, or a broken frame.',
+      'Report only clear visual faults: text that is hard to read, text covering the product, a cut-off subject, a product sitting inside a plain white or grey rectangle (kind "studio-backdrop"), frames that do not change (kind "flat-motion"), or a broken frame.',
       ...(o.questions?.length ? ['Also answer these, reporting an issue only when the answer is yes for the first and third and no for the second:', ...o.questions.map((q) => `- ${q}`)] : []),
       ...(o.faultQuestions?.length ? ['Also answer these. Report one issue for each question whose answer is yes, with the image number and what you see:', ...o.faultQuestions.map((q) => `- ${q}`)] : []),
       BLIND_RULES,
@@ -160,7 +168,7 @@ export function buildVisualPrompt(o: {
     ...o.layerSummary,
     'HOW TO FIX: propose at most a few fixes, using only these tools and only layers in this scene:',
     ...allowed.map(describeTool),
-    'Reply with only a JSON object: {"sceneId": string, "pass": boolean, "issues": [{"image": number, "atSec": number, "kind": string, "where": string, "evidence": string}], "fixes": [{"tool": string, "args": object}]}.',
+    'Reply with only a JSON object: {"sceneId": string, "pass": boolean, "issues": [{"image": number, "atSec": number, "kind": string, "where": string, "evidence": string}], "fixes": [{"tool": string, "args": "<json object as a string>"}]}.',
     'Every issue must name the image number and the second it appears at. Evidence is one sentence describing what you see.',
   ].join('\n');
 }
@@ -226,9 +234,19 @@ export function parseVisualVerdict(
       evidence,
     });
   }
-  const fixes = Array.isArray(input.fixes)
-    ? input.fixes.filter((f): f is ProposedFix => !!f && typeof f === 'object' && typeof (f as ProposedFix).tool === 'string')
-    : [];
+  const fixes = Array.isArray(input.fixes) ? input.fixes.flatMap((f) => {
+    if (!f || typeof f !== 'object' || typeof (f as ProposedFix).tool !== 'string') return [];
+    let args = (f as { args?: unknown }).args;
+    if (typeof args === 'string') {
+      try {
+        args = JSON.parse(args);
+      } catch {
+        args = undefined;
+      }
+    }
+    if (!args || typeof args !== 'object' || Array.isArray(args)) return [];
+    return [{ tool: (f as ProposedFix).tool, args: args as Record<string, unknown> }];
+  }) : [];
   return { verdict: { sceneId: o.sceneId, pass: issues.length === 0, issues, fixes }, dropped };
 }
 

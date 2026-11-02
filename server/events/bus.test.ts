@@ -1,4 +1,3 @@
-import { appendFileSync } from 'node:fs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -42,13 +41,19 @@ it('unsubscribe stops delivery and films are isolated', async () => {
   expect(got).toHaveLength(1);
 });
 
-it('ignores a half-written last line', async () => {
+it('keeps seq gapless under concurrent emits and replays after a seq', async () => {
   const dir = tmp();
   const bus = createEventBus(dir);
-  await bus.emit(A, status(A));
-  await bus.emit(A, status(A));
-  appendFileSync(join(dir, 'films', A, 'events.jsonl'), '{"seq":3,"event":{"filmI');
-  expect((await readEvents(dir, A)).map((e) => e.seq)).toEqual([1, 2]);
+  const seqs = await Promise.all([1, 2, 3, 4, 5].map(() => bus.emit(A, status(A))));
+  expect([...seqs].sort()).toEqual([1, 2, 3, 4, 5]);
+  expect((await readEvents(dir, A, 3)).map((e) => e.seq)).toEqual([4, 5]);
+  expect(await readEvents(dir, B)).toEqual([]);
+});
+
+it('survives a new bus over the same dir (restart)', async () => {
+  const dir = tmp();
+  await createEventBus(dir).emit(A, status(A));
+  expect(await createEventBus(dir).emit(A, status(A))).toBe(2);
 });
 
 it('rejects an invalid event', async () => {

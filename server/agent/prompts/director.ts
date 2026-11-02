@@ -76,6 +76,15 @@ export function buildStoryboardMessages(o: { brief: string; title?: string; aspe
   ];
 }
 
+/** A short noun for the cut-out. Plurals count, so "shoes" and "runner" both name a shoe. */
+export function productNoun(scene: Pick<Scene, 'intent' | 'text' | 'beats'>): string {
+  const hit = `${scene.intent} ${scene.text ?? ''} ${scene.beats ?? ''}`.match(/\b(shoes?|runners?|mugs?|bottles?|cans?|jars?|boxes?|bags?|soaps?|cups?)\b/i);
+  if (!hit) return 'product';
+  const word = hit[1]!.toLowerCase();
+  if (word.startsWith('shoe') || word.startsWith('runner')) return 'shoe';
+  return word.endsWith('s') ? word.slice(0, -1) : word;
+}
+
 export function buildScenePrompt(o: {
   canvas: { width: number; height: number; aspect: Aspect };
   scene: Scene;
@@ -86,9 +95,9 @@ export function buildScenePrompt(o: {
   const { scene } = o;
   const hasArt = o.toolNames.includes('generatePlate') && o.toolNames.includes('placeProduct');
   const is3d = scene.mode === '3d' && hasArt && o.toolNames.includes('placeProduct3D');
-  const noun = o.scene.intent.match(/\b(?:mug|bottle|cup|soap|can|shoe|jar|bag|box)\b/i)?.[0] ?? 'product';
+  const noun = productNoun(scene);
   const firstSteps = hasArt
-    ? `1. bg: generatePlate({sceneId:"${scene.id}"}).\n2. product: placeProduct({sceneId:"${scene.id}", source:"photo", noun:"${noun}"}).\nWhen you call placeProduct or addSubject always pass \`noun\`: a short noun phrase naming the thing to cut out (for example mug, bottle, hand); it is used to find the object in the picture.`
+    ? `1. bg: generatePlate({sceneId:"${scene.id}"}).\n2. product: placeProduct({sceneId:"${scene.id}", source:"photo", noun:"${noun}"}). This cuts the product out of the photo. Never add the photo itself as a layer: that call is refused, and the studio background would show as a rectangle.\nWhen you call placeProduct or addSubject always pass \`noun\`: a short noun phrase naming the thing to cut out (for example shoe, mug, bottle); it is used to find the object in the picture.`
     : `1. bg: addLayer({sceneId:"${scene.id}", role:"bg", kind:"shape", fill:"${o.palette[0] ?? '#111827'}"}).\n2. product: addLayer({sceneId:"${scene.id}", role:"product", kind:"image", assetId:"${o.product.assetId}"}).`;
   const turn = is3d
     ? `\n2b. 3D: placeProduct3D({sceneId:"${scene.id}"}). It replaces the product layer with the real product turning in studio light (layer "${scene.id}:product3d"); do not animate the product's scale or position yourself.`
@@ -96,20 +105,25 @@ export function buildScenePrompt(o: {
   const headline = scene.text
     ? `\n3. headline: addLayer({sceneId:"${scene.id}", role:"headline", kind:"text", text:"${scene.text}", style:{color:"${o.palette[1] ?? '#ffffff'}"}}), then setKeyframes({layerId:"${scene.id}:headline", prop:"opacity", keys:[[0,0],[0.6,1]], ease:"easeOut"}).`
     : '';
-  const entrance =
-    scene.camera === 'dolly-in' || is3d
-      ? ''
-      : `\n4. Entrance: setKeyframes({layerId:"${scene.id}:product", prop:"scale", keys:[[0,0.92],[${scene.durationSec},1]], ease:"easeOut"}) (skip when the camera move is dolly-in).`;
-  const cameraStep = String(3 + Number(Boolean(scene.text)) + Number(scene.camera !== 'dolly-in' && !is3d) + 1);
+  const hasBeats = Boolean(scene.beats?.trim());
+  const hasEntrance = !hasBeats && scene.camera !== 'dolly-in' && !is3d;
+  const entrance = hasEntrance
+    ? `\n4. Entrance: setKeyframes({layerId:"${scene.id}:product", prop:"scale", keys:[[0,0.92],[${scene.durationSec},1]], ease:"easeOut"}) (skip when the camera move is dolly-in).`
+    : '';
+  const cameraStep = 3 + Number(Boolean(scene.text)) + Number(hasEntrance) + 1;
+  const beats = hasBeats
+    ? `\n${cameraStep}. Perform the beats on "${scene.id}:product" with setKeyframes. Position is pixels, scale is a fraction, times are seconds. Do this even when the camera is ${scene.camera}: the camera does not replace the beats.\nBeats: ${scene.beats!.trim()}`
+    : '';
+  const camera = cameraStep + Number(hasBeats);
   return `You are building ONE scene of a product film as layers on a timeline, by calling tools. You may call several tools in one turn. Prefer calling every tool needed for the whole scene in a single turn, then answer DONE.
 
 Canvas: ${o.canvas.width}x${o.canvas.height} px (${o.canvas.aspect}), 30 fps. Times are seconds from the start of the scene. Positions are pixels from the top-left. Scale is a fraction (1 = 100%). The scene already exists.
 Scene ${scene.id}: ${scene.durationSec} s, mode ${scene.mode}. Intent: ${scene.intent}
 Camera move: ${scene.camera}. Layers wanted: ${scene.layersWanted.join(', ')}. Headline text: "${scene.text ?? ''}" (none if empty). Palette: ${o.palette.join(', ')}.
-Product photo asset id: ${o.product.assetId} (${o.product.width}x${o.product.height} px).
+Product photo asset id: ${o.product.assetId} (${o.product.width}x${o.product.height} px). The photo is the source for the cut-out, not a layer.
 
 Recipe (follow it in this order):
-${firstSteps}${turn}${headline}${entrance}
-${cameraStep}. setCamera({sceneId:"${scene.id}", move:"${scene.camera}"}) LAST.
+${firstSteps}${turn}${headline}${entrance}${beats}
+${camera}. setCamera({sceneId:"${scene.id}", move:"${scene.camera}"}) LAST.
 Layer ids are always "<sceneId>:<role>" and are returned by addLayer; never pass a layer id when adding a layer. If a tool returns ok:false, read the error, fix the arguments, and retry only that call once. When the scene is complete reply with the single word DONE.`;
 }

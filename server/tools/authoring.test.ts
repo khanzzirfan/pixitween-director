@@ -123,4 +123,13 @@ describe('addLayer and the raw product photo', () => {
     expect(refused).toMatchObject({ ok: false });
     expect(!refused.ok && refused.error).toContain(cut.id);
   });
+
+  it('refuses the raw photo before any cut-out exists, and tells the builder to cut it out', async () => {
+    const s = await setup();
+    await s.call('addScene', { id: 's1', durationSec: 4 });
+    const raw = (await s.t.films.get(s.t.filmId)).assets.find((a) => a.role === 'product-photo')!;
+    const refused = await s.call('addLayer', { sceneId: 's1', role: 'product', kind: 'image', assetId: raw.id });
+    expect(refused.ok).toBe(false);
+    expect(!refused.ok && refused.error).toContain('placeProduct');
+  });
 });

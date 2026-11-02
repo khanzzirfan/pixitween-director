@@ -9,7 +9,7 @@ import { offerRetry, shouldOfferRetry } from './retry';
 const FILM = 'film_3fa9c2d41b7e';
 function setup() {
   const dir = mkdtempSync(join(tmpdir(), 'retry-'));
-  const approvals = createApprovalStore({ dir: () => dir });
+  const approvals = createApprovalStore({ dataDir: dir });
   const events: EmitInput[] = [];
   const ctx = { filmId: FILM, emit: (e: EmitInput) => events.push(e) } as unknown as ToolCtx;
   // a first approval already consumed, so a proposal made now is attempt 2

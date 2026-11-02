@@ -6,16 +6,21 @@ import { createDirectAdmission } from './admission';
 import { bootHooks } from './boot';
 import { getValidator } from './engine/validate';
 import { hostedTracingVars, loadEnv, type Env } from './env';
+import { importLegacyData } from './db/import-legacy';
 import { createEventBus } from './events/bus';
 import { createApp } from './http/app';
 import { emitStamped, makeToolCtx, type AppDeps } from './http/deps';
 import { mountStatic } from './http/static';
 import { createLedger } from './ledger';
+import { resumeLineups } from './lineup/runner';
 import { createMetaClients } from './meta';
 import { createAssetStore } from './store/asset-store';
 import { createFilmStore } from './store/film-store';
 
 export async function buildDeps(env: Env): Promise<AppDeps> {
+  const imported = importLegacyData(env.DATA_DIR); // one time per film, asset and line-up; the old files stay as a backup
+  if (imported.films + imported.assets + imported.lineups > 0) console.log(`[db] imported ${imported.films} films, ${imported.assets} assets, ${imported.lineups} line-ups into director.db`);
+  for (const s of imported.skipped) console.warn(`[db] skipped ${s}`);
   const bus = createEventBus(env.DATA_DIR);
   const assets = createAssetStore({ dir: env.DATA_DIR, publicBaseUrl: env.PUBLIC_BASE_URL, maxUploadBytes: env.MAX_UPLOAD_MB * 1024 * 1024 });
   const films = createFilmStore({ dir: env.DATA_DIR, validator: await getValidator() });
@@ -46,9 +51,12 @@ export async function main(): Promise<void> {
   const env = loadEnv();
   const tracing = hostedTracingVars();
   if (tracing.length) console.warn(`[privacy] hosted tracing is off, but ${tracing.join(', ')} ${tracing.length === 1 ? 'is' : 'are'} set; nothing is sent to any tracing service.`);
-  const app = await createServerApp(await buildDeps(env));
+  const deps = await buildDeps(env);
+  const app = await createServerApp(deps);
   const server = serve({ fetch: app.fetch, port: env.PORT });
   console.log(`PixiTween Director listening on http://localhost:${env.PORT}`);
+  const resumed = resumeLineups(deps);
+  if (resumed.length) console.log(`[lineup] resuming ${resumed.join(', ')}`);
   const stop = () => server.close(() => process.exit(0));
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);

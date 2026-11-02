@@ -65,3 +65,17 @@ it('404s malformed and unknown asset ids', async () => {
     expect((await app.request(`/api/assets/${id}`)).status).toBe(404);
   }
 });
+
+it('serves the gallery as summaries: ready films only, newest first, no composition, take children left out', async () => {
+  const { t, app } = await setup();
+  await t.films.update(t.filmId, { status: 'ready' });
+  const child = await t.films.create({ aspect: '16:9', brief: { text: 'c', productAssetId: 'x' }, assets: [], parentId: t.filmId });
+  await t.films.commit(child.id, load('shape-only'), 'director');
+  await t.films.update(child.id, { status: 'ready' });
+  const res = await app.request('/api/gallery');
+  expect(res.status).toBe(200);
+  const items = (await res.json()) as Array<{ id: string }>;
+  expect(items.map((i) => i.id)).toEqual([t.filmId]);
+  expect(Object.keys(items[0]!).sort()).toEqual(['aspect', 'createdAt', 'crew', 'durationSec', 'hasGenerated', 'id', 'sceneCount', 'thumbUrl', 'title']);
+  expect(JSON.stringify(items)).not.toContain('"layers"');
+});

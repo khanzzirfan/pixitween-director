@@ -1,4 +1,5 @@
 import type { FilmId, FilmState, FilmVersion } from './composition';
+import type { GallerySummary } from './gallery';
 
 export const PASSCODE_HEADER = 'x-director-passcode';
 
@@ -7,6 +8,7 @@ export interface CreateFilmResponse {
   queue?: { state: 'running' } | { state: 'queued'; position: number; etaSec: number };
 }
 export type ListFilmsResponse = FilmState[];
+export type GalleryResponse = GallerySummary[];
 export type VersionsResponse = FilmVersion[];
 export interface UndoRedoResponse {
   version: number;

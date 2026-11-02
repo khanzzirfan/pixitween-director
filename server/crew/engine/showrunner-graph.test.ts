@@ -1,13 +1,11 @@
-import { existsSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { MemorySaver } from '@langchain/langgraph';
 import { describe, expect, it } from 'vitest';
 import type { InboxItem } from '@shared/crew';
 import type { ChatMessage, LlmBackend, ToolCall } from '@shared/ports';
 import type { Scene } from '@shared/storyboard';
 import { makeTestCrew, waitFor } from '../test-helpers';
-import { FileSaver } from './checkpointer';
+import { openDatabase } from '../../db/open';
+import { SqliteSaver } from './sqlite-saver';
 import { TERMINAL } from '../board';
 import { DONE_NUDGE, WRAPPING } from '../showrunner';
 import { createShowrunnerGraph } from './showrunner-graph';
@@ -82,9 +80,8 @@ describe('the showrunner graph', () => {
 
   it('resumes a run that was stopped mid-turn', async () => {
     const t = await makeTestCrew();
-    const dir = mkdtempSync(join(tmpdir(), 'crew-graph-abort-'));
-    const file = join(dir, 'showrunner.json');
-    const first = createShowrunnerGraph({ crew: t.crew, backend: scripted([planning]), model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 200, checkpointer: new FileSaver(file) });
+    const db = openDatabase(':memory:');
+    const first = createShowrunnerGraph({ crew: t.crew, backend: scripted([planning]), model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 200, checkpointer: new SqliteSaver(db) });
     const ac = new AbortController();
     const run = first.run(ac.signal);
     t.inbox.push(item('system', 'New film: a cold-brew can'));
@@ -93,7 +90,7 @@ describe('the showrunner graph', () => {
     await run;
 
     const second = scripted([[{ name: 'say', args: { text: 'picked up' } }]]);
-    const resumed = createShowrunnerGraph({ crew: t.crew, backend: second, model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 40, checkpointer: new FileSaver(file) });
+    const resumed = createShowrunnerGraph({ crew: t.crew, backend: second, model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 40, checkpointer: new SqliteSaver(db) });
     const resumedRun = resumed.run(new AbortController().signal);
     await new Promise((r) => setTimeout(r, 10));
     t.inbox.push(item('user', 'carry on'));
@@ -104,15 +101,14 @@ describe('the showrunner graph', () => {
 
   it('resumes the same thread with its history after a restart', async () => {
     const t = await makeTestCrew();
-    const dir = mkdtempSync(join(tmpdir(), 'crew-graph-'));
-    const file = join(dir, 'showrunner.json');
-    const first = createShowrunnerGraph({ crew: t.crew, backend: scripted([planning]), model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 40, checkpointer: new FileSaver(file) });
+    const db = openDatabase(':memory:');
+    const first = createShowrunnerGraph({ crew: t.crew, backend: scripted([planning]), model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 40, checkpointer: new SqliteSaver(db) });
     t.inbox.push(item('system', 'New film: a cold-brew can'));
     await first.run(new AbortController().signal);
-    expect(existsSync(file)).toBe(true);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM lg_checkpoints').get()).not.toEqual({ n: 0 });
 
     const second = scripted([[{ name: 'say', args: { text: 'still here' } }]]);
-    const resumed = createShowrunnerGraph({ crew: t.crew, backend: second, model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 30, checkpointer: new FileSaver(file) });
+    const resumed = createShowrunnerGraph({ crew: t.crew, backend: second, model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 30, checkpointer: new SqliteSaver(db) });
     const resumedRun = resumed.run(new AbortController().signal);
     await new Promise((r) => setTimeout(r, 10));
     t.inbox.push(item('user', 'one more thing'));

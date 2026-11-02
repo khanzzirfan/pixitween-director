@@ -35,4 +35,5 @@ it('a motion scene still gets a shape background and the product layer', async (
   await ensureSceneBasics({ ctx: t.ctx, scene: scene('mist', 'motion'), product: { assetId: t.productId }, palette: ['#180d0a'] });
   const ls = await layers(t);
   expect(ls.map((l) => [l.id, l.kind])).toEqual([['mist:bg', 'shape'], ['mist:product', 'image']]);
+  expect(ls.find((l) => l.id === 'mist:product')!.assetId).not.toBe(t.productId);
 });

@@ -4,12 +4,11 @@ import { Buffer } from 'node:buffer';
 import type { Hono } from 'hono';
 import { formatPrice, parseFeed, shownPrice, type Product } from '@shared/catalog';
 import type { Aspect } from '@shared/composition';
-import { BRIEF_MAX, newLineupId, type Lineup, type LineupItem } from '@shared/lineup';
-import { bindDirector, runDirector } from '../../agent/director';
+import { BRIEF_MAX, newLineupId, type LineupItem } from '@shared/lineup';
 import { resolvePhoto } from '../../lineup/photos';
-import { bindCrew, runCrew } from '../../crew/run-crew';
 import { loadEnv } from '../../env';
 import { imageSize } from '../../media/image';
+import { runLineup } from '../../lineup/runner';
 import { createLineupStore, type LineupStore } from '../../lineup/store';
 import type { AppDeps } from '../deps';
 import { readFileSync } from 'node:fs';
@@ -18,7 +17,6 @@ const DEMO_FEED = 'fixtures/catalog/feed-6.csv';
 /** Every product is a full film with a paid crew, so a line-up is kept short. */
 const MAX_PRODUCTS = 12;
 const ASPECTS: readonly Aspect[] = ['9:16', '16:9', '1:1'];
-const STOPPED = 'stopped: the server restarted before this film was finished';
 
 const isFile = (v: unknown): v is File => typeof File !== 'undefined' && v instanceof File;
 
@@ -31,16 +29,6 @@ export function productBrief(p: Product, brief: string): string {
 export function registerLineupRoutes(app: Hono, deps: AppDeps): void {
   let store: LineupStore | undefined;
   const lineups = (): LineupStore => (store ??= createLineupStore({ dir: deps.dataDir ?? loadEnv().DATA_DIR }));
-  const active = new Set<string>();
-
-  /** A line-up whose runner is gone (a restart) is settled on the first read: what was unfinished ends failed. */
-  async function settle(l: Lineup): Promise<Lineup> {
-    if (active.has(l.id) || l.items.every((i) => i.state === 'done' || i.state === 'failed')) return l;
-    let next = l;
-    for (const i of l.items) if (i.state === 'making' || i.state === 'waiting') next = await lineups().setItem(l.id, i.product.id, { state: 'failed', error: STOPPED });
-    return next;
-  }
-
   app.post('/api/lineups', async (c) => {
     const form = await c.req.formData().catch(() => undefined);
     if (!form) return c.json({ error: 'bad_request', message: 'Send the feed as multipart/form-data.' }, 400);
@@ -94,24 +82,7 @@ export function registerLineupRoutes(app: Hono, deps: AppDeps): void {
     if (!items.some((i) => i.filmId)) return c.json({ error: 'no_photos', message: items[0]?.error ?? 'No product had a photo.' }, 400);
     const lineup = await lineups().create({ id: newLineupId(), aspect: aspect as Aspect, createdAt: new Date().toISOString(), brief, items });
 
-    bindDirector(deps);
-    if (env.CREW_ENABLED) bindCrew(deps);
-    active.add(lineup.id);
-    void (async () => {
-      // strictly one after another: the next film starts when the last one has finished, ready or failed
-      for (const item of lineup.items) {
-        if (!item.filmId) continue;
-        await lineups().setItem(lineup.id, item.product.id, { state: 'making' });
-        try {
-          await (env.CREW_ENABLED ? runCrew(item.filmId) : runDirector(item.filmId));
-          const film = await deps.films.get(item.filmId);
-          await lineups().setItem(lineup.id, item.product.id, film.status === 'failed' ? { state: 'failed', error: 'the film did not finish' } : { state: 'done' });
-        } catch (e) {
-          console.error(`lineup ${lineup.id} film ${item.filmId} failed:`, e);
-          await lineups().setItem(lineup.id, item.product.id, { state: 'failed', error: e instanceof Error ? e.message.slice(0, 200) : 'the film failed' });
-        }
-      }
-    })().finally(() => active.delete(lineup.id));
+    void runLineup(deps, lineup.id, lineups()).catch((e) => console.error(`lineup ${lineup.id} failed:`, e));
 
     return c.json({ lineupId: lineup.id, filmIds: lineup.items.flatMap((i) => (i.filmId ? [i.filmId] : [])) }, 202);
   });
@@ -119,6 +90,6 @@ export function registerLineupRoutes(app: Hono, deps: AppDeps): void {
   app.get('/api/lineups/:id', async (c) => {
     const l = await lineups().get(c.req.param('id'));
     if (!l) return c.json({ error: 'not_found' }, 404);
-    return c.json(await settle(l));
+    return c.json(l);
   });
 }

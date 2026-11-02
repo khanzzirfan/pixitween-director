@@ -1,7 +1,5 @@
 // Owned by S7b. Persists in-flight generation state so a restart can resume it.
-import { randomBytes } from 'node:crypto';
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { getDb } from '../db/open';
 import { loadEnv } from '../env';
 
 export type JobStatus = 'submitted' | 'rendering' | 'downloading' | 'placing' | 'checking' | 'done' | 'failed' | 'cancelled' | 'timed_out';
@@ -32,54 +30,31 @@ export interface JobStore {
   listActive(): Promise<JobRecord[]>;
 }
 
-export function createJobStore(o: { filmsDir?: string } = {}): JobStore {
-  const filmsDir = () => o.filmsDir ?? join(loadEnv().DATA_DIR, 'films');
-  const fileFor = (filmId: string, sceneId: string) => join(filmsDir(), filmId, 'generate', `${sceneId}.json`);
+export function createJobStore(o: { dataDir?: string } = {}): JobStore {
+  const db = () => getDb(o.dataDir ?? loadEnv().DATA_DIR);
 
   return {
     async save(record) {
-      const file = fileFor(record.filmId, record.sceneId);
-      await mkdir(join(filmsDir(), record.filmId, 'generate'), { recursive: true });
-      const tmp = `${file}.${randomBytes(4).toString('hex')}.tmp`;
-      await writeFile(tmp, JSON.stringify(record, null, 2));
-      await rename(tmp, file);
+      db()
+        .prepare(
+          `INSERT INTO generate_jobs (film_id, scene_id, status, record_json, updated_at) VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT (film_id, scene_id) DO UPDATE SET status = excluded.status, record_json = excluded.record_json, updated_at = excluded.updated_at`,
+        )
+        .run(record.filmId, record.sceneId, record.status, JSON.stringify(record), record.updatedAt);
     },
 
     async get(filmId, sceneId) {
-      try {
-        return JSON.parse(await readFile(fileFor(filmId, sceneId), 'utf8')) as JobRecord;
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-        throw e;
-      }
+      const row = db().prepare('SELECT record_json FROM generate_jobs WHERE film_id = ? AND scene_id = ?').get(filmId, sceneId) as
+        { record_json: string } | undefined;
+      return row ? (JSON.parse(row.record_json) as JobRecord) : undefined;
     },
 
     async listActive() {
-      const out: JobRecord[] = [];
-      let films: string[];
-      try {
-        films = await readdir(filmsDir());
-      } catch {
-        return out;
-      }
-      for (const film of films) {
-        let files: string[];
-        try {
-          files = (await readdir(join(filmsDir(), film, 'generate'))).filter((f) => f.endsWith('.json'));
-        } catch {
-          continue;
-        }
-        for (const f of files) {
-          const path = join(filmsDir(), film, 'generate', f);
-          try {
-            const rec = JSON.parse(await readFile(path, 'utf8')) as JobRecord;
-            if (isActiveStatus(rec.status)) out.push(rec);
-          } catch {
-            console.warn(`generate jobs: skipping unreadable job file ${path}`);
-          }
-        }
-      }
-      return out;
+      const marks = ACTIVE.map(() => '?').join(',');
+      const rows = db()
+        .prepare(`SELECT record_json FROM generate_jobs WHERE status IN (${marks}) ORDER BY film_id, scene_id`)
+        .all(...ACTIVE) as { record_json: string }[];
+      return rows.map((r) => JSON.parse(r.record_json) as JobRecord);
     },
   };
 }

@@ -61,11 +61,20 @@ describe('visual prompt', () => {
   });
   it('exports the schema and the allowlist', () => {
     expect(VISUAL_SCHEMA.required).toEqual(['sceneId', 'pass', 'issues', 'fixes']);
+    expect(VISUAL_SCHEMA.additionalProperties).toBe(false);
+    expect(VISUAL_SCHEMA.properties.issues.items.additionalProperties).toBe(false);
+    expect(VISUAL_SCHEMA.properties.fixes.items.additionalProperties).toBe(false);
+    expect(VISUAL_SCHEMA.properties.fixes.items.properties.args.type).toBe('string');
     expect(ALLOWED_FIX_TOOLS).toHaveLength(7);
   });
 });
 
 describe('parseVisualVerdict', () => {
+  it('reads fix args sent as a JSON string', () => {
+    const raw = JSON.stringify({ sceneId: 's1', pass: false, issues: [], fixes: [{ tool: 'setTransform', args: JSON.stringify({ layerId: 's1:product', y: 400 }) }] });
+    const { verdict } = parseVisualVerdict(raw, { sceneId: 's1', frameTimes: [1] });
+    expect(verdict.fixes).toEqual([{ tool: 'setTransform', args: { layerId: 's1:product', y: 400 } }]);
+  });
   it('keeps the seed verdict issues against one frame at 1.25 s', () => {
     const { verdict, dropped } = parseVisualVerdict(seedContent, { sceneId: 's1', frameTimes: [1.25] });
     expect(verdict.issues.map((i) => i.kind)).toEqual(['text-over-product', 'low-contrast']);

@@ -1,5 +1,6 @@
 import type { Hono } from 'hono';
 import { isAssetId, isFilmId } from '@shared/composition';
+import { toGallerySummaries } from '@shared/gallery';
 import type { AppDeps } from './deps';
 import { registerSseRoute } from './sse';
 
@@ -8,6 +9,9 @@ const notFound = { error: 'not_found' } as const;
 export function registerReadRoutes(app: Hono, deps: AppDeps): void {
   // a take's child film is part of its parent, not a film of its own
   app.get('/api/films', async (c) => c.json((await deps.films.list()).filter((f) => !f.parentId)));
+
+  // what the gallery grid shows, without any composition on the wire; defined before :id so 'gallery' is never read as an id
+  app.get('/api/gallery', async (c) => c.json(toGallerySummaries((await deps.films.list()).filter((f) => !f.parentId))));
 
   app.get('/api/films/:id', async (c) => {
     const id = c.req.param('id');

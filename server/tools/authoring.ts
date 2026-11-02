@@ -91,9 +91,12 @@ export const tools: ToolDef[] = [
       // the raw product photo still has its studio background: it would sit on the plate as a grey rectangle (and replace the cut-out)
       if (a.assetId) {
         const film = await ctx.films.get(ctx.filmId);
-        const raw = film.assets.some((x) => x.id === a.assetId && x.role === 'product-photo');
-        const cut = raw ? await filmCutout(ctx) : undefined;
-        if (raw && cut) return { ok: false, error: `asset ${a.assetId} is the raw product photo with its studio background. Use the cut-out ${cut.id}, or call placeProduct; never add the photo as a layer.` };
+        const raw = a.role === 'product' && film.assets.some((x) => x.id === a.assetId && x.role === 'product-photo');
+        if (raw) {
+          const cut = await filmCutout(ctx);
+          const which = cut ? ` Use the cut-out ${cut.id}, or call placeProduct.` : ' Call placeProduct so the product is cut out of the photo.';
+          return { ok: false, error: `asset ${a.assetId} is the raw product photo with its studio background.${which} Never add the photo as a layer.` };
+        }
       }
       return runAuthoring(ctx, `addLayer ${a.sceneId}:${a.role}`, (c) => {
         const before = new Set(Object.keys(readDirector(c).layers));

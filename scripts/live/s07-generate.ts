@@ -161,8 +161,8 @@ export const run: LiveScript['run'] = async ({ log }) => {
       if (e.event.type === 'generate.progress') statuses.push({ status: e.event.status.replace(/^(failed:).*/, '$1 (see report)'), atSec: Math.round((Date.now() - t0) / 100) / 10 });
     });
 
-    const approvals = createApprovalStore({ dir: () => join(dir, 'films', film.id) });
-    const jobs = createJobStore({ filmsDir: join(dir, 'films') });
+    const approvals = createApprovalStore({ dataDir: dir });
+    const jobs = createJobStore({ dataDir: dir });
     const runner = createRunner({
       clippy: () => oneClipOnly(clippy), approvals, jobs, rate: createRateLimiter({ max: 1 }),
       env: { PUBLIC_BASE_URL: env.PUBLIC_BASE_URL, DATA_DIR: dir },

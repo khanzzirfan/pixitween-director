@@ -18,7 +18,7 @@ export const SCALE_DRIFT = 0.35;
 /** RGB distance from every bible colour that counts as a different colour. */
 export const PALETTE_DISTANCE = 48;
 
-export type ContinuityFinding = Omit<Finding, 'rule'> & { rule: Finding['rule'] | 'C1' | 'C2' | 'C3' };
+export type ContinuityFinding = Omit<Finding, 'rule'> & { rule: Finding['rule'] | 'C1' | 'C2' | 'C3' | 'C4' };
 
 const rgb = (hex: string): [number, number, number] | undefined => {
   const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
@@ -102,15 +102,39 @@ function typeDrift(comp: Comp, bible: StyleBible): ContinuityFinding[] {
   return out;
 }
 
-/** The S5a rules for every scene, plus the three cross-scene checks. Without a bible only the scale check runs. */
+/** The product layer is still the uploaded photo, so its studio background is in the frame. */
+export function studioBackdrop(comp: Comp, photoIds: readonly string[]): ContinuityFinding[] {
+  const ids = new Set(photoIds);
+  if (!ids.size) return [];
+  const out: ContinuityFinding[] = [];
+  for (const s of listScenes(comp)) {
+    const product = layersOf(comp, s.precompId).find((l) => roleOf(comp, l.id) === 'product');
+    const assetId = typeof product?.assetId === 'string' ? product.assetId : undefined;
+    if (!product || !assetId || !ids.has(assetId)) continue;
+    out.push({
+      id: `C4:${s.sceneId}:studio-backdrop`,
+      rule: 'C4',
+      kind: 'studio-backdrop',
+      severity: 'error',
+      sceneId: s.sceneId,
+      layerId: product.id,
+      evidence: 'the product is still the untouched photo, so its studio background sits in frame as a rectangle. Cut it out and rebuild the scene.',
+      metrics: { assetId },
+    });
+  }
+  return out;
+}
+
+/** The S5a rules for every scene, plus the cross-scene checks. Without a bible only the scale check runs. photoIds are the film's raw product photos. */
 export async function runContinuity(
   comp: Comp,
   assets: { read(id: string): Promise<Buffer> } | null,
   bible?: StyleBible,
   storyboard?: Storyboard,
+  photoIds: readonly string[] = [],
 ): Promise<ContinuityFinding[]> {
   const { findings } = await runRules(comp, assets, storyboard ? { storyboard } : {});
-  return [...findings, ...scaleDrift(comp, storyboard), ...(bible ? [...paletteDrift(comp, bible), ...typeDrift(comp, bible)] : [])];
+  return [...findings, ...scaleDrift(comp, storyboard), ...(bible ? [...paletteDrift(comp, bible), ...typeDrift(comp, bible)] : []), ...studioBackdrop(comp, photoIds)];
 }
 
 /** The findings each film's last continuity run reported, so a run pushes only what is new. */
@@ -122,7 +146,8 @@ export async function runContinuityJob(job: Job, signal: AbortSignal, crew: Crew
   try {
     const film = await crew.films.get(job.filmId);
     if (!film.composition) return { summary: 'no composition yet', model: 'rules' };
-    const found = await runContinuity(film.composition as Comp, { read: (id: string) => crew.toolCtx.assets.read(id) }, film.styleBible, film.storyboard);
+    const photos = film.assets.filter((a) => a.role === 'product-photo').map((a) => a.id);
+    const found = await runContinuity(film.composition as Comp, { read: (id: string) => crew.toolCtx.assets.read(id) }, film.styleBible, film.storyboard, photos);
     const previous = lastSeen.get(job.filmId) ?? new Set<string>();
     const fresh = found.filter((f) => !previous.has(f.id));
     lastSeen.set(job.filmId, new Set(found.map((f) => f.id)));

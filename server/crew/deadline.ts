@@ -9,8 +9,8 @@ const END: Record<Exclude<Phase, 'wrap'>, number> = { plan: 25 / 180, build: 110
 /** A build job aborts after this share of the deadline; a build that starts in the polish phase gets the shorter late share. */
 const BUILD_JOB = 80 / 180;
 const LATE_BUILD_JOB = 45 / 180;
-/** After this share, a rebuild or restyle becomes an edit. After the late share, only checks and edits start. */
-const NOTE_EDIT_ONLY = 60 / 180;
+/** After the build phase, a rebuild or restyle becomes an edit. After the late share, only checks and edits start. */
+const NOTE_EDIT_ONLY = END.build;
 const NOTE_REFUSED = 150 / 180;
 
 export interface Deadline {

@@ -65,7 +65,7 @@ export interface FilmStore {
     source: FilmVersion['source'],
     note?: string,
   ): Promise<{ ok: true; version: number } | { ok: false; issues: unknown }>;
-  // Read, apply, validate and commit as ONE step inside the per-film lock (D-15).
+  // Read, apply, validate and commit as ONE step inside one transaction (D-15).
   // `fn` is pure and SYNCHRONOUS. If it throws, nothing is stored, the lock is released and the error is rethrown.
   mutate<T>(
     id: FilmId,

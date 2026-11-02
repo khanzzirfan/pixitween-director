@@ -18,6 +18,8 @@ import type { JobKind } from '@shared/crew';
 import { createFakeCrew } from './fake-showrunner';
 import { createId } from './ids';
 import { createInbox, type Inbox } from './inbox';
+import { corpusFor, lessonsBlock, recordOutcome } from '../corpus/store';
+import { getDb } from '../db/open';
 import { createCrewPersist } from './persist';
 import { createScheduler, type Scheduler } from './scheduler';
 import { newTurn, type CrewCtx } from './showrunner-tools';
@@ -135,9 +137,11 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
         // a photo that cannot be read is left out; the film still has its hero
       }
     }
-    const common = { crew, backend, model, productImageUrl, extraPhotos, heroPhotoId: film.brief.productAssetId, events: () => events, idleEndMs: o.idleEndMs ?? env.CREW_IDLE_END_MS, deadline };
-    const [{ createShowrunnerGraph }, { createCrewCheckpointer }] = await Promise.all([import('./engine/showrunner-graph'), import('./engine/checkpointer')]);
-    const checkpointer = createCrewCheckpointer(deps.dataDir ?? env.DATA_DIR, filmId);
+    const corpusDb = getDb(deps.dataDir ?? env.DATA_DIR);
+    const lessons = corpusFor(corpusDb, film.brief.text, 5, filmId);
+    const common = { crew, backend, model, lessons: lessonsBlock(lessons), productImageUrl, extraPhotos, heroPhotoId: film.brief.productAssetId, events: () => events, idleEndMs: o.idleEndMs ?? env.CREW_IDLE_END_MS, deadline };
+    const [{ createShowrunnerGraph }, { SqliteSaver }] = await Promise.all([import('./engine/showrunner-graph'), import('./engine/sqlite-saver')]);
+    const checkpointer = new SqliteSaver(getDb(deps.dataDir ?? env.DATA_DIR));
     const showrunner = createShowrunnerGraph({ ...common, checkpointer, threadId: filmId });
 
     const ac = new AbortController();
@@ -176,6 +180,12 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
           // keep the original failure
         }
       } finally {
+        try {
+          const end = await deps.films.get(filmId);
+          recordOutcome(corpusDb, { filmId, briefText: film.brief.text, entryIds: lessons.map((l) => l.id), status: end.status, costUsd: deps.ledger.total(filmId) });
+        } catch (e) {
+          console.error('corpus outcome not recorded', e);
+        }
         clearTimeout(wrapTimer);
         unsubscribe();
         inbox.close();

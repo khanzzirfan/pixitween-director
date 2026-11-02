@@ -1,5 +1,4 @@
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { getDb } from '../db/open';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { LlmBackend, ToolCall } from '@shared/ports';
 import type { Scene } from '@shared/storyboard';
@@ -184,7 +183,8 @@ describe('runCrew', () => {
     const film = await deps.films.get(deps.filmId);
     expect(film.status).toBe('ready');
     expect(deps.events.filter((e) => e.type === 'film.status').map((e) => (e as { status: string }).status)).toEqual(['planning', 'building', 'ready']);
-    expect(existsSync(join(deps.dir, 'films', deps.filmId, 'crew', 'checkpoints', 'showrunner.json'))).toBe(true);
+    expect(getDb(deps.dir).prepare('SELECT COUNT(*) AS n FROM lg_checkpoints WHERE thread_id = ?').get(deps.filmId)).not.toEqual({ n: 0 });
+    expect(getDb(deps.dir).prepare('SELECT status, entry_ids_json FROM film_outcomes WHERE film_id = ?').get(deps.filmId)).toMatchObject({ status: 'ready' });
   });
 
   it('a LangGraph session stopped mid-build resumes with no duplicate job and no lost inbox item', async () => {
@@ -236,7 +236,7 @@ describe('runCrew', () => {
     expect(deps.events.some((e) => e.type === 'showrunner.say' && e.text === 'still here')).toBe(true);
   });
 
-  it('saves the board under data/films/<id>/crew/board.json and can resume it', async () => {
+  it('saves the board in director.db and can resume it', async () => {
     const deps = await makeTestDeps();
     registerWorker('build-scene', async () => ({ summary: 'ok' }));
     const backend = scripted([[

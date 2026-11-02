@@ -9,16 +9,19 @@ export const DIRECTION = `Direction:
 - One idea, one hero moment about two thirds through, and an ending that answers the opening. Say the film in one sentence before you plan it.
 - The first scene's headline says what the film is about in plain words, large, readable with the sound off within 3 seconds. Never open on a slow logo.
 - Something new happens every 2 to 4 seconds. Give each scene one event that completes, then a still moment to read it.
-- Every build brief names the motion: what enters, from which side, how far and how long, what holds still while it is read, and what the one hero element does. "Make it nice" is not a brief.
+- Every build brief names the motion: what enters, from which side, how far and how long, what holds still while it is read, and what the one hero element does. "Make it nice" is not a brief. The scene beats are that shot. A few pixels of drift is not.
+- The product photo still has its studio background. A scene is not built until the product is cut out of it. When continuity reports studio-backdrop, rebuild that scene.
 - Avoid: a centred title on a gradient, everything fading in together, linear easing, glows and particles, placeholder text, and a sign that repeats what the picture shows.`;
 
 /** The builder's craft block, for our tools: four eases, keyframes, layers. The recipe is the minimum. */
-export const BUILDER_DIRECTION = `CRAFT (the recipe is the minimum; add at least one authored move that fits the intent)
-- Entrances use opacity plus 10 to 28 px of travel (or scale 0.88 to 0.98), ease easeOut, 0.4 to 0.8 s. Exits use easeIn and last about half as long. Never opacity alone.
+export const BUILDER_DIRECTION = `CRAFT (the recipe is the minimum; the beats are the shot)
+- Perform the scene beats with setKeyframes on the product: what enters, from where, how far, how long, and the one hero move. A camera dolly does not replace them. A hold may drift 1 to 3 % scale. Never replace the beats with a push of a few pixels.
+- Cut the product out with placeProduct before you animate it. Never add the product photo as a layer: its studio background would sit on the plate as a rectangle, and that call is refused.
+- Text entrances use opacity plus 10 to 28 px of travel (or scale 0.88 to 0.98), ease easeOut, 0.4 to 0.8 s. Exits use easeIn and last about half as long. Never opacity alone.
 - Moves between states use easeInOut, 0.6 to 1.1 s. Use linear only for continuous drift or rotation.
 - Stagger several elements 0.05 to 0.15 s apart. Do not start everything at once, and do not give everything the same curve and length.
 - Text holds still for max(1.5 s, 1 s + 0.3 s per word) after it finishes arriving. Headline at least 84 px, other key text at least 48 px, full opacity, high contrast against what is behind it.
-- Let the hero element move last and most. One secondary element may drift slowly (1 to 3 % scale) during a hold; the rest stays still.
+- Let the hero element move last and most.
 - Avoid: a centred title on a gradient, glows, particles, rainbow gradients, an unlit flat background, and text that repeats the picture.`;
 
 const SHOWRUNNER_BASE = `You are the showrunner of a small film crew making a short animated product film (10 to 30 seconds).
@@ -96,7 +99,8 @@ export function renderOutlineBlock(storyboard: Storyboard, sceneId: string): str
   storyboard.scenes.forEach((s, i) => {
     const intent = s.intent.length > 60 ? `${s.intent.slice(0, 57)}...` : s.intent;
     const text = s.text ? `"${s.text}"` : '(no headline yet)';
-    lines.push(i === index ? `${i + 1} ${s.id} · ${s.durationSec} s · ← YOU` : `${i + 1} ${s.id} · ${s.durationSec} s · ${intent} · ${text}`);
+    const beats = s.beats ? `\n   beats: ${s.beats}` : '';
+    lines.push(i === index ? `${i + 1} ${s.id} · ${s.durationSec} s · ← YOU${beats}` : `${i + 1} ${s.id} · ${s.durationSec} s · ${intent} · ${text}`);
   });
   lines.push("Do not repeat another scene's headline or shot. The text lane places and styles your text after you finish.");
   return lines.join('\n');

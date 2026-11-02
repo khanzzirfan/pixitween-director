@@ -5,7 +5,7 @@ import { addLayer, addScene, newFilmComposition, registerAsset } from '../author
 import { makeTestFilm } from '../test-utils/film';
 import { imageSize } from '../media/image';
 import { runTool } from '../tools/registry';
-import { cutout, selectObject } from './cutout';
+import { cutout, selectObject, studioKey } from './cutout';
 import { lintPrompt, extractBrandTerms } from './lint';
 import { coverCrop } from './stills';
 import type { SamObject } from '@shared/ports';
@@ -48,6 +48,21 @@ it('chooses the highest-area eligible SAM object, then confidence on ties', () =
     ])?.objectId,
   ).toBe('b');
   expect(selectObject([object('low', 0.1, { left: 0, top: 0, right: 10, bottom: 10 })])).toBeUndefined();
+});
+
+it('keys a product on a white studio background without calling SAM', async () => {
+  const t = await makeTestFilm();
+  const source = await sharp({ create: { width: 80, height: 80, channels: 3, background: '#ffffff' } })
+    .composite([{ input: await sharp({ create: { width: 30, height: 16, channels: 3, background: '#111111' } }).png().toBuffer(), left: 20, top: 32 }])
+    .png()
+    .toBuffer();
+  const keyed = await studioKey(source);
+  expect(keyed?.objectId).toBe('studio-key');
+  const cut = await cutout(t.ctx, { source, noun: 'shoe', sceneId: 's1' });
+  expect(t.meta.calls.filter((call) => call.client === 'sam')).toHaveLength(0);
+  expect(t.ledger.total(t.filmId)).toBe(0);
+  expect(cut.cutout.width).toBeLessThan(80);
+  expect(cut.objectId).toBe('studio-key');
 });
 
 describe('SAM cutout and placeProduct tool', () => {

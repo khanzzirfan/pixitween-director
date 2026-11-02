@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Buffer } from 'node:buffer';
 import { ASSET_ID_RE, type AssetRef } from '@shared/composition';
 import type { AssetStore } from '@shared/ports';
+import { getDb } from '../db/open';
 import { imageSize } from '../media/image';
 
 export const DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -59,14 +60,12 @@ export function createAssetStore(opts: AssetStoreOptions): FileAssetStore {
   const checkId = (id: string) => {
     if (!ASSET_ID_RE.test(id)) throw new AssetNotFoundError(String(id));
   };
-  const readMeta = async (id: string): Promise<Omit<AssetRef, 'url'>> => {
+  const db = getDb(opts.dir);
+  const readMeta = (id: string): Omit<AssetRef, 'url'> => {
     checkId(id);
-    try {
-      return JSON.parse(await readFile(join(dir, `${id}.json`), 'utf8')) as Omit<AssetRef, 'url'>;
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'ENOENT') throw new AssetNotFoundError(id);
-      throw e;
-    }
+    const row = db.prepare('SELECT meta_json FROM assets WHERE id = ?').get(id) as { meta_json: string } | undefined;
+    if (!row) throw new AssetNotFoundError(id);
+    return JSON.parse(row.meta_json) as Omit<AssetRef, 'url'>;
   };
   const atomicWrite = async (file: string, data: Buffer | string) => {
     const tmp = `${file}.${randomBytes(4).toString('hex')}.tmp`;
@@ -87,30 +86,36 @@ export function createAssetStore(opts: AssetStoreOptions): FileAssetStore {
         ref.width = size.width;
         ref.height = size.height;
       }
+      // Bytes first: a crash leaves an orphan file, never a row pointing at nothing.
       await atomicWrite(join(dir, `${id}.${ext}`), bytes);
-      await atomicWrite(join(dir, `${id}.json`), JSON.stringify(ref));
+      db.prepare('INSERT INTO assets (id, mime, file, bytes, created_at, meta_json) VALUES (?, ?, ?, ?, ?, ?)').run(
+        id,
+        mime,
+        `${id}.${ext}`,
+        bytes.length,
+        new Date().toISOString(),
+        JSON.stringify(ref),
+      );
       return { ...ref, url: url(id) };
     },
     async read(id) {
-      const ref = await readMeta(id);
+      const ref = readMeta(id);
       return readFile(join(dir, `${id}.${EXT[ref.mime]}`));
     },
     url,
     absoluteUrl: (id) => base + url(id),
     async get(id) {
-      return { ...(await readMeta(id)), url: url(id) };
+      return { ...readMeta(id), url: url(id) };
     },
     async has(id) {
-      if (!ASSET_ID_RE.test(id)) return false;
-      return stat(join(dir, `${id}.json`)).then(
-        () => true,
-        () => false,
-      );
+      return ASSET_ID_RE.test(id) && !!db.prepare('SELECT 1 FROM assets WHERE id = ?').get(id);
     },
     async list() {
-      const names = await readdir(dir).catch(() => [] as string[]);
-      const refs = await Promise.all(names.filter((n) => n.endsWith('.json')).map((n) => this.get(n.slice(0, -5))));
-      return refs;
+      const rows = db.prepare('SELECT meta_json FROM assets ORDER BY created_at, id').all() as { meta_json: string }[];
+      return rows.map((r) => {
+        const m = JSON.parse(r.meta_json) as Omit<AssetRef, 'url'>;
+        return { ...m, url: url(m.id) };
+      });
     },
   };
 }

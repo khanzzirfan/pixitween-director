@@ -1,9 +1,10 @@
-import type { Buffer } from 'node:buffer';
+import { Buffer } from 'node:buffer';
 import sharp from 'sharp';
 import type { AssetRef } from '@shared/composition';
 import type { SamObject } from '@shared/ports';
 import type { ToolCtx } from '@shared/tools';
 import { alphaCutout, imageSize } from '../media/image';
+import { backdropColor, whiteKeyAlpha } from './cutout-sheet';
 import { ArtError } from './errors';
 import { charge, emitAsset } from './events';
 import { PRICE } from './prices';
@@ -22,6 +23,40 @@ export function selectObject(objects: SamObject[], minConfidence = 0.5): SamObje
       return area(b) - area(a) || (b.confidence ?? 1) - (a.confidence ?? 1) || a.objectId.localeCompare(b.objectId);
     })[0];
 }
+/**
+ * A pack shot on a near-white studio sweep can be keyed without a model. Returns nothing when the border is not light, or when keying
+ * removes almost everything or almost nothing (a white product, or a photo that only happens to have a light edge).
+ */
+export async function studioKey(source: Buffer): Promise<SamObject | undefined> {
+  try {
+    const { width, height } = await imageSize(source);
+    const rgb = await sharp(source).removeAlpha().raw().toBuffer();
+    const bg = backdropColor(rgb, width, height);
+    if (bg[0] < 210 || bg[1] < 210 || bg[2] < 210) return undefined;
+    const alpha = whiteKeyAlpha(rgb, width, height, bg);
+    let ink = 0;
+    let left = width;
+    let top = height;
+    let right = 0;
+    let bottom = 0;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (alpha[y * width + x]! <= 128) continue;
+        ink++;
+        if (x < left) left = x;
+        if (y < top) top = y;
+        if (x + 1 > right) right = x + 1;
+        if (y + 1 > bottom) bottom = y + 1;
+      }
+    }
+    const frac = ink / (width * height);
+    if (frac < 0.02 || frac > 0.72 || right <= left) return undefined;
+    return { objectId: 'studio-key', bounds: { left, top, right, bottom }, alpha: Buffer.from(alpha), confidence: 1 };
+  } catch {
+    return undefined;
+  }
+}
+
 export async function cutout(
   ctx: ToolCtx,
   o: { source: Buffer; noun: string; sceneId?: string; minConfidence?: number; feather?: number; cacheKey?: string },
@@ -29,9 +64,9 @@ export async function cutout(
   if (o.cacheKey && cache.has(o.cacheKey)) return cache.get(o.cacheKey)!;
   const pending = (async () => {
     const { width, height } = await imageSize(o.source);
-    const objects = await ctx.meta.sam.segmentImage(o.source, o.noun);
-    charge(ctx, 'sam-3.1', '1 image', PRICE.samImageUsd);
-    const object = selectObject(objects, o.minConfidence ?? 0.5);
+    const keyed = await studioKey(o.source);
+    const object = keyed ?? selectObject(await ctx.meta.sam.segmentImage(o.source, o.noun), o.minConfidence ?? 0.5);
+    if (!keyed) charge(ctx, 'sam-3.1', '1 image', PRICE.samImageUsd);
     if (!object) throw new ArtError('no-object', `no ${o.noun} found in the photo`);
     if (object.alpha.length !== width * height)
       throw new ArtError('alpha-size-mismatch', `SAM alpha length ${object.alpha.length} does not match ${width}x${height}`);

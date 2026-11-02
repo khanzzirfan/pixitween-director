@@ -27,6 +27,12 @@ function film(heights: number[], o: { fill?: string; textFill?: string; font?: s
 const kinds = (f: Array<{ kind: string }>) => f.map((x) => x.kind);
 const heroes = board([scene('s1', 'hero'), scene('s2', 'hero')]);
 
+it('flags a product layer that is still the raw photo, and ignores a cut-out', async () => {
+  const raw = await runContinuity(film([0.4]), null, undefined, undefined, [PRODUCT]);
+  expect(raw.find((f) => f.kind === 'studio-backdrop')).toMatchObject({ rule: 'C4', severity: 'error', sceneId: 's1' });
+  expect(kinds(await runContinuity(film([0.4]), null))).not.toContain('studio-backdrop');
+});
+
 describe('product-scale-drift', () => {
   it('flags two hero scenes at 0.40 and 0.60 once, on the later scene', async () => {
     const found = (await runContinuity(film([0.4, 0.6]), null, undefined, heroes)).filter((f) => f.kind === 'product-scale-drift');

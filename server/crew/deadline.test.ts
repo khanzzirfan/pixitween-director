@@ -20,11 +20,12 @@ it('polish starts no rebuild, restyle or take, and wrap starts nothing', () => {
   expect(at(170_000).mayStart('critique')).toBe(false);
 });
 
-it('late notes become edits after 60 s and are refused after 150 s', () => {
-  expect(at(59_000).kindFor('restyle-scene')).toBe('restyle-scene');
-  expect(at(61_000).kindFor('restyle-scene')).toBe('edit');
-  expect(at(61_000).kindFor('rebuild-scene')).toBe('edit');
-  expect(at(61_000).kindFor('build-scene')).toBe('build-scene');
+it('late notes stay rebuilds through the build phase, become edits once polish starts, and are refused after 150 s', () => {
+  expect(at(109_000).kindFor('restyle-scene')).toBe('restyle-scene');
+  expect(at(109_000).kindFor('rebuild-scene')).toBe('rebuild-scene');
+  expect(at(111_000).kindFor('restyle-scene')).toBe('edit');
+  expect(at(111_000).kindFor('rebuild-scene')).toBe('edit');
+  expect(at(111_000).kindFor('build-scene')).toBe('build-scene');
   expect(at(151_000).kindFor('edit')).toBeUndefined();
   expect(at(151_000).kindFor('critique')).toBe('critique');
 });

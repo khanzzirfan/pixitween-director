@@ -5,6 +5,7 @@ import { beforeEach, expect, it } from 'vitest';
 import type { AepCompositionJson } from '@shared/aep';
 import type { FilmStore } from '@shared/ports';
 import { lightValidator } from '../engine/validate';
+import { createLedger } from '../ledger';
 import { fixturePath } from '../test-utils/fixtures';
 import { FilmNotFoundError, createFilmStore } from './film-store';
 
@@ -120,7 +121,7 @@ it('lists newest first', async () => {
   expect((await store.list()).map((f) => f.id)).toEqual([second.id, id]);
 });
 
-it('derives cost from ledger.jsonl', async () => {
+it('derives cost from the ledger', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'films-'));
   const s = createFilmStore({ dir, validator: lightValidator });
   const f = await s.create(brief);
@@ -129,4 +130,21 @@ it('derives cost from ledger.jsonl', async () => {
   l.add(f.id, 'm', 'u', 0.25);
   l.addCredits(f.id, 25, 'n');
   expect(await s.get(f.id)).toMatchObject({ costUsd: 0.25, clippyCredits: 25 });
+});
+
+it('list() returns each film exactly as get() does, with its ledger totals and head composition', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'films-list-'));
+  const films = createFilmStore({ dir, validator: lightValidator });
+  const ledger = createLedger({ dir, emit: () => undefined });
+  const a = await films.create(brief);
+  const b = await films.create(brief);
+  await films.commit(a.id, shape, 'director');
+  ledger.add(a.id, 'm', 'u', 0.5);
+  ledger.addCredits(a.id, 25, 'x');
+  const listed = await films.list();
+  expect(listed).toHaveLength(2);
+  for (const f of listed) expect(f).toEqual(await films.get(f.id));
+  expect(listed.find((f) => f.id === a.id)).toMatchObject({ costUsd: 0.5, clippyCredits: 25, version: 1 });
+  expect(listed.find((f) => f.id === a.id)?.composition).toBeDefined();
+  expect(listed.find((f) => f.id === b.id)).toMatchObject({ costUsd: 0, clippyCredits: 0, version: 0 });
 });

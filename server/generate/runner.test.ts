@@ -34,8 +34,8 @@ async function setup(o: { clip?: Buffer | 404; frac?: number; failSubmit?: Clipp
   const frames = 100;
   t.meta.sam.trackVideo = async () => ({ frames, framesWithObject: Array.from({ length: Math.round(frames * (o.frac ?? 0.9)) }, (_, i) => i), objectIds: ['0'] });
 
-  const approvals = createApprovalStore({ dir: () => t.dir });
-  const jobs = createJobStore({ filmsDir: join(t.dir, 'films') });
+  const approvals = createApprovalStore({ dataDir: t.dir });
+  const jobs = createJobStore({ dataDir: t.dir });
   const rate = createRateLimiter({ max: 4 });
   const clippy = makeFakeClippy({ script: ['queued', 'rendering', 'done'], resultUrl: URL_SECRET, failSubmit: o.failSubmit });
   const fetchImpl = (async () =>

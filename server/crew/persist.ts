@@ -1,25 +1,7 @@
-// Owned by S12a. Crew files under data/films/<id>/crew/, written atomically (temp file, then rename) like the film store.
-import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+// Owned by S12a. The crew's job board and per-job snapshots, one row each in director.db.
 import { jobSchema, type Job } from '@shared/crew';
+import { getDb } from '../db/open';
 import type { SceneSnapshot } from './scene-snapshot';
-
-async function writeJson(file: string, data: unknown): Promise<void> {
-  await mkdir(dirname(file), { recursive: true });
-  const tmp = `${file}.${randomBytes(4).toString('hex')}.tmp`;
-  await writeFile(tmp, JSON.stringify(data));
-  await rename(tmp, file);
-}
-
-async function readJson<T>(file: string): Promise<T | undefined> {
-  try {
-    return JSON.parse(await readFile(file, 'utf8')) as T;
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    throw e;
-  }
-}
 
 export interface CrewPersist {
   saveBoard(jobs: Job[]): Promise<void>;
@@ -30,18 +12,35 @@ export interface CrewPersist {
 }
 
 export function createCrewPersist(dataDir: string, filmId: string): CrewPersist {
-  const root = join(dataDir, 'films', filmId, 'crew');
-  const jobFile = (jobId: string) => {
+  const db = () => getDb(dataDir);
+  const checkJob = (jobId: string) => {
     if (!/^j\d+$/.test(jobId)) throw new Error(`bad job id '${jobId}'`);
-    return join(root, 'snapshots', `${jobId}.json`);
   };
   return {
-    saveBoard: (jobs) => writeJson(join(root, 'board.json'), jobs),
-    async loadBoard() {
-      const raw = await readJson<unknown[]>(join(root, 'board.json'));
-      return (raw ?? []).map((j) => jobSchema.parse(j));
+    async saveBoard(jobs) {
+      db()
+        .prepare(
+          'INSERT INTO crew_board (film_id, jobs_json, updated_at) VALUES (?, ?, ?) ON CONFLICT (film_id) DO UPDATE SET jobs_json = excluded.jobs_json, updated_at = excluded.updated_at',
+        )
+        .run(filmId, JSON.stringify(jobs), new Date().toISOString());
     },
-    saveSnapshot: (jobId, snap) => writeJson(jobFile(jobId), snap),
-    loadSnapshot: (jobId) => readJson<SceneSnapshot>(jobFile(jobId)),
+    async loadBoard() {
+      const row = db().prepare('SELECT jobs_json FROM crew_board WHERE film_id = ?').get(filmId) as { jobs_json: string } | undefined;
+      return (row ? (JSON.parse(row.jobs_json) as unknown[]) : []).map((j) => jobSchema.parse(j));
+    },
+    async saveSnapshot(jobId, snap) {
+      checkJob(jobId);
+      db()
+        .prepare(
+          'INSERT INTO crew_snapshots (film_id, job_id, snapshot_json) VALUES (?, ?, ?) ON CONFLICT (film_id, job_id) DO UPDATE SET snapshot_json = excluded.snapshot_json',
+        )
+        .run(filmId, jobId, JSON.stringify(snap));
+    },
+    async loadSnapshot(jobId) {
+      checkJob(jobId);
+      const row = db().prepare('SELECT snapshot_json FROM crew_snapshots WHERE film_id = ? AND job_id = ?').get(filmId, jobId) as
+        { snapshot_json: string } | undefined;
+      return row ? (JSON.parse(row.snapshot_json) as SceneSnapshot) : undefined;
+    },
   };
 }

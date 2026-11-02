@@ -12,7 +12,7 @@ const SERVER = fileURLToPath(new URL('..', import.meta.url));
 
 function approval(): ConsumedApproval {
   const dir = mkdtempSync(join(tmpdir(), 'guard-'));
-  const s = createApprovalStore({ dir: (f) => join(dir, f) });
+  const s = createApprovalStore({ dataDir: dir });
   return s.consume(s.propose('film1', 's2', 25).token, 'film1', 's2');
 }
 const args = (key?: string): AnimateImageArgs => ({ model: 'fast-h3', prompt: 'x', sourceImageUrl: 'https://a.example/i.jpg', durationSec: 5.2, aspect: '16:9', idempotencyKey: key });

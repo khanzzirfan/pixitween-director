@@ -28,7 +28,7 @@ export interface BoardDeps {
   emit(event: { type: 'job.update'; job: Job }): void;
   persist(jobs: Job[]): void | Promise<void>;
   now?: () => number;
-  /** Jobs read back from board.json. Ids continue after the highest one. */
+  /** Jobs read back from the saved board. Ids continue after the highest one. */
   initial?: Job[];
 }
 

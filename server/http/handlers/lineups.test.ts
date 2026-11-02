@@ -94,3 +94,30 @@ it('tells the crew the feed facts and the owner words', () => {
   expect(text).toContain('$95.00');
   expect(text).toContain('moody');
 });
+
+it('a restart resumes a line-up: the film being made re-enters the crew, waiting ones follow, done ones are left alone', async () => {
+  const { createLineupStore } = await import('../../lineup/store');
+  const { resumeLineups } = await import('../../lineup/runner');
+  const deps = await makeTestDeps();
+  process.env.DATA_DIR = deps.dir;
+  const store = createLineupStore({ dir: deps.dir });
+  const product = (id: string) => ({ id, title: id, category: 'mug', price: 10, currency: 'USD', imageUrl: `${id}.png`, link: 'https://x.test' }) as never;
+  const film = async () => (await deps.films.create({ aspect: '9:16', brief: { text: 't', productAssetId: 'ast_x' }, assets: [] })).id;
+  const [a, b, c] = [await film(), await film(), await film()];
+  await store.create({
+    id: 'lin_resume0001',
+    aspect: '9:16',
+    brief: '',
+    createdAt: new Date().toISOString(),
+    items: [
+      { product: product('p1'), filmId: a, state: 'done' },
+      { product: product('p2'), filmId: b, state: 'making' },
+      { product: product('p3'), filmId: c, state: 'waiting' },
+    ],
+  });
+  expect(resumeLineups(deps)).toEqual(['lin_resume0001']);
+  for (let i = 0; i < 200 && (await store.get('lin_resume0001'))!.items.some((x) => x.state !== 'done'); i++) await new Promise((r) => setTimeout(r, 20));
+  expect(order).toEqual([b, c]);
+  expect((await store.get('lin_resume0001'))!.items.map((x) => x.state)).toEqual(['done', 'done', 'done']);
+  expect(resumeLineups(deps)).toEqual([]);
+});

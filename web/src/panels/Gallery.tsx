@@ -1,7 +1,7 @@
 // Owned by S8a. Finished films as a grid; opening one sets ?film=<id>.
 import { goHome } from '../shell/nav';
 import { useCallback, useEffect, useState } from 'react';
-import type { FilmState } from '@shared/composition';
+import type { GallerySummary } from '@shared/gallery';
 import { api } from '../api/client';
 import './gallery/gallery.css';
 import { formatDuration, toGalleryItems, type GalleryItem } from './gallery/model';
@@ -10,7 +10,7 @@ import type { PanelProps } from './types';
 export const STUB_OWNER = 'S8a' as const;
 
 export interface GalleryProps extends Partial<PanelProps> {
-  fetchFilms?: () => Promise<FilmState[]>;
+  fetchFilms?: () => Promise<GallerySummary[]>;
   onOpen?: (filmId: string) => void;
   onReplay?: (filmId: string) => void;
 }
@@ -24,7 +24,7 @@ function defaultOpen(filmId: string, replay = false) {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-export default function Gallery({ fetchFilms = api.listFilms, onOpen = defaultOpen, onReplay = (id) => defaultOpen(id, true) }: GalleryProps) {
+export default function Gallery({ fetchFilms = api.listGallery, onOpen = defaultOpen, onReplay = (id) => defaultOpen(id, true) }: GalleryProps) {
   const [state, setState] = useState<{ kind: 'loading' } | { kind: 'error' } | { kind: 'ready'; items: GalleryItem[] }>({ kind: 'loading' });
 
   const load = useCallback(() => {

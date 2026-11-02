@@ -66,6 +66,17 @@ async function start(entries: Entry[], o: { image?: boolean; idleEndMs?: number;
 }
 
 describe('the loop', () => {
+  it('puts the corpus lessons in the system message, so folded history keeps them', async () => {
+    const t = await makeTestCrew({ runWorker: (_job, signal) => new Promise((_res, rej) => signal.addEventListener('abort', () => rej(new Error('stopped')))) });
+    const backend = scripted([[]]);
+    const showrunner = createShowrunner({ crew: t.crew, backend, model: 'muse-wonder-1.0', wrapUp: false, idleEndMs: 40, lessons: '\n\nLessons from past ads:\n- Hold the label.' });
+    const done = showrunner.run(new AbortController().signal);
+    t.inbox.push(item('system', 'New film: a cold-brew can'));
+    await done;
+    const system = backend.sent[0]!.find((m) => m.role === 'system')!;
+    expect(String(system.content)).toContain('Hold the label.');
+  });
+
   it('one planning turn leaves four jobs on the board, and prices the turn', async () => {
     const s = await start([planning], { instant: true });
     s.inbox.push(item('system', 'New film: a cold-brew can'));

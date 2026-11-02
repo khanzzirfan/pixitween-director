@@ -30,7 +30,7 @@ async function setup(o: { balance?: number | 'none'; modes?: Array<'motion' | 'g
   const dir = mkdtempSync(join(tmpdir(), 'gen-'));
   const clippy = o.balance === 'none' ? undefined : makeFakeClippy({ balance: o.balance ?? 120 });
   setGenerateServicesForTests({
-    approvals: createApprovalStore({ dir: (f) => join(dir, f), now: () => new Date(now) }),
+    approvals: createApprovalStore({ dataDir: dir, now: () => new Date(now) }),
     clippy,
     balance: createBalanceReader(clippy, { ttlMs: 0 }),
   });

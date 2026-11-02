@@ -1,7 +1,7 @@
 import type { ToolCtx } from '@shared/tools';
 import type { Scene } from '@shared/storyboard';
+import { productNoun } from './prompts/director';
 import { layerIdsByRole, markPlaceholder } from '../authoring/api';
-import { filmCutout } from '../tools/product-cutout';
 import { runTool } from '../tools/registry';
 
 export const PLACEHOLDER_TEXT = 'Clip pending approval';
@@ -40,9 +40,22 @@ export async function ensureSceneBasics(o: {
       comp = film.composition;
     } else await add({ sceneId: o.scene.id, role: 'bg', kind: 'shape', fill: o.palette[0] ?? '#111827' });
   }
-  if (!pending && comp && !layerIdsByRole(comp, 'product', o.scene.id).length && !layerIdsByRole(comp, 'product3d', o.scene.id).length)
-    // the cut-out when the film has one, so the default is not a photo rectangle with its studio background
-    await add({ sceneId: o.scene.id, role: 'product', kind: 'image', assetId: (o.product.own ? undefined : await filmCutout(o.ctx))?.id ?? o.product.assetId });
+  if (!pending && comp && !layerIdsByRole(comp, 'product', o.scene.id).length && !layerIdsByRole(comp, 'product3d', o.scene.id).length) {
+    if (o.product.own) await add({ sceneId: o.scene.id, role: 'product', kind: 'image', assetId: o.product.assetId });
+    else {
+      // the builder ran out of time before placeProduct. Cut the product out here, so the film never ships the studio rectangle.
+      const placed = await runTool(o.ctx, 'placeProduct', { sceneId: o.scene.id, source: 'photo', noun: productNoun(o.scene) }).catch((e: unknown) => ({
+        ok: false as const,
+        error: e instanceof Error ? e.message : String(e),
+      }));
+      if (placed.ok) {
+        const id = (placed.data as { layerId?: string } | undefined)?.layerId;
+        if (id) added.push(id);
+        film = await o.ctx.films.get(o.ctx.filmId);
+        comp = film.composition;
+      } else o.ctx.emit({ type: 'error', where: 'scene-basics', message: placed.error });
+    }
+  }
   if (comp && o.scene.text && !layerIdsByRole(comp, 'headline', o.scene.id).length)
     await add({ sceneId: o.scene.id, role: 'headline', kind: 'text', text: o.scene.text, style: { color: '#ffffff' } });
   if (comp && o.scene.mode === 'generate') {
