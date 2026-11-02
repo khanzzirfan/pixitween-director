@@ -25,7 +25,7 @@
         "`npm run lint` passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -51,7 +51,7 @@
         "`npm run lint` passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -83,7 +83,7 @@
         "`npm run lint` passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -112,7 +112,7 @@
         "`npm run lint` passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -143,7 +143,7 @@
         "`npm run lint` passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -175,7 +175,7 @@
         "`npm run lint` passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -204,7 +204,7 @@
         "`npm run lint` passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -233,7 +233,7 @@
         "`npm run lint` passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -261,7 +261,7 @@
         "`npm run lint` passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -292,7 +292,7 @@
         "`npm run lint` passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -320,7 +320,7 @@
         "`npm run lint` passes"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-001"
@@ -352,7 +352,7 @@
         "`npm run lint` passes"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-002",
@@ -395,7 +395,7 @@
         "`npm run lint` passes"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [],
       "labels": [
@@ -422,7 +422,7 @@
         "`npm run lint` passes"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-013"
@@ -457,8 +457,8 @@
         "`npm run lint` passes"
       ],
       "priority": 15,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Deviation: the required sentence says the history starts on 27 Oct 2026, but git's first commit is 2026-10-28, so the document says 28 Oct 2026 and the test checks it against git. The engine is described as source-available (its LICENSE says so), not open source. Live gates s04-art, s06-chat and s11-mcp do not exist and are listed as not written.",
       "dependsOn": [
         "US-012"
       ],
@@ -491,7 +491,7 @@
         "`npm run lint` passes"
       ],
       "priority": 16,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-012"
@@ -523,8 +523,8 @@
         "`npm run lint` passes"
       ],
       "priority": 17,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "The engine is described as source-available, not Apache-2.0 or open source: its own LICENSE says so.",
       "dependsOn": [
         "US-012"
       ],
@@ -557,8 +557,8 @@
         "`npm run lint` passes"
       ],
       "priority": 18,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Built-during section says 14 PRDs for the first wave and 10 more, because 24 PRDs exist.",
       "dependsOn": [
         "US-017",
         "US-014"
@@ -590,8 +590,8 @@
         "`npm run lint` passes"
       ],
       "priority": 19,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Deviation: the on-screen label reads 'Engine: reacthub-pixitweenjs (source-available, pre-existing)', not 'open source', because the engine's LICENSE is source-available.",
       "dependsOn": [
         "US-012"
       ],
@@ -624,7 +624,7 @@
         "`npm run lint` passes"
       ],
       "priority": 20,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-012"
@@ -654,7 +654,7 @@
         "`npm run lint` passes"
       ],
       "priority": 21,
-      "passes": false,
+      "passes": true,
       "notes": "",
       "dependsOn": [
         "US-012"
@@ -687,8 +687,8 @@
         "`npm run lint` passes"
       ],
       "priority": 22,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Deviation: findings.md is in a gitignored folder, so the page summarises it and says the full write-up is the author's private notes instead of linking it. The latency test reads findings.md when it is present.",
       "dependsOn": [
         "US-012"
       ],
@@ -718,8 +718,8 @@
         "`npm run lint` passes"
       ],
       "priority": 23,
-      "passes": false,
-      "notes": "",
+      "passes": true,
+      "notes": "Last run 30 Oct 2026: 26 pass, 13 fail, 3 pending. Pending ids: owner.markers (cost-table, gif, links, live-url, repo-url, team, video-url), engine.needs (owner review stamp), prd.complete:prd-s11-mcp-server (postponed by the owner). Fail ids: prd.complete for prd-s02 to prd-s09 and prd-s12f only, because those PRD files' passes flags were never set (blocked: not this PRD's files). No docs:, readme.links, secrets or env.* result fails. Secret-scan false positives are allowlisted with reasons in scripts/preflight/secrets-allowlist.ts. No OWNER marker was removed or filled.",
       "dependsOn": [
         "US-012",
         "US-013",
