@@ -273,6 +273,7 @@ flowchart LR
 | Folder | What it holds |
 |--------|---------------|
 | `server/` | the Hono API, the crew, the agents and their tools, the Meta clients, catalog line-ups, the stores |
+| `engine/` | the Motion engine: our own GSAP + Three.js player for one composition JSON, with its CLI and browser tests |
 | `web/` | the React studio, the player, frame capture, export and replay |
 | `shared/` | contracts used by both sides: film state, storyboard, events, crew, tools |
 | `scripts/` | live checks, the cost-per-film calculator, the crew report, the submission preflight |
@@ -311,14 +312,15 @@ Replays and 3D scenes cost nothing.
 
 Everything here was written during the event; the git history starts on 28 Oct 2026. It was built with AI coding agents (Ralph TUI and Claude Code) from PRDs kept in `ralph/`: 14 PRDs for the first build, then 10 more for the crew, the replay, the 3D product shots and the studio shell. What is new and what existed before the event: [`docs/new-vs-existing.md`](docs/new-vs-existing.md).
 
-**Pre-existing dependencies:**
+That includes the player. The **Motion engine** in [`engine/`](engine/README.md) is our own GSAP + Three.js player for the composition JSON the agents write, built during the hackathon, with its own CLI (`npm run engine:cli`) and browser tests (`npm run engine:e2e`).
+
+**Dependencies we did not write:**
 
 | Dependency | What it is | How we use it |
 |------------|-----------|---------------|
-| [`reacthub-pixitweenjs`](https://www.npmjs.com/package/reacthub-pixitweenjs) | our own timeline engine, published on npm before the hackathon under its own source-available licence (free for individuals, non-profits and organisations under €1M revenue) | the player that renders the composition JSON the agents write; installed from npm, never copied or edited here. Gaps are tracked in [`docs/todos/ENGINE-NEEDS.md`](docs/todos/ENGINE-NEEDS.md) |
 | `@meta-sam/parser` | Meta's parser for SAM output, under the SAM License | reading SAM 3.1 results |
 | Third-party libraries | React, Three.js, GSAP, Hono, sharp, zod, better-sqlite3 and others | see `package.json`; licences are in the packages |
 
 ## Licenses and credits
 
-This repository is Apache-2.0 (see [`LICENSE`](LICENSE)). The engine is a separate project under its own licence. Images, audio and video: [`ASSET-CREDITS.md`](ASSET-CREDITS.md). Demo feed photos: [`fixtures/catalog/surf/CREDITS.md`](fixtures/catalog/surf/CREDITS.md). `@meta-sam/parser` is under the SAM License. The Meta models are used through the Meta Model API under Meta's terms.
+This repository is Apache-2.0 (see [`LICENSE`](LICENSE)). Images, audio and video: [`ASSET-CREDITS.md`](ASSET-CREDITS.md). Demo feed photos: [`fixtures/catalog/surf/CREDITS.md`](fixtures/catalog/surf/CREDITS.md). `@meta-sam/parser` is under the SAM License. The Meta models are used through the Meta Model API under Meta's terms.
