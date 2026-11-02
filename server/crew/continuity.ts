@@ -1,7 +1,7 @@
 // Owned by S12c. Cross-scene consistency, checked by code (design.md 5.12): the S5a rules plus three drift checks,
 // so the film looks like one film. Drift is a warning for the showrunner, never a reason to refuse finish.
 import type { Buffer } from 'node:buffer';
-import type { Job, StyleBible } from '@shared/crew';
+import { WRITING_KINDS, type Job, type StyleBible } from '@shared/crew';
 import type { Storyboard } from '@shared/storyboard';
 import type { Comp, Obj } from '../authoring/types';
 import { layerBoxAt, listScenes } from '../review/geometry';
@@ -9,6 +9,7 @@ import { runRules } from '../review/rules';
 import type { Finding } from '../review/types';
 import { boxH } from '../review/types';
 import { BIBLE_FONT_STACKS } from '../authoring/constants';
+import { TERMINAL } from './board';
 import { createId } from './ids';
 import type { WorkerResult } from './scheduler';
 import type { CrewCtx } from './showrunner-tools';
@@ -26,7 +27,7 @@ const rgb = (hex: string): [number, number, number] | undefined => {
 };
 const distance = (a: [number, number, number], b: [number, number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 /** Pure white and black are the defaults for text and shadows, so they are never a drift. */
-const NEUTRALS = [rgb('#ffffff')!, rgb('#000000')!];
+const NEUTRALS = [rgb('#ffffff')!, rgb('#000000')!, rgb('#111111')!];
 
 const layersOf = (comp: Comp, precompId: string): Obj[] => (((comp.precomps as Record<string, Obj>)[precompId]?.layers ?? []) as Obj[]);
 const roleOf = (comp: Comp, layerId: string): string | undefined => (comp.meta as { director?: { layers?: Record<string, { role: string }> } } | undefined)?.director?.layers?.[layerId]?.role;
@@ -147,10 +148,15 @@ export async function runContinuityJob(job: Job, signal: AbortSignal, crew: Crew
     const film = await crew.films.get(job.filmId);
     if (!film.composition) return { summary: 'no composition yet', model: 'rules' };
     const photos = film.assets.filter((a) => a.role === 'product-photo').map((a) => a.id);
-    const found = await runContinuity(film.composition as Comp, { read: (id: string) => crew.toolCtx.assets.read(id) }, film.styleBible, film.storyboard, photos);
+    const all = await runContinuity(film.composition as Comp, { read: (id: string) => crew.toolCtx.assets.read(id) }, film.styleBible, film.storyboard, photos);
+    // a scene a builder is still writing is not reported: its half-made frames would start fixes on work in progress.
+    // The continuity run after that builder ends reports it.
+    const busy = new Set(crew.board.list().filter((j) => j.sceneId && WRITING_KINDS.includes(j.kind) && !TERMINAL.includes(j.status)).map((j) => j.sceneId!));
+    const found = all.filter((f) => !busy.has(f.sceneId));
     const previous = lastSeen.get(job.filmId) ?? new Set<string>();
     const fresh = found.filter((f) => !previous.has(f.id));
-    lastSeen.set(job.filmId, new Set(found.map((f) => f.id)));
+    // what a busy scene showed last time stays seen, so it is not repeated once the scene is settled and unchanged
+    lastSeen.set(job.filmId, new Set([...found.map((f) => f.id), ...[...previous].filter((id) => all.some((f) => f.id === id && busy.has(f.sceneId)))]));
     for (const f of fresh) crew.emit({ type: 'review.finding', sceneId: f.sceneId, kind: f.kind, atSec: f.atSec, evidence: f.evidence, deterministic: true });
     if (fresh.length)
       crew.inbox.push({
@@ -160,7 +166,8 @@ export async function runContinuityJob(job: Job, signal: AbortSignal, crew: Crew
         jobId: job.id,
         text: fresh.map((f) => `${f.sceneId} ${f.severity === 'error' ? 'ERROR ' : ''}${f.kind}: ${f.evidence}`).join('; ').slice(0, 1900),
       });
-    return { summary: found.length ? `${found.length} finding${found.length > 1 ? 's' : ''}, ${fresh.length} new` : 'no continuity issues', model: 'rules' };
+    const held = busy.size ? `, ${busy.size} scene${busy.size > 1 ? 's' : ''} still building` : '';
+    return { summary: (found.length ? `${found.length} finding${found.length > 1 ? 's' : ''}, ${fresh.length} new` : 'no continuity issues') + held, model: 'rules' };
   } finally {
     crew.emit({ type: 'crew.agent', lane: 'continuity', worker: 'continuity', state: 'idle', jobId: job.id });
   }

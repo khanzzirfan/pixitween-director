@@ -92,6 +92,11 @@ With no keys, `DIRECTOR_FAKE=1 npm run dev` runs the whole crew offline with scr
 | `npm run dev:fake` | the whole app offline on its own data folder (`data-fake`), ports 8790 and 5180: scripted art, no keys, no spend; the catalog demo button works here |
 | `npm run dev:nowatch`, `npm run dev:server:nowatch` | the same without file watching, so editing `server/**` cannot restart the server and kill a live film |
 | `npm run build`, `npm run check:bundle`, `npm run start` | build the web app, check it holds no keys, run the server as the container does |
+| `npm run db:import -- [DATA_DIR]` | import the old files under `DATA_DIR` into `DATA_DIR/director.db` (the server also does this on boot) |
+| `npm run db:export-events -- <filmId> [DATA_DIR]` | write one film's events as JSONL to stdout, the format the report scripts read |
+| `npm run corpus:films -- [MOVIES_DIR] [DATA_DIR]` | snapshot the analysed reference films (`debug/movies`) into `docs/direction/corpus/films` and load them and their lessons into `director.db` |
+| `npm run corpus:report -- [DATA_DIR]` | which craft lessons were shown to how many films, how many ended ready, at what average cost |
+| `npm run r8:fixtures` | regenerate the engine's R8 test fixtures (`fixtures/r8`) |
 | `npm run live -- <name> [--yes]` | live checks that spend money: a dry run unless `--yes` is passed |
 | `npx tsx scripts/preflight-submission.ts` | what still blocks the submission |
 

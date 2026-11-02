@@ -38,7 +38,14 @@ export type Geometry3DType = (typeof GEOMETRY_3D_TYPES)[number];
 
 const PositiveVec3Schema = z.tuple([z.number().positive(), z.number().positive(), z.number().positive()]);
 
-export const BoxGeometrySchema = z.object({ type: z.literal('box'), size: PositiveVec3Schema }).strict();
+export const BoxGeometrySchema = z
+  .object({
+    type: z.literal('box'),
+    size: PositiveVec3Schema,
+    /** Corner radius as a share of the shortest side, 0 (sharp, the default) to 0.5 (a ball). */
+    round: z.number().min(0).max(0.5).optional(),
+  })
+  .strict();
 
 export const SphereGeometrySchema = z.object({ type: z.literal('sphere'), radius: z.number().positive() }).strict();
 

@@ -4,6 +4,7 @@ import type { AssetRef } from '@shared/composition';
 import type { AssetStore } from '@shared/ports';
 import { boxFaces } from './box';
 import { hexOf, sideColour } from './colour';
+import { detailFocus } from './focus';
 import { maskContour, type Point } from './contour';
 import type { Rgba } from './pixels';
 import type { PrimitiveShape } from './types';
@@ -28,6 +29,8 @@ export interface Prepared3D {
   aspect: number;
   /** The outline in the front image's own pixels, for an extruded cut-out. */
   contour?: Point[];
+  /** Where the label is on the front picture, [u, v] shares of its width and height (v from the top): the macro shot aims here. Flat products only. */
+  focus?: [number, number];
   /** Set when the requested shape could not be built and another was used. */
   fallback?: 'extrude';
 }
@@ -111,7 +114,7 @@ export async function prepareProduct3D(assets: AssetStore, input: PrepareInput, 
     const moved = contour.map(([x, y]) => [round3(x - box.x), round3(y - box.y)] as Point);
     const side = sideColour(front, { top: 0, bottom: h - 1, cx: w / 2, r: w / 2 });
     const texture = await assets.put(await encode(front.data, w, h), 'image/png', { ...meta, width: w, height: h });
-    result = { shape: 'other', texture, textureKind: 'front', side: hexOf(side), aspect: round3(h / w), contour: moved, ...(input.shape !== 'other' ? { fallback: 'extrude' as const } : {}) };
+    result = { shape: 'other', texture, textureKind: 'front', side: hexOf(side), aspect: round3(h / w), contour: moved, focus: detailFocus(front), ...(input.shape !== 'other' ? { fallback: 'extrude' as const } : {}) };
   }
   cache.set(key, result);
   return result;

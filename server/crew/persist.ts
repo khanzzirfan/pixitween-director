@@ -26,7 +26,11 @@ export function createCrewPersist(dataDir: string, filmId: string): CrewPersist 
     },
     async loadBoard() {
       const row = db().prepare('SELECT jobs_json FROM crew_board WHERE film_id = ?').get(filmId) as { jobs_json: string } | undefined;
-      return (row ? (JSON.parse(row.jobs_json) as unknown[]) : []).map((j) => jobSchema.parse(j));
+      // jobs of a kind this build has retired (an older crew: cast-character, make-set, ...) are history: they stay in the file and are left out here
+      return (row ? (JSON.parse(row.jobs_json) as unknown[]) : []).flatMap((j) => {
+        const r = jobSchema.safeParse(j);
+        return r.success ? [r.data] : [];
+      });
     },
     async saveSnapshot(jobId, snap) {
       checkJob(jobId);

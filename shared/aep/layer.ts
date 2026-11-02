@@ -335,6 +335,8 @@ const aepModel3DPrimitiveSourceSchema = z
     type: z.literal("primitive"),
     shape: z.enum(["can", "bottle", "box", "jar", "tube", "pouch"]),
     proportions: aepModel3DProportionsSchema.optional(),
+    /** A box only: corner radius as a share of its shortest side, 0 (sharp) to 0.5 (a ball). Ice is a little round; a drop is a ball. */
+    round: z.number().min(0).max(0.5).optional(),
   })
   .strict();
 
@@ -827,6 +829,9 @@ export const aepLayerSchema = z
     if (layer.kind === "actor3d") refineActor3DLayer(layer, ctx);
     if (layer.kind === "prop3d") refineProp3DLayer(layer, ctx);
     if (layer.kind === "actor3d" || layer.kind === "prop3d") return;
+    if (layer.kind === "model3d" && layer.source.type === "primitive" && layer.source.round !== undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "model3d source.round is only for a stage prop3d box", path: ["source", "round"] });
+    }
     if (layer.is3D === true && !layer.transform3D) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

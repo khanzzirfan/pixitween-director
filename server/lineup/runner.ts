@@ -1,4 +1,4 @@
-// Runs a line-up: one product's film after another, strictly in order. The state lives in director.db, so a restart
+// Runs a line-up: LINEUP_CONCURRENCY product films at a time, started in order. The state lives in director.db, so a restart
 // calls `resumeLineups` and carries on; a film that was being made re-enters the crew, which resumes from its checkpoint.
 import { runDirector, bindDirector } from '../agent/director';
 import { bindCrew, runCrew } from '../crew/run-crew';
@@ -22,18 +22,26 @@ export async function runLineup(
     if (env.CREW_ENABLED) bindCrew(deps);
     const lineup = await store.get(lineupId);
     if (!lineup) return;
-    for (const item of lineup.items) {
-      if (!item.filmId || (item.state !== 'waiting' && item.state !== 'making')) continue;
+    const todo = lineup.items.filter((item) => item.filmId && (item.state === 'waiting' || item.state === 'making'));
+    // each line-up film runs on a tighter clock than a single film: the owner waits for all of them
+    const limits = { deadlineMs: env.LINEUP_FILM_DEADLINE_MS, maxFixes: env.LINEUP_MAX_FIXES_PER_SCENE, maxCritiques: env.LINEUP_MAX_AUTO_CRITIQUES };
+    const runOne = async (item: (typeof todo)[number]) => {
       await store.setItem(lineupId, item.product.id, { state: 'making' });
       try {
-        await (env.CREW_ENABLED ? runCrew(item.filmId) : runDirector(item.filmId));
-        const film = await deps.films.get(item.filmId);
+        await (env.CREW_ENABLED ? runCrew(item.filmId!, limits) : runDirector(item.filmId!));
+        const film = await deps.films.get(item.filmId!);
         await store.setItem(lineupId, item.product.id, film.status === 'failed' ? { state: 'failed', error: 'the film did not finish' } : { state: 'done' });
       } catch (e) {
         console.error(`lineup ${lineupId} film ${item.filmId} failed:`, e);
         await store.setItem(lineupId, item.product.id, { state: 'failed', error: e instanceof Error ? e.message.slice(0, 200) : 'the film failed' });
       }
-    }
+    };
+    // LINEUP_CONCURRENCY films at once, started in line-up order: a free slot takes the next product
+    let next = 0;
+    const slot = async () => {
+      while (next < todo.length) await runOne(todo[next++]!);
+    };
+    await Promise.all(Array.from({ length: Math.min(env.LINEUP_CONCURRENCY, todo.length) }, slot));
   } finally {
     running.delete(lineupId);
   }

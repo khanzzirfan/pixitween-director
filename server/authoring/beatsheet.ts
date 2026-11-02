@@ -292,7 +292,7 @@ function stripNulls(v: unknown): unknown {
 }
 
 /** The board in a Spark reply (an object or JSON text), or why it could not be read. Elements that fail the safety pass are listed in `dropped`. */
-export function parseBoard(raw: unknown): { ok: true; board: CinematicBoard; dropped: string[] } | { ok: false; reason: string } {
+export function parseBoard(raw: unknown, o: { stored?: boolean } = {}): { ok: true; board: CinematicBoard; dropped: string[]; notes: string[] } | { ok: false; reason: string } {
   let data: unknown = raw;
   if (typeof raw === 'string') {
     try {
@@ -305,14 +305,23 @@ export function parseBoard(raw: unknown): { ok: true; board: CinematicBoard; dro
   const r = boardSchema.safeParse(stripNulls(data));
   if (!r.success) return { ok: false, reason: r.error.issues[0]?.message ?? 'wrong shape' };
   const { elements, dropped } = sanitizeElements(r.data.elements);
-  return { ok: true, board: { concept: r.data.concept, mood: r.data.mood, ...(r.data.tone ? { tone: r.data.tone } : {}), ...(r.data.key ? { key: r.data.key } : {}), ...(r.data.set ? { set: r.data.set } : {}), ...(r.data.handheld !== undefined ? { handheld: r.data.handheld } : {}), ...(r.data.tagline?.trim() ? { tagline: r.data.tagline.trim().split(/\s+/).slice(0, TEXT_RULES.taglineWords).join(' ') } : {}), elements, sheet: { beats: r.data.beats.map((b) => ({ ...b, seconds: Math.round(b.seconds * 100) / 100 })) } }, dropped };
+  // a tagline over the word limit is dropped, not cut: a cut line ends mid-phrase ("Pack the cold, chase"); without one the end card shows the brand
+  const notes: string[] = [];
+  let tagline = r.data.tagline?.trim().replace(/\s+/g, ' ') || undefined;
+  // a board read back from disk was accepted under the rules of its day: its tagline stays (the end card shrinks the type to fit)
+  if (!o.stored && tagline && tagline.split(' ').length > TEXT_RULES.taglineWords) {
+    // a note, not a rule break: the board is good apart from this line, so it must not fail the checker and send Muse's board to the floor
+    notes.push(`tagline "${tagline}" is over ${TEXT_RULES.taglineWords} words and was dropped`);
+    tagline = undefined;
+  }
+  return { ok: true, board: { concept: r.data.concept, mood: r.data.mood, ...(r.data.tone ? { tone: r.data.tone } : {}), ...(r.data.key ? { key: r.data.key } : {}), ...(r.data.set ? { set: r.data.set } : {}), ...(r.data.handheld !== undefined ? { handheld: r.data.handheld } : {}), ...(tagline ? { tagline } : {}), elements, sheet: { beats: r.data.beats.map((b) => ({ ...b, seconds: Math.round(b.seconds * 100) / 100 })) } }, dropped, notes };
 }
 
 /** A board as it is kept (shots under `sheet`), read back from disk: undefined when it is not a board any more. Elements go through the safety pass again. */
 export function readStoredBoard(raw: unknown): CinematicBoard | undefined {
   if (raw === null || typeof raw !== 'object') return undefined;
   const o = raw as { sheet?: { beats?: unknown } };
-  const parsed = parseBoard({ ...(raw as object), beats: o.sheet?.beats });
+  const parsed = parseBoard({ ...(raw as object), beats: o.sheet?.beats }, { stored: true });
   return parsed.ok ? parsed.board : undefined;
 }
 

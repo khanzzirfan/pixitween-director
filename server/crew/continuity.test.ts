@@ -113,6 +113,19 @@ describe('runContinuityJob', () => {
     expect(again!.text).toBe('s2 product-scale-drift: ' + again!.text.split('product-scale-drift: ')[1]); // that finding and no other
   });
 
+  it('holds back a scene a builder is still writing, and reports it once the builder is done', async () => {
+    const t = await setup([0.4, 0.6]);
+    const build = t.board.add({ kind: 'build-scene', origin: 'auto', sceneId: 's2', brief: 'b', reason: 'r' });
+    const held = await runContinuityJob(t.job(), new AbortController().signal, t.crew);
+    expect(held.summary).toMatch(/1 scene still building$/);
+    expect((await t.inbox.drain()).map((i) => i.text).join(' ')).not.toContain('s2 ');
+    t.board.update(build.id, { status: 'running' });
+    t.board.update(build.id, { status: 'done' });
+    await runContinuityJob(t.job(), new AbortController().signal, t.crew);
+    const [item] = await t.inbox.drain();
+    expect(item!.text).toContain('s2 product-scale-drift');
+  });
+
   it('says so when there is nothing to check, and announces itself on the continuity lane', async () => {
     const t = await makeTestCrew();
     const job = t.board.add({ kind: 'continuity', origin: 'auto', brief: 'b', reason: 'r' });

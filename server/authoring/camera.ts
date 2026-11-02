@@ -4,6 +4,11 @@ import { readDirector, sceneMeta, writeDirector } from './meta';
 import type { CameraMove, Comp, Obj } from './types';
 
 const AFFECTED = new Set(['bg', 'product', 'product3d', 'subject', 'clip']);
+/**
+ * How far from the camera each role sits, for the parallax weight. A layer's own z is its draw order, and it climbs every
+ * time a plate or product is placed again (each one goes to the back), so a re-placed product at z 13 barely moved.
+ */
+const ROLE_DEPTH: Record<string, number> = { bg: 10, clip: 10, subject: 5, product: 1, product3d: 1 };
 const EPS = 1e-6;
 const firstOf = <T>(f: T | Kf<T>[]): T => (isAnimated(f) ? (f as Kf<T>[])[0]!.v : (f as T));
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
@@ -36,7 +41,7 @@ export function setCamera(c: Comp, sceneId: string, move: CameraMove, strength =
     const pos = firstOf<Vec2>(layer.transform.position);
     const scl = firstOf<Vec2>(layer.transform.scale);
     const base = (lm.base ??= { x: pos[0], y: pos[1], scale: scl[0] });
-    const w = depthWeight(lm.z ?? 0);
+    const w = depthWeight(ROLE_DEPTH[lm.role] ?? lm.z ?? 0);
 
     let position: Vec2 | Kf<Vec2>[] = [base.x, base.y];
     const scale = base.scale;

@@ -3,11 +3,11 @@ import type { Lineup } from '@shared/lineup';
 import { makeTestDeps } from '../../test-utils/deps';
 
 let inFlight = 0;
-let overlap = false;
+let maxInFlight = 0;
 const order: string[] = [];
 const runCrew = vi.fn(async (id: string) => {
   order.push(id);
-  if (++inFlight > 1) overlap = true;
+  maxInFlight = Math.max(maxInFlight, ++inFlight);
   await new Promise((r) => setTimeout(r, 10));
   inFlight--;
 });
@@ -23,7 +23,7 @@ beforeEach(() => {
   process.env.DIRECTOR_FAKE = '1';
   process.env.CREW_ENABLED = 'true';
   inFlight = 0;
-  overlap = false;
+  maxInFlight = 0;
   order.length = 0;
 });
 afterEach(() => {
@@ -47,7 +47,7 @@ const settled = async (app: ReturnType<typeof createApp>, id: string): Promise<L
   throw new Error('line-up did not finish');
 };
 
-it('a catalogue is one crew film per product, run strictly one after another', async () => {
+it('a catalogue is one crew film per product, started in feed order, LINEUP_CONCURRENCY at a time', async () => {
   const form = new FormData();
   form.set('demo', 'feed-6');
   form.set('brief', 'warm and fast');
@@ -57,8 +57,8 @@ it('a catalogue is one crew film per product, run strictly one after another', a
   expect(filmIds.length).toBeGreaterThan(1);
   const lineup = await settled(app, lineupId);
   expect(lineup.items.every((i) => i.state === 'done')).toBe(true);
-  expect(order).toEqual(filmIds); // the feed's order, one at a time
-  expect(overlap).toBe(false);
+  expect(order).toEqual(filmIds); // started in the feed's order
+  expect(maxInFlight).toBe(2); // LINEUP_CONCURRENCY, default 2
   const first = await deps.films.get(filmIds[0]!);
   expect(first.crew).toBe(true);
   expect(first.brief.text).toContain('warm and fast');

@@ -17,6 +17,13 @@ describe('buildGeometry', () => {
     expect(size.z).toBeCloseTo(3, 6);
   });
 
+  it('a rounded box keeps its size and has more corners cut than a sharp one', () => {
+    const round = buildGeometry({ type: 'box', size: [1, 2, 3], round: 0.2 });
+    const size = boundingSize(round);
+    expect([size.x, size.y, size.z].map((v) => +v.toFixed(3))).toEqual([1, 2, 3]);
+    expect(round.getAttribute('position').count).toBeGreaterThan(buildGeometry({ type: 'box', size: [1, 2, 3] }).getAttribute('position').count);
+  });
+
   it('sphere radius 0.5 gives a bounding sphere radius 0.5', () => {
     const geometry = buildGeometry({ type: 'sphere', radius: 0.5 });
     geometry.computeBoundingSphere();

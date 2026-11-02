@@ -86,6 +86,9 @@ export function refineProp3DLayer(
     }
   }
 
+  if (prop.source.type === "primitive" && prop.source.round !== undefined && prop.source.shape !== "box") {
+    issue(`prop3d '${prop.id}' round is only valid for a box`, ["source", "round"]);
+  }
   if (!isCard) {
     if (prop.billboard) {
       issue(`prop3d '${prop.id}' billboard is only valid for a card source`, ["billboard"]);
@@ -113,6 +116,7 @@ export function usesCinematicFields(
   }
   if (layer.kind === "prop3d") {
     if (layer.source.type === "card") return "prop3d card source";
+    if (layer.source.type === "primitive" && layer.source.round !== undefined) return "prop3d source.round";
     if (layer.material) return "prop3d material";
     if (layer.swarm) return "prop3d swarm";
     if (layer.billboard) return "prop3d billboard";

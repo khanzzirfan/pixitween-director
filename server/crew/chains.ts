@@ -12,6 +12,8 @@ export interface ChainDeps {
   board(): Board;
   scheduler(): Scheduler;
   inbox: Inbox;
+  /** Overrides MAX_AUTO_CRITIQUES (CREW_MAX_AUTO_CRITIQUES, or the line-up's lower cap). */
+  maxCritiques?: number;
   /** Called when a chained dispatch throws. */
   onError?(e: unknown): void;
   newId?(): string;
@@ -50,7 +52,7 @@ export function createJobChains(deps: ChainDeps): (job: Job) => void {
       .then(async () => {
         await deps.scheduler().dispatch({ kind: 'continuity', sceneId, origin: 'auto', brief: `check continuity after ${job.id}`, reason: `after ${job.kind} on ${sceneId}`, filmId: job.filmId });
         const rounds = critiques.get(sceneId) ?? 0;
-        if (rounds < MAX_AUTO_CRITIQUES && !deps.board().list().some((j) => j.kind === 'critique' && j.sceneId === sceneId && j.status === 'queued')) {
+        if (rounds < (deps.maxCritiques ?? MAX_AUTO_CRITIQUES) &&!deps.board().list().some((j) => j.kind === 'critique' && j.sceneId === sceneId && j.status === 'queued')) {
           critiques.set(sceneId, rounds + 1);
           await deps.scheduler().dispatch({ kind: 'critique', sceneId, origin: 'auto', brief: `review the frames of ${sceneId}`, reason: `after ${job.kind} on ${sceneId}`, filmId: job.filmId });
         }

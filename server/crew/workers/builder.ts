@@ -18,6 +18,7 @@ import { applyTextLane, fitTextToSafeArea } from '../text-lane';
 import { restoreScene } from '../scene-snapshot';
 import { timedOut, type WorkerResult } from '../scheduler';
 import type { CrewCtx } from '../showrunner-tools';
+import { bestFlatTextColor } from '../../review/contrast';
 import { layerBoxAt, listScenes, runRules, suggestFix } from '../../review/rules';
 import { scopedRunTool } from './scope';
 
@@ -111,6 +112,27 @@ export async function snapText(ctx: ToolCtx, sceneId: string, storyboard: Storyb
   return moved;
 }
 
+/**
+ * Text that fails the 4.5:1 contrast check gets the flat colour (near-white or near-black) that reads best on its plate,
+ * so the critic does not have to send the scene back for a fix round. Text whose best colour is no better is left alone.
+ */
+export async function fixContrast(ctx: ToolCtx, sceneId: string, storyboard: Storyboard | undefined): Promise<number> {
+  const comp = (await ctx.films.get(ctx.filmId)).composition;
+  if (!comp) return 0;
+  const { findings } = await runRules(comp, { read: (id: string) => ctx.assets.read(id) }, { sceneIds: [sceneId], storyboard });
+  const run = scopedRunTool(sceneId);
+  let fixed = 0;
+  for (const f of findings.filter((x) => x.rule === 'R3' && x.kind === 'low-contrast' && x.layerId)) {
+    const lum = Number(f.metrics?.plateLuminance);
+    const ratio = Number(f.metrics?.ratio);
+    if (!Number.isFinite(lum)) continue;
+    const best = bestFlatTextColor(lum);
+    if (Number.isFinite(ratio) && best.ratio <= ratio) continue;
+    if ((await run(ctx, 'restyleText', { layerId: f.layerId, color: best.color })).ok) fixed++;
+  }
+  return fixed;
+}
+
 export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx, o: BuilderOptions = {}): Promise<WorkerResult> {
   const sceneId = job.sceneId;
   if (!sceneId) throw new Error(`${job.kind} needs a scene`);
@@ -162,6 +184,7 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
     if (!late && r.calls && !r.stalled) await snapText(ctx, sceneId, film.storyboard).catch(() => 0);
     if (!late && (!r.calls || r.stalled)) throw new Error(r.failures.at(-1) ? `builder stalled: ${r.failures.at(-1)}`.slice(0, 280) : 'builder made no progress');
     await runTextLane(crew, job, sceneId, film.styleBible);
+    if (!late) await fixContrast(ctx, sceneId, film.storyboard).catch(() => 0);
     const after = await crew.films.get(job.filmId);
     return { summary: `${r.calls} tool calls, ${r.ok} ok${late ? ', out of time' : ''}`, version: after.version, costUsd: Math.max(0, crew.toolCtx.ledger.total(job.filmId) - spentBefore), model };
   } finally {

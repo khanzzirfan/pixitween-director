@@ -173,7 +173,7 @@ export function convertProp(
   } else if (source.shape === 'box') {
     const w = source.proportions?.width ?? 1;
     const h = source.proportions?.height ?? 1;
-    geometry = { type: 'box', size: [w, h, source.proportions?.depth ?? w] };
+    geometry = { type: 'box', size: [w, h, source.proportions?.depth ?? w], ...(source.round ? { round: source.round } : {}) };
     if (prop.textures?.front || prop.textures?.label) warnings.push(`prop ${prop.id}: a box's front image is not supported yet; drawn in its side colour`);
   } else {
     geometry = { type: 'lathe', shape: source.shape, width: source.proportions?.width ?? 1, height: source.proportions?.height ?? 1 };
@@ -450,15 +450,13 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
   }
   if (dropped > 0) warnings.push(`layer ${world.id}: ${dropped} object(s) dropped; the engine allows at most ${MAX_OBJECTS} objects per scene`);
 
-  if (world.camera.target && isKeyframed(world.camera.target)) {
-    warnings.push(`layer ${world.id}: animated camera.target is not supported yet; using the first value`);
-  }
   const fovValue = world.camera.fov ?? 35;
   const tweens = mergeTweens(
     [
       ...baseTweens,
       ...actorTweens,
       ...cameraTweens(world.camera.position, ['position.x', 'position.y', 'position.z'], ctx.fps, world.inPoint),
+      ...cameraTweens(world.camera.target, ['lookAt.x', 'lookAt.y', 'lookAt.z'], ctx.fps, world.inPoint),
       ...cameraTweens(fovValue, ['fov'], ctx.fps, world.inPoint),
       ...lightTweens,
       ...focusTweens,
