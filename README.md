@@ -1,4 +1,4 @@
-# Shelfreel
+# MuseReels
 
 > Your whole catalog, as ads. Drop in a product CSV and a crew of Muse agents makes a checked, editable video ad for every product, and a price change re-cuts the ad in a second for $0. Built for the Meta Global AI Developer Hackathon (27 Oct – 4 Nov 2026).
 
@@ -94,6 +94,8 @@ With no keys, `DIRECTOR_FAKE=1 npm run dev` runs the whole crew offline with scr
 | `npm run build`, `npm run check:bundle`, `npm run start` | build the web app, check it holds no keys, run the server as the container does |
 | `npm run live -- <name> [--yes]` | live checks that spend money: a dry run unless `--yes` is passed |
 | `npx tsx scripts/preflight-submission.ts` | what still blocks the submission |
+
+**Export.** Open a film, choose **MP4** on the Export tab. The browser draws every frame exactly; Chrome encodes in the page, other browsers upload frames to the server's ffmpeg. ffmpeg is optional locally (`brew install ffmpeg`). See [docs/architecture/mp4-export.md](docs/architecture/mp4-export.md).
 
 ## Cost per film
 

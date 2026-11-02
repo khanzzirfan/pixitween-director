@@ -48,3 +48,22 @@ it('puts the plan, crew and conversation in the shell: plan open first, crew one
   expect(screen.getByRole('region', { name: 'Crew' })).toBeInTheDocument();
   expect(screen.getByTestId('slot-player')).toBeInTheDocument();
 });
+
+it('keeps the user\'s brief at the top of the showrunner chat when the studio opens', async () => {
+  open({ ...(film(true) as object), assets: [{ id: 'ast_x', url: '/api/assets/ast_x' }] });
+  await screen.findByTestId('crew-studio');
+  expect(screen.getByTestId('brief-text')).toHaveTextContent('a mug');
+  expect(screen.getByTestId('brief-photo').querySelector('img')).toHaveAttribute('src', '/api/assets/ast_x');
+});
+
+it('shows the same chat, with the brief and a waiting line, while a just-sent film loads', async () => {
+  const { rememberIntake } = await import('./intakeHandoff');
+  rememberIntake('film_3fa9c2d41b7e', { text: 'a perfume film', photoUrl: 'blob:p' });
+  vi.spyOn(client.api, 'getFilm').mockReturnValue(new Promise(() => {}) as never);
+  vi.stubGlobal('EventSource', class { addEventListener() {} close() {} });
+  window.history.replaceState({}, '', '/?film=film_3fa9c2d41b7e');
+  render(<App />);
+  expect(screen.getByTestId('pending-studio')).toBeInTheDocument();
+  expect(screen.getByTestId('brief-text')).toHaveTextContent('a perfume film');
+  expect(screen.getByText('starting your film…')).toBeInTheDocument();
+});

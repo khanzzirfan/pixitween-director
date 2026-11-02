@@ -17,7 +17,7 @@ export function bubblesOf(crew: CrewState): Bubble[] {
   return [...mine, ...theirs].sort((a, b) => a.at.localeCompare(b.at));
 }
 
-export function DirectorNotes({ crew, now = Date.now(), onAsk, children, readOnly }: { crew: CrewState; now?: number; onAsk(option: string): void; children?: ReactNode; readOnly?: boolean }) {
+export function DirectorNotes({ crew, now = Date.now(), onAsk, children, readOnly, lead, waiting }: { crew: CrewState; now?: number; onAsk(option: string): void; children?: ReactNode; readOnly?: boolean; lead?: ReactNode; waiting?: string }) {
   const bubbles = bubblesOf(crew);
   const lastAsk = bubbles.findLastIndex((b) => b.kind === 'ask');
   const thinking = crew.lanes.showrunner?.state === 'thinking';
@@ -26,10 +26,11 @@ export function DirectorNotes({ crew, now = Date.now(), onAsk, children, readOnl
   useEffect(() => {
     const el = box.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [bubbles.length, thinking]);
+  }, [bubbles.length, thinking, !!lead]);
   return (
     <div ref={box} className="notes" role="log" aria-live="polite" aria-label="Director's notes">
-      {bubbles.length === 0 && !thinking && <p className="notes-empty">Tell the showrunner what to change. It listens while the crew builds.</p>}
+      {lead}
+      {!lead && bubbles.length === 0 && !thinking && <p className="notes-empty">Tell the showrunner what to change. It listens while the crew builds.</p>}
       {bubbles.map((b, i) => (
         <div key={`${b.at}-${i}`} className={`bubble ${b.side} k-${b.kind}`}>
           {b.kind === 'heard' && <span className="heard-tag">heard</span>}
@@ -49,6 +50,12 @@ export function DirectorNotes({ crew, now = Date.now(), onAsk, children, readOnl
         <div className="bubble crew thinking" aria-label="The showrunner is thinking">
           <span className="dots" aria-hidden="true"><i /><i /><i /></span>
           <span className="think-secs">thinking · {secondsSince(crew.lanes.showrunner?.since, now)} s</span>
+        </div>
+      )}
+      {waiting && !thinking && (
+        <div className="bubble crew thinking" aria-label={waiting}>
+          <span className="dots" aria-hidden="true"><i /><i /><i /></span>
+          <span className="think-secs">{waiting}</span>
         </div>
       )}
       {children}

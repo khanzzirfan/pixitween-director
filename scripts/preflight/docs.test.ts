@@ -80,7 +80,7 @@ it('README links every call site of the Meta models table to a file that exists'
 
 it('README has the pitch, the owner markers and no draft text', () => {
   const t = read('README.md');
-  expect(t.startsWith('# Shelfreel')).toBe(true);
+  expect(t.startsWith('# MuseReels')).toBe(true);
   for (const m of ['gif', 'live-url', 'video-url', 'cost-table', 'team']) expect(t, m).toContain(`<!-- OWNER:${m} -->`);
   expect(t).not.toContain('<fill:');
   const order = ['## What it does', '## Demo', '## Meta models used', '## Architecture'].map((h) => t.indexOf(h));

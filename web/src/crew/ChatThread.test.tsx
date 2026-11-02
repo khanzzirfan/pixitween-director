@@ -35,3 +35,18 @@ it('shows a failed send', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Send' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('rate limited');
 });
+
+it('opens with what the user first sent: the opener, the photo and the brief, before the crew\'s notes', () => {
+  render(<ChatThread crew={foldCrew(FIXTURE)} aspect="16:9" onPlay={() => {}} onSend={() => {}} onVoice={() => {}} brief={{ text: 'a cold brew launch film', photoUrl: 'blob:can' }} />);
+  const bubbles = [...document.querySelectorAll('.bubble')].map((b) => (b.querySelector('img') ? 'you:photo' : `${b.classList.contains('you') ? 'you' : 'crew'}:${b.querySelector('p')?.textContent ?? ''}`));
+  expect(bubbles.slice(0, 3)).toEqual([expect.stringMatching(/^crew:What are we making/), 'you:photo', 'you:a cold brew launch film']);
+  expect(screen.getByTestId('brief-photo').querySelector('img')).toHaveAttribute('src', 'blob:can');
+  expect(bubbles[3]).toBe('crew:Four scenes, four builders. Starting now.');
+});
+
+it('shows a waiting bubble and holds typing while the film is still starting', () => {
+  render(<ChatThread crew={foldCrew([])} aspect="16:9" onPlay={() => {}} onSend={() => {}} onVoice={() => {}} brief={{ text: 'hi' }} waiting="starting your film…" composerDisabled />);
+  expect(screen.getByText('starting your film…')).toBeInTheDocument();
+  expect(screen.getByLabelText('Message')).toBeDisabled();
+  expect(screen.getByText('hi')).toBeInTheDocument();
+});

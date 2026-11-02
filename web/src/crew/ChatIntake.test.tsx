@@ -90,3 +90,13 @@ it('NewFilm shows the chat when crew mode is on, the classic form when off or wh
   await new Promise((r) => setTimeout(r, 50));
   expect(await screen.findByRole('button', { name: /Create my storyboard/ })).toBeInTheDocument();
 });
+
+it('remembers what was sent, so the studio chat can open with it', async () => {
+  const { recallIntake } = await import('./intakeHandoff');
+  vi.spyOn(api, 'createFilm').mockResolvedValue({ filmId: 'film_aaaaaaaaaaaa' } as never);
+  render(<ChatIntake />);
+  attach();
+  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'a perfume film for Dubai evenings' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+  await waitFor(() => expect(recallIntake('film_aaaaaaaaaaaa')).toMatchObject({ text: 'a perfume film for Dubai evenings', photoUrl: 'blob:x', voice: false }));
+});

@@ -1,4 +1,4 @@
-# Deploying Shelfreel on Fly.io
+# Deploying MuseReels on Fly.io
 
 One small container: the built web app and the Node server, with a 1 GB volume for films. Nothing here is run for you; these are the commands to run yourself.
 
@@ -22,8 +22,8 @@ The check fails if `web/dist` is missing, if a key, token or server-only variabl
 Optional local test of the container, with a data folder you can throw away:
 
 ```bash
-docker build -f deploy/Dockerfile -t pixitween-director .
-docker run --rm -p 8080:8080 -v "$PWD/.docker-data:/data" -e DATA_DIR=/data pixitween-director
+docker build -f deploy/Dockerfile -t musereels .
+docker run --rm -p 8080:8080 -v "$PWD/.docker-data:/data" -e DATA_DIR=/data musereels
 ```
 
 ## Create the app

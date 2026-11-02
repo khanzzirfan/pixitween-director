@@ -94,17 +94,57 @@ describe('recording', () => {
 });
 
 describe('mp4 option', () => {
-  it('appears only when supported, and names the file .mp4', async () => {
-    const mp4 = vi.fn(async () => new Blob(['m']));
-    const { unmount } = render(<ExportPanel film={film()} events={[]} getPlayer={() => player()} deps={{ mp4Supported: async () => false }} />);
-    await waitFor(() => expect(screen.queryByRole('option', { name: 'MP4 (experimental)' })).toBeNull());
-    unmount();
-    render(<ExportPanel film={film()} events={[]} getPlayer={() => player()} deps={{ mp4Supported: async () => true, exportMp4: mp4 as never, mixAudio: mixNone as never, now: fixedNow }} />);
-    await screen.findByRole('option', { name: 'MP4 (experimental)' });
-    fireEvent.change(screen.getByLabelText('Format'), { target: { value: 'mp4' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Export video' }));
+  const props = { film: film(), events: [], getPlayer: () => player() };
+  const pick = () => fireEvent.change(screen.getByLabelText('Format'), { target: { value: 'mp4' } });
+  const run = () => fireEvent.click(screen.getByRole('button', { name: 'Export video' }));
+
+  it('uses the browser path when WebCodecs is there, checks the file on the server and names it .mp4', async () => {
+    const exact = vi.fn(async () => new Blob(['m']));
+    const viaServer = vi.fn();
+    const check = vi.fn(async () => ['frames 5, expected 6']);
+    render(<ExportPanel {...props} deps={{ mp4Supported: async () => true, serverHasFfmpeg: async () => true, exportMp4: exact as never, exportMp4ViaServer: viaServer as never, checkMp4OnServer: check, mixAudio: mixNone as never, now: fixedNow }} />);
+    await screen.findByRole('option', { name: 'MP4' });
+    pick();
+    run();
     expect(await screen.findByRole('link')).toHaveAttribute('download', 'morning-ritual-20261102.mp4');
-    expect(mp4).toHaveBeenCalledTimes(1);
+    expect(exact).toHaveBeenCalledTimes(1);
+    expect(viaServer).not.toHaveBeenCalled();
+    expect(screen.getByText('frames 5, expected 6')).toBeVisible();
+  });
+
+  it('uses the server path without WebCodecs and says it is silent', async () => {
+    const exact = vi.fn();
+    const viaServer = vi.fn(async () => ({ blob: new Blob(['m']), problems: ['frozen: frames at 1.00 s and 2.00 s are identical'] }));
+    render(<ExportPanel {...props} deps={{ mp4Supported: async () => false, serverHasFfmpeg: async () => true, exportMp4: exact as never, exportMp4ViaServer: viaServer as never, mixAudio: mixNone as never, now: fixedNow }} />);
+    await screen.findByRole('option', { name: 'MP4' });
+    pick();
+    run();
+    expect(await screen.findByRole('link')).toHaveAttribute('download', 'morning-ritual-20261102.mp4');
+    expect(viaServer).toHaveBeenCalledTimes(1);
+    expect(exact).not.toHaveBeenCalled();
+    expect(screen.getByText('Built on the server, without sound.')).toBeVisible();
+    expect(screen.getByText(/^frozen:/)).toBeVisible();
+  });
+
+  it('hides the MP4 option when neither path exists, and WebM still works', async () => {
+    const rec = vi.fn(async (_o: unknown) => new Blob(['w']));
+    render(<ExportPanel {...props} deps={{ mp4Supported: async () => false, serverHasFfmpeg: async () => false, recordCanvas: rec, mixAudio: mixNone as never, now: fixedNow }} />);
+    await waitFor(() => expect(screen.queryByLabelText('Format')).toBeNull());
+    run();
+    expect(await screen.findByRole('link')).toHaveAttribute('download', 'morning-ritual-20261102.webm');
+    expect(rec).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the frame being rendered', async () => {
+    let report: (p: { fraction: number }) => void = () => undefined;
+    const exact = vi.fn((o: { onProgress: typeof report }) => new Promise<Blob>(() => void (report = o.onProgress)));
+    render(<ExportPanel {...props} deps={{ mp4Supported: async () => true, serverHasFfmpeg: async () => false, exportMp4: exact as never, mixAudio: mixNone as never }} />);
+    await screen.findByRole('option', { name: 'MP4' });
+    pick();
+    run();
+    await waitFor(() => expect(exact).toHaveBeenCalled());
+    report({ fraction: 0.5 });
+    expect(await screen.findByText('Rendering frame 60 of 120')).toBeVisible();
   });
 });
 

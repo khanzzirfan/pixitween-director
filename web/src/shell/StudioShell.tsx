@@ -179,9 +179,9 @@ export function StudioShell(p: StudioShellProps) {
   return (
     <div className={`sh ${wide ? 'is-wide' : 'is-narrow'}`} data-testid={p.testId}>
       <header className="sh-header">
-        <button type="button" className="sh-bare sh-home" title="Home: start a new film" aria-label="Shelfreel, home" onClick={goHome}>
+        <button type="button" className="sh-bare sh-home" title="Home: start a new film" aria-label="MuseReels, home" onClick={goHome}>
           <span className="sh-logo" aria-hidden="true" />
-          <strong className="sh-brand">Shelfreel</strong>
+          <strong className="sh-brand">MuseReels</strong>
         </button>
         <span className="sh-title" title={p.title}>{p.title}</span>
         <ol className="sh-steps" aria-label="Progress">

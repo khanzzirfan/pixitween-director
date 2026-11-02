@@ -1,25 +1,25 @@
 {
-  "name": "PixiTween Director E1: export a 3D hero film to MP4 with ffmpeg (exact frames, headless)",
+  "name": "PixiTween Director E1: frame-exact MP4 export (browser renders, WebCodecs encodes, ffmpeg on the server as fallback and checker)",
   "branchName": "ralph/e1-mp4-export",
-  "description": "Adds a deterministic MP4 export for built films, including the 3D hero films. Headless Chromium seeks the film to every frame time and saves a PNG, then ffmpeg encodes the frames to H.264 (yuv420p, faststart). Runs from a script for one film or a whole catalog. Leaves out audio, a server route, a button in the UI and the browser-side WebCodecs export.",
+  "description": "Adds a frame-exact MP4 export for any film, including the 3D hero films. The viewer's own browser seeks the film to every frame time and draws it with its GPU. Where WebCodecs H.264 is available, Mediabunny encodes the frames in the page (with the composition's audio). Where it is not, the page uploads JPEG frames to the server, which encodes them with ffmpeg (silent). The server also checks every finished MP4 with ffprobe for length, size, frame count and frozen frames. Judges install nothing: they open the deployed Fly app in Chrome and press Export. No Playwright, no headless Chromium, no CLI.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "ffmpeg encode helper: a folder of PNG frames to an H.264 MP4",
-      "description": "As an exporter, I want one function that turns numbered PNG frames into a web-safe MP4 so that every export uses the same encoder settings.",
+      "title": "ffmpeg encode helper: a folder of numbered frames to an H.264 MP4",
+      "description": "As a server maintainer, I want one function that turns numbered JPEG or PNG frames into a web-safe MP4 so that every server export uses the same encoder settings.",
       "steps": [
-        "Read server/media/ffmpeg.ts (runFfmpeg, hasFfmpeg, probeVideo) and its test server/media/ffmpeg.test.ts for how ffmpeg is faked and when real runs are skipped.",
-        "Create server/media/encode.ts exporting buildEncodeArgs({ framesDir, fps, out, crf = 18 }): string[] that returns ['-y','-framerate',String(fps),'-i',`${framesDir}/f%05d.png`,'-c:v','libx264','-pix_fmt','yuv420p','-crf',String(crf),'-preset','medium','-vf','scale=trunc(iw/2)*2:trunc(ih/2)*2','-movflags','+faststart',out].",
-        "In the same file export encodeFrames({ framesDir, fps, out, crf }, run = runFfmpeg): Promise<void> that throws a plain Error('no frames in <dir>') when the folder has no f00000.png style files, then calls run(buildEncodeArgs(...)) with a timeoutMs of 300000.",
-        "Export frameName(i: number): string returning `f${String(i).padStart(5,'0')}.png` so the grabber and the encoder agree on names.",
-        "Create server/media/encode.test.ts: buildEncodeArgs output is exactly the array above for fps 30 and crf default; crf 23 changes only that value; frameName(0) is 'f00000.png' and frameName(239) is 'f00239.png'; encodeFrames on an empty temp dir rejects with 'no frames' and never calls the runner (fake run); with 3 frame files it calls the runner once with the built args.",
-        "In the same test file add one real-ffmpeg test (skipped when !(await hasFfmpeg())): write 12 small 64x64 PNGs with sharp, encodeFrames to a temp mp4 at 12 fps, and assert probeVideo(buffer) reports width 64, height 64 and frames 12."
+        "Read server/media/ffmpeg.ts (runFfmpeg, hasFfmpeg, probeVideo) and server/media/ffmpeg.test.ts for how real runs are skipped.",
+        "Create server/media/encode.ts exporting frameName(i: number, ext: 'jpg' | 'png' = 'jpg'): string returning `f${String(i).padStart(5,'0')}.${ext}`.",
+        "Export buildEncodeArgs({ framesDir, fps, out, ext = 'jpg', crf = 18 }): string[] returning ['-y','-framerate',String(fps),'-i',`${framesDir}/f%05d.${ext}`,'-c:v','libx264','-pix_fmt','yuv420p','-crf',String(crf),'-preset','veryfast','-vf','scale=trunc(iw/2)*2:trunc(ih/2)*2:in_range=full:out_range=tv,format=yuv420p','-movflags','+faststart',out].",
+        "Export encodeFrames(o: { framesDir; fps; out; ext?; crf? }, run = runFfmpeg): Promise<void> that rejects with Error('no frames in <dir>') when f00000.<ext> is missing, and otherwise calls run(buildEncodeArgs(o), { timeoutMs: 300000 }).",
+        "Create server/media/encode.test.ts with a fake run for the pure parts, and one real-ffmpeg test (describe.skipIf(!(await hasFfmpeg()))) that writes 12 solid-colour 64x64 JPEGs with sharp (each a different colour), encodes them at 12 fps into a temp file and asserts probeVideo gives width 64, height 64 and frames 12."
       ],
       "acceptanceCriteria": [
-        "buildEncodeArgs({ framesDir: 'd', fps: 30, out: 'o.mp4' }) contains '-pix_fmt','yuv420p' and '-movflags','+faststart' and ends with 'o.mp4'",
-        "encodeFrames on a folder with no frames rejects with a message containing 'no frames' and the fake runner is called 0 times",
-        "The real-ffmpeg test encodes 12 frames to an MP4 whose probed width and height are 64 and whose frame count is 12 (or is skipped with ffmpeg missing)",
-        "frameName(0) === 'f00000.png' and frameName(239) === 'f00239.png'",
+        "frameName(0) === 'f00000.jpg', frameName(239) === 'f00239.jpg' and frameName(3, 'png') === 'f00003.png'",
+        "buildEncodeArgs({ framesDir: 'd', fps: 30, out: 'o.mp4' }) contains 'd/f%05d.jpg', '-pix_fmt','yuv420p' and '-movflags','+faststart' and ends with 'o.mp4'; crf 23 changes only the crf value",
+        "encodeFrames on an empty temp dir rejects with a message containing 'no frames' and the fake run is called 0 times; with 3 frame files it is called once with the built args",
+        "The real-ffmpeg test yields an MP4 probed at 64x64 with 12 frames, or is skipped when ffmpeg is missing",
+        "The real-ffmpeg test also asserts the MP4's pix_fmt is yuv420p with limited (tv) range, not yuvj420p",
         "`npm run typecheck` passes",
         "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
@@ -36,20 +36,22 @@
     },
     {
       "id": "US-002",
-      "title": "Frame times and the frame grabber that writes numbered PNGs",
-      "description": "As an exporter, I want a grabber that seeks a film to every frame time and writes numbered PNGs so that the encoder gets exact, evenly spaced frames.",
+      "title": "Check a finished MP4 against the film it came from",
+      "description": "As a viewer, I want every finished MP4 checked for length, size, frame count and frozen frames so that a broken export is reported instead of handed over silently.",
       "steps": [
-        "Read scripts/lib/film-frames.ts and scripts/motion-check.ts (the Seek slider flow, wait time after a seek) and web/stage-check.html (window.__stage seek and whenReady).",
-        "Create scripts/lib/film-grab.ts exporting frameTimes(durationSec: number, fps: number): number[]: i / fps for i = 0 .. Math.ceil(durationSec * fps) - 1, each rounded to 4 decimals, so 8 s at 30 fps gives 240 times and the last is below durationSec.",
-        "Export a type FrameSource = { duration: number; grab(timeSec: number): Promise<Buffer> } and grabFrames(source: FrameSource, fps: number, dir: string, onFrame?: (i: number, n: number) => void): Promise<number> that writes frameName(i) files with fs/promises, calls onFrame after each, and returns the frame count. It must not hold all frames in memory.",
-        "Export openCatalogHero({ base, catalogId, productId }): Promise<FrameSource & { close(): Promise<void> }> that launches playwright-core chromium with the GPU args from scripts/motion-check.ts, opens `${base}/?catalog=${catalogId}`, clicks the row, pauses, reads the Seek slider max as duration, and returns a grab(t) that sets the slider value (native setter plus input event), waits 140 ms and returns the canvas screenshot. Do not call it from any test.",
-        "Create scripts/lib/film-grab.test.ts with a fake FrameSource: frameTimes(8, 30) has length 240, starts at 0 and its last value is 7.9667; frameTimes(1, 24) has length 24; grabFrames writes f00000.png .. f00023.png for a fake that returns a 1-byte buffer, returns 24 and calls onFrame 24 times in order; a fake whose grab throws on frame 5 rejects with that error after writing 5 files."
+        "Read server/media/ffmpeg.ts (probeVideo, extractFrames) and server/authoring/motion-check.ts (changedShare, Gray).",
+        "Create server/media/export-check.ts exporting the type ExportExpect = { durationSec: number; fps: number; width: number; height: number }.",
+        "Export compareProbe(probe: { durationSec; width; height; frames }, expect: ExportExpect, tol = 0.15): string[] (pure): 'duration A s, expected B s' (two decimals) when they differ by more than tol; 'size WxH, expected WxH' when width or height differ by more than 1 (the encoder rounds odd sizes down); 'frames N, expected M' when the count differs by more than 2 from round(durationSec * fps).",
+        "Export frozenPairs(grays: Gray[], times: number[]): string[] (pure) returning 'frozen: frames at A s and B s are identical' for each neighbour pair whose changedShare is 0.",
+        "Export checkExport(video: Buffer, expect, deps = { probeVideo, extractFrames }): Promise<string[]>: probe and compareProbe, then extract 9 evenly spaced frames, reduce each to a 54x96 gray image with sharp and append frozenPairs. An ffmpeg failure returns ['check failed: <message>'] and never throws.",
+        "Create server/media/export-check.test.ts for compareProbe and frozenPairs with plain objects, checkExport with fake deps, and one real-ffmpeg test (skipped without ffmpeg) on a 2 s lavfi testsrc clip that returns no problems against its own expectation."
       ],
       "acceptanceCriteria": [
-        "frameTimes(8, 30).length is 240 and the last time is below 8",
-        "grabFrames with a fake source over 1 s at 24 fps writes exactly 24 files named f00000.png to f00023.png and resolves 24",
-        "A grab() that throws on frame index 5 makes grabFrames reject with that error and leaves 5 files",
-        "No test imports or launches a real browser",
+        "compareProbe of a 6 s probe against an expected 8 s returns exactly ['duration 6.00 s, expected 8.00 s']",
+        "compareProbe returns [] for a probe within 0.15 s, 1 px and 2 frames of the expectation",
+        "frozenPairs with exactly one identical neighbour pair returns one problem starting with 'frozen:' that names both times",
+        "checkExport with a fake probeVideo that throws resolves to one problem starting with 'check failed:'",
+        "The real testsrc clip checks clean, or the test is skipped when ffmpeg is missing",
         "`npm run typecheck` passes",
         "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
@@ -61,29 +63,32 @@
         "US-001"
       ],
       "labels": [
-        "scripts",
-        "frames"
+        "server",
+        "media",
+        "ffmpeg",
+        "verify"
       ]
     },
     {
       "id": "US-003",
-      "title": "export-mp4 script: one film or a whole catalog to MP4 files",
-      "description": "As a catalog owner, I want one command that exports a hero film, or every ready film in a catalog, to MP4 so that I can use the films outside the studio.",
+      "title": "Server export routes: upload frames, encode with ffmpeg, check any MP4",
+      "description": "As a browser without WebCodecs, I want to upload my frames and get an MP4 back so that every viewer can export; and as any browser, I want the server to check my MP4.",
       "steps": [
-        "Read scripts/motion-check.ts (argv, DATA, BASE, run.json row filter) and scripts/dev/make-test-clip.ts for the script style, and shared/catalog-run.ts for row statuses.",
-        "Create scripts/export-mp4.ts. Usage line: `npx tsx scripts/export-mp4.ts <catalogId> [productId ...]` with env BASE (default http://localhost:5181), DATA (default data-surf), FPS (default 30), CRF (default 18). Exit code 2 and the usage line when catalogId is missing.",
-        "Export planExports(run, only: string[]): string[] (pure): the given ids when only is non-empty (an id that is not a row throws `no such row: <id>`), else the ids of rows whose status is ready, fixed or flagged and not failed; and exportPath(data, catalogId, productId): `${data}/catalogs/${catalogId}/exports/${productId}.mp4`.",
-        "The main flow (guarded so importing the file runs nothing): fail early with the FfmpegMissingError message if hasFfmpeg() is false; for each id open the hero with openCatalogHero, grabFrames into a temp dir, encodeFrames to exportPath, remove the temp dir, close the browser, print `<id>  <frames> frames  <MB> MB  <seconds> s`; one failing row is reported and the loop continues; exit code 1 if any row failed.",
-        "Print the plan first (count of films, fps, estimated time as films * duration * fps * 0.35 s, labelled 'estimate') and write nothing outside the exports folder.",
-        "Add the script line `\"export:mp4\": \"tsx scripts/export-mp4.ts\"` to package.json scripts, next to the other tsx script entries.",
-        "Create scripts/export-mp4.test.ts for the pure parts: planExports on a run with ready, fixed, flagged, failed and queued rows returns the first three; with only=['p2'] returns ['p2']; with an unknown id throws 'no such row: zzz'; exportPath('data-surf','cat_abc','p1') returns 'data-surf/catalogs/cat_abc/exports/p1.mp4'."
+        "Read server/http/handlers/local.ts (handler module style), server/http/routes.ts, server/http/auth.ts and server/http/upload-limit.ts.",
+        "Add to shared/api.ts: ExportStartRequest { fps: number; frames: number; width: number; height: number }, ExportStartResponse { id: string }, ExportCheckResponse { problems: string[] }.",
+        "Create server/http/handlers/exports.ts exporting registerExportRoutes(app, deps, opts: { encode?; check?; hasFfmpeg?; now?; tmpRoot? } = {}) with: POST /api/exports (zod: fps 1..60, frames 1..1800, width and height 16..2160) -> 201 { id }, creating a temp dir; PUT /api/exports/:id/frames/:i (body image/jpeg, at most 4 MB through hono bodyLimit, i within 0..frames-1) -> 204, written as frameName(i); POST /api/exports/:id/finish -> encodes, runs checkExport, deletes the dir, and answers 200 with the MP4 bytes (content-type video/mp4) and an 'x-export-problems' header holding the JSON array; POST /api/exports/check (body video/mp4, at most 200 MB, query durationSec, fps, width, height) -> 200 ExportCheckResponse.",
+        "Errors: 503 { error: 'ffmpeg_missing' } on every route when hasFfmpeg() is false; 404 { error: 'no_such_export' } for an unknown id; 409 { error: 'missing_frames', missing: number[] } on finish when any frame was not uploaded (the first 20 indexes); 429 { error: 'busy' } when 2 sessions are already open. A session idle for 10 minutes is deleted on the next request.",
+        "Add the import and registerExportRoutes(app, deps) line to server/http/routes.ts after registerLocalRoutes; change nothing else there.",
+        "Create server/http/handlers/exports.test.ts on a bare Hono app with fake encode and check and a temp tmpRoot: the start, frames and finish flow; each error above; idle expiry with a fake now(); the dir is gone after finish and after an encode error. Add one real-ffmpeg test (skipped without ffmpeg) that uploads 6 sharp JPEGs and gets back bytes that probeVideo reads as 6 frames."
       ],
       "acceptanceCriteria": [
-        "planExports on rows ready, fixed, flagged, failed, queued returns exactly the ready, fixed and flagged ids in order",
-        "planExports(run, ['zzz']) throws an Error whose message is 'no such row: zzz'",
-        "exportPath('data-surf', 'cat_abc', 'p1') returns 'data-surf/catalogs/cat_abc/exports/p1.mp4'",
-        "Importing scripts/export-mp4.ts in a test starts no browser and no ffmpeg process",
-        "`npm run export:mp4` with no arguments prints the usage line and exits with code 2",
+        "start, 3 frame PUTs and finish answer 201, 204 x3 and 200 with content-type video/mp4, and the fake encode was called once",
+        "finish with frame 1 of 3 missing answers 409 with missing [1]; an unknown id answers 404; a third open session answers 429",
+        "with hasFfmpeg faked false every export route answers 503 { error: 'ffmpeg_missing' }",
+        "a PUT of a 5 MB body answers 413 and writes nothing",
+        "the session temp dir no longer exists after finish, after a failed encode and after idle expiry",
+        "POST /api/exports without the passcode answers 401 when a passcode is configured (through the app's middleware chain)",
+        "server/http/routes.ts differs from before only by the import and the one register line",
         "`npm run typecheck` passes",
         "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
@@ -96,26 +101,27 @@
         "US-002"
       ],
       "labels": [
-        "scripts",
-        "export"
+        "server",
+        "http",
+        "ffmpeg"
       ]
     },
     {
       "id": "US-004",
-      "title": "Check the finished MP4 against the film it came from",
-      "description": "As a catalog owner, I want each exported MP4 checked for size, length and motion so that a broken or frozen export is reported instead of shipped.",
+      "title": "Frame-exact capture in the browser and WebCodecs MP4 encode",
+      "description": "As a viewer, I want the MP4 built from exactly one frame per frame time so that 3D camera moves are smooth and nothing is dropped, however slow my machine is.",
       "steps": [
-        "Read server/authoring/motion-check.ts (changedShare, judgeMotion, Gray) and server/media/ffmpeg.ts (probeVideo, extractFrames).",
-        "In scripts/export-mp4.ts add checkExport(video: Buffer, expect: { durationSec: number; fps: number; width: number; height: number }, tol = 0.15): string[] returning problems: 'duration X s, expected Y s' when it differs by more than tol seconds; 'size WxH, expected WxH' when width or height differ by more than 1 (the encoder rounds odd sizes down to even); 'frames N, expected M' when the count differs by more than 2.",
-        "Add motionOfVideo(video: Buffer, durationSec: number): Promise<string[]> that extracts 9 evenly spaced frames with extractFrames, reduces each to a 54x96 gray image with sharp, compares neighbours with changedShare, and returns 'frozen: frames at A s and B s are identical' for any neighbour pair with a change share of 0.",
-        "Call both after encoding each film, print each problem under the row line, and count a film with any problem as failed.",
-        "Extend scripts/export-mp4.test.ts: checkExport accepts a probe-shaped match (given as a plain object through a small seam so no video is needed) and reports duration, size and frame mismatches with the exact messages above; motionOfVideo, with a fake extractFrames returning two identical gray frames among distinct ones, reports exactly one 'frozen' problem naming the two times."
+        "Read web/src/export/mp4Export.ts (the real-time version this does not delete), web/src/export/types.ts, web/src/export/playerCanvas.ts and web/src/dev/stage-check.tsx (seek, then one animation frame).",
+        "Create web/src/export/frameExport.ts exporting frameTimes(durationSec, fps): number[] (i / fps for i = 0 .. ceil(durationSec * fps) - 1, rounded to 4 decimals) and settle(raf = requestAnimationFrame): Promise<void> resolving after two animation frames.",
+        "Export captureFrames(o: { driver: ExportDriver; durationSec; fps; signal?; onFrame(i, timeSec): Promise<void>; onProgress? }, deps = { settle }): Promise<number>: pause the driver, then for each time seek, await settle(), await onFrame(i, t) and report progress; throws ExportError('aborted') when the signal aborts between frames; returns the frame count. It never calls play().",
+        "Export exportMp4Exact(o: { canvas; driver; durationSec; fps?; audio?; onProgress?; signal? }, deps = { mediabunny?, settle? }): Promise<Blob> building Output(Mp4OutputFormat, BufferTarget), a CanvasSource(canvas, { codec: 'avc', quality: Quality('high') }) and, when audio is given, an AudioBufferSource({ codec: 'aac' }); it uses captureFrames with onFrame = videoSource.add(t, 1 / fps), then adds the audio, finalizes and returns a video/mp4 Blob.",
+        "Create web/src/export/frameExport.test.ts with a fake driver that records calls, a settle that resolves at once and vi.mock('mediabunny') as in mp4Export.test.ts."
       ],
       "acceptanceCriteria": [
-        "checkExport reports 'duration 6.00 s, expected 8.00 s' for a probe of 6 s against an expected 8 s",
-        "checkExport reports nothing for a probe within 0.15 s, 1 px and 2 frames of the expectation",
-        "motionOfVideo with one identical neighbour pair returns exactly one problem that starts with 'frozen:'",
-        "A film with any problem makes the script exit with code 1 (covered by a test of the exit-code helper)",
+        "frameTimes(8, 30) has 240 entries, starts at 0 and ends at 7.9667; frameTimes(1, 24) has 24",
+        "captureFrames over 1 s at 24 fps seeks exactly 24 times in increasing order, awaits settle before each onFrame, and never calls play()",
+        "aborting the signal after frame 5 rejects with ExportError code 'aborted' and onFrame was called 6 times or fewer",
+        "exportMp4Exact calls videoSource.add 240 times for 8 s at 30 fps with timestamps i/30 and duration 1/30, adds an AudioBufferSource only when audio is passed, and returns a Blob of type 'video/mp4'",
         "`npm run typecheck` passes",
         "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
@@ -123,29 +129,29 @@
       "priority": 4,
       "passes": false,
       "notes": "",
-      "dependsOn": [
-        "US-003"
-      ],
+      "dependsOn": [],
       "labels": [
-        "scripts",
-        "export",
-        "verify"
+        "frontend",
+        "export"
       ]
     },
     {
       "id": "US-005",
-      "title": "Document the MP4 export and how to test it by hand",
-      "description": "As a catalog owner, I want a short doc of how the export works and how to test it so that I can run the manual gates later without rereading the code.",
+      "title": "Browser client for the server path: upload JPEG frames, check any MP4",
+      "description": "As a viewer in a browser without WebCodecs H.264, I want my frames sent to the server for encoding so that I still get an MP4.",
       "steps": [
-        "Read docs/architecture/README.md (how the other architecture docs are linked) and docs/architecture/cinematic-assembly.md (the Phase list and where renders are checked).",
-        "Create docs/architecture/mp4-export.md with sections: What it does (frames by seek, then ffmpeg), Why not the browser recorder (real time, dropped frames, tab must stay visible), Commands (the npm script, env BASE DATA FPS CRF), What the checks mean (the three checkExport messages and 'frozen'), Limits (silent, needs a GPU Chromium and a running app, about 1-2 min per film, flat cut-outs show only their front), and Manual gates MG-1 to MG-3 copied from this PRD.",
-        "Add one row for the new doc to the documents list in docs/architecture/README.md in the same style as the existing rows; touch nothing else in that file.",
-        "State plainly in the doc that timing numbers are not measured yet and are filled in from MG-2."
+        "Read web/src/api/client.ts (request() and the passcode header) and the routes from US-003.",
+        "Create web/src/export/serverExport.ts exporting exportMp4ViaServer(o: { canvas; driver; durationSec; fps?; onProgress?; signal? }, deps = { request?, settle?, toJpeg? }): Promise<{ blob: Blob; problems: string[] }>. It POSTs /api/exports, uses captureFrames with onFrame = toJpeg(canvas, 0.9) then PUT /api/exports/<id>/frames/<i>, and finally POSTs finish and reads the x-export-problems header. Uploads run at most 4 at a time; progress is frames uploaded / total.",
+        "Use fetch with the same passcode header as request() for the binary bodies (export a small helper from serverExport.ts; do not edit client.ts).",
+        "Export checkMp4OnServer(blob, expect): Promise<string[]> that POSTs /api/exports/check and returns problems, or [] with no error shown when the server answers 503 (no ffmpeg there).",
+        "Map server errors to ExportError: 503 ffmpeg_missing -> code 'unsupported' with the message 'This server has no ffmpeg, so it cannot build an MP4 for this browser.'; 429 busy -> message 'The server is busy with another export. Try again in a minute.'",
+        "Create web/src/export/serverExport.test.ts with a fake fetch and toJpeg."
       ],
       "acceptanceCriteria": [
-        "docs/architecture/mp4-export.md exists and names the commands `npm run export:mp4`, BASE, DATA, FPS and CRF",
-        "docs/architecture/README.md links to mp4-export.md",
-        "The doc contains no timing number that is presented as measured",
+        "a 1 s, 6 fps export makes 1 start request, 6 frame PUTs with content-type image/jpeg and the passcode header, and 1 finish request, and never has more than 4 PUTs in flight",
+        "the returned problems equal the parsed x-export-problems header",
+        "a 503 from start rejects with ExportError code 'unsupported' and the ffmpeg message",
+        "checkMp4OnServer resolves [] on a 503 and the parsed problems on a 200",
         "`npm run typecheck` passes",
         "`npm test` passes (offline, no network)",
         "`npm run lint` passes"
@@ -154,7 +160,73 @@
       "passes": false,
       "notes": "",
       "dependsOn": [
+        "US-003",
         "US-004"
+      ],
+      "labels": [
+        "frontend",
+        "export"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Export panel: one MP4 option that picks the right path",
+      "description": "As a viewer or judge, I want a plain MP4 option that works in my browser so that I can download the film without installing anything.",
+      "steps": [
+        "Read web/src/panels/ExportPanel.tsx and its tests.",
+        "Replace the 'MP4 (experimental)' option with 'MP4'. Pick the path when the panel opens: 'browser' when mp4Supported() is true; else 'server' when GET /api/health reports ffmpeg true; else hide the MP4 option. Inject both through the existing deps object.",
+        "Browser path: exportMp4Exact with the mixed audio, then checkMp4OnServer; server path: exportMp4ViaServer. Show any problems as notes under the download link, and add the note 'Built on the server, without sound.' on the server path.",
+        "Show 'Rendering frame N of M' while running. Keep the WebM option, the Cancel button and every existing aria label.",
+        "Extend web/src/panels/ExportPanel.test.tsx for both paths, the hidden option, the notes and cancel."
+      ],
+      "acceptanceCriteria": [
+        "with mp4Supported true the panel offers 'MP4' and choosing it calls exportMp4Exact, never exportMp4ViaServer",
+        "with mp4Supported false and health ffmpeg true, choosing MP4 calls exportMp4ViaServer and shows 'Built on the server, without sound.'",
+        "with both false there is no MP4 option and WebM still works",
+        "problems returned by a check are shown as notes, and the download name ends in '.mp4'",
+        "the existing ExportPanel tests still pass unchanged apart from the renamed option label",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004",
+        "US-005"
+      ],
+      "labels": [
+        "frontend",
+        "ui",
+        "export"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Document the MP4 export for judges and for manual testing",
+      "description": "As a judge or the owner, I want a short doc of how to export and how the export works so that nobody has to read the code.",
+      "steps": [
+        "Read docs/README.md (the document table) and README.md.",
+        "Create docs/architecture/mp4-export.md with sections: How to export (open the film, Export tab, MP4, download; nothing to install), How it works (seek every frame, browser WebCodecs or server ffmpeg, then ffprobe checks), Why not record in real time (dropped frames, tab must stay visible), What the notes mean (the three compareProbe messages, 'frozen', 'check failed'), Limits (server path is silent; flat cut-outs show only their front; the server keeps at most 2 exports open), Running it yourself (ffmpeg optional locally: `brew install ffmpeg` or `apt install ffmpeg`; the Fly image already has it), and the manual gates MG-1 to MG-4.",
+        "State plainly that timing and size numbers are not measured yet and come from the manual gates.",
+        "Add one row to the document table in docs/README.md and one short Export paragraph to README.md linking the new doc; touch nothing else in either file."
+      ],
+      "acceptanceCriteria": [
+        "docs/architecture/mp4-export.md exists and names both paths, the /api/exports routes and the install commands for ffmpeg",
+        "docs/README.md and README.md link to mp4-export.md",
+        "the doc presents no timing or size number as measured",
+        "no mention of Playwright, headless Chromium or an export CLI",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006"
       ],
       "labels": [
         "docs"
@@ -166,26 +238,34 @@
       "docs/architecture/cinematic-assembly.md"
     ],
     "readFirst": [
-      "server/media/ffmpeg.ts (runFfmpeg, hasFfmpeg, probeVideo, FfmpegMissingError, the temp-dir helper pattern)",
-      "scripts/lib/film-frames.ts (filmFrames: headless Chromium, window.__stage.seek, one PNG per time) and web/stage-check.html",
-      "scripts/motion-check.ts (how a catalog hero film is opened and sought in the app; env BASE, DATA)",
-      "web/src/export/mp4Export.ts and web/src/export/formats.ts (the browser exports this does not replace)",
-      "shared/catalog-run.ts (the run and row shapes) and server/catalog/hero.ts (where a row's hero film comes from)"
+      "web/src/export/mp4Export.ts, web/src/export/types.ts, web/src/export/playerCanvas.ts and web/src/panels/ExportPanel.tsx (the S8a export this makes frame-exact; today it plays in real time and samples)",
+      "web/src/player/Player.tsx (PlayerHandle: seek, getCanvas, whenReady) and web/src/dev/stage-check.tsx (seek then wait one animation frame before reading the canvas)",
+      "server/media/ffmpeg.ts (runFfmpeg, hasFfmpeg, probeVideo, extractFrames, FfmpegMissingError)",
+      "server/http/routes.ts (contract D-1), server/http/handlers/local.ts (handler module style), server/http/auth.ts (the passcode guards every non-GET route) and server/http/upload-limit.ts (hono bodyLimit)",
+      "web/src/api/client.ts (request() adds the passcode header on writes) and shared/api.ts (HealthResponse.ffmpeg)",
+      "server/authoring/motion-check.ts (changedShare, Gray) for the frozen-frame check"
     ],
     "requires": [],
     "owns": [
       "server/media/encode.ts",
       "server/media/encode.test.ts",
-      "scripts/lib/film-grab.ts",
-      "scripts/lib/film-grab.test.ts",
-      "scripts/export-mp4.ts",
-      "scripts/export-mp4.test.ts",
+      "server/media/export-check.ts",
+      "server/media/export-check.test.ts",
+      "server/http/handlers/exports.ts",
+      "server/http/handlers/exports.test.ts",
+      "web/src/export/frameExport.ts",
+      "web/src/export/frameExport.test.ts",
+      "web/src/export/serverExport.ts",
+      "web/src/export/serverExport.test.ts",
       "docs/architecture/mp4-export.md"
     ],
     "sharedEdits": [
-      "scripts/lib/film-frames.ts",
-      "package.json",
-      "docs/architecture/README.md"
+      "server/http/routes.ts",
+      "shared/api.ts",
+      "web/src/panels/ExportPanel.tsx",
+      "web/src/panels/ExportPanel.test.tsx",
+      "README.md",
+      "docs/README.md"
     ],
     "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
     "guardrails": [
@@ -200,12 +280,14 @@
       "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
       "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
       "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
-      "Reuse, never copy: runFfmpeg, hasFfmpeg, probeVideo and FfmpegMissingError come from server/media/ffmpeg.ts. Do not edit that file or scripts/motion-check.ts.",
-      "Shared edits are small: scripts/lib/film-frames.ts may only gain an exported helper that the new code needs (its filmFrames signature and behaviour stay as they are); package.json gets only the `export:mp4` script line; docs/architecture/README.md gets only one link row.",
-      "Tests never launch Chromium and never need a GPU. They use fake runners; the single test that runs the real ffmpeg is skipped when hasFfmpeg() is false and builds its frames with ffmpeg's lavfi `testsrc` or with sharp.",
-      "The export never calls Muse, SAM, Meta or any model, and spends nothing. It reads stored films and builds only.",
-      "Silent output in this PRD: do not add an audio track. Leave a clearly named optional `audioPath` argument in the encode helper only if it is covered by a test.",
-      "The dev server on http://localhost:5173 is owner-run and shared: never kill or restart it. Real Chromium runs are manual gates."
+      "Reuse, never copy: runFfmpeg, hasFfmpeg, probeVideo, extractFrames and FfmpegMissingError come from server/media/ffmpeg.ts; changedShare comes from server/authoring/motion-check.ts. Do not edit either file.",
+      "Shared edits are small: server/http/routes.ts gets only the import and the registerExportRoutes(app, deps) line (the same exception C1 used); shared/api.ts gets only the export request and response types; README.md gets only one Export paragraph; docs/architecture/README.md gets only one link row. ExportPanel.tsx keeps its WebM path, its states and its aria labels.",
+      "No Playwright, no headless Chromium, no new npm dependency. Mediabunny is already installed. Frames are drawn by the viewer's browser only.",
+      "Tests never need a GPU or a real browser encoder: VideoEncoder, Mediabunny, canvas.toBlob and fetch are faked. The only real-ffmpeg tests are skipped when hasFfmpeg() is false and build their frames with sharp or ffmpeg lavfi testsrc.",
+      "The export never calls Muse, SAM, Meta or any model and spends nothing.",
+      "The server path is silent (no audio track). The browser path keeps the audio S8a already mixes.",
+      "Server export sessions live only in a temp dir under os.tmpdir() and are deleted on finish, on error and after 10 minutes idle. Nothing is written to the data folder.",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill or restart it. Real browser exports are manual gates."
     ],
     "qualityGates": {
       "universal": [
@@ -218,9 +300,10 @@
       ]
     },
     "manualGates": [
-      "MG-1: owner runs `npm run dev`, then `npm run export:mp4 -- <catalogId> <productId>` for one hero film and plays the file in QuickTime and in Chrome. It must show the same camera moves as the Catalog wall player.",
-      "MG-2: owner runs the export for a whole catalog and records seconds per film and file size. Expect about 1-2 minutes per 8 s film and a few MB (not yet measured).",
-      "MG-3: owner compares three frames (1 s, 4 s, 7 s) of the MP4 against the wall player; flat cut-out products must show the same turn."
+      "MG-1 (Chrome, local): open a 3D hero film at http://localhost:5173/?replay=1, choose MP4 and export. Play it in QuickTime and Chrome: same camera moves as the player, audio in sync by eye, no frozen stretch. Note the time taken and file size.",
+      "MG-2 (server path): in Chrome devtools run `delete window.VideoEncoder` (or use Firefox), reload, export MP4 again. The panel must say it is using the server; the file must play and be silent. Note the upload time and size.",
+      "MG-3 (Fly, after the owner deploys): open the deployed app in a browser with no local ffmpeg, export one film by each path, and confirm GET /api/health reports ffmpeg true. Timings in the doc are filled in from MG-1 to MG-3; until then they are estimates.",
+      "MG-4: compare frames at 1 s, 4 s and 7 s of the MP4 against the player paused at those times; flat cut-out products must show the same turn."
     ]
   }
 }

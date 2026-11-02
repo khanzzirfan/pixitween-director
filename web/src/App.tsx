@@ -11,6 +11,8 @@ import Review from './panels/Review';
 import Storyboard from './panels/Storyboard';
 import Player, { type PlayerHandle } from './player/Player';
 import { CrewStudio } from './crew/CrewStudio';
+import { recallIntake } from './crew/intakeHandoff';
+import { PendingStudio } from './crew/PendingStudio';
 import { ReplayPage } from './crew/replay/ReplayPage';
 import CatalogImport from './catalog/CatalogImport';
 import CatalogPage from './catalog/CatalogPage';
@@ -28,6 +30,9 @@ function Director({ filmId }: { filmId: string | null }) {
 
   const exportTab: ShellTab = { id: 'export', label: 'Export', icon: 'download', content: <Slot name="export"><ExportPanel {...panelProps} getPlayer={getPlayer} /></Slot> };
   const galleryTab: ShellTab = { id: 'gallery', label: 'Gallery', icon: 'grid', content: <Slot name="gallery"><Gallery {...panelProps} /></Slot> };
+
+  // just sent from the intake chat: keep the same chat on screen while the film loads, instead of flashing the classic desk
+  if (filmId && !film && recallIntake(filmId)) return <PendingStudio filmId={filmId} events={events} playerRef={playerRef} extraTabs={[exportTab, galleryTab]} />;
 
   if (film?.crew) return <CrewStudio film={film} events={events} playerRef={playerRef} extraTabs={[exportTab, galleryTab]} />;
 

@@ -1,4 +1,4 @@
-# The crew: how Shelfreel makes a film with agents
+# The crew: how MuseReels makes a film with agents
 
 You talk, a crew of Muse agents builds. One lead agent plans and answers you; several builders work on different scenes at the same moment; a critic who has never seen the plan checks the pictures. Everything the crew does is written to an event log, so any finished film can be played back as a show.
 

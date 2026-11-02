@@ -2,11 +2,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiRequestError, api } from '../api/client';
 import { useRecorder } from '../panels/useRecorder';
+import { OPENER } from './BriefBubbles';
 import { Composer } from './ChatThread';
+import { rememberIntake } from './intakeHandoff';
 import './crew.css';
 
 type Aspect = '16:9' | '9:16' | '1:1';
-const OPENER = 'What are we making? Send a photo of the product and tell me about it.';
 
 const messageOf = (e: unknown) =>
   e instanceof ApiRequestError && e.body && typeof e.body === 'object' && 'message' in e.body
@@ -73,6 +74,7 @@ export function ChatIntake() {
     try {
       setSent(recorder.blob ? '🎙 Voice brief' : text.trim());
       const result = await api.createFilm(form);
+      rememberIntake(result.filmId, { text: recorder.blob ? '' : text.trim(), voice: !!recorder.blob, photoUrl: URL.createObjectURL(product) });
       const url = new URL(window.location.href);
       url.searchParams.set('film', result.filmId);
       history.pushState({}, '', url);

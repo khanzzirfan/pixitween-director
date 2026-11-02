@@ -1,6 +1,8 @@
 // Owned by S12d. The conversation with the showrunner: a thread, a composer, and a ready bubble when the film is done.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { BriefBubbles } from './BriefBubbles';
 import { DirectorNotes } from './DirectorNotes';
+import type { SentBrief } from './intakeHandoff';
 import type { CrewState } from './crewReducer';
 import { PushToTalk } from './PushToTalk';
 
@@ -78,9 +80,15 @@ export interface ChatThreadProps {
   onVoice(blob: Blob): Promise<unknown> | void;
   /** A replay: the thread is shown with no composer, no push-to-talk and no answer chips. */
   readOnly?: boolean;
+  /** What the user first sent: shown at the top of the thread, so it never disappears when the studio opens. */
+  brief?: SentBrief;
+  /** A line shown as a thinking bubble until the showrunner speaks (the film is still starting). */
+  waiting?: string;
+  /** Typing is held until the film exists. */
+  composerDisabled?: boolean;
 }
 
-export function ChatThread({ crew, now, filmStatus, aspect, productUrl, getPoster, onPlay, onSend, onVoice, readOnly }: ChatThreadProps) {
+export function ChatThread({ crew, now, filmStatus, aspect, productUrl, getPoster, onPlay, onSend, onVoice, readOnly, brief, waiting, composerDisabled }: ChatThreadProps) {
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [poster, setPoster] = useState<string | undefined>();
@@ -110,7 +118,7 @@ export function ChatThread({ crew, now, filmStatus, aspect, productUrl, getPoste
   };
   return (
     <div className="thread">
-      <DirectorNotes crew={crew} now={now} onAsk={(o) => void send(o)} readOnly={readOnly}>
+      <DirectorNotes crew={crew} now={now} onAsk={(o) => void send(o)} readOnly={readOnly} lead={brief && (brief.photoUrl || brief.text || brief.voice) ? <BriefBubbles {...brief} /> : undefined} waiting={waiting}>
         {ready && <ReadyBubble posterUrl={poster ?? productUrl} aspect={aspect} onPlay={onPlay} />}
       </DirectorNotes>
       {error && <p role="alert" className="crew-error">{error}</p>}
@@ -118,6 +126,7 @@ export function ChatThread({ crew, now, filmStatus, aspect, productUrl, getPoste
       <Composer
         value={text}
         onChange={setText}
+        disabled={composerDisabled}
         onSend={() => { const t = text; setText(''); void send(t); }}
         hint="Enter to send · hold Space to talk"
         tools={<PushToTalk onVoice={onVoice} />}

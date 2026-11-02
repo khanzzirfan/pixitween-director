@@ -61,3 +61,17 @@ export interface ApiError {
   owner?: string;
   message?: string;
 }
+
+/** E1: server-side MP4 export. */
+export interface ExportStartRequest {
+  fps: number;
+  frames: number;
+  width: number;
+  height: number;
+}
+export interface ExportStartResponse {
+  id: string;
+}
+export interface ExportCheckResponse {
+  problems: string[];
+}

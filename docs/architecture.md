@@ -1,6 +1,6 @@
 # Architecture
 
-How Shelfreel fits together. One Node process serves the API and the built web app. The film is JSON (a PixiJS timeline) that the browser plays live, so there is no render server; the browser also does the work only a browser can: capturing frames for the critic and encoding the MP4 export.
+How MuseReels fits together. One Node process serves the API and the built web app. The film is JSON (a PixiJS timeline) that the browser plays live, so there is no render server; the browser also does the work only a browser can: capturing frames for the critic and encoding the MP4 export.
 
 ## System overview
 

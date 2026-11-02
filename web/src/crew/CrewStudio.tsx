@@ -10,6 +10,7 @@ import { StudioShell, type ShellTab } from '../shell/StudioShell';
 import { STEPS, stepFor } from '../shell/steps';
 import { BudgetMeter } from './BudgetMeter';
 import { ChatThread } from './ChatThread';
+import { recallIntake } from './intakeHandoff';
 import { CrewBoard } from './CrewBoard';
 import { LiveStoryboard } from './LiveStoryboard';
 import { ringFor } from './SceneCard';
@@ -36,6 +37,8 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [],
   useCaptureRequests({ filmId: film.id, requests: replay ? [] : crew.captureRequests, storyboard, getPlayer });
 
   const product = film.assets.find((a) => a.id === film.brief.productAssetId);
+  // what the user first sent: the copy from the intake chat, or the brief and photo stored on the film (a reload, a shared link)
+  const brief = recallIntake(film.id) ?? { text: film.brief?.text || film.brief?.transcript || '', photoUrl: product?.url };
   const status = [...events].reverse().find((e) => e.type === 'film.status');
   const filmStatus = status?.type === 'film.status' ? status.status : film.status;
 
@@ -108,6 +111,7 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [],
           onSend={(message) => api.chat(film.id, { message })}
           onVoice={(blob) => actions!.postVoice(blob)}
           readOnly={!!replay}
+          brief={brief}
         />
       }
       sideTitle={replay ? 'What the showrunner said' : 'Talk to the showrunner'}

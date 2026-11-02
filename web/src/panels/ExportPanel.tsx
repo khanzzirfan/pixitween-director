@@ -2,10 +2,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { collectAudioPlan } from '../export/audioPlan';
 import { exportFileName, extensionForMime, pickRecorderMime } from '../export/formats';
-import { exportMp4, mp4Supported } from '../export/mp4Export';
+import { exportMp4Exact } from '../export/frameExport';
+import { mp4Supported } from '../export/mp4Export';
 import { mixAudio } from '../export/mixAudio';
 import { getExportCanvas, isDrawingBufferPreserved, playerToDriver } from '../export/playerCanvas';
 import { recordCanvas } from '../export/recordCanvas';
+import { checkMp4OnServer, exportMp4ViaServer } from '../export/serverExport';
 import { EXPORT_READY_WAIT_SEC, ExportError, NOT_READY_MESSAGE, type ExportPlayerHandle } from '../export/types';
 import type { PanelProps } from './types';
 
@@ -19,15 +21,31 @@ export interface ExportPanelProps extends PanelProps {
     mixAudio?: typeof mixAudio;
     now?: () => Date;
     mp4Supported?: typeof mp4Supported;
-    exportMp4?: typeof exportMp4;
+    exportMp4?: typeof exportMp4Exact;
+    exportMp4ViaServer?: typeof exportMp4ViaServer;
+    checkMp4OnServer?: typeof checkMp4OnServer;
+    /** Whether the server has ffmpeg (GET /api/health). */
+    serverHasFfmpeg?: () => Promise<boolean>;
   };
 }
 
 type State =
   | { kind: 'idle' }
-  | { kind: 'running'; progress: number }
+  | { kind: 'running'; progress: number; frame?: { n: number; of: number } }
   | { kind: 'done'; url: string; name: string }
   | { kind: 'error'; message: string };
+
+const SERVER_NOTE = 'Built on the server, without sound.';
+type Mp4Path = 'browser' | 'server' | null;
+
+async function healthHasFfmpeg(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/health');
+    return res.ok && ((await res.json()) as { ffmpeg?: boolean }).ffmpeg === true;
+  } catch {
+    return false;
+  }
+}
 
 const canRecord = () =>
   typeof MediaRecorder !== 'undefined' && typeof HTMLCanvasElement !== 'undefined' && 'captureStream' in HTMLCanvasElement.prototype;
@@ -39,12 +57,15 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
   const [state, setState] = useState<State>({ kind: 'idle' });
   const [notes, setNotes] = useState<string[]>([]);
   const [format, setFormat] = useState<'webm' | 'mp4'>('webm');
-  const [mp4, setMp4] = useState(false);
+  const [mp4, setMp4] = useState<Mp4Path>(null);
   const abort = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let alive = true;
-    void (deps.mp4Supported ?? mp4Supported)().then((ok) => alive && setMp4(ok));
+    void (async () => {
+      const path: Mp4Path = (await (deps.mp4Supported ?? mp4Supported)()) ? 'browser' : (await (deps.serverHasFfmpeg ?? healthHasFfmpeg)()) ? 'server' : null;
+      if (alive) setMp4(path);
+    })();
     return () => void (alive = false);
   }, []);
 
@@ -73,11 +94,19 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
       else if (mixed.warnings.length) messages.push(`Exported without audio from: ${mixed.warnings.map((w) => w.layerId).join(', ')}`);
 
       const driver = playerToDriver(handle!);
-      const onProgress = (p: { fraction: number }) => setState({ kind: 'running', progress: Math.round(p.fraction * 100) });
+      const totalFrames = Math.ceil(durationSec * comp.fps);
+      const onProgress = (p: { fraction: number }) =>
+        setState({ kind: 'running', progress: Math.round(p.fraction * 100), frame: format === 'mp4' ? { n: Math.round(p.fraction * totalFrames), of: totalFrames } : undefined });
       let blob: Blob;
       let ext: string;
-      if (format === 'mp4') {
-        blob = await (deps.exportMp4 ?? exportMp4)({ canvas, driver, durationSec, audio: mixed.buffer, onProgress, signal: ctl.signal });
+      if (format === 'mp4' && mp4 === 'server') {
+        const r = await (deps.exportMp4ViaServer ?? exportMp4ViaServer)({ canvas, driver, durationSec, fps: comp.fps, onProgress, signal: ctl.signal });
+        blob = r.blob;
+        messages.push(SERVER_NOTE, ...r.problems);
+        ext = 'mp4';
+      } else if (format === 'mp4') {
+        blob = await (deps.exportMp4 ?? exportMp4Exact)({ canvas, driver, durationSec, fps: comp.fps, audio: mixed.buffer, onProgress, signal: ctl.signal });
+        messages.push(...(await (deps.checkMp4OnServer ?? checkMp4OnServer)(blob, { durationSec, fps: comp.fps, width: canvas.width, height: canvas.height })));
         ext = 'mp4';
       } else {
         const mimeType = pickRecorderMime((m) => MediaRecorder.isTypeSupported(m));
@@ -113,12 +142,12 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
       </div>
       {state.kind === 'idle' && (
         <>
-          {mp4 && (
+          {mp4 !== null && (
             <label>
               Format{' '}
               <select value={format} onChange={(e) => setFormat(e.target.value as 'webm' | 'mp4')} aria-label="Format">
                 <option value="webm">WebM</option>
-                <option value="mp4">MP4 (experimental)</option>
+                <option value="mp4">MP4</option>
               </select>
             </label>
           )}
@@ -141,7 +170,7 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
           <div className="export-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={state.progress}>
             <span style={{ width: `${state.progress}%` }} />
           </div>
-          <p>{state.progress}% complete</p>
+          <p>{state.frame ? `Rendering frame ${state.frame.n} of ${state.frame.of}` : `${state.progress}% complete`}</p>
           <button type="button" onClick={() => abort.current?.abort()}>
             Cancel
           </button>

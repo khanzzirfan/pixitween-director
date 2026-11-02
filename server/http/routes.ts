@@ -7,6 +7,7 @@ import { hasFfmpeg } from '../media/ffmpeg';
 import type { AppDeps } from './deps';
 import { registerCatalogRoutes } from './handlers/catalogs';
 import { registerChatRoutes } from './handlers/chat';
+import { registerExportRoutes } from './handlers/exports';
 import { registerFilmsRoutes } from './handlers/films';
 import { registerGenerateRoutes } from './handlers/generate';
 import { registerLocalRoutes } from './handlers/local';
@@ -36,4 +37,5 @@ export function registerRoutes(app: Hono, deps: AppDeps): void {
   registerReviewRoutes(app, deps);
   registerGenerateRoutes(app, deps);
   registerLocalRoutes(app, deps);
+  registerExportRoutes(app, deps);
 }

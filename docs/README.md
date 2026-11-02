@@ -1,6 +1,6 @@
 # Docs index
 
-Shelfreel makes photoreal 9:16 product ads, and a Catalog Crew that turns a CSV feed into one retail clip per product. The engine is `reacthub-pixitweenjs` (0.3.5 as of 31 Oct 2026). Deadline for the hackathon submission: Wed 4 Nov 2026, 21:00 EST.
+MuseReels makes photoreal 9:16 product ads, and a Catalog Crew that turns a CSV feed into one retail clip per product. The engine is `reacthub-pixitweenjs` (0.3.5 as of 31 Oct 2026). Deadline for the hackathon submission: Wed 4 Nov 2026, 21:00 EST.
 
 ## Where to start
 
@@ -18,6 +18,7 @@ Shelfreel makes photoreal 9:16 product ads, and a Catalog Crew that turns a CSV 
 |-----|----------------|
 | [architecture.md](architecture.md) | UI, API contract, backend, outside services, the film lifecycle and the tool list |
 | [architecture/README.md](architecture/README.md) | The architecture in a nutshell, as of 29 Oct |
+| [architecture/mp4-export.md](architecture/mp4-export.md) | How the MP4 export works, its two paths and checks |
 | [crew.md](crew.md) | Showrunner, parallel scene builders, critic, jobs, budget, replay |
 | [local-mode.md](local-mode.md) | Running on open-weight models for privacy, offline or free use |
 | [baseten-spark-open.md](baseten-spark-open.md) | Muse Spark Open on Baseten |
