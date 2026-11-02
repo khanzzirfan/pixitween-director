@@ -21,9 +21,10 @@ it('POST /api/films rejects bad input with a coded error', async () => {
   const app = createApp(await makeTestDeps());
   const form = new FormData();
   form.set('brief', 'a mug');
+  form.set('aspect', '4:3');
   const res = await app.request('/api/films', { method: 'POST', body: form });
   expect(res.status).toBe(400);
-  expect((await res.json()).error).toBe('product_required');
+  expect((await res.json()).error).toBe('bad_aspect');
 });
 
 it('POST /api/films accepts a photo and brief, returns 202 and runs the fake director to ready', async () => {
@@ -36,6 +37,9 @@ it('POST /api/films accepts a photo and brief, returns 202 and runs the fake dir
     .toBuffer();
   const form = new FormData();
   form.set('product', new File([png], 'p.png', { type: 'image/png' }));
+  // more photos of the same product are kept too, the first one is the hero
+  form.append('photos', new File([png], 'q.png', { type: 'image/png' }));
+  form.append('photos', new File([png], 'r.png', { type: 'image/png' }));
   form.set('brief', 'a ceramic mug at sunrise');
   const res = await app.request('/api/films', { method: 'POST', body: form });
   expect(res.status).toBe(202);
@@ -45,6 +49,8 @@ it('POST /api/films accepts a photo and brief, returns 202 and runs the fake dir
     const film = await deps.films.get(filmId);
     if (film.status === 'ready' || film.status === 'failed') {
       expect(film.status).toBe('ready');
+      expect(film.assets.filter((a) => a.role === 'product-photo')).toHaveLength(3);
+      expect(film.assets[0]!.id).toBe(film.brief.productAssetId);
       expect(film.storyboard?.scenes.length).toBeGreaterThan(0);
       expect(film.composition).toBeDefined();
       return;
@@ -52,6 +58,29 @@ it('POST /api/films accepts a photo and brief, returns 202 and runs the fake dir
     await new Promise((r) => setTimeout(r, 25));
   }
   throw new Error('film never settled');
+});
+
+async function settled(deps: Awaited<ReturnType<typeof makeTestDeps>>, filmId: string) {
+  for (let i = 0; i < 200; i++) {
+    const film = await deps.films.get(filmId);
+    if (film.status === 'ready' || film.status === 'failed') return film;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error('film never settled');
+}
+
+it('POST /api/films with no photo invents one from the brief and bills the image', async () => {
+  const base = await makeTestDeps();
+  const deps = { ...base, makeToolCtx: (id: string) => makeToolCtx(base, id) };
+  const form = new FormData();
+  form.set('brief', 'a ceramic mug at sunrise');
+  const res = await createApp(deps).request('/api/films', { method: 'POST', body: form });
+  expect(res.status).toBe(202);
+  const film = await settled(deps, (await res.json()).filmId);
+  expect(film.status).toBe('ready');
+  expect(film.assets.filter((a) => a.role === 'product-photo')).toHaveLength(1);
+  expect(film.assets.find((a) => a.id === film.brief.productAssetId)).toBeDefined();
+  expect(deps.ledger.total(film.id)).toBeGreaterThan(0);
 });
 
 it('chat validates ids and messages, and 409s while the film has no composition', async () => {

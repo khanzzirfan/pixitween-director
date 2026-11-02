@@ -5,7 +5,7 @@ import { getValidator } from '../engine/validate';
 import { loadEnv } from '../env';
 import { hasFfmpeg } from '../media/ffmpeg';
 import type { AppDeps } from './deps';
-import { registerCatalogRoutes } from './handlers/catalogs';
+import { registerLineupRoutes } from './handlers/lineups';
 import { registerChatRoutes } from './handlers/chat';
 import { registerExportRoutes } from './handlers/exports';
 import { registerFilmsRoutes } from './handlers/films';
@@ -32,7 +32,7 @@ export function registerRoutes(app: Hono, deps: AppDeps): void {
   });
   registerReadRoutes(app, deps);
   registerFilmsRoutes(app, deps);
-  registerCatalogRoutes(app, deps);
+  registerLineupRoutes(app, deps);
   registerChatRoutes(app, deps);
   registerReviewRoutes(app, deps);
   registerGenerateRoutes(app, deps);

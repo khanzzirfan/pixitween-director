@@ -1,25 +1,29 @@
 // The studio between "Send" and the film arriving: the same frame and the same chat as CrewStudio, with the user's brief already in the thread.
-import { type RefObject } from 'react';
+import { type ReactNode, type RefObject } from 'react';
 import Player, { type PlayerHandle } from '../player/Player';
 import type { FilmEvent } from '@shared/events';
 import { Slot } from '../shell/Slot';
-import { StudioShell, type ShellTab } from '../shell/StudioShell';
+import { railTabs, type RailId } from '../shell/rail';
+import { StudioBoard } from '../shell/StudioBoard';
+import { StudioShell } from '../shell/StudioShell';
 import { STEPS } from '../shell/steps';
 import { ChatThread } from './ChatThread';
 import { CrewBoard } from './CrewBoard';
 import { LiveStoryboard } from './LiveStoryboard';
+import { filmBoard } from './filmBoard';
 import { recallIntake } from './intakeHandoff';
 import { useCrew, useNow } from './useCrew';
 import './crew.css';
 
-export function PendingStudio({ filmId, events, playerRef, extraTabs = [] }: { filmId: string; events: FilmEvent[]; playerRef: RefObject<PlayerHandle | null>; extraTabs?: ShellTab[] }) {
+export function PendingStudio({ filmId, events, playerRef, panels = {} }: { filmId: string; events: FilmEvent[]; playerRef: RefObject<PlayerHandle | null>; panels?: Partial<Record<RailId, ReactNode>> }) {
   const { crew } = useCrew(filmId, events);
   const now = useNow();
-  const tabs: ShellTab[] = [
-    { id: 'plan', label: 'Plan', icon: 'list', content: <LiveStoryboard crew={crew} now={now} /> },
-    { id: 'crew', label: 'Crew', icon: 'users', content: <CrewBoard crew={crew} now={now} /> },
-    ...extraTabs,
-  ];
+  const tabs = railTabs({
+    board: <StudioBoard {...filmBoard(null, crew, recallIntake(filmId)?.text ?? '')} />,
+    plan: <LiveStoryboard crew={crew} now={now} />,
+    crew: <CrewBoard crew={crew} now={now} />,
+    ...panels,
+  });
   return (
     <StudioShell
       testId="pending-studio"

@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { App } from '../App';
+import ExportPanel from './ExportPanel';
 import * as client from '../api/client';
 
 const h = vi.hoisted(() => ({ canvas: {} as HTMLCanvasElement, captureStream: vi.fn() }));
@@ -43,7 +44,7 @@ afterEach(() => {
 const film = { id: 'film_3fa9c2d41b7e', title: 'Mug', status: 'ready', composition: { version: '1.9.0', id: 'c', width: 10, height: 10, fps: 30, durationInFrames: 60, assets: {}, layers: [] } };
 
 it('shows Nothing to export with no film', () => {
-  render(<App />);
+  render(<ExportPanel film={null} events={[]} getPlayer={() => null} />);
   expect(screen.getByText('Nothing to export')).toBeInTheDocument();
 });
 

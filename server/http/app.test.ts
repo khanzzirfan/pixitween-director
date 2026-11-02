@@ -59,7 +59,7 @@ it('enforces the passcode on mutating routes only', async () => {
 it('lets mutating routes through when no passcode is set', async () => {
   const res = await (await mk()).request('/api/films', { method: 'POST' });
   expect(res.status).toBe(400);
-  expect((await res.json()).error).toBe('product_required');
+  expect((await res.json()).error).toBe('brief_or_audio');
 });
 
 it('answers 404 JSON for unknown API paths', async () => {

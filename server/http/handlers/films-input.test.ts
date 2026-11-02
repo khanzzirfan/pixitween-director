@@ -11,10 +11,13 @@ describe('parseCreateFilm', () => {
   it('accepts a photo with a text brief and defaults the aspect', async () => {
     const out = await parseCreateFilm({ product: file(png, 'p.png', 'image/png'), brief: '  a mug  ' }, opts);
     expect(out).toMatchObject({ brief: 'a mug', aspect: '16:9' });
-    expect(out.product.mime).toBe('image/png');
+    expect(out.photos.map((p) => p.mime)).toEqual(['image/png']);
   });
-  it('requires a photo and sniffs its real type', async () => {
-    expect((await fails({ brief: 'x' })).code).toBe('product_required');
+  it('takes no photo (the server invents one), several photos, and sniffs each real type', async () => {
+    expect((await parseCreateFilm({ brief: 'x' }, opts)).photos).toEqual([]);
+    const two = await parseCreateFilm({ product: [file(png, 'a.png', 'image/png'), file(png, 'b.png', 'image/png')], brief: 'x' }, opts);
+    expect(two.photos).toHaveLength(2);
+    expect((await fails({ product: Array.from({ length: 7 }, () => file(png, 'a.png', 'image/png')), brief: 'x' })).code).toBe('too_many_photos');
     const bad = await fails({ product: file('not an image', 'p.png', 'image/png'), brief: 'x' });
     expect(bad).toMatchObject({ code: 'unsupported_media', status: 415 });
   });

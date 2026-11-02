@@ -120,7 +120,9 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
   const film = await crew.films.get(job.filmId);
   const scene = film.storyboard?.scenes.find((s) => s.id === sceneId);
   if (!scene) throw new SceneGoneError(sceneId);
-  const product = film.assets.find((a) => a.id === film.brief.productAssetId);
+  // a shot may name one of the film's other photos; anything else falls back to the hero photo
+  const photoId = scene.photoId && film.assets.some((a) => a.id === scene.photoId) ? scene.photoId : film.brief.productAssetId;
+  const product = film.assets.find((a) => a.id === photoId);
   const dims = ASPECT_SIZES[film.aspect];
   const palette = film.styleBible?.palette ?? film.storyboard!.palette;
   const spentBefore = crew.toolCtx.ledger.total(job.filmId);
@@ -145,7 +147,7 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
       scene,
       canvas: { ...dims, aspect: film.aspect },
       palette,
-      product: { assetId: film.brief.productAssetId, width: product?.width ?? dims.width, height: product?.height ?? dims.height },
+      product: { assetId: photoId, width: product?.width ?? dims.width, height: product?.height ?? dims.height },
       extraSystem: [film.styleBible ? renderBibleBlock(film.styleBible) : '', film.storyboard ? renderOutlineBlock(film.storyboard, sceneId) : '', SAFE_AREA, BUILDER_DIRECTION, renderJobBlock(job)].filter(Boolean).join('\n'),
       toolFilter: building ? (t: ToolDef) => !EDIT_ONLY_TOOLS.includes(t.name) : () => true,
       signal,
@@ -156,7 +158,7 @@ export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx
     const late = timedOut(signal);
     if ((r.aborted || signal.aborted) && !late) throw abortError();
     const basicsCtx: ToolCtx = late ? { ...ctx, signal: undefined } : ctx;
-    if (building) await ensureSceneBasics({ ctx: basicsCtx, scene, product: { assetId: film.brief.productAssetId }, palette });
+    if (building) await ensureSceneBasics({ ctx: basicsCtx, scene, product: { assetId: photoId, own: photoId !== film.brief.productAssetId }, palette });
     if (!late && r.calls && !r.stalled) await snapText(ctx, sceneId, film.storyboard).catch(() => 0);
     if (!late && (!r.calls || r.stalled)) throw new Error(r.failures.at(-1) ? `builder stalled: ${r.failures.at(-1)}`.slice(0, 280) : 'builder made no progress');
     await runTextLane(crew, job, sceneId, film.styleBible);

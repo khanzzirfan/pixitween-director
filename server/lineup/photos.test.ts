@@ -1,9 +1,9 @@
 import type * as FsModule from 'node:fs';
-import { existsSync, mkdirSync, mkdtempSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createCutoutCache, photoKey, resolvePhoto } from './photos';
+import { resolvePhoto } from './photos';
 
 /** Every file the resolver reads, so a test can prove it read none. */
 const reads = vi.hoisted(() => [] as string[]);
@@ -75,30 +75,4 @@ it('refuses a remote photo', () => {
 it('says a repo photo that is not there is not found', () => {
   expect(resolvePhoto('fixtures/nope.png', new Map())).toEqual({ error: 'photo not found: fixtures/nope.png' });
   expect(reads).toHaveLength(1);
-});
-
-it('keys a photo by the sha256 of its bytes', () => {
-  const key = photoKey(Buffer.from('can'));
-  expect(key).toMatch(/^[0-9a-f]{64}$/);
-  expect(photoKey(Buffer.from('can'))).toBe(key);
-  expect(photoKey(Buffer.from('mug'))).not.toBe(key);
-});
-
-it('gives a cut-out cached in one cache to a new cache on the same dir', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'catalog-cut-'));
-  const entry = { id: 'asset_1', width: 100, height: 200, accent: '#3d4a5c', chroma: 0.42 };
-  await createCutoutCache(dir).set('key1', entry);
-  expect(existsSync(join(dir, 'catalogs', 'cutouts.json'))).toBe(true);
-  expect(await createCutoutCache(dir).get('key1')).toEqual(entry);
-});
-
-it('keeps every cut-out it is given', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'catalog-cut-'));
-  const cache = createCutoutCache(dir);
-  await cache.set('key1', { id: 'asset_1', width: 10, height: 20, accent: '#111111', chroma: 0.1 });
-  await cache.set('key2', { id: 'asset_2', width: 30, height: 40, accent: '#222222', chroma: 0.2 });
-  const other = createCutoutCache(dir);
-  expect(await other.get('key1')).toEqual({ id: 'asset_1', width: 10, height: 20, accent: '#111111', chroma: 0.1 });
-  expect(await other.get('key2')).toEqual({ id: 'asset_2', width: 30, height: 40, accent: '#222222', chroma: 0.2 });
-  expect(await other.get('nope')).toBeUndefined();
 });

@@ -8,9 +8,9 @@ test('prompt to film, chat edit, undo and redo, layer select', async ({ page }) 
   await page.goto('/');
 
   // Brief: upload a product photo and describe the film.
-  await page.getByLabel('Product photo').setInputFiles(PRODUCT);
-  await page.getByRole('textbox', { name: 'Brief', exact: true }).fill('A morning ritual with a ceramic mug, warm sunrise light');
-  await page.getByRole('button', { name: 'Create my storyboard →' }).click();
+  await page.getByLabel('Photos or CSV').setInputFiles(PRODUCT);
+  await page.getByLabel('Message').fill('A morning ritual with a ceramic mug, warm sunrise light');
+  await page.getByRole('button', { name: 'Make film' }).click();
 
   // The fake director builds the film; the URL picks up the film id and the status reaches ready.
   await expect(page).toHaveURL(/[?&]film=film_/);

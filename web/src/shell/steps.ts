@@ -2,9 +2,9 @@
 import type { ShellStep } from './StudioShell';
 
 export const STEPS: ShellStep[] = [
-  { label: 'Brief', tab: 'new' },
+  { label: 'Brief', tab: 'board' },
   { label: 'Plan', tab: 'plan' },
-  { label: 'Build', tab: 'plan' },
+  { label: 'Build', tab: 'crew' },
   { label: 'Review', tab: 'review' },
   { label: 'Export', tab: 'export' },
 ];

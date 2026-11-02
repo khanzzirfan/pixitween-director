@@ -14,9 +14,9 @@ test('crew studio: four builders at once, a mid-build message adds a scene, the 
   await page.goto('/');
   // the chat intake replaces the form in crew mode
   await expect(page.getByRole("log", { name: "Conversation" })).toBeVisible();
-  await page.getByLabel("Product photo").setInputFiles(PRODUCT);
+  await page.getByLabel('Photos or CSV').setInputFiles(PRODUCT);
   await page.getByLabel('Message').fill('A morning ritual with a ceramic mug, warm sunrise light');
-  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await page.getByRole('button', { name: 'Make film' }).click();
   await expect(page).toHaveURL(/[?&]film=film_/);
 
   const studio = page.getByTestId('crew-studio');

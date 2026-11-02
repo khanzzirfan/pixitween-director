@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { FILM_ID_RE, type FilmId } from './composition';
-import { catalogRowSchema } from './catalog-run';
 import { inboxItemSchema, jobSchema, laneSchema, storyboardOpSchema, styleBibleSchema } from './crew';
 import { storyboardSchema } from './storyboard';
 
@@ -102,8 +101,6 @@ export const filmEventSchema = z.discriminatedUnion('type', [
   z.object({ ...base, type: t('capture.request'), requestId: z.string(), sceneId: z.string(), timesSec: z.array(z.number()) }),
   z.object({ ...base, type: t('budget'), spentUsd: z.number(), capUsd: z.number(), level: z.enum(['ok', 'warn', 'stop']) }),
   z.object({ ...base, type: t('error'), where: z.string(), status: z.number().optional(), message: z.string() }),
-  z.object({ ...base, type: t('catalog.row'), catalogId: z.string(), row: catalogRowSchema }),
-  z.object({ ...base, type: t('catalog.done'), catalogId: z.string(), costUsd: z.number(), ms: z.number() }),
 ]);
 
 export type FilmEvent = z.infer<typeof filmEventSchema>;

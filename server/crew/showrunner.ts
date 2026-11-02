@@ -23,6 +23,10 @@ export interface ShowrunnerDeps {
   model: string;
   /** The product photo as a data URL. Sent only with the first turn. */
   productImageUrl?: string;
+  /** The film's other photos, so the first turn can see them and name one per shot (scene.photoId). */
+  extraPhotos?: Array<{ id: string; url: string }>;
+  /** The hero photo's asset id, named in the first turn beside the extras. */
+  heroPhotoId?: string;
   tools?: ToolDef[];
   /** Open findings for the board table. */
   findings?: () => Finding[];
@@ -246,7 +250,12 @@ export function createShowrunnerAgent(deps: ShowrunnerDeps, snapshot: Showrunner
     compose(text) {
       const first = !sentImage;
       sentImage = true;
-      return first && deps.productImageUrl ? [{ type: 'text', text }, { type: 'image_url', image_url: { url: deps.productImageUrl } }] : text;
+      if (!first || !deps.productImageUrl) return text;
+      const extras = deps.extraPhotos ?? [];
+      const note = extras.length
+        ? `\n\nThe owner sent ${extras.length + 1} photos, shown in this order: the hero photo (${deps.heroPhotoId ?? 'hero'}), then ${extras.map((p) => p.id).join(', ')}. Make one film that cuts between them: give each shot the photoId of the photo it shows (leave it out for the hero photo), and use every photo at least once.`
+        : '';
+      return [{ type: 'text', text: text + note }, { type: 'image_url', image_url: { url: deps.productImageUrl } }, ...extras.map((p) => ({ type: 'image_url' as const, image_url: { url: p.url } }))];
     },
     turn,
     next,

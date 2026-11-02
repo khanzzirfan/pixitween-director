@@ -6,17 +6,22 @@ import { api } from '../api/client';
 import { captureScene } from '../capture/driver';
 import Player, { type PlayerHandle } from '../player/Player';
 import { Filmstrip, sceneStarts } from '../shell/Filmstrip';
-import { StudioShell, type ShellTab } from '../shell/StudioShell';
+import Review from '../panels/Review';
+import { railTabs, type RailId } from '../shell/rail';
+import { StudioBoard } from '../shell/StudioBoard';
+import { StudioShell } from '../shell/StudioShell';
 import { STEPS, stepFor } from '../shell/steps';
 import { BudgetMeter } from './BudgetMeter';
 import { ChatThread } from './ChatThread';
 import { recallIntake } from './intakeHandoff';
 import { CrewBoard } from './CrewBoard';
+import { filmBoard } from './filmBoard';
 import { LiveStoryboard } from './LiveStoryboard';
 import { ringFor } from './SceneCard';
 import { TakesPicker } from './TakesPicker';
 import { useCaptureRequests } from './useCaptureRequests';
 import { useCrew, useNow } from './useCrew';
+import '../lineup/lineup.css';
 import './crew.css';
 
 /** A replay: the studio shows the log played back, read-only. */
@@ -26,7 +31,15 @@ export interface ReplayView {
   version?: number;
 }
 
-export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [], replay }: { film: FilmState; events: FilmEvent[]; playerRef: RefObject<PlayerHandle | null>; frozenNow?: number; extraTabs?: ShellTab[]; replay?: ReplayView }) {
+/** A catalogue's film inside its line-up: the product tabs under the stage, a note above the chat, and a hold while it waits its turn. */
+export interface LineupView {
+  tabs: ReactNode;
+  note: ReactNode;
+  /** set while this product's film has not started: the chat says so and cannot start the crew early */
+  hold?: string;
+}
+
+export function CrewStudio({ film, events, playerRef, frozenNow, panels = {}, replay, lineup }: { film: FilmState; events: FilmEvent[]; playerRef: RefObject<PlayerHandle | null>; frozenNow?: number; panels?: Partial<Record<RailId, ReactNode>>; replay?: ReplayView; lineup?: LineupView }) {
   const { crew, actions } = useCrew(film.id, events);
   const liveNow = useNow(1000, frozenNow !== undefined);
   const now = frozenNow ?? liveNow;
@@ -65,22 +78,21 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [],
     if (at !== undefined) playerRef.current?.seek(at);
   };
 
-  const tabs: ShellTab[] = [
-    { id: 'plan', label: 'Plan', icon: 'list', badge: scenes.length || undefined, content: <LiveStoryboard crew={crew} now={now} onOps={replay ? undefined : (ops) => actions!.postStoryboard(ops)} /> },
+  const tabs = railTabs(
     {
-      id: 'crew',
-      label: 'Crew',
-      icon: 'users',
-      badge: busy || undefined,
-      content: (
+      board: <StudioBoard {...filmBoard(film, crew, brief.text)} />,
+      plan: <LiveStoryboard crew={crew} now={now} onOps={replay ? undefined : (ops) => actions!.postStoryboard(ops)} />,
+      crew: (
         <>
           <CrewBoard crew={crew} now={now} onCancel={replay ? undefined : (id) => void actions!.cancelJob(id)} />
           <TakesPicker crew={crew} onPick={replay ? undefined : (jobId, takeFilmId) => actions!.pickTake(jobId, takeFilmId)} />
         </>
       ),
+      review: <Review film={film} events={events} getPlayer={getPlayer} />,
+      ...panels,
     },
-    ...extraTabs,
-  ];
+    { plan: scenes.length || undefined, crew: busy || undefined },
+  );
 
   return (
     <StudioShell
@@ -98,8 +110,15 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [],
           {replay?.bar}
         </section>
       }
-      strip={<Filmstrip scenes={scenes} selected={selected} onSelect={jump} ringOf={(id) => ringFor(jobs, id)} />}
+      strip={
+        <>
+          {lineup?.tabs}
+          <Filmstrip scenes={scenes} selected={selected} onSelect={jump} ringOf={(id) => ringFor(jobs, id)} />
+        </>
+      }
       side={
+        <div className="ln-side">
+          {lineup?.note}
         <ChatThread
           crew={crew}
           now={now}
@@ -112,7 +131,9 @@ export function CrewStudio({ film, events, playerRef, frozenNow, extraTabs = [],
           onVoice={(blob) => actions!.postVoice(blob)}
           readOnly={!!replay}
           brief={brief}
+          {...(lineup?.hold ? { waiting: lineup.hold, composerDisabled: true } : {})}
         />
+        </div>
       }
       sideTitle={replay ? 'What the showrunner said' : 'Talk to the showrunner'}
       headerRight={<BudgetMeter budget={crew.budget} credits={crew.credits} />}

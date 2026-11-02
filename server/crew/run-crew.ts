@@ -127,7 +127,15 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     } catch {
       // the photo is optional context; the brief still says what the product is
     }
-    const common = { crew, backend, model, productImageUrl, events: () => events, idleEndMs: o.idleEndMs ?? env.CREW_IDLE_END_MS, deadline };
+    const extraPhotos: Array<{ id: string; url: string }> = [];
+    for (const a of film.assets.filter((x) => x.role === 'product-photo' && x.id !== film.brief.productAssetId)) {
+      try {
+        extraPhotos.push({ id: a.id, url: `data:image/jpeg;base64,${(await resizeFit(await deps.assets.read(a.id), 768, 'jpeg')).toString('base64')}` });
+      } catch {
+        // a photo that cannot be read is left out; the film still has its hero
+      }
+    }
+    const common = { crew, backend, model, productImageUrl, extraPhotos, heroPhotoId: film.brief.productAssetId, events: () => events, idleEndMs: o.idleEndMs ?? env.CREW_IDLE_END_MS, deadline };
     const [{ createShowrunnerGraph }, { createCrewCheckpointer }] = await Promise.all([import('./engine/showrunner-graph'), import('./engine/checkpointer')]);
     const checkpointer = createCrewCheckpointer(deps.dataDir ?? env.DATA_DIR, filmId);
     const showrunner = createShowrunnerGraph({ ...common, checkpointer, threadId: filmId });

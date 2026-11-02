@@ -54,7 +54,7 @@ Everything in this repository was written during the event: its git history star
 
 | Folder | What it holds |
 |--------|---------------|
-| `server/` | the Hono API, the crew, the agents, the tools, the Meta clients, the catalog runner, the stores |
+| `server/` | the Hono API, the crew, the agents, the tools, the Meta clients, the catalogue line-ups, the stores |
 | `web/` | the React studio, the player, frame capture, export and replay |
 | `shared/` | contracts used by both: film state, storyboard, events, crew, tools |
 | `scripts/` | live checks, the cost-per-film calculator, the crew report, the submission preflight |

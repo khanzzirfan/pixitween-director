@@ -13,7 +13,8 @@ const PLACEHOLDER_SIZE = 0.024;
 export async function ensureSceneBasics(o: {
   ctx: ToolCtx;
   scene: Scene;
-  product: { assetId: string };
+  /** `own`: a shot that shows one of the film's other photos, so the hero's cut-out must not stand in for it. */
+  product: { assetId: string; own?: boolean };
   palette: string[];
 }): Promise<{ added: string[] }> {
   const added: string[] = [];
@@ -41,7 +42,7 @@ export async function ensureSceneBasics(o: {
   }
   if (!pending && comp && !layerIdsByRole(comp, 'product', o.scene.id).length && !layerIdsByRole(comp, 'product3d', o.scene.id).length)
     // the cut-out when the film has one, so the default is not a photo rectangle with its studio background
-    await add({ sceneId: o.scene.id, role: 'product', kind: 'image', assetId: (await filmCutout(o.ctx))?.id ?? o.product.assetId });
+    await add({ sceneId: o.scene.id, role: 'product', kind: 'image', assetId: (o.product.own ? undefined : await filmCutout(o.ctx))?.id ?? o.product.assetId });
   if (comp && o.scene.text && !layerIdsByRole(comp, 'headline', o.scene.id).length)
     await add({ sceneId: o.scene.id, role: 'headline', kind: 'text', text: o.scene.text, style: { color: '#ffffff' } });
   if (comp && o.scene.mode === 'generate') {

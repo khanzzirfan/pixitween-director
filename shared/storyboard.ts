@@ -17,6 +17,8 @@ export const sceneSchema = z.object({
   estCredits: z.number().min(0).optional(),
   /** Set when the director asked for this scene; the showrunner may not remove it without a user turn. */
   requestedBy: z.literal('user').optional(),
+  /** One of the film's supplied photos (an asset id) to use for this shot, so a film with several photos cuts between them. Absent: the hero photo. */
+  photoId: z.string().min(1).max(64).optional().describe('Asset id of one of the supplied photos to use for this shot; leave out for the hero photo'),
   /** Toy-studio films (S16b): the shot's story beats, who is in it and what each does when. */
   beats: z.string().max(300).optional(),
   castIds: z.array(z.string().min(1)).optional(),

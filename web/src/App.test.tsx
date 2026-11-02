@@ -5,11 +5,11 @@ import * as client from './api/client';
 
 afterEach(() => window.history.replaceState({}, '', '/'));
 
-it('renders the eight slots', () => {
+it('opens on the Brief screen: a board, an empty stage and the chat', () => {
   render(<App />);
-  for (const name of ['new-film', 'storyboard', 'player', 'review', 'chat', 'catalog', 'export', 'gallery']) {
-    expect(screen.getByTestId(`slot-${name}`)).toBeInTheDocument();
-  }
+  expect(screen.getByTestId('studio-board')).toBeInTheDocument();
+  expect(screen.getByTestId('slot-player')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Make film' })).toBeDisabled();
 });
 
 it('opens the film named by ?film= and shows its status', async () => {
@@ -21,9 +21,4 @@ it('opens the film named by ?film= and shows its status', async () => {
   await waitFor(() => expect(screen.getByTestId('film-status')).toHaveTextContent('planning'));
   expect(screen.getByTestId('player-empty')).toBeInTheDocument(); // no composition yet
   vi.unstubAllGlobals();
-});
-
-it('the chat stub renders the backend badge', () => {
-  render(<App />);
-  expect(screen.getByTestId('backend-badge')).toBeInTheDocument();
 });

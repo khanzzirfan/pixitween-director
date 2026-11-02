@@ -6,9 +6,9 @@ const PRODUCT = path.resolve('fixtures/seed/mug-product.png');
 
 async function makeFilm(page: Page) {
   await page.goto('/');
-  await page.getByLabel('Product photo').setInputFiles(PRODUCT);
-  await page.getByRole('textbox', { name: 'Brief', exact: true }).fill('A morning ritual with a ceramic mug, warm sunrise light');
-  await page.getByRole('button', { name: 'Create my storyboard →' }).click();
+  await page.getByLabel('Photos or CSV').setInputFiles(PRODUCT);
+  await page.getByLabel('Message').fill('A morning ritual with a ceramic mug, warm sunrise light');
+  await page.getByRole('button', { name: 'Make film' }).click();
   await expect(page).toHaveURL(/[?&]film=film_/);
   await expect(page.getByTestId('film-status')).toHaveText('ready', { timeout: 60_000 });
 }

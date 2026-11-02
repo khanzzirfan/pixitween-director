@@ -82,8 +82,10 @@ function blankStoryboard(film: FilmState): Storyboard {
 
 function blankComposition(film: FilmState, sb: Storyboard): Comp {
   let c = newFilmComposition({ aspect: film.aspect, title: sb.title, palette: sb.palette });
-  const product = film.assets.find((a) => a.id === film.brief.productAssetId);
-  if (product) c = registerAsset(c, { id: product.id, kind: 'image', src: product.url, width: product.width, height: product.height });
+  // the hero photo and any other photos the owner sent, so a shot can show any of them
+  for (const photo of film.assets.filter((a) => a.id === film.brief.productAssetId || a.role === 'product-photo')) {
+    c = registerAsset(c, { id: photo.id, kind: 'image', src: photo.url, width: photo.width, height: photo.height });
+  }
   return c;
 }
 
