@@ -47,6 +47,14 @@ export const catalogRowSchema = z.object({
   error: z.string().optional(),
   /** How long the last build took, in milliseconds. */
   ms: z.number().optional(),
+  /** The product's hero film, once it is cut: Muse's idea for it, who directed it, and a version bumped on every rebuild. */
+  hero: z
+    .object({
+      concept: z.string(),
+      source: z.enum(['muse', 'floor']),
+      version: z.number().int().min(1),
+    })
+    .optional(),
 });
 export type CatalogRow = z.infer<typeof catalogRowSchema>;
 
@@ -70,12 +78,17 @@ export const lineFilmSchema = z.object({
 });
 export type LineFilm = z.infer<typeof lineFilmSchema>;
 
+/** The longest brief a run keeps, in characters. */
+export const BRIEF_MAX = 600;
+
 export const catalogRunSchema = z.object({
   id: z.string().regex(CATALOG_ID_RE),
   /** The carrier film: its ctx runs the art, its event log carries the catalog events. */
   filmId: z.string().min(1),
   aspect: z.enum(['9:16', '16:9', '1:1']),
   createdAt: z.string(),
+  /** What the campaign is for, in the owner's words ("summer holiday sale, beach, surf"). Muse reads it for every product's film. */
+  brief: z.string().max(BRIEF_MAX).optional(),
   state: z.enum(['running', 'done']),
   costUsd: z.number().min(0),
   rows: z.array(catalogRowSchema).min(1).max(200),

@@ -3,7 +3,7 @@
 // The wall draws; it decides nothing. What a row means is the server's own check (see `chips.ts`).
 import { useEffect, useRef, useState } from 'react';
 import { formatPrice, shownPrice } from '@shared/catalog';
-import { isFinal, summarize, type CatalogRow, type CatalogSummary } from '@shared/catalog-run';
+import { isFinal, summarize, type CatalogRow, type CatalogSummary, type LineFilm } from '@shared/catalog-run';
 import { editProduct, type ProductEdit } from './api';
 import { checkChip, statusChip } from './chips';
 import './catalog.css';
@@ -34,6 +34,15 @@ export interface CatalogWallProps {
   catalogId?: string;
   /** Called with the row the server answered a price edit with. */
   onEdited?: (row: CatalogRow) => void;
+  /** The run's line films: the showcase, listed above the rows. */
+  films?: LineFilm[];
+  /** The id of the line film that is on the stage. */
+  selectedFilm?: string | null;
+  /** Called with the id of the line film the owner clicked. */
+  onSelectFilm?: (lineId: string) => void;
+  /** What the picked row plays: its hero film or its tile. */
+  rowView?: 'film' | 'tile';
+  onRowView?: (view: 'film' | 'tile') => void;
 }
 
 /** The price editor of the row on the stage: one price, or an old price and a sale price. */
@@ -130,12 +139,16 @@ function CatalogRowView({
   onSelect,
   catalogId,
   onEdited,
+  rowView,
+  onRowView,
 }: {
   row: CatalogRow;
   selected: boolean;
   onSelect?: (id: string) => void;
   catalogId?: string;
   onEdited?: (row: CatalogRow) => void;
+  rowView?: 'film' | 'tile';
+  onRowView?: (view: 'film' | 'tile') => void;
 }) {
   const product = row.product;
   const final = isFinal(row.status);
@@ -162,13 +175,37 @@ function CatalogRowView({
           {check.text}
         </span>
       </button>
+      {selected && row.hero && (
+        <div className="catalog-view" role="group" aria-label={`What ${product.title} plays`}>
+          <button type="button" aria-pressed={rowView !== 'tile'} onClick={() => onRowView?.('film')}>
+            Film
+          </button>
+          <button type="button" aria-pressed={rowView === 'tile'} onClick={() => onRowView?.('tile')}>
+            Tile
+          </button>
+          {row.hero.concept && <span className="catalog-concept" title={row.hero.source === 'muse' ? 'Directed by Muse' : 'Floor board'}>{row.hero.concept}</span>}
+        </div>
+      )}
       {selected && catalogId && final && row.status !== 'failed' && <PriceEditor row={row} catalogId={catalogId} onEdited={onEdited} />}
     </li>
   );
 }
 
 /** The catalog wall: the header line with the counts, then one row per product. */
-export default function CatalogWall({ rows, summary, costUsd = 0, selected, onSelect, catalogId, onEdited }: CatalogWallProps) {
+export default function CatalogWall({
+  rows,
+  summary,
+  costUsd = 0,
+  selected,
+  onSelect,
+  catalogId,
+  onEdited,
+  films = [],
+  selectedFilm,
+  onSelectFilm,
+  rowView,
+  onRowView,
+}: CatalogWallProps) {
   const counts = summary ?? summarize(rows);
   return (
     <section className="catalog-wall" aria-label="Catalog wall">
@@ -177,6 +214,23 @@ export default function CatalogWall({ rows, summary, costUsd = 0, selected, onSe
         <span className="catalog-sep">{' · '}</span>
         <span className="catalog-cost">{`$${costUsd.toFixed(2)}`}</span>
       </p>
+      {films.length > 0 && (
+        <div className="catalog-films" aria-label="Line films">
+          {films.map((film) => (
+            <button
+              key={film.id}
+              type="button"
+              className={`catalog-film${selectedFilm === film.id ? ' is-on' : ''}`}
+              data-film={film.id}
+              aria-pressed={selectedFilm === film.id}
+              onClick={() => onSelectFilm?.(film.id)}
+            >
+              <span className="catalog-film-title">▶ {film.title} line film</span>
+              <span className="catalog-film-sub">{`${film.productIds.length} products · ${film.tagline}`}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <ul className="catalog-rows">
         {rows.map((row) => (
           <CatalogRowView
@@ -186,6 +240,8 @@ export default function CatalogWall({ rows, summary, costUsd = 0, selected, onSe
             onSelect={onSelect}
             catalogId={catalogId}
             onEdited={onEdited}
+            rowView={rowView}
+            onRowView={onRowView}
           />
         ))}
       </ul>

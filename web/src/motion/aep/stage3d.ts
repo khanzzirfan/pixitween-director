@@ -19,6 +19,8 @@ export interface StageContext {
   fps: number;
   /** The world's in-point (frames): members' keyframes are composition frames, tweened on the world's clock. */
   worldInPoint?: number;
+  /** The world's out-point (frames): a member that lives to it stays on the world's last frame. */
+  worldOutPoint?: number;
   /** The unit the composition's layer rotations are written in ('rad' for a legacy film). */
   rotationUnit?: AepRotationUnit;
 }
@@ -232,7 +234,7 @@ export function convertProp(
     },
     castShadow: prop.castShadow ?? !isCard,
     fit: prop.size ?? PROP_DEFAULT_SIZE,
-    life: { start: Math.max(0, (prop.inPoint - clock) / ctx.fps), end: Math.max(0, (prop.outPoint - clock) / ctx.fps) },
+    life: propLife(prop, clock, ctx),
     billboard: billboard || undefined,
     flipbook,
     swarm,
@@ -274,8 +276,41 @@ function cubicBezierAt([x1, y1, x2, y2]: readonly number[], x: number): number {
   return 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t;
 }
 
+/**
+ * One tween for every set of tweens that start together, last as long, ease alike and drive the same target: the camera's position and lens
+ * keyed on the same frames move as one tween, not two. A layer may hold only 64 tweens, and this is what lets a film of ten shots keep both.
+ * The order of the first of each set is kept.
+ */
+export function mergeTweens<T extends ConvertedTween & { target?: string; repeat?: number; yoyo?: boolean }>(tweens: T[]): T[] {
+  const out: T[] = [];
+  const at = new Map<string, T>();
+  for (const t of tweens) {
+    const id = [t.target ?? '', t.at, t.duration, t.ease, t.repeat ?? 0, t.yoyo ?? false].join('|');
+    const hit = at.get(id);
+    if (hit && !Object.keys(t.to).some((k) => k in hit.to)) {
+      Object.assign(hit.from, t.from);
+      Object.assign(hit.to, t.to);
+      continue;
+    }
+    const copy = { ...t, from: { ...t.from }, to: { ...t.to } };
+    at.set(id, copy);
+    out.push(copy);
+  }
+  return out;
+}
+
+/**
+ * A member's life on the world's clock, in seconds. The engine shows an object while its time is before `end`, as a 2D layer's out-point;
+ * a 2D layer that ends with the film still shows on the film's last frame, so a member that lives to the world's end gets one frame more,
+ * or it would vanish on the last frame.
+ */
+export function propLife(prop: { inPoint: number; outPoint: number }, clock: number, ctx: StageContext): { start: number; end: number } {
+  const toEnd = ctx.worldOutPoint !== undefined && prop.outPoint >= ctx.worldOutPoint;
+  return { start: Math.max(0, (prop.inPoint - clock) / ctx.fps), end: Math.max(0, (prop.outPoint + (toEnd ? 1 : 0) - clock) / ctx.fps) };
+}
+
 export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerCtx: StageContext): ConvertWorldResult {
-  const ctx: StageContext = { ...outerCtx, worldInPoint: world.inPoint };
+  const ctx: StageContext = { ...outerCtx, worldInPoint: world.inPoint, worldOutPoint: world.outPoint };
   const { base, tweens: baseTweens, warnings } = mapBaseLayer(world, ctx.fps, ctx.rotationUnit);
   const id = sanitizeId(world.id);
 
@@ -419,14 +454,16 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
     warnings.push(`layer ${world.id}: animated camera.target is not supported yet; using the first value`);
   }
   const fovValue = world.camera.fov ?? 35;
-  const tweens = [
-    ...baseTweens,
-    ...actorTweens,
-    ...cameraTweens(world.camera.position, ['position.x', 'position.y', 'position.z'], ctx.fps, world.inPoint),
-    ...cameraTweens(fovValue, ['fov'], ctx.fps, world.inPoint),
-    ...lightTweens,
-    ...focusTweens,
-  ].map((t) => ({ repeat: 0, yoyo: false, ...t }));
+  const tweens = mergeTweens(
+    [
+      ...baseTweens,
+      ...actorTweens,
+      ...cameraTweens(world.camera.position, ['position.x', 'position.y', 'position.z'], ctx.fps, world.inPoint),
+      ...cameraTweens(fovValue, ['fov'], ctx.fps, world.inPoint),
+      ...lightTweens,
+      ...focusTweens,
+    ].map((t) => ({ repeat: 0, yoyo: false, ...t })),
+  );
   if (tweens.length > 64) warnings.push(`layer ${world.id}: ${tweens.length} tweens exceed the engine limit of 64`);
 
   // The library's floor: a shadow-only catcher at 0.55 under `ground: "none"`, darkened by the key

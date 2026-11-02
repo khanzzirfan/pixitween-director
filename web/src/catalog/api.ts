@@ -103,6 +103,16 @@ export function getClip(id: string, productId: string): Promise<AepCompositionJs
   return catalogRequest<AepCompositionJson>('GET', `/api/catalogs/${enc(id)}/clips/${enc(productId)}`);
 }
 
+/** A product's hero film: Muse's board for it, played over its cut-out. */
+export function getHeroFilm(id: string, productId: string): Promise<AepCompositionJson> {
+  return catalogRequest<AepCompositionJson>('GET', `/api/catalogs/${enc(id)}/heroes/${enc(productId)}`);
+}
+
+/** A line film: the products of one line cut together, the run's showcase. */
+export function getLineFilm(id: string, lineId: string): Promise<AepCompositionJson> {
+  return catalogRequest<AepCompositionJson>('GET', `/api/catalogs/${enc(id)}/films/${enc(lineId)}`);
+}
+
 /** A price edit: the clip is rebuilt from what the run already paid for, so it costs nothing. */
 export function editProduct(id: string, productId: string, body: ProductEdit): Promise<CatalogEditResult> {
   return catalogRequest<CatalogEditResult>(

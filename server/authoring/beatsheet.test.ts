@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
-import { boardPrompt, checkBeatSheet, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
+import { boardPrompt, checkBeatSheet, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
 import { floorElements } from './ingredients';
 import { EXAMPLES, pickExamples, referenceDeck } from './reference-deck';
 
@@ -101,7 +101,7 @@ const lemonBoard = () => ({
     { size: 'medium', move: 'push', seconds: 0.9, ingredient: { kind: 'fizz', action: 'splash' } },
     { size: 'macro', move: 'push', seconds: 0.9 },
     { size: 'close', move: 'orbit', seconds: 1.1, ingredient: { kind: 'ice', action: 'orbit' } },
-    { size: 'wide', move: 'push', seconds: 1.1 },
+    { size: 'wide', move: 'truck', seconds: 1.1 },
     { size: 'medium', move: 'dolly-zoom', seconds: 1 },
     { size: 'medium', move: 'hold', seconds: 2 },
   ],
@@ -149,6 +149,15 @@ describe('parseBoard', () => {
     expect(parseBoard(undefined).ok).toBe(false);
     expect(parseBoard('hello').ok).toBe(false);
     expect(parseBoard({ beats: [{ size: 'huge', move: 'push', seconds: 1 }], elements: [] }).ok).toBe(false);
+  });
+});
+
+describe('parseBoard tagline', () => {
+  it('keeps a tagline to the rule book\'s word count', () => {
+    const board = floorBoard({ title: 'Beach Towel', category: 'summer' });
+    const raw = { concept: 'c', mood: 'm', tagline: 'Ride every wave all summer long with us', elements: board.elements, beats: board.sheet.beats };
+    const r = parseBoard(raw);
+    expect(r.ok && r.board.tagline?.split(' ').length).toBe(6);
   });
 });
 
@@ -295,12 +304,15 @@ describe('shot fields (angle, phase, product, cut)', () => {
     s.beats.at(-1)!.product = 'drop';
     expect(checkBeatSheet(s, els).join('|')).toMatch(/holds still in the last shot/);
   });
-  it('a macro that plays inside a dolly-zoom or push counts for the no-element rule by its played size', () => {
+  it('a macro that plays inside a push counts for the no-element rule by its played size; a dolly-zoom is a close, so it takes elements', () => {
     const s = base();
     s.beats[5]!.size = 'macro';
     expect(checkBeatSheet(s, els).join('|')).not.toMatch(/shot 6 is a label macro/);
     s.beats[5]!.ingredient = { kind: 'ice', action: 'drift' };
-    expect(checkBeatSheet(s, els).join('|')).toMatch(/shot 6 is a label macro/);
+    expect(checkBeatSheet(s, els).join('|')).not.toMatch(/shot 6 is a label macro/);
+    s.beats[1]!.size = 'macro';
+    s.beats[1]!.ingredient = { kind: 'ice', action: 'drift' };
+    expect(checkBeatSheet(s, els).join('|')).toMatch(/shot 2 is a label macro/);
   });
 });
 
@@ -346,5 +358,95 @@ describe('reviewBoard and the mending retry', () => {
     expect(ok.ok && ok.board.key).toBe('low');
     const odd = parseBoard({ ...base, tone: 'purple' });
     expect(odd.ok && odd.board.tone).toBeUndefined();
+  });
+});
+
+describe('the set on a board', () => {
+  const withSet = (set: unknown) => ({ ...JSON.parse(JSON.stringify({ concept: 'c', mood: 'm', elements: floorElements('Stone Mug', 'home'), beats: defaultBeatSheet(floorElements('Stone Mug', 'home')).beats })), set });
+  it('reads the look and the air, and a bad air becomes none', () => {
+    const ok = parseBoard(withSet({ look: 'beach', air: 'spray' }));
+    expect(ok.ok && ok.board.set).toEqual({ look: 'beach', air: 'spray' });
+    const bad = parseBoard(withSet({ look: 'beach', air: 'confetti' }));
+    expect(bad.ok && bad.board.set).toEqual({ look: 'beach', air: 'none' });
+  });
+  it('drops a look it does not know, and a board without one has none', () => {
+    const unknown = parseBoard(withSet({ look: 'moon', air: 'dust' }));
+    expect(unknown.ok && unknown.board.set).toBeUndefined();
+    const none = parseBoard(withSet(undefined));
+    expect(none.ok && none.board.set).toBeUndefined();
+  });
+  it('the floor board picks a set from the words: a beach for summer things, a garden for green ones, else a studio', () => {
+    expect(floorSet('beach summer Wave Rider Longboard').look).toBe('beach');
+    expect(floorSet('home herbal tea').look).toBe('garden');
+    expect(floorSet('home Stone Mug').look).toBe('studio');
+    expect(floorBoard({ title: 'Swim Goggles', category: 'summer' }).set?.look).toBe('beach');
+  });
+  it('the prompt teaches the looks, the air and the idea of depth', () => {
+    const p = boardPrompt({ title: 'Mug', seconds: 8 }).system;
+    for (const w of ['beach', 'pool', 'sunset', 'night', 'bokeh', 'spray', 'parallax']) expect(p).toContain(w);
+  });
+});
+
+describe('handheld on a board', () => {
+  const body = (handheld: unknown) => ({ concept: 'c', mood: 'm', handheld, elements: floorElements('Stone Mug', 'home'), beats: defaultBeatSheet(floorElements('Stone Mug', 'home')).beats });
+  it('reads true and false, and anything else is left unset (the film then shakes a little)', () => {
+    const off = parseBoard(body(false));
+    expect(off.ok && off.board.handheld).toBe(false);
+    const on = parseBoard(body(true));
+    expect(on.ok && on.board.handheld).toBe(true);
+    const bad = parseBoard(body('yes please'));
+    expect(bad.ok && bad.board.handheld).toBeUndefined();
+  });
+  it('the prompt asks for it and teaches the cut', () => {
+    const sys = boardPrompt({ title: 'Mug', seconds: 8 }).system;
+    expect(sys).toContain('handheld');
+    expect(sys).toContain('a cut should land while the camera is moving');
+  });
+});
+
+describe('the words on a board', () => {
+  const els3 = floorElements('Stone Mug', 'home');
+  const base = defaultBeatSheet(els3);
+  const withText = (texts: Record<number, string>) => ({ beats: base.beats.map((b, i) => (texts[i] !== undefined ? { ...b, text: texts[i] } : b)) });
+  it('the floor sheet has none, and a hook line and a feeling pass', () => {
+    expect(base.beats.some((b) => b.text)).toBe(false);
+    expect(checkBeatSheet(withText({ 0: 'Pack the car', 3: 'Feel the summer' }), els3)).toEqual([]);
+  });
+  it('allows three shots with words, never the last or a macro', () => {
+    expect(checkBeatSheet(withText({ 0: 'One', 1: 'Two', 3: 'Three', 4: 'Four' }), els3).join('|')).toMatch(/at most 3 shots carry text/);
+    expect(checkBeatSheet(withText({ 6: 'Buy it now' }), els3).join('|')).toMatch(/last shot carries no text/);
+    const macro = base.beats.findIndex((b) => b.size === 'macro');
+    expect(checkBeatSheet(withText({ [macro]: 'Look closer' }), els3).join('|')).toMatch(/label macro; keep words out/);
+  });
+  it('holds the words to what a shot can say: five at most, about four a second', () => {
+    expect(checkBeatSheet(withText({ 0: 'one two three four five six' }), els3).join('|')).toMatch(/at most 5 words/);
+    const short = { beats: base.beats.map((b, i) => (i === 1 ? { ...b, seconds: 0.6, text: 'one two three four' } : b)) };
+    expect(checkBeatSheet(short, els3).join('|')).toMatch(/can take only 2 words/);
+  });
+  it('keeps the price out of a shot', () => {
+    expect(checkBeatSheet(withText({ 0: 'Now $29 only' }), els3).join('|')).toMatch(/price never goes in/);
+    expect(checkBeatSheet(withText({ 0: 'Save 50 today' }), els3).join('|')).toMatch(/price never goes in/);
+    expect(checkBeatSheet(withText({ 0: 'Five colours, one board' }), els3).join('|')).not.toMatch(/price never goes in/);
+    expect(checkBeatSheet(withText({ 0: 'Now 9 off' }), els3).join('|')).toMatch(/price never goes in/);
+  });
+  it('reads the tagline and the shot words from Muse, and the prompt teaches them', () => {
+    const b = { concept: 'c', mood: 'm', tagline: ' Summer, packed. ', elements: els3, beats: withText({ 0: 'Pack the car' }).beats };
+    const r = parseBoard(b);
+    expect(r.ok && r.board.tagline).toBe('Summer, packed.');
+    expect(r.ok && r.board.sheet.beats[0]!.text).toBe('Pack the car');
+    const sys = boardPrompt({ title: 'Mug', seconds: 8 }).system;
+    expect(sys).toContain('THE WORDS');
+    expect(sys).toContain('tagline');
+  });
+});
+
+describe('a dolly-zoom is never framed as a macro', () => {
+  it('reads as a close, and so does the hold after it', () => {
+    const sheet = sheetOf([
+      { size: 'wide', move: 'push', seconds: 1 },
+      { size: 'macro', move: 'dolly-zoom', seconds: 1 },
+      { size: 'wide', move: 'hold', seconds: 2 },
+    ]);
+    expect(effectiveSizes(sheet)).toEqual(['wide', 'close', 'close']);
   });
 });

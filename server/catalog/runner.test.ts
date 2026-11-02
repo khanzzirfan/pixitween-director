@@ -127,7 +127,8 @@ describe('runCatalog', () => {
     });
 
     // the cut-outs and the plate were paid for already, so the second run asks for none
-    expect(fresh.calls).toEqual({ cut: 0, plate: 0 });
+    expect(fresh.calls.cut).toBe(0);
+    expect(fresh.calls.plate).toBe(0);
     const again = await t.store.get(second.id);
     expect(again?.costUsd).toBe(0);
     // and it is a run that worked, not a run that failed before it needed a cut-out

@@ -2,7 +2,7 @@ import { formatPrice } from '@shared/catalog';
 import { ASPECT_SIZES } from '@shared/composition';
 import { newFilmComposition, registerAsset } from './composition';
 import { addLayer, type AddLayerOptions } from './layers';
-import { readDirector, writeDirector } from './meta';
+import { readDirector, sceneMeta, writeDirector } from './meta';
 import type { ClipAsset, Rect } from './retail-clip';
 import { shade } from './retail-clip';
 import { addScene } from './scenes';
@@ -62,10 +62,10 @@ export function inkOn(hex: string): string {
   return L > 0.45 ? '#1a1a1a' : '#ffffff';
 }
 
-type Added = { c: Comp; id: string };
+export type Added = { c: Comp; id: string };
 const layersOf = (c: Comp, sceneId: string): Obj[] => (c.precomps as Record<string, Obj>)[sceneId]!.layers as Obj[];
 
-function add(c: Comp, sceneId: string, o: Omit<AddLayerOptions, 'sceneId'>, retag = false): Added {
+export function add(c: Comp, sceneId: string, o: Omit<AddLayerOptions, 'sceneId'>, retag = false): Added {
   const before = new Set(layersOf(c, sceneId).map((l) => l.id));
   let out = addLayer(c, { sceneId, ...o });
   const id = layersOf(out, sceneId).find((l) => !before.has(l.id))!.id;
@@ -77,13 +77,13 @@ function add(c: Comp, sceneId: string, o: Omit<AddLayerOptions, 'sceneId'>, reta
   return { c: out, id };
 }
 
-function patch(c: Comp, sceneId: string, id: string, fn: (l: Obj) => void): Comp {
+export function patch(c: Comp, sceneId: string, id: string, fn: (l: Obj) => void): Comp {
   const out = structuredClone(c);
   fn(layersOf(out, sceneId).find((x) => x.id === id)!);
   return out;
 }
 
-function shape(c: Comp, sceneId: string, box: Rect, fill: string, z: number, path?: Obj, look?: (l: Obj) => void): Added {
+export function shape(c: Comp, sceneId: string, box: Rect, fill: string, z: number, path?: Obj, look?: (l: Obj) => void): Added {
   const s = add(c, sceneId, { role: 'bg', kind: 'shape', fill, box, z }, true);
   return { c: patch(s.c, sceneId, s.id, (l) => { if (path) l.path = path; look?.(l); }), id: s.id };
 }
@@ -179,6 +179,8 @@ export function buildVariantFilm(i: VariantFilmInput): Comp {
   // the lineup end card
   const eid = 'end';
   c = addScene(c, { id: eid, durationSec: r(E), mode: 'motion', intent: 'Lineup of every variant with the tagline and prices, held' });
+  // the scene is a whole number of frames, so its last key is the scene's own end, never the unrounded one past it
+  const endAt = sceneMeta(c, eid).durationFrames / (c.fps as number);
   const floorY = H * (portrait ? 0.7 : 0.72);
   c = shape(c, eid, { x: 0, y: 0, w: W, h: floorY }, tint(i.accent, 0.82), 11).c;
   const floor = shape(c, eid, { x: 0, y: floorY, w: W, h: H - floorY }, i.accent, 10.9);
@@ -202,7 +204,7 @@ export function buildVariantFilm(i: VariantFilmInput): Comp {
     const yc = top + ph / 2;
     c = setKeyframes(c, p.id, 'y', [[0, r(yc - H * 0.5)], [r(t0), r(yc - H * 0.5)], [r(t0 + 0.32), r(yc + u * 0.008)], [r(t0 + 0.45), r(yc)]], 'easeIn');
     c = setKeyframes(c, p.id, 'opacity', [[0, 0], [r(t0), 0], [r(t0 + 0.08), 1]], 'easeOut');
-    c = setKeyframes(c, p.id, 'scale', [[0, r(k * 1e4) / 1e4], [r(t0 + 0.45), r(k * 1e4) / 1e4], [r(E), r(k * 1.05 * 1e4) / 1e4]], 'linear');
+    c = setKeyframes(c, p.id, 'scale', [[0, r(k * 1e4) / 1e4], [r(t0 + 0.45), r(k * 1e4) / 1e4], [Math.floor(endAt * 100) / 100, r(k * 1.05 * 1e4) / 1e4]], 'linear');
     c = setKeyframes(c, sh.id, 'opacity', [[0, 0], [r(t0 + 0.3), 0], [r(t0 + 0.45), 0.35]], 'easeOut');
     // the price under each pack, on the band
     const priceSize = Math.round(Math.min(u * 0.05, (slot * 0.85) / (formatPrice(v.price, v.currency).length * 0.62)));

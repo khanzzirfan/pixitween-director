@@ -49,7 +49,7 @@ it('counts every cut and every plate', async () => {
   await art.plate('tabletop-hero', 'everyday', 'can', '9:16');
   await art.plate('flat-lay', 'everyday', 'can', '9:16');
 
-  expect(art.calls).toEqual({ cut: 1, plate: 2 });
+  expect(art.calls).toEqual({ cut: 1, plate: 2, direct: 0 });
 });
 
 it('the real art calls SAM and Muse and says what it cost', async () => {

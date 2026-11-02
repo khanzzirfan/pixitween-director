@@ -6,9 +6,18 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import type { PlateMap } from '@engine/qa';
 import type { RowCheck } from '@shared/catalog-run';
+import type { CinematicBoard } from '../authoring/beatsheet';
+import type { ClipAsset } from '../authoring/retail-clip';
 import { buildCatalogClip, type CatalogClipInput } from '../authoring/catalog-clip';
 import type { Comp } from '../authoring/types';
 import { verifyRetailClip } from '../authoring/verify-clip';
+
+/** The stored pictures of a film's set. */
+export interface SetArt {
+  backdrop: ClipAsset;
+  dot?: ClipAsset;
+  ground: string;
+}
 
 /** A plate id becomes a file name, so it may not point out of the fixtures folder. */
 export const PLATE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -26,6 +35,10 @@ export type RowBuild = CatalogClipInput & {
   baseY?: number;
   /** The plate's read, as JSON. It comes off the disk, so it is not trusted to have a shape. */
   plateMap?: unknown;
+  /** The hero film's board, once Muse (or the floor) wrote it: a price edit plays it again at $0. */
+  film?: CinematicBoard;
+  /** The pictures of the film's set, drawn once the board named its look: the backdrop, the bokeh dot and the floor colour. */
+  setArt?: SetArt;
 };
 
 /** Where a row ends once its clip is built: it passed, the fixer had to move it, or it still blocks. */

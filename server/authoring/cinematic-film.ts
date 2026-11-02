@@ -7,9 +7,12 @@ import { effectiveAngles, effectiveSizes, totalSeconds, type Angle, type Beat, t
 import type { IngredientAsset } from './ingredients';
 import { shade, type ClipAsset, type Rect } from './retail-clip';
 import { addScene } from './scenes';
+import { CAMERA } from './cinematic-rules';
+import { WALL, type SetAir, type SetLook } from './set-art';
 import { setKeyframes } from './transform';
 import type { Aspect, Comp, Obj } from './types';
-import { inkOn, tint, typeIn, words } from './variant-film';
+import { inkOn, tint, words } from './variant-film';
+import { BEVEL_SHARE, DEPTH_SHARE } from '../product3d/presets';
 import type { PrimitiveShape } from '../product3d/types';
 
 // The cinematic film: one beat sheet played in one stage3d world (engine aep-32, schema 1.12.0). The camera cuts between shots and
@@ -24,8 +27,8 @@ export const SCHEMA = '1.12.0';
 const ID = 'cine';
 export const PRODUCT_H = 0.16;
 export const PRODUCT_Y = PRODUCT_H / 2;
-export const FOV_BASE = 30;
-export const FOV_WIDE = 80;
+export const FOV_BASE = CAMERA.fovBase;
+export const FOV_WIDE = CAMERA.fovWide;
 /** Camera height as an angle above the product's centre: low looks up at it, high looks down. */
 export const ELEVATION: Record<Angle, number> = { low: -3, eye: 7, high: 28 };
 /** How much of the frame's height the product fills at each size. The macro frames the label band and the name above it, about two thirds of the can. */
@@ -40,10 +43,13 @@ export interface CinematicInput {
   sheet: BeatSheet;
   /** The product's textures from prepareProduct3D. */
   texture: ClipAsset & { kind: 'label' | 'front' };
-  shape: PrimitiveShape;
+  /** A round or box shape wears the texture; 'other' is a flat cut-out, extruded from its outline (`contour`) with the photo on its front. */
+  shape: PrimitiveShape | 'other';
   side: string;
   /** Height over width of the product. */
   productAspect: number;
+  /** The outline in the front texture's own pixels; required for shape 'other'. */
+  contour?: Array<[number, number]>;
   title: string;
   price: number;
   wasPrice?: number;
@@ -52,6 +58,12 @@ export interface CinematicInput {
   accent: string;
   /** The ingredients made for this product, by kind. A beat whose kind is missing plays without it. */
   ingredients?: Record<string, IngredientAsset>;
+  /** The line under the name in the end hold (at most six words); the shots' own words come from the sheet. */
+  tagline?: string;
+  /** A live, hand-held tremor over the camera's moves (the board's choice). It is dropped when the world's 64-tween budget has no room for it. */
+  handheld?: boolean;
+  /** The board's set: a backdrop picture on the wall behind the product, the floor colour, and the air. Without it the product floats on the plain field. */
+  set?: { look: SetLook; air: SetAir; backdrop: ClipAsset; ground: string; /** the soft dot the bokeh lights are drawn with */ dot?: ClipAsset };
   /** The board's light: the key light's colour and how dark or bright the world is. */
   tone?: Tone;
   key?: KeyLevel;
@@ -64,6 +76,13 @@ type Bez = [number, number, number, number];
 const EASE_OUT: Bez = [0.16, 1, 0.3, 1];
 const EASE_IN_OUT: Bez = [0.42, 0, 0.58, 1];
 const LINEAR: Bez = [0, 0, 1, 1];
+/**
+ * The eases that keep a shot moving through its ends. The corpus cuts at peak velocity: the shot before leaves at speed and the shot after
+ * enters at speed, so a cut is a change of place, never a stop. This curve runs at two thirds of its mean speed at both ends (EASE_IN_OUT
+ * and EASE_OUT stop at the end, which makes a dead cut). The hook enters faster still.
+ */
+const EASE_THROUGH: Bez = [0.3, 0.2, 0.7, 0.8];
+const EASE_HOOK: Bez = [0.15, 0.5, 0.7, 0.8];
 const r = (n: number) => Math.round(n * 1e4) / 1e4;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -88,11 +107,20 @@ interface Pose {
   fov: number;
   /** degrees above the product's centre */
   el: number;
+  /** metres sideways along the camera's right (a truck slides the camera; the target stays on the product) */
+  x?: number;
 }
 const positionOf = (p: Pose): V3 => {
   const el = rad(p.el);
-  return [r(Math.sin(rad(p.az)) * Math.cos(el) * p.d), r(PRODUCT_Y + Math.sin(el) * p.d), r(Math.cos(rad(p.az)) * Math.cos(el) * p.d)];
+  const az = rad(p.az);
+  const side = p.x ?? 0;
+  // the camera's right-hand vector at this azimuth is (cos az, 0, -sin az)
+  return [r(Math.sin(az) * Math.cos(el) * p.d + Math.cos(az) * side), r(PRODUCT_Y + Math.sin(el) * p.d), r(Math.cos(az) * Math.cos(el) * p.d - Math.sin(az) * side)];
 };
+/** How far the camera starts from where a push arrives: the hook comes in hard (the references push 40-90 %), later pushes ease in. */
+export const PUSH_FROM = { hook: CAMERA.pushFromHook, later: CAMERA.pushFromLater, wide: CAMERA.pushFromWide } as const;
+/** The whip's ease: nearly all of the swing happens in the first fifth of the shot, then it brakes. */
+const EASE_WHIP: Bez = [0.05, 0.9, 0.1, 1];
 
 export interface BeatFrames {
   /** first and last frame of the shot */
@@ -117,7 +145,14 @@ export interface CameraPlan {
  * degrees while the distance shrinks so the product keeps its size (distance times tan(fov/2) is constant). A hold after a dolly-zoom stays at
  * the wide lens, so the film ends on the reveal.
  */
-export function planCamera(sheet: BeatSheet, fps: number): CameraPlan {
+export function planCamera(sheet: BeatSheet, fps: number, o: { maxFill?: number; holdFill?: number } = {}): CameraPlan {
+  // a wide product must not outgrow the frame's width: the sizes are shares of the frame's height, so they are capped (the macro is a crop on purpose)
+  // the end hold keeps the framing of the shot before it, so that shot and the hold are both held to the most the text above the product leaves room for
+  const lastIdx = sheet.beats.length - 1;
+  const fillOf = (size: ShotSize, i = -1): number => {
+    const cap = i >= lastIdx - 1 ? Math.min(o.maxFill ?? Infinity, o.holdFill ?? Infinity) : (o.maxFill ?? Infinity);
+    return size === 'macro' ? FILL.macro : Math.min(FILL[size], cap);
+  };
   const sizes = effectiveSizes(sheet);
   const angles = effectiveAngles(sheet);
   const beats: BeatFrames[] = [];
@@ -126,6 +161,7 @@ export function planCamera(sheet: BeatSheet, fps: number): CameraPlan {
   const focus: Array<Key<number>> = [];
   let cur: Pose = { d: framingDistance(FILL.medium), az: 0, fov: FOV_BASE, el: ELEVATION.eye };
   let clock = 0;
+  let swings = 0;
   const frames = Math.round(totalSeconds(sheet) * fps);
   sheet.beats.forEach((b, i) => {
     const start = Math.round(clock * fps);
@@ -134,15 +170,43 @@ export function planCamera(sheet: BeatSheet, fps: number): CameraPlan {
     const end = last ? frames : Math.round(clock * fps) - 1;
     const size = sizes[i]!;
     const el = ELEVATION[angles[i]!];
-    const arrive = framingDistance(FILL[size]);
+    const arrive = framingDistance(fillOf(size, i));
     const az0 = ((i * 37) % 21) - 10;
+    // the sideways moves (truck, crane, whip) go one way and the next the other, so the film never repeats a direction
+    const dir = swings % 2 === 0 ? 1 : -1;
+    if (b.move === 'truck' || b.move === 'crane' || b.move === 'whip') swings++;
     let from: Pose;
     let to: Pose;
-    let ease: Bez = EASE_OUT;
+    let ease: Bez = EASE_THROUGH;
+    let rack = false;
     switch (b.move) {
       case 'push':
-        from = { d: arrive * 1.35, az: az0, fov: FOV_BASE, el };
+        from = { d: arrive * (i === 0 ? PUSH_FROM.hook : size === 'wide' ? PUSH_FROM.wide : PUSH_FROM.later), az: az0, fov: FOV_BASE, el };
         to = { d: arrive, az: az0 * 0.5, fov: FOV_BASE, el };
+        ease = i === 0 ? EASE_HOOK : EASE_THROUGH;
+        break;
+      case 'truck':
+        // the camera slides a third of the way across, the target stays on the product: the set streams by
+        from = { d: arrive, az: 0, fov: FOV_BASE, el, x: -dir * arrive * CAMERA.truckShare };
+        to = { d: arrive, az: 0, fov: FOV_BASE, el, x: dir * arrive * CAMERA.truckShare };
+        ease = EASE_THROUGH;
+        break;
+      case 'crane':
+        // rises from the low angle to the high one, or falls from high to low
+        from = { d: arrive * 1.05, az: az0 * 0.4, fov: FOV_BASE, el: dir > 0 ? ELEVATION.low : ELEVATION.high };
+        to = { d: arrive, az: az0 * 0.2, fov: FOV_BASE, el: dir > 0 ? ELEVATION.high : ELEVATION.low };
+        ease = EASE_THROUGH;
+        break;
+      case 'whip':
+        from = { d: arrive * 1.08, az: dir * CAMERA.whipAzimuth, fov: FOV_BASE, el };
+        to = { d: arrive, az: 0, fov: FOV_BASE, el };
+        ease = EASE_WHIP;
+        break;
+      case 'rack':
+        from = { d: arrive * 1.12, az: az0 * 0.5, fov: FOV_BASE, el };
+        to = { d: arrive, az: az0 * 0.25, fov: FOV_BASE, el };
+        ease = EASE_THROUGH;
+        rack = true;
         break;
       case 'pull':
         from = { d: arrive * 0.7, az: az0, fov: FOV_BASE, el };
@@ -151,7 +215,7 @@ export function planCamera(sheet: BeatSheet, fps: number): CameraPlan {
       case 'orbit':
         from = { d: arrive, az: -22, fov: FOV_BASE, el };
         to = { d: arrive, az: 22, fov: FOV_BASE, el };
-        ease = EASE_IN_OUT;
+        ease = EASE_THROUGH;
         break;
       case 'dolly-zoom': {
         from = { d: arrive, az: az0 * 0.4, fov: FOV_BASE, el };
@@ -162,7 +226,7 @@ export function planCamera(sheet: BeatSheet, fps: number): CameraPlan {
       default: {
         // hold: continues from where the last shot ended (after a dolly-zoom that is the wide lens), creeping in 8 %
         to = { ...cur };
-        from = { d: cur.d * 1.08, az: cur.az, fov: cur.fov, el: cur.el };
+        from = { d: cur.d * 1.08, az: cur.az, fov: cur.fov, el: cur.el, ...(cur.x !== undefined ? { x: cur.x } : {}) };
         ease = EASE_IN_OUT;
       }
     }
@@ -170,10 +234,109 @@ export function planCamera(sheet: BeatSheet, fps: number): CameraPlan {
     position.push(key(start, positionOf(from), ease), key(end, positionOf(to), ease, !last));
     fov.push(key(start, from.fov, ease), key(end, to.fov, ease, !last));
     // the product stays in focus: the focus distance is the camera's distance to it
-    focus.push(key(start, r(from.d), ease), key(end, r(to.d), ease, !last));
+    // the product stays in focus, except in a rack: the focus starts at the near lights (about half the way) and runs back to the product
+    focus.push(key(start, r(rack ? to.d * 0.5 : from.d), ease), key(end, r(to.d), ease, !last));
     cur = to;
   });
   return { beats, position, fov, focus, frames };
+}
+
+/** The value an ease gives at progress `u` (0 to 1): the cubic-bezier of its handles, solved for x by Newton's method. */
+function bezierAt([x1, y1, x2, y2]: Bez, u: number): number {
+  if (u <= 0) return 0;
+  if (u >= 1) return 1;
+  let t = u;
+  for (let n = 0; n < 8; n++) {
+    const m = 1 - t;
+    const x = 3 * m * m * t * x1 + 3 * m * t * t * x2 + t * t * t;
+    const dx = 3 * m * m * x1 + 6 * m * t * (x2 - x1) + 3 * t * t * (1 - x2);
+    if (Math.abs(dx) < 1e-9) break;
+    t = Math.min(1, Math.max(0, t - (x - u) / dx));
+  }
+  const m = 1 - t;
+  return 3 * m * m * t * y1 + 3 * m * t * t * y2 + t * t * t;
+}
+
+/** The moves that may carry a tremor: a whip is too fast to sample, a dolly-zoom must stay steady for the vertigo to read. */
+const SHAKY: ReadonlySet<string> = new Set(['push', 'pull', 'truck', 'crane', 'orbit', 'rack', 'hold']);
+/** The tremor's size: a share of the camera's distance, about one percent of the frame's height. */
+const SHAKE_AMOUNT = CAMERA.shakeAmount;
+/** A layer may hold 64 tweens. Everything but the camera's position and lens takes some, and the tremor must leave them room. */
+const TWEEN_BUDGET = CAMERA.tweenBudget;
+
+/**
+ * How many tremor keys each shot can afford. The camera's position and lens move as one tween per segment (the converter merges them), so a
+ * shot with n tremor keys costs n + 2 (its segments and the hold to the next cut), plus 2 for the focus; the product and the light take theirs.
+ * Zero means there is no room and the film plays steady.
+ */
+export function shakeKeysPerShot(shots: number, otherTweens: number): number {
+  return Math.max(0, Math.min(CAMERA.shakeKeysMax, Math.floor((TWEEN_BUDGET - otherTweens) / Math.max(1, shots)) - 4));
+}
+
+/**
+ * The tremor: each shot that may carry one is sampled along its own eased path at `perShot` points, and every point is nudged a little in x and
+ * y (a deterministic pattern, so the same board shakes the same way). The path is the planned one, so a cut and a hold meet it exactly: only
+ * the keys between a shot's ends move. The segments are linear, since the ease is in the samples (a through-ease is nearly linear anyway).
+ */
+export function shakeCamera(plan: CameraPlan, perShot: number): CameraPlan {
+  if (perShot < 1) return plan;
+  const position: Array<Key<V3>> = [];
+  const fov: Array<Key<number>> = [];
+  plan.beats.forEach((b, n) => {
+    const p0 = plan.position[n * 2]!;
+    const p1 = plan.position[n * 2 + 1]!;
+    const f0 = plan.fov[n * 2]!;
+    const f1 = plan.fov[n * 2 + 1]!;
+    if (!SHAKY.has(b.move) || p1.t - p0.t < 4 * (perShot + 1)) {
+      position.push(p0, p1);
+      fov.push(f0, f1);
+      return;
+    }
+    const e: Bez = p0.easeOut ?? LINEAR;
+    const amp = SHAKE_AMOUNT * b.to.d;
+    for (let k = 0; k <= perShot + 1; k++) {
+      const u = k / (perShot + 1);
+      const w = bezierAt(e, u);
+      const t = k === 0 ? p0.t : k === perShot + 1 ? p1.t : Math.round(p0.t + u * (p1.t - p0.t));
+      const edge = k === 0 || k === perShot + 1;
+      const wob = (axis: number) => (edge ? 0 : (Math.sin((n * 7 + k * 3 + axis * 5) * 1.7) * 0.6 + Math.cos((n * 3 + k * 5 + axis) * 2.3) * 0.4) * amp);
+      const v: V3 = [r(p0.v[0] + (p1.v[0] - p0.v[0]) * w + wob(0)), r(p0.v[1] + (p1.v[1] - p0.v[1]) * w + wob(1)), r(p0.v[2] + (p1.v[2] - p0.v[2]) * w)];
+      const lens = r(f0.v + (f1.v - f0.v) * w);
+      position.push(key(t, v, undefined, edge && k > 0 && !!p1.hold));
+      fov.push(key(t, lens, undefined, edge && k > 0 && !!f1.hold));
+    }
+  });
+  return { ...plan, position, fov };
+}
+
+/** How fast a segment starts and ends, as a share of its mean speed: the slope of its ease at both ends. A key without an ease is linear (1 and 1). */
+function endSlopes(k: Key<unknown>): { start: number; end: number } {
+  const e = k.easeOut;
+  if (!e) return { start: 1, end: 1 };
+  return { start: e[0] > 0 ? e[1] / e[0] : Infinity, end: e[2] < 1 ? (1 - e[3]) / (1 - e[2]) : Infinity };
+}
+
+export interface CutSpeed {
+  /** the cut is at the start of this shot (index into the beats) */
+  shot: number;
+  /** how fast the shot before leaves, and the shot after enters, as shares of their mean speeds; null when that side is a hold (still by design) */
+  out: number | null;
+  in: number | null;
+}
+/**
+ * The speed at each cut: the camera leaves one shot and enters the next at this share of its mean speed (1 is steady). A cut between two
+ * moving shots should be well above 0 on both sides; a hold has no speed to carry, and a whip brakes on purpose, so neither is measured.
+ */
+export function cutSpeeds(plan: CameraPlan): CutSpeed[] {
+  const out: CutSpeed[] = [];
+  for (let n = 1; n < plan.beats.length; n++) {
+    const a = plan.beats[n - 1]!;
+    const b = plan.beats[n]!;
+    const leaving = a.move === 'hold' || a.move === 'whip' ? null : endSlopes(plan.position[(n - 1) * 2]!).end;
+    const entering = b.move === 'hold' ? null : endSlopes(plan.position[n * 2]!).start;
+    out.push({ shot: n, out: leaving, in: entering });
+  }
+  return out;
 }
 
 // ---- layer helpers (the scene's 2D layers go through addLayer like every other clip) ----
@@ -281,6 +444,45 @@ function ingredientProp(i: number, b: Beat, f: BeatFrames, a: IngredientAsset | 
   return { beat: i, instances: count, layer: { ...base, source, size: a.sizeM, ...look, swarm } };
 }
 
+/**
+ * The air of the set. Dust is a swarm of tiny specks drifting round the product; spray a burst of droplets in the peak shot (or the third shot);
+ * bokeh is a few soft lights, single cards that drift slowly near the lens and out of focus. Swarms count toward the instance budget; cards
+ * (a swarm cannot be a card) count toward the prop limit.
+ */
+function airProps(set: NonNullable<CinematicInput['set']>, sheet: BeatSheet, cam: CameraPlan, frames: number): { planned: Planned[]; cards: Obj[] } {
+  const base = { kind: 'prop3d', stage: `${ID}:world`, inPoint: 0, outPoint: frames };
+  const speck = { source: { type: 'primitive', shape: 'box', proportions: { width: 1, height: 1 } }, material: { color: '#fff6e4', roughness: 1 }, castShadow: false };
+  if (set.air === 'dust') {
+    const layer: Obj = { ...base, id: `${ID}:air-dust`, name: 'dust', ...speck, size: 0.0035, swarm: { count: 80, seed: 41, motion: 'drift', emitter: { shape: 'sphere', center: [0, PRODUCT_Y, 0.05], radius: 0.38 }, drift: {}, spin: 0, sizeJitter: 0.55 } };
+    return { planned: [{ beat: -1, layer, instances: 80 }], cards: [] };
+  }
+  if (set.air === 'spray') {
+    const peak = sheet.beats.findIndex((b) => b.phase === 'peak');
+    const at = peak >= 0 ? peak : Math.min(2, cam.beats.length - 1);
+    const f = cam.beats[at]!;
+    const layer: Obj = {
+      ...base, id: `${ID}:air-spray`, name: 'spray', ...speck, size: 0.004, inPoint: f.start, outPoint: Math.min(f.end + 12, frames),
+      swarm: { count: 70, seed: 77, motion: 'burst', emitter: { shape: 'point', center: [0, 0.01, 0.1] }, direction: [0, 1, 0.25], spread: 55, speed: 0.75, drag: 1.5, gravity: 2.2, spin: 0, stagger: r2(Math.min(0.3, (f.end - f.start) / 30 / 3)), sizeJitter: 0.5 },
+    };
+    return { planned: [{ beat: at, layer, instances: 70 }], cards: [] };
+  }
+  if (set.air === 'bokeh' && set.dot) {
+    // x, y, z at the start and the end, size, opacity: round the edges of the frame, in front of and behind the product
+    const lights: Array<[V3, V3, number, number]> = [
+      [[-0.14, 0.2, 0.3], [-0.1, 0.26, 0.3], 0.09, 0.5],
+      [[0.15, 0.06, 0.34], [0.11, 0.12, 0.34], 0.12, 0.42],
+      [[0.09, 0.27, -0.3], [0.13, 0.22, -0.3], 0.07, 0.55],
+      [[-0.17, 0.04, -0.45], [-0.13, 0.08, -0.45], 0.11, 0.45],
+    ];
+    const cards = lights.map(([a, b, size, opacity], n): Obj => ({
+      ...base, id: `${ID}:air-bokeh${n}`, name: 'bokeh', source: { type: 'card' }, textures: { front: set.dot!.id }, size, material: { opacity },
+      position: [key(0, a), key(frames, b)],
+    }));
+    return { planned: [], cards };
+  }
+  return { planned: [], cards: [] };
+}
+
 /** Trims the swarms until the world holds at most LIMITS.instances copies: each swarm keeps its share, never below 4. */
 function fitInstances(planned: Planned[]): Planned[] {
   const total = planned.reduce((s, p) => s + p.instances, 0);
@@ -308,7 +510,10 @@ function uniq<T>(ks: Array<Key<T>>): Array<Key<T>> {
  * The product's turn and rise, from the shots' product field: a drop-in rises from above spinning (once the lens has settled), a turn swings
  * it 45 degrees through the shot, still holds the yaw it has, and the label macro faces the lens (yaw 0) at its middle.
  */
-function productMoves(sheet: BeatSheet, cam: CameraPlan, land: number, frames: number): { yaw: Array<Key<V3>>; rise: Array<Key<V3>> } {
+/** How far a flat cut-out swings to either side on a turn: it shows only its front, so it rocks from one side to the other inside 30 degrees. */
+const FLAT_SWING = 25;
+
+function productMoves(sheet: BeatSheet, cam: CameraPlan, land: number, frames: number, flat = false): { yaw: Array<Key<V3>>; rise: Array<Key<V3>> } {
   let at = -28;
   const yaw: Array<Key<V3>> = [key(0, [4, at, 0])];
   const rise: Array<Key<V3>> = [key(0, [0, 0, 0])];
@@ -320,9 +525,11 @@ function productMoves(sheet: BeatSheet, cam: CameraPlan, land: number, frames: n
       rise.push(key(f.start, [0, 0.6, 0], EASE_OUT), key(f.start + dur, [0, 0, 0]));
       yaw.push(key(f.start, [4, at - 220, -24], EASE_OUT), key(f.start + dur, [4, at, 0], EASE_IN_OUT));
     } else if (pm === 'turn') {
-      yaw.push(key(f.start, [4, at, 0], EASE_IN_OUT));
-      at += 45;
-      yaw.push(key(f.end, [4, at, 0], EASE_IN_OUT));
+      // the turn runs on through the cut into the next shot, like the camera
+      yaw.push(key(f.start, [4, at, 0], EASE_THROUGH));
+      // a round pack turns on; a flat one swings across to the other side, so every turn moves it
+      at = flat ? (at > 0 ? -FLAT_SWING : FLAT_SWING) : at + 45;
+      yaw.push(key(f.end, [4, at, 0], EASE_THROUGH));
     } else {
       yaw.push(key(f.start, [4, at, 0]));
     }
@@ -364,12 +571,26 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   const u = Math.min(W, H);
   const portrait = H > W;
   const D = totalSeconds(i.sheet);
+  const flat = i.shape === 'other';
+  if (flat && (!i.contour || i.contour.length < 3)) throw new Error("a flat product needs a contour of at least 3 points");
+  const aspect = Math.max(0.3, i.productAspect);
+  // A flat product is sized by its longest side: a tall one is PRODUCT_H high, a wide one at most 0.9 PRODUCT_H wide, so it stays in a portrait frame.
+  const fitSize = flat && aspect < 1 ? Math.min(PRODUCT_H / aspect, PRODUCT_H * 0.9) : PRODUCT_H;
+  /** The product's height as a share of PRODUCT_H, and the lift that keeps its centre where the camera looks. */
+  const hFrac = flat ? Math.min(1, fitSize * aspect / PRODUCT_H) : 1;
+  const lift = r((PRODUCT_H * (1 - hFrac)) / 2);
   const sizes = effectiveSizes(i.sheet);
   let c = newFilmComposition({ aspect: i.aspect, title: `${i.brand ?? i.title}: cinematic`, palette: [i.accent] });
   const fps = c.fps as number;
   c = addScene(c, { id: ID, durationSec: D, mode: 'motion', intent: `Cinematic 3D film: ${i.sheet.beats.map((b) => `${b.size} ${b.move}`).join(', ')}` });
   const frames = sceneMeta(c, ID).durationFrames;
-  const cam = planCamera(i.sheet, fps);
+  // the most of the frame's height a flat, wide product may fill before its width passes 90 % of the frame's
+  const widthM = aspect >= 1 ? PRODUCT_H / aspect : fitSize;
+  const maxFill = flat ? (CAMERA.maxWidthShare * PRODUCT_H * (W / H)) / widthM : Infinity;
+  // the end hold's product leaves room above it for the name and tagline: its height is capped, whatever the shot sizes say
+  const holdFill = (CAMERA.maxHoldHeight / 1.16) / hFrac;
+  let cam = planCamera(i.sheet, fps, { maxFill, holdFill });
+  const fillIn = (size: ShotSize): number => (size === 'macro' ? FILL.macro : Math.min(FILL[size], maxFill));
   const holdBeat = cam.beats.at(-1)!;
   const holdStart = holdBeat.start / fps;
   const macro = cam.beats.find((b) => b.size === 'macro');
@@ -378,33 +599,44 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   const keyColor = i.tone === 'warm' ? '#ffd7a3' : i.tone === 'cool' ? '#bcd6ff' : tint(i.accent, 0.7);
   const fieldColor = keyLevel === 'high' ? tint(i.accent, 0.9) : shade(i.tone && i.tone !== 'neutral' ? keyColor : i.accent, keyLevel === 'low' ? 0.93 : 0.85);
   const haloGain = keyLevel === 'low' ? 0.6 : 1;
-  const exposure = keyLevel === 'low' ? 0.95 : keyLevel === 'high' ? 1.3 : 1.1;
+  // a set has real light on a real floor, so it needs less exposure than the dark field a halo is drawn on
+  const exposure = i.set ? (keyLevel === 'low' ? 0.9 : keyLevel === 'high' ? 1.05 : 1) : keyLevel === 'low' ? 0.95 : keyLevel === 'high' ? 1.3 : 1.1;
 
   // the 2D world under the 3D one: a near-black field and a warm halo behind the product that follows its size from shot to shot
   c = shape(c, { x: 0, y: 0, w: W, h: H }, fieldColor, 12).c;
   const pcx = W / 2;
   const pcy = H * 0.5;
   const hd = H * 0.46;
-  const halo = shape(c, { x: pcx - hd / 2, y: pcy - hd / 2, w: hd, h: hd }, i.tone && i.tone !== 'neutral' ? shade(keyColor, 0.45) : tint(i.accent, 0.3), 11, { kind: 'ellipse', size: [hd, hd] }, (l) => {
-    l.effects = [{ name: 'gaussian-blur', params: { blurriness: r2(hd * 0.1) } }];
-  });
-  c = halo.c;
-  const haloScale: Array<[number, number]> = [];
-  const haloOp: Array<[number, number]> = [[0, 0]];
-  cam.beats.forEach((b, n) => {
-    const s = (FILL[b.size] / FILL.medium) * (b.move === 'dolly-zoom' ? 1.35 : 1);
-    const t0 = b.start / fps;
-    // a shot's last frame is one frame before the next shot's first, so the halo cuts with the camera
-    const t1 = n === cam.beats.length - 1 ? D : b.end / fps;
-    haloScale.push([r(t0), r2(Math.max(0.6, Math.min(2.6, FILL[b.size] / FILL.medium)))], [r(t1), r2(Math.max(0.6, Math.min(2.6, s)))]);
-    haloOp.push([r(Math.max(t0, 0.3)), r2((b.size === 'macro' ? 0.45 : 0.85) * haloGain)]);
-  });
-  c = setKeyframes(c, halo.id, 'scale', dedupe(haloScale), 'easeInOut');
-  c = setKeyframes(c, halo.id, 'opacity', dedupe(haloOp), 'easeOut');
+  if (!i.set) {
+    const halo = shape(c, { x: pcx - hd / 2, y: pcy - hd / 2, w: hd, h: hd }, i.tone && i.tone !== 'neutral' ? shade(keyColor, 0.45) : tint(i.accent, 0.3), 11, { kind: 'ellipse', size: [hd, hd] }, (l) => {
+      l.effects = [{ name: 'gaussian-blur', params: { blurriness: r2(hd * 0.1) } }];
+    });
+    c = halo.c;
+    const haloScale: Array<[number, number]> = [];
+    const haloOp: Array<[number, number]> = [[0, 0]];
+    cam.beats.forEach((b, n) => {
+      const s = (fillIn(b.size) / FILL.medium) * (b.move === 'dolly-zoom' ? 1.35 : 1);
+      const t0 = b.start / fps;
+      // a shot's last frame is one frame before the next shot's first, so the halo cuts with the camera
+      const t1 = n === cam.beats.length - 1 ? D : b.end / fps;
+      haloScale.push([r(t0), r2(Math.max(0.6, Math.min(2.6, fillIn(b.size) / FILL.medium)))], [r(t1), r2(Math.max(0.6, Math.min(2.6, s)))]);
+      haloOp.push([r(Math.max(t0, 0.3)), r2((b.size === 'macro' ? 0.45 : 0.85) * haloGain)]);
+    });
+    c = setKeyframes(c, halo.id, 'scale', dedupe(haloScale), 'easeInOut');
+    c = setKeyframes(c, halo.id, 'opacity', dedupe(haloOp), 'easeOut');
+  }
 
   // assets: the product's textures and every picture an ingredient plays
   c = registerAsset(c, { id: i.texture.id, kind: 'image', src: i.texture.src, width: i.texture.width, height: i.texture.height });
   const used = new Set<string>([i.texture.id]);
+  if (i.set) {
+    c = registerAsset(c, { id: i.set.backdrop.id, kind: 'image', src: i.set.backdrop.src, width: i.set.backdrop.width, height: i.set.backdrop.height });
+    used.add(i.set.backdrop.id);
+    if (i.set.dot && i.set.air === 'bokeh') {
+      c = registerAsset(c, { id: i.set.dot.id, kind: 'image', src: i.set.dot.src, width: i.set.dot.width, height: i.set.dot.height });
+      used.add(i.set.dot.id);
+    }
+  }
   const planned: Planned[] = [];
   i.sheet.beats.forEach((b, n) => {
     const a = b.ingredient ? i.ingredients?.[b.ingredient.kind] : undefined;
@@ -419,7 +651,9 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
       }
     }
   });
-  const props = fitInstances(planned).slice(0, LIMITS.props - 1);
+  const air = i.set ? airProps(i.set, i.sheet, cam, frames) : { planned: [], cards: [] };
+  planned.push(...air.planned);
+  const props = fitInstances(planned).slice(0, LIMITS.props - 1 - air.cards.length);
   for (const id of used) c = share(c, id);
 
   // the product: lands from above in the first shot, then turns slowly; during the macro the label faces the camera
@@ -429,7 +663,17 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   if (macro && macro.start > land + 3) yaw.push(key(Math.round((macro.start + macro.end) / 2), [4, 0, 0], EASE_IN_OUT));
   yaw.push(key(Math.max(turnEnd, (yaw.at(-1)?.t ?? 0) + 3), [4, 22, 0], EASE_IN_OUT), key(frames, [4, 16, 0]));
   let rise: Array<Key<V3>> = [key(0, [0, 0.6, 0], EASE_OUT), key(land, [0, 0, 0])];
-  if (i.sheet.beats.some((b) => b.product)) ({ yaw, rise } = productMoves(i.sheet, cam, land, frames));
+  if (i.sheet.beats.some((b) => b.product)) ({ yaw, rise } = productMoves(i.sheet, cam, land, frames, flat));
+  if (i.handheld) {
+    // what the camera leaves for itself: the product's turn and rise, the light's keys, and a few more
+    const others = yaw.length + rise.length + 8;
+    cam = shakeCamera(cam, shakeKeysPerShot(cam.beats.length, others));
+  }
+  if (flat) {
+    // a flat cut-out shows only its front: it may swing CAMERA.flatSwingMax degrees either way, never edge-on or from behind
+    yaw = yaw.map((k) => ({ ...k, v: [k.v[0], Math.max(-CAMERA.flatSwingMax, Math.min(CAMERA.flatSwingMax, k.v[1])), k.v[2]] as V3 }));
+    rise = rise.map((k) => ({ ...k, v: [k.v[0], r(k.v[1] + lift), k.v[2]] as V3 }));
+  }
   const can: Obj = {
     id: `${ID}:product`,
     name: 'Product',
@@ -438,10 +682,12 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     stage: `${ID}:world`,
     inPoint: 0,
     outPoint: frames,
-    source: { type: 'primitive', shape: i.shape, proportions: { width: 1, height: r2(Math.max(0.3, i.productAspect)) } },
-    textures: { label: i.texture.id, side: i.side },
-    size: PRODUCT_H,
-    material: { roughness: 0.3, metalness: 0.6, clearcoat: 0.8 },
+    source: flat
+      ? { type: 'extrude', contour: i.contour, depth: r2(i.texture.width * DEPTH_SHARE), bevel: r2(i.texture.width * BEVEL_SHARE) }
+      : { type: 'primitive', shape: i.shape, proportions: { width: 1, height: r2(aspect) } },
+    textures: flat ? { front: i.texture.id, side: i.side } : { label: i.texture.id, side: i.side },
+    size: r(fitSize),
+    material: flat ? { roughness: 0.5, metalness: 0.05, clearcoat: 0.25 } : { roughness: 0.3, metalness: 0.6, clearcoat: 0.8 },
     position: rise,
     rotation: yaw,
   };
@@ -455,7 +701,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     transform: { position: [W / 2, H / 2], anchor: [W / 2, H / 2], scale: [1, 1], rotation: 0, opacity: 1 },
     viewport: { width: W, height: H },
     camera: { position: cam.position, target: [0, PRODUCT_Y, 0], fov: cam.fov, focus: { distance: cam.focus, aperture: APERTURE } },
-    set: { ground: 'none', wall: false },
+    set: i.set ? { ground: i.set.ground, groundSize: [16, 12], wall: { distance: WALL.distance, height: WALL.height }, backdrop: i.set.backdrop.id } : { ground: 'none', wall: false },
     style: { shading: 'pbr', exposure },
     shadow: { opacity: 0.45, softness: 0.7 },
     lights: {
@@ -464,7 +710,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
       rim: { intensity: [key(0, 0.6, EASE_IN_OUT), key(Math.max(turnEnd, land + 6), 0.6, EASE_IN_OUT), key(frames, 1.4)] },
     },
   };
-  c = insertStage(c, world, [can, ...props.map((p) => p.layer)]);
+  c = insertStage(c, world, [can, ...props.map((p) => p.layer), ...air.cards]);
   c = cutLayers(c, i.sheet, cam, fps, [W, H], fieldColor, keyColor);
   c = structuredClone(c);
   c.version = SCHEMA as never;
@@ -474,14 +720,16 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   const ink = keyLevel === 'high' ? shade(i.accent, 0.8) : '#ffffff';
   const top = H * (portrait ? 0.13 : 0.1);
   // the product in the end hold: how high and wide it really stands (the wide lens and the camera height make it a little bigger than its fill)
-  const fill = FILL[sizes.at(-1) ?? 'medium'];
-  const ph = H * fill * 1.16;
-  const pw = ph / Math.max(0.3, i.productAspect);
+  const fill = Math.min(fillIn(sizes.at(-1) ?? 'medium'), holdFill);
+  const ph = H * fill * 1.16 * hFrac;
+  const pw = Math.min(ph / aspect, W * 0.9);
   const canTop = H * 0.5 - ph / 2;
   const name = i.brand && i.title.startsWith(i.brand) ? i.title.slice(i.brand.length).trim() || i.title : i.title;
   const nameSize = Math.round(u * 0.09);
   // the name sits clear above the can (and the brand clear above the name); on a tall can they move up together
-  const nameCy = Math.max(H * 0.07 + u * 0.11, Math.min(top + u * 0.11, canTop - nameSize * 0.9));
+  // a tagline takes a line under the name, so the name and the brand move up to leave it room above the product
+  const hasTag = !!i.tagline?.trim();
+  const nameCy = Math.max(hasTag ? H * 0.045 + u * 0.1 : H * 0.07 + u * 0.11, Math.min(top + u * 0.11 - (hasTag ? u * 0.03 : 0), canTop - nameSize * 0.9 - (hasTag ? u * 0.05 : 0)));
   if (i.brand) {
     const bm = add(c, { role: 'caption', kind: 'text', text: i.brand.toUpperCase(), z: 0.2, style: { size: Math.round(u * 0.032), weight: 700, color: keyLevel === 'high' ? shade(i.accent, 0.5) : tint(i.accent, 0.6), align: 'center' }, box: { x: W * 0.1, y: nameCy - u * 0.11, w: W * 0.8, h: u * 0.045 } });
     const fade: Array<[number, number]> = [[0, 0], [0.3, 0], [0.6, 1]];
@@ -490,7 +738,27 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     c = setKeyframes(bm.c, bm.id, 'opacity', dedupe(fade), 'easeOut');
   }
   const nm = words(c, ID, name, { cx: portrait ? W / 2 : W * 0.4, cy: nameCy, maxW: W * 0.84, size: nameSize, color: ink, boldLast: true, z: 0.2 });
-  c = typeIn(nm.c, nm.ids, r2(holdStart + 0.1), nameCy);
+  c = popWords(nm.c, nm.ids, nameCy, holdStart + 0.1, D);
+  const light = ink === '#ffffff';
+  for (const id of nm.ids) c = shadowed(c, id, light);
+  // the tagline, small under the name, a beat after it
+  const tag = i.tagline?.trim();
+  if (tag) {
+    const tagCy = nameCy + nameSize * 0.6 + u * 0.034;
+    const tg = words(c, ID, tag, { cx: portrait ? W / 2 : W * 0.4, cy: tagCy, maxW: W * 0.8, size: Math.round(u * 0.036), color: keyLevel === 'high' ? shade(i.accent, 0.55) : tint(i.accent, 0.75), z: 0.2 });
+    c = popWords(tg.c, tg.ids, tagCy, holdStart + 0.45, D);
+    for (const id of tg.ids) c = shadowed(c, id, light);
+  }
+
+  // the shots' own words: a hook line, a feeling; popped in the lower third, gone before the cut (never in the macro or the last shot)
+  const textCy = H * (portrait ? 0.8 : 0.84);
+  i.sheet.beats.forEach((b, n) => {
+    const f = cam.beats[n]!;
+    if (!b.text || n === cam.beats.length - 1 || f.size === 'macro') return;
+    const line = words(c, ID, b.text, { cx: W / 2, cy: textCy, maxW: W * 0.84, size: Math.round(u * 0.085), color: ink, boldLast: true, z: 0.2 });
+    c = popWords(line.c, line.ids, textCy, f.start / fps + 0.06, D, Math.max(f.start / fps + 0.5, (f.end + 1) / fps - 0.1));
+    for (const id of line.ids) c = shadowed(c, id, light);
+  });
 
   // the price disc beside the can when there is room for it, else under it; never over it
   const priceText = formatPrice(i.price, i.currency);
@@ -532,6 +800,30 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
       transform: { position: [0, 0], anchor: [0, 0], scale: [1, 1], rotation: 0, opacity: 1 },
     });
   }
+  return c;
+}
+
+/** A soft shadow under a word, so it reads over a bright beach as well as a dark field. */
+function shadowed(c: Comp, id: string, light: boolean): Comp {
+  return patch(c, id, (l) => {
+    l.effects = [{ name: 'drop-shadow', params: { distance: 3, direction: 180, softness: 14, opacity: light ? 0.55 : 0.2, color: '#000000' } }];
+  });
+}
+
+/**
+ * Words that pop: each arrives a little after the one before (0.07 s), swelling from 60 % past full size (112 %) and settling, rising 26 px
+ * as it fades in. With `outAt` they all fade out together from then. The overshoot is what makes copy feel like it was thrown in, not typed.
+ */
+function popWords(c: Comp, ids: string[], cy: number, at: number, D: number, outAt?: number): Comp {
+  const cap = (t: number) => Math.min(r2(t), r2(D - 0.05));
+  ids.forEach((id, n) => {
+    const a = cap(Math.max(0.06, at + n * 0.07));
+    const op: Array<[number, number]> = [[0, 0], [a, 0], [cap(a + 0.1), 1]];
+    if (outAt !== undefined && outAt > a + 0.4) op.push([cap(outAt), 1], [cap(outAt + 0.12), 0]);
+    c = setKeyframes(c, id, 'opacity', dedupe(op), 'easeOut');
+    c = setKeyframes(c, id, 'scale', dedupe([[0, 0.6], [a, 0.6], [cap(a + 0.15), 1.12], [cap(a + 0.28), 1]]), 'easeOut');
+    c = setKeyframes(c, id, 'y', dedupe([[0, r2(cy + 26)], [a, r2(cy + 26)], [cap(a + 0.22), r2(cy)]]), 'easeOut');
+  });
   return c;
 }
 

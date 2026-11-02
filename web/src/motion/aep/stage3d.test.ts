@@ -4,7 +4,7 @@ import type { AepCompositionJson } from '@shared/aep/composition';
 import { parseMotionDoc } from '@engine/schema';
 import { validateTargets } from '@engine/timeline';
 import { aepToMotion } from './index';
-import { convertActor, convertProp, convertWorld } from './stage3d';
+import { convertActor, convertProp, convertWorld, mergeTweens, propLife } from './stage3d';
 
 type AepStage3DLayer = Extract<AepLayer, { kind: 'stage3d' }>;
 
@@ -176,6 +176,14 @@ describe('convertProp', () => {
     expect(warnings).toEqual([]);
   });
 
+  it('keeps a member that lives to the world\'s end alive on its last frame, like a 2D layer that ends with the film', () => {
+    const c = { assets: {}, fps: 30, worldInPoint: 0, worldOutPoint: 240 };
+    // the engine shows an object while its time is before life.end: 240 frames must reach past 8.0 s
+    expect(propLife({ inPoint: 0, outPoint: 240 }, 0, c)).toEqual({ start: 0, end: 241 / 30 });
+    expect(propLife({ inPoint: 30, outPoint: 120 }, 0, c)).toEqual({ start: 1, end: 4 });
+    expect(propLife({ inPoint: 0, outPoint: 240 }, 0, { assets: {}, fps: 30 })).toEqual({ start: 0, end: 8 });
+  });
+
   it('keeps an extruded contour with its front image, side colour and a life window', () => {
     const bean = prop({
       id: 'cine:ing0-coffee-bean',
@@ -242,5 +250,26 @@ describe('convertWorld lighting, focus and shadow', () => {
     expect(layer.exposure).toBe(0.95);
     expect(layer.shadow).toMatchObject({ softness: 0.7, size: [10, 8], enabled: true });
     expect(layer.camera.near).toBe(0.05);
+  });
+});
+
+describe('mergeTweens', () => {
+  const t = (target: string, at: number, to: Record<string, number>, ease = 'none') => ({ target, at, duration: 1, from: Object.fromEntries(Object.keys(to).map((k) => [k, 0])), to, ease, repeat: 0, yoyo: false });
+  it('joins tweens that start together, last as long and ease alike on one target', () => {
+    const out = mergeTweens([t('camera', 0, { 'position.x': 1 }), t('camera', 0, { fov: 40 }), t('camera', 1, { fov: 50 })]);
+    expect(out).toHaveLength(2);
+    expect(out[0]!.to).toEqual({ 'position.x': 1, fov: 40 });
+    expect(out[0]!.from).toEqual({ 'position.x': 0, fov: 0 });
+  });
+  it('keeps tweens of another target, another ease or another length apart, and never merges one property twice', () => {
+    expect(mergeTweens([t('camera', 0, { fov: 1 }), t('lighting', 0, { fov: 1 })])).toHaveLength(2);
+    expect(mergeTweens([t('camera', 0, { a: 1 }, 'none'), t('camera', 0, { b: 1 }, 'cubic(0,0,1,1)')])).toHaveLength(2);
+    expect(mergeTweens([t('camera', 0, { a: 1 }), { ...t('camera', 0, { b: 1 }), duration: 2 }])).toHaveLength(2);
+    expect(mergeTweens([t('camera', 0, { a: 1 }), t('camera', 0, { a: 2 })])).toHaveLength(2);
+  });
+  it('does not change the tweens it is given', () => {
+    const a = t('camera', 0, { x: 1 });
+    mergeTweens([a, t('camera', 0, { y: 1 })]);
+    expect(a.to).toEqual({ x: 1 });
   });
 });

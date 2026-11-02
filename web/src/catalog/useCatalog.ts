@@ -84,7 +84,9 @@ export function useCatalog(catalogId: string | null | undefined): CatalogState {
     if (!fresh.length) return;
     handled.current = events.length;
     setRun((prev) => (prev ? applyEvents(prev, fresh, catalogId) : prev));
-  }, [events, run, catalogId]);
+    // the run's end brings its line films, which no event carries, so the run is read again
+    if (fresh.some((e) => e.type === 'catalog.done' && e.catalogId === catalogId)) load();
+  }, [events, run, catalogId, load]);
 
   const rows = useMemo(() => run?.rows ?? [], [run]);
   const summary = useMemo(() => summarize(rows), [rows]);

@@ -5,12 +5,12 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { AepCompositionJson } from '@shared/aep';
 import type { CatalogRow, CatalogRun } from '@shared/catalog-run';
 import type * as CatalogApi from './api';
-import { getCatalog, getClip } from './api';
+import { getCatalog, getClip, getHeroFilm, getLineFilm } from './api';
 import CatalogPage from './CatalogPage';
 
 vi.mock('./api', async (importOriginal) => {
   const actual = await importOriginal<typeof CatalogApi>();
-  return { ...actual, getCatalog: vi.fn(), getClip: vi.fn() };
+  return { ...actual, getCatalog: vi.fn(), getClip: vi.fn(), getLineFilm: vi.fn(), getHeroFilm: vi.fn() };
 });
 vi.mock('../api/sse', () => ({ useFilmEvents: vi.fn(() => []) }));
 // The real Player needs WebGL; this stand-in shows which composition it was given.
@@ -112,4 +112,61 @@ it('names the run in the title and counts it in the wall', async () => {
   await screen.findByText('Sparkling Can');
   expect(screen.getByTitle('Catalog: 3 products')).toBeInTheDocument();
   expect(screen.getByTestId('catalog-head')).toHaveTextContent('2/3 done · 2 ready · 0 fixed · 0 flagged');
+});
+
+it('opens on the line film when the run has one, and switches between the film and a row', async () => {
+  const FILM_COMP = { ...COMP, id: 'line-film-cans' };
+  vi.mocked(getCatalog).mockResolvedValue({
+    ...RUN,
+    films: [{ id: 'line-cans', title: 'cans', tagline: 'Pick your favourite', productIds: ['can-original', 'mug-stone'], version: 1 }],
+  });
+  vi.mocked(getLineFilm).mockReset().mockResolvedValue(FILM_COMP);
+  render(<CatalogPage catalogId={CATALOG} />);
+
+  await waitFor(() => expect(getLineFilm).toHaveBeenCalledWith(CATALOG, 'line-cans'));
+  await waitFor(() => expect(screen.getByTestId('player-stub')).toHaveAttribute('data-composition', 'line-film-cans'));
+  expect(screen.getByText('▶ cans line film')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByText('Stone Mug'));
+  await waitFor(() => expect(screen.getByTestId('player-stub')).toHaveAttribute('data-composition', COMP.id));
+  expect(screen.getAllByTestId('player-stub')).toHaveLength(1);
+
+  fireEvent.click(screen.getByText('▶ cans line film'));
+  await waitFor(() => expect(screen.getByTestId('player-stub')).toHaveAttribute('data-composition', 'line-film-cans'));
+});
+
+it('a row with a hero film plays the film, and the tile on request', async () => {
+  const HERO = { ...COMP, id: 'hero-stone' };
+  vi.mocked(getCatalog).mockResolvedValue({
+    ...RUN,
+    rows: RUN.rows.map((r) => (r.product.id === 'mug-stone' ? { ...r, hero: { concept: 'one bright mug in the dark', source: 'muse' as const, version: 1 } } : r)),
+  });
+  vi.mocked(getHeroFilm).mockReset().mockResolvedValue(HERO);
+  render(<CatalogPage catalogId={CATALOG} />);
+  await screen.findByText('Stone Mug', {}, { timeout: 3000 });
+
+  fireEvent.click(screen.getByText('Stone Mug'));
+  await waitFor(() => expect(getHeroFilm).toHaveBeenCalledWith(CATALOG, 'mug-stone'), { timeout: 3000 });
+  await waitFor(() => expect(screen.getByTestId('player-stub')).toHaveAttribute('data-composition', 'hero-stone'), { timeout: 3000 });
+  expect(screen.getByText('one bright mug in the dark')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Tile' }));
+  await waitFor(() => expect(screen.getByTestId('player-stub')).toHaveAttribute('data-composition', COMP.id), { timeout: 3000 });
+  expect(screen.getAllByTestId('player-stub')).toHaveLength(1);
+});
+
+it('opens on the first hero film, ahead of the line film', async () => {
+  const HERO = { ...COMP, id: 'hero-can' };
+  vi.mocked(getCatalog).mockResolvedValue({
+    ...RUN,
+    rows: RUN.rows.map((r) => (r.product.id === 'can-original' ? { ...r, hero: { concept: 'a can in the cold', source: 'muse' as const, version: 1 } } : r)),
+    films: [{ id: 'line-cans', title: 'cans', tagline: 'Pick your favourite', productIds: ['can-original', 'mug-stone'], version: 1 }],
+  });
+  vi.mocked(getHeroFilm).mockReset().mockResolvedValue(HERO);
+  vi.mocked(getLineFilm).mockReset().mockResolvedValue({ ...COMP, id: 'line-film-cans' });
+  render(<CatalogPage catalogId={CATALOG} />);
+
+  await waitFor(() => expect(getHeroFilm).toHaveBeenCalledWith(CATALOG, 'can-original'), { timeout: 3000 });
+  await waitFor(() => expect(screen.getByTestId('player-stub')).toHaveAttribute('data-composition', 'hero-can'), { timeout: 3000 });
+  expect(getLineFilm).not.toHaveBeenCalled();
 });

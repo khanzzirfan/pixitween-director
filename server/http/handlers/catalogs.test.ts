@@ -513,3 +513,90 @@ it('keeps a fake run out of the cut-out cache a real run reads', async () => {
   await startDemo(app, store);
   expect(existsSync(join(deps.dir, 'catalogs', 'cutouts.json'))).toBe(false);
 });
+
+it('cuts a line film per brand when the run ends, and hands it back', async () => {
+  const { app, store } = await setup();
+  const run = await startDemo(app, store);
+
+  expect(run.films?.map((f) => [f.id, f.productIds.length, f.version])).toEqual([
+    ['line-coffee-co', 3, 1],
+    ['line-hearth', 3, 1],
+  ]);
+  const res = await app.request(`/api/catalogs/${run.id}/films/line-hearth`);
+  expect(res.status).toBe(200);
+  const texts = textsOf(await res.json());
+  expect(texts).toContain('$19.00');
+  expect((await app.request(`/api/catalogs/${run.id}/films/line-nope`)).status).toBe(404);
+});
+
+it('cuts the line film again after a price edit, with the new price', async () => {
+  const { app, store } = await setup();
+  const run = await startDemo(app, store);
+
+  const res = await edit(app, run.id, 'mug-stone', { price: 21, salePrice: null });
+  expect(res.status).toBe(200);
+
+  const after = await store.get(run.id);
+  expect(after!.films!.find((f) => f.id === 'line-hearth')!.version).toBe(2);
+  expect(after!.films!.find((f) => f.id === 'line-coffee-co')!.version).toBe(1);
+  const texts = textsOf(await (await app.request(`/api/catalogs/${run.id}/films/line-hearth`)).json());
+  expect(texts).toContain('$21.00');
+  expect(texts).not.toContain('$19.00');
+});
+
+it('cuts a hero film for every finished row, and hands it back', async () => {
+  const { app, store, art } = await setup();
+  const run = await startDemo(app, store);
+
+  expect(run.rows.every((r) => r.hero?.version === 1 && r.hero.source === 'floor')).toBe(true);
+  expect(art.calls.direct).toBe(run.rows.length);
+  const res = await app.request(`/api/catalogs/${run.id}/heroes/mug-stone`);
+  expect(res.status).toBe(200);
+  const texts = textsOf(await res.json());
+  expect(texts).toContain('$19.00');
+  expect(texts).toContain('$24.00');
+  expect((await app.request(`/api/catalogs/${run.id}/heroes/nope`)).status).toBe(404);
+});
+
+it('cuts the hero film again after a price edit, from its stored board, without asking Muse', async () => {
+  const { app, store, art } = await setup();
+  const run = await startDemo(app, store);
+  const directed = art.calls.direct;
+
+  const res = await edit(app, run.id, 'mug-stone', { price: 21, salePrice: null });
+  const body = (await res.json()) as { row: CatalogRow };
+  expect(body.row.hero?.version).toBe(2);
+  expect(art.calls.direct).toBe(directed);
+  const texts = textsOf(await (await app.request(`/api/catalogs/${run.id}/heroes/mug-stone`)).json());
+  expect(texts).toContain('$21.00');
+  expect(texts).not.toContain('$19.00');
+});
+
+it('hands the campaign brief to every film, keeps it on the run, and refuses one that is too long', async () => {
+  const { app, store, art } = await setup();
+  const form = new FormData();
+  form.set('demo', 'feed-6');
+  form.set('brief', '  Summer holiday sale: beach, surf, swim.  ');
+  const res = await app.request('/api/catalogs', { method: 'POST', body: form });
+  expect(res.status).toBe(202);
+  const run = await waitFor(store, ((await res.json()) as { catalogId: string }).catalogId);
+
+  expect(run.brief).toBe('Summer holiday sale: beach, surf, swim.');
+  expect(art.directed).toHaveLength(run.rows.length);
+  expect(art.directed.every((d) => d.brief === run.brief)).toBe(true);
+
+  const long = new FormData();
+  long.set('demo', 'feed-6');
+  long.set('brief', 'x'.repeat(601));
+  expect((await app.request('/api/catalogs', { method: 'POST', body: long })).status).toBe(400);
+});
+
+it('plays every hero film in the 3D world, a flat product as its own extruded cut-out', async () => {
+  const { app, store } = await setup();
+  const run = await startDemo(app, store);
+  const comp = (await (await app.request(`/api/catalogs/${run.id}/heroes/mug-stone`)).json()) as any;
+  const layers = Object.values(comp.precomps as Record<string, any>).flatMap((p) => p.layers as any[]);
+  expect(layers.some((l) => l.kind === 'stage3d')).toBe(true);
+  const product = layers.find((l) => l.role === 'product' && l.kind === 'prop3d');
+  expect(product?.source.type === 'extrude' || product?.source.type === 'primitive').toBe(true);
+});
