@@ -7,6 +7,13 @@ import type { AppDeps } from '../http/deps';
 import { createLineupStore, unfinishedLineupIds, type LineupStore } from './store';
 
 const running = new Set<string>();
+/** Line-ups the owner has stopped. The loop checks this between films and does not mark a stopped film done. */
+const cancelled = new Set<string>();
+
+/** Ask a running line-up to stop. The current film is aborted by the caller; this keeps the loop from starting the next one. */
+export function cancelLineup(lineupId: string): void {
+  cancelled.add(lineupId);
+}
 
 /** Make every product of the line-up that is not done, in order. Resolves when the line-up has ended. */
 export async function runLineup(
@@ -23,18 +30,34 @@ export async function runLineup(
     const lineup = await store.get(lineupId);
     if (!lineup) return;
     for (const item of lineup.items) {
+      if (cancelled.has(lineupId)) break;
       if (!item.filmId || (item.state !== 'waiting' && item.state !== 'making')) continue;
       await store.setItem(lineupId, item.product.id, { state: 'making' });
       try {
         await (env.CREW_ENABLED ? runCrew(item.filmId) : runDirector(item.filmId));
+        if (cancelled.has(lineupId)) {
+          await store.setItem(lineupId, item.product.id, { state: 'stopped', error: 'Stopped.' });
+          break;
+        }
         const film = await deps.films.get(item.filmId);
         await store.setItem(lineupId, item.product.id, film.status === 'failed' ? { state: 'failed', error: 'the film did not finish' } : { state: 'done' });
       } catch (e) {
+        if (cancelled.has(lineupId)) {
+          await store.setItem(lineupId, item.product.id, { state: 'stopped', error: 'Stopped.' });
+          break;
+        }
         console.error(`lineup ${lineupId} film ${item.filmId} failed:`, e);
         await store.setItem(lineupId, item.product.id, { state: 'failed', error: e instanceof Error ? e.message.slice(0, 200) : 'the film failed' });
       }
     }
+    if (cancelled.has(lineupId)) {
+      const fresh = await store.get(lineupId);
+      for (const item of fresh?.items ?? []) {
+        if (item.state === 'waiting' || item.state === 'making') await store.setItem(lineupId, item.product.id, { state: 'stopped', error: 'Stopped.' });
+      }
+    }
   } finally {
+    cancelled.delete(lineupId);
     running.delete(lineupId);
   }
 }

@@ -10,8 +10,9 @@ export interface LineupStarted {
 
 export const createLineup = (form: FormData) => request<LineupStarted>('POST', '/api/lineups', form);
 export const getLineup = (id: string) => request<Lineup>('GET', `/api/lineups/${encodeURIComponent(id)}`);
+export const stopLineup = (id: string) => request<{ ok: boolean; stopped: boolean }>('POST', `/api/lineups/${encodeURIComponent(id)}/stop`);
 
-const finished = (l: Lineup) => l.items.every((i) => i.state === 'done' || i.state === 'failed');
+const finished = (l: Lineup) => l.items.every((i) => i.state === 'done' || i.state === 'failed' || i.state === 'stopped');
 
 /** The line-up as the server has it, read again every few seconds until every film has ended. */
 export function useLineup(id: string | null | undefined, everyMs = 3000): { lineup: Lineup | null; reload: () => void } {
