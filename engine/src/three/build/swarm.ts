@@ -267,7 +267,8 @@ const MATRIX = new THREE.Matrix4();
 
 /**
  * One InstancedMesh from an already fitted source mesh: its local matrix is baked into the instanced
- * geometry so copies keep the source's size and base pivot, and copies share its first material.
+ * geometry so copies keep the source's size and base pivot, and copies share its materials (an extruded cut-out keeps its photo on the
+ * caps and its plain colour on the sides; one material for both smears the photo along the sides).
  */
 export function buildSwarm(source: THREE.Mesh, cfg: Swarm3D): SwarmRig {
   source.updateWorldMatrix(true, false);
@@ -275,7 +276,7 @@ export function buildSwarm(source: THREE.Mesh, cfg: Swarm3D): SwarmRig {
   geometry.applyMatrix4(source.matrixWorld);
   geometry.computeBoundingBox();
   const box = geometry.boundingBox?.getSize(new THREE.Vector3()) ?? new THREE.Vector3(1, 1, 1);
-  const material = Array.isArray(source.material) ? source.material[0] : source.material;
+  const material = source.material;
   const constants = createSwarmConstants(cfg, box.y / 2);
   const mesh = new THREE.InstancedMesh(geometry, material, constants.count);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

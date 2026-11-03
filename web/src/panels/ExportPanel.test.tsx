@@ -172,3 +172,64 @@ describe('a 3D product (S13b)', () => {
     expect(mix).not.toHaveBeenCalled();
   });
 });
+
+describe('server render', () => {
+  const view = (o: Record<string, unknown> = {}) => ({ id: 'j1', filmId: 'film_aaaaaaaaaaaa', status: 'rendering', quality: 'draft', frame: 0, frames: 150, progress: 0, problems: [], ...o });
+  const renderDeps = (o: Record<string, unknown> = {}) => ({
+    renderExportAvailable: async () => true,
+    startRenderExport: vi.fn(async () => view()),
+    pollRenderExport: vi.fn(async (_id: string, p: { onView(v: unknown): void }) => {
+      p.onView(view({ frame: 45, progress: 0.27 }));
+      p.onView(view({ status: 'encoding', frame: 150, progress: 0.92 }));
+      return view({ status: 'done', progress: 1, fileName: 'morning-ritual-20261103.mp4', problems: ['frozen: frames at 7.78 s and 8.89 s are identical'] });
+    }),
+    downloadRenderExport: vi.fn(async () => new Blob(['mp4'])),
+    cancelRenderExport: vi.fn(async () => undefined),
+    now: fixedNow,
+    ...o,
+  });
+
+  it('shows progress, then the download, without needing a browser recorder', async () => {
+    vi.stubGlobal('MediaRecorder', undefined);
+    const deps = renderDeps();
+    render(<ExportPanel film={film()} events={[]} deps={deps as never} />);
+    await waitFor(() => expect(screen.getByLabelText('Quality')).toBeVisible());
+    expect(screen.getByRole('button', { name: 'Export video' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Export video' }));
+    expect(await screen.findByRole('link', { name: /Download morning-ritual-20261103\.mp4/ })).toHaveAttribute('download', 'morning-ritual-20261103.mp4');
+    expect(deps.startRenderExport).toHaveBeenCalledWith('film_aaaaaaaaaaaa', 'draft');
+    expect(deps.downloadRenderExport).toHaveBeenCalledWith('j1');
+    expect(screen.getByText(/frozen: frames/)).toBeVisible();
+  });
+
+  it('shows the phase and frame count while it works', async () => {
+    let release!: () => void;
+    const deps = renderDeps({
+      pollRenderExport: vi.fn(async (_id: string, p: { onView(v: unknown): void }) => {
+        p.onView(view({ frame: 45, progress: 0.27 }));
+        await new Promise<void>((r) => (release = r));
+        return view({ status: 'cancelled' });
+      }),
+    });
+    render(<ExportPanel film={film()} events={[]} deps={deps as never} />);
+    await waitFor(() => expect(screen.getByLabelText('Quality')).toBeVisible());
+    fireEvent.change(screen.getByLabelText('Quality'), { target: { value: 'full' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Export video' }));
+    expect(await screen.findByText('Rendering your film…')).toBeVisible();
+    expect(screen.getByText('Rendering frame 45 of 150')).toBeVisible();
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '27');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(deps.cancelRenderExport).toHaveBeenCalledWith('j1');
+    release();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Export video' })).toBeVisible());
+  });
+
+  it('shows the server error and offers another try', async () => {
+    const deps = renderDeps({ pollRenderExport: vi.fn(async () => view({ status: 'error', error: 'The 3D product did not finish drawing.' })) });
+    render(<ExportPanel film={film()} events={[]} deps={deps as never} />);
+    await waitFor(() => expect(screen.getByLabelText('Quality')).toBeVisible());
+    fireEvent.click(screen.getByRole('button', { name: 'Export video' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The 3D product did not finish drawing.');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+  });
+});

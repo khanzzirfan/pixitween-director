@@ -80,10 +80,14 @@
       "y": 540,
       "end": 6,
       "effects": [
-        { "id": "gaussianBlur", "type": "gaussianBlur", "params": { "strength": 2 } }
+        { "id": "gaussianBlur", "type": "gaussianBlur", "params": { "strength": 2 } },
+        { "id": "split", "type": "splitTone", "params": { "amount": 0.4 } },
+        { "id": "streak", "type": "lensStreak", "params": { "strength": 0.3 } }
       ],
       "tweens": [
-        { "target": "effect:gaussianBlur", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "strength": 0 }, "to": { "strength": 6 } }
+        { "target": "effect:gaussianBlur", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "strength": 0 }, "to": { "strength": 6 } },
+        { "target": "effect:split", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "amount": 0 }, "to": { "amount": 0.8 } },
+        { "target": "effect:streak", "at": 0, "duration": 6, "ease": "sine.inOut", "from": { "strength": 0 }, "to": { "strength": 0.6 } }
       ]
     }
   ]

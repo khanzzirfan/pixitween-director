@@ -84,6 +84,42 @@ describe('convertWorld', () => {
     expect(layer.lighting.preset).toBe('golden');
   });
 
+  it('turns the finish (bloom, grade, fringe, vignette, grain) into engine effects, and keyframes the bloom', () => {
+    const w = {
+      ...world(),
+      post: {
+        bloom: { intensity: [{ t: 0, v: 0.6 }, { t: 60, v: 1.4 }], threshold: 0.5 },
+        grade: { contrast: 0.1, saturation: 0.15 },
+        aberration: { offset: 0.0008 },
+        vignette: { darkness: 0.5 },
+        grain: { opacity: 0.12 },
+      },
+    } as unknown as AepStage3DLayer;
+    const { layer, warnings } = convertWorld(w, members, { assets, fps: 30 });
+    expect((layer.effects as Array<{ id: string; type: string; params: Record<string, number> }>).map((e) => e.type)).toEqual(['bloom', 'brightnessContrast', 'hueSaturation', 'chromaticAberration', 'vignette', 'noise']);
+    expect(layer.effects[0]!.params).toMatchObject({ intensity: 0.6, threshold: 0.5 });
+    expect(layer.tweens.some((t) => t.target === 'effect:bloom' && 'intensity' in t.to)).toBe(true);
+    expect(warnings.join(' ')).not.toMatch(/post|bloom/);
+  });
+
+  it('turns shot transitions into engine transitions in seconds on the world\'s clock', () => {
+    const w = { ...world(), inPoint: 30, shotTransitions: [{ startFrame: 66, durationFrames: 12, name: 'CrossZoom', params: { strength: 0.5 } }] } as unknown as AepStage3DLayer;
+    const { layer } = convertWorld(w, members, { assets, fps: 30 });
+    expect((layer as unknown as { transitions: unknown[] }).transitions).toEqual([{ at: 1.2, duration: 0.4, name: 'CrossZoom', params: { strength: 0.5 } }]);
+    expect((convertWorld(world(), members, { assets, fps: 30 }).layer as unknown as { transitions?: unknown }).transitions).toBeUndefined();
+  });
+
+  it('lays a glossy reflection and rippling caustics over the ground, and neither without a ground', () => {
+    const w = { ...world(), set: { ...world().set, reflection: { strength: 0.4 }, caustics: { strength: 0.6 } } } as unknown as AepStage3DLayer;
+    const objects = convertWorld(w, members, { assets, fps: 30 }).layer.objects;
+    expect(objects.find((o) => o.id === 'mirror')?.geometry).toMatchObject({ type: 'mirror', strength: 0.4 });
+    const light = objects.find((o) => o.id === 'caustics')!;
+    expect(light.geometry).toEqual({ type: 'caustics', size: [16, 8], strength: 0.6, fade: 0.3, scale: 40 });
+    expect(light.rotation).toEqual([-90, 0, 0]);
+    const bare = { ...w, set: { ...(w as unknown as { set: object }).set, ground: 'none' } } as unknown as AepStage3DLayer;
+    expect(convertWorld(bare, members, { assets, fps: 30 }).layer.objects.some((o) => o.id === 'caustics' || o.id === 'mirror')).toBe(false);
+  });
+
   it('adds a ground plane and a backdrop plane', () => {
     const { layer } = convertWorld(world(), members, { assets, fps: 30 });
     const ground = layer.objects.find((o) => o.id === 'ground')!;
@@ -133,6 +169,15 @@ describe('convertWorld', () => {
 describe('convertProp', () => {
   const prop = (over: Record<string, unknown> = {}) =>
     ({ id: 'first-sip:counter', kind: 'prop3d', stage: 'first-sip:world', inPoint: 0, outPoint: 120, source: { type: 'gltf', assetId: 'counter' }, size: 0.6, position: [1.5, 0, 0], ...over }) as unknown as Extract<AepLayer, { kind: 'prop3d' }>;
+
+  it('converts a liquid prop to a liquid timed to its life, sized by its box and never fitted', () => {
+    const coffee = prop({ source: { type: 'liquid', form: 'crown', seed: 4 }, size: 0.35, inPoint: 30, outPoint: 75, material: { color: '#3b2314', roughness: 0.06, clearcoat: 1 } });
+    const { object, warnings } = convertProp(coffee, ctx);
+    expect(object!.geometry).toEqual({ type: 'liquid', form: 'crown', size: 0.35, duration: 1.5, seed: 4 });
+    expect(object!.fit).toBeUndefined();
+    expect(object!.material).toMatchObject({ color: '#3b2314', roughness: 0.06, clearcoat: 1 });
+    expect(warnings).toEqual([]);
+  });
 
   it('converts a counter prop to a gltf object', () => {
     const { object, warnings } = convertProp(prop(), ctx);
@@ -241,6 +286,38 @@ describe('convertWorld lighting, focus and shadow', () => {
     const lighting = layer.tweens.filter((t) => t.target === 'lighting');
     expect(lighting.map((t) => Object.keys(t.to)[0]).sort()).toEqual(['keyAzimuth', 'rimIntensity']);
     expect(warnings.join(' ')).not.toMatch(/overrides|focus/);
+  });
+
+  it('keeps the rim light colour and turns the blur shots into spans in seconds', () => {
+    const w = { ...cine(), lights: { ...(cine() as any).lights, rim: { color: '#22ccdd', intensity: 1 } }, post: { motionBlur: { samples: 8, shots: [{ startFrame: 30, durationFrames: 15, shutter: 0.7 }] } } } as unknown as AepStage3DLayer;
+    const { layer } = convertWorld(w, [], ctx);
+    expect(layer.lighting).toMatchObject({ rimColor: '#22ccdd' });
+    expect((layer as any).motionBlur).toEqual({ samples: 8, spans: [{ from: 1, to: 1.5, shutter: 0.7 }] });
+    expect((convertWorld(cine(), [], ctx).layer as any).motionBlur).toBeUndefined();
+  });
+
+  it('an animated aperture becomes dof tweens, and bokeh rides on the effect', () => {
+    const w = { ...cine(), camera: { ...(cine() as any).camera, focus: { distance: 1.2, aperture: [{ t: 0, v: 0.2 }, { t: 30, v: 0.9 }], bokeh: 0.6 } } } as unknown as AepStage3DLayer;
+    const { layer } = convertWorld(w, [], ctx);
+    expect(layer.effects).toEqual([{ id: 'dof', type: 'stageDof', params: { aperture: 0.2, focusDistance: 1.2, bokeh: 0.6 } }]);
+    expect(layer.tweens.filter((t) => t.target === 'effect:dof').some((t) => 'aperture' in t.to)).toBe(true);
+  });
+
+  it('turns speed-ramp spans into seconds on the layer clock', () => {
+    const rates = [{ at: 0, rate: 1 }, { at: 0.5, rate: 0.2 }, { at: 1, rate: 1 }];
+    const w = { ...cine(), timeWarp: [{ startFrame: 30, durationFrames: 15, rates }] } as unknown as AepStage3DLayer;
+    expect((convertWorld(w, [], ctx).layer as any).timeWarp).toEqual([{ from: 1, to: 1.5, rates }]);
+    expect((convertWorld(cine(), [], ctx).layer as any).timeWarp).toBeUndefined();
+  });
+
+  it('turns spot lights into engine spots (cone in degrees), and tweens an animated one on its own light', () => {
+    const spots = [{ id: 'spot1', position: [-0.7, 0.4, 0.3], target: [0, 0.08, 0], intensity: [{ t: 0, v: 2 }, { t: 30, v: 6 }], angle: 18, penumbra: 0.8, color: '#88aaff' }];
+    const w = { ...cine(), lights: { ...(cine() as any).lights, spots } } as unknown as AepStage3DLayer;
+    const { layer, warnings } = convertWorld(w, [], ctx);
+    expect(warnings.join(' ')).not.toMatch(/spots/);
+    expect((layer as any).lights).toEqual([{ id: 'spot1', type: 'spot', position: [-0.7, 0.4, 0.3], target: [0, 0.08, 0], intensity: 2, castShadow: false, color: '#88aaff', angle: 18, penumbra: 0.8 }]);
+    expect(layer.tweens.some((t) => t.target === 'light:spot1' && 'intensity' in t.to)).toBe(true);
+    expect((convertWorld(cine(), [], ctx).layer as any).lights).toEqual([]);
   });
 
   it('an animated camera target becomes lookAt tweens, with no warning', () => {

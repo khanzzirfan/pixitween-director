@@ -71,10 +71,10 @@ export function buildScene(layer: ThreeLayer, ctx: SceneContext = {}): ThreeRig 
   const lookAt = new THREE.Vector3(layer.camera.lookAt[0], layer.camera.lookAt[1], layer.camera.lookAt[2]);
   camera.lookAt(lookAt);
 
-  const { keyAzimuth, keyElevation, keyIntensity, keyColor, fillIntensity, rimIntensity, ambient } = layer.lighting;
+  const { keyAzimuth, keyElevation, keyIntensity, keyColor, fillIntensity, rimIntensity, rimColor, ambient } = layer.lighting;
   const lightingConfig = resolveLightingConfig(
     layer.lighting.preset,
-    { keyAzimuth, keyElevation, keyIntensity, keyColor, fillIntensity, rimIntensity },
+    { keyAzimuth, keyElevation, keyIntensity, keyColor, fillIntensity, rimIntensity, rimColor },
     layer.lighting.environment,
   );
   if (ambient !== undefined) lightingConfig.ambientIntensity = ambient;
@@ -115,7 +115,7 @@ export function buildScene(layer: ThreeLayer, ctx: SceneContext = {}): ThreeRig 
   const built: BuiltObject[] = [];
   const gltfAssets = new Set<string>();
   for (const spec of layer.objects) {
-    const object = buildObject(spec, ctx);
+    const object = buildObject(spec, { ...ctx, viewport: { width: layer.width, height: layer.height } });
     warnings.push(...object.warnings);
     scene.add(object.root);
     objects.set(spec.id, object.root);
@@ -200,6 +200,8 @@ function buildLight(spec: Light3D): { light: THREE.Light; target: THREE.Object3D
       const light = new THREE.SpotLight(color, spec.intensity);
       light.position.set(spec.position[0], spec.position[1], spec.position[2]);
       light.castShadow = spec.castShadow;
+      light.angle = THREE.MathUtils.degToRad(spec.angle ?? 30);
+      light.penumbra = spec.penumbra ?? 0.4;
       light.target.position.set(spec.target[0], spec.target[1], spec.target[2]);
       return { light, target: light.target };
     }

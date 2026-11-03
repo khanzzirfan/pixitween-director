@@ -19,6 +19,7 @@ import { createFakeCrew } from './fake-showrunner';
 import { createId } from './ids';
 import { createInbox, type Inbox } from './inbox';
 import { corpusFor, lessonsBlock, recordOutcome } from '../corpus/store';
+import { startCinematic } from './cinematic-cut';
 import { getDb } from '../db/open';
 import { createCrewPersist } from './persist';
 import { createScheduler, type Scheduler } from './scheduler';
@@ -159,12 +160,14 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     };
 
     // the hard clock: at the deadline, stop what is open (writers roll back), finish with what exists and end the session
+    // the wrap's finish, so a session that ends while it runs (the cinematic cut takes a minute) waits for it before calling the film ready
+    let wrapping: Promise<void> | undefined;
     const wrapTimer = setTimeout(() => {
-      void (async () => {
+      wrapping = (async () => {
         if (ac.signal.aborted) return;
         crew.emit({ type: 'showrunner.say', kind: 'note', text: 'Out of time: wrapping up with what is built.' });
         for (const j of board.list()) if (!TERMINAL.includes(j.status)) await scheduler.cancel(j.id).catch(() => undefined);
-        await autoFinish(crew).catch(() => false);
+        await autoFinish(crew, { force: true }).catch(() => false);
         ac.abort();
       })();
     }, deadline.totalMs);
@@ -173,10 +176,13 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     const done = (async () => {
       try {
         if (!opts.resume) {
+          // the 3D cut's slow part (cut-out, board, element pictures) runs while the crew builds, so the finish only assembles
+          startCinematic(toolCtx, film.brief.text, (line) => crew.emit({ type: 'showrunner.say', kind: 'note', text: line }));
           await status('planning');
           push({ from: 'system', text: `New film. Brief: ${film.brief.text} Aspect ${film.aspect}.`, data: { brief: film.brief.text, aspect: film.aspect } });
         }
         await showrunner.run(ac.signal);
+        await wrapping;
         // the session ended without a finish: keep what exists
         const now = await deps.films.get(filmId);
         if (now.status !== 'ready' && now.status !== 'failed') await status(now.composition ? 'ready' : 'failed');

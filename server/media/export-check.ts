@@ -21,11 +21,15 @@ export function compareProbe(probe: Probe, expect: ExportExpect, tol = 0.15): st
   return out;
 }
 
+/** Pairs of sampled frames that are identical. A still end card is deliberate, so a frozen run that reaches the end of a film that moved earlier is not reported. */
 export function frozenPairs(grays: Gray[], times: number[]): string[] {
+  const frozen: boolean[] = [];
+  for (let i = 1; i < grays.length; i++) frozen.push(changedShare(grays[i - 1]!, grays[i]!) === 0);
+  let end = frozen.length;
+  while (end > 0 && frozen[end - 1]) end--;
+  const keep = end > 0 ? end : frozen.length; // a film frozen from the start is reported whole
   const out: string[] = [];
-  for (let i = 1; i < grays.length; i++) {
-    if (changedShare(grays[i - 1]!, grays[i]!) === 0) out.push(`frozen: frames at ${times[i - 1]!.toFixed(2)} s and ${times[i]!.toFixed(2)} s are identical`);
-  }
+  for (let i = 0; i < keep; i++) if (frozen[i]) out.push(`frozen: frames at ${times[i]!.toFixed(2)} s and ${times[i + 1]!.toFixed(2)} s are identical`);
   return out;
 }
 

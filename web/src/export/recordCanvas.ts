@@ -23,6 +23,8 @@ export interface RecordDeps {
 }
 
 const TIMEOUT_MARGIN_SEC = 5;
+/** A recorder that has not started by now never will (seen once as a silent hang at 0 %). */
+const START_TIMEOUT_MS = 8000;
 
 export function recordCanvas(opts: RecordOptions, deps: RecordDeps = {}): Promise<Blob> {
   const MR = deps.MediaRecorderCtor ?? MediaRecorder;
@@ -44,6 +46,7 @@ export function recordCanvas(opts: RecordOptions, deps: RecordDeps = {}): Promis
     let audioCtx: AudioContext | undefined;
     let recorderStopped = false;
     let driverPaused = false;
+    let startTimer: ReturnType<typeof setTimeout> | undefined;
     const chunks: Blob[] = [];
 
     const onVisibility = () => {
@@ -79,6 +82,7 @@ export function recordCanvas(opts: RecordOptions, deps: RecordDeps = {}): Promis
     const cleanup = () => {
       document.removeEventListener('visibilitychange', onVisibility);
       signal?.removeEventListener('abort', onAbort);
+      clearTimeout(startTimer);
       stream?.getTracks().forEach((t) => t.stop());
     };
     function fail(err: ExportError) {
@@ -144,6 +148,7 @@ export function recordCanvas(opts: RecordOptions, deps: RecordDeps = {}): Promis
           raf(tick);
         };
         recorder.onstart = () => {
+          clearTimeout(startTimer);
           audioSource?.start();
           driver.play();
           raf(tick);
@@ -151,6 +156,7 @@ export function recordCanvas(opts: RecordOptions, deps: RecordDeps = {}): Promis
 
         document.addEventListener('visibilitychange', onVisibility);
         signal?.addEventListener('abort', onAbort);
+        startTimer = setTimeout(() => fail(new ExportError('recorder-error', 'The recorder did not start. Try again, or use the server export.')), START_TIMEOUT_MS);
         recorder.start(250);
       } catch (e) {
         fail(e instanceof ExportError ? e : new ExportError('unsupported', e instanceof Error ? e.message : String(e)));

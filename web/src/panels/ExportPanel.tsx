@@ -7,6 +7,7 @@ import { mp4Supported } from '../export/mp4Export';
 import { mixAudio } from '../export/mixAudio';
 import { getExportCanvas, isDrawingBufferPreserved, playerToDriver } from '../export/playerCanvas';
 import { recordCanvas } from '../export/recordCanvas';
+import { cancelRenderExport, downloadRenderExport, pollRenderExport, renderExportAvailable, startRenderExport, type ExportQuality } from '../export/renderExport';
 import { checkMp4OnServer, exportMp4ViaServer } from '../export/serverExport';
 import { EXPORT_READY_WAIT_SEC, ExportError, NOT_READY_MESSAGE, type ExportPlayerHandle } from '../export/types';
 import type { PanelProps } from './types';
@@ -26,13 +27,19 @@ export interface ExportPanelProps extends PanelProps {
     checkMp4OnServer?: typeof checkMp4OnServer;
     /** Whether the server has ffmpeg (GET /api/health). */
     serverHasFfmpeg?: () => Promise<boolean>;
+    /** Whether the server can build the video itself (GET /api/render-exports/capability). */
+    renderExportAvailable?: () => Promise<boolean>;
+    startRenderExport?: typeof startRenderExport;
+    pollRenderExport?: typeof pollRenderExport;
+    downloadRenderExport?: typeof downloadRenderExport;
+    cancelRenderExport?: typeof cancelRenderExport;
   };
 }
 
 type State =
   | { kind: 'idle' }
-  | { kind: 'running'; progress: number; frame?: { n: number; of: number } }
-  | { kind: 'done'; url: string; name: string }
+  | { kind: 'running'; progress: number; frame?: { n: number; of: number }; label?: string }
+  | { kind: 'done'; url: string; name: string; size?: number }
   | { kind: 'error'; message: string };
 
 const SERVER_NOTE = 'Built on the server, without sound.';
@@ -59,6 +66,9 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
   const [format, setFormat] = useState<'webm' | 'mp4'>('webm');
   const [mp4, setMp4] = useState<Mp4Path>(null);
   const abort = useRef<AbortController | null>(null);
+  const [serverRender, setServerRender] = useState(false);
+  const [quality, setQuality] = useState<ExportQuality>('draft');
+  const jobId = useRef<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -66,6 +76,7 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
       const path: Mp4Path = (await (deps.mp4Supported ?? mp4Supported)()) ? 'browser' : (await (deps.serverHasFfmpeg ?? healthHasFfmpeg)()) ? 'server' : null;
       if (alive) setMp4(path);
     })();
+    void (deps.renderExportAvailable ?? renderExportAvailable)().then((ok) => alive && setServerRender(ok));
     return () => void (alive = false);
   }, []);
 
@@ -73,7 +84,44 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
   const supported = canRecord();
   const hasContent = !!comp && comp.durationInFrames > 0;
 
+  async function startOnServer() {
+    if (!film?.id) return;
+    const ctl = new AbortController();
+    abort.current = ctl;
+    jobId.current = null;
+    setNotes([]);
+    setState({ kind: 'running', progress: 0, label: 'Starting the export…' });
+    try {
+      const job = await (deps.startRenderExport ?? startRenderExport)(film.id, quality);
+      jobId.current = job.id;
+      const last = await (deps.pollRenderExport ?? pollRenderExport)(job.id, {
+        signal: ctl.signal,
+        onView: (v) =>
+          setState({
+            kind: 'running',
+            progress: Math.round(v.progress * 100),
+            frame: v.status === 'rendering' ? { n: v.frame, of: v.frames } : undefined,
+            label: v.status === 'encoding' ? 'Building your MP4…' : 'Rendering your film…',
+          }),
+      });
+      if (last.status === 'cancelled') return setState({ kind: 'idle' });
+      if (last.status === 'error') throw new ExportError('recorder-error', last.error ?? 'The export failed.');
+      setState({ kind: 'running', progress: 100, label: 'Getting your file ready…' });
+      const blob = await (deps.downloadRenderExport ?? downloadRenderExport)(job.id);
+      setNotes(last.problems);
+      setState({ kind: 'done', url: URL.createObjectURL(blob), name: last.fileName ?? exportFileName(film.title ?? 'film', 'mp4', now()), size: blob.size });
+    } catch (e) {
+      setState(ctl.signal.aborted ? { kind: 'idle' } : { kind: 'error', message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  function cancel() {
+    abort.current?.abort();
+    if (jobId.current) void (deps.cancelRenderExport ?? cancelRenderExport)(jobId.current);
+  }
+
   async function start() {
+    if (serverRender) return startOnServer();
     if (!comp) return;
     const ctl = new AbortController();
     abort.current = ctl;
@@ -142,7 +190,16 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
       </div>
       {state.kind === 'idle' && (
         <>
-          {mp4 !== null && (
+          {serverRender && (
+            <label>
+              Quality{' '}
+              <select value={quality} onChange={(e) => setQuality(e.target.value as ExportQuality)} aria-label="Quality">
+                <option value="draft">Quick (540×960, 15 fps)</option>
+                <option value="full">Full (1080×1920, 30 fps, slower)</option>
+              </select>
+            </label>
+          )}
+          {!serverRender && mp4 !== null && (
             <label>
               Format{' '}
               <select value={format} onChange={(e) => setFormat(e.target.value as 'webm' | 'mp4')} aria-label="Format">
@@ -156,22 +213,22 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
             type="button"
             aria-label="Export video"
             onClick={() => void start()}
-            disabled={!supported || !hasContent}
+            disabled={(!serverRender && !supported) || !hasContent}
           >
             Export video →
           </button>
-          {!supported && <p>Your browser can&apos;t record video. Try Chrome.</p>}
-          {supported && !hasContent && <p>Nothing to export</p>}
+          {!serverRender && !supported && <p>Your browser can&apos;t record video. Try Chrome.</p>}
+          {(serverRender || supported) && !hasContent && <p>Nothing to export</p>}
         </>
       )}
       {state.kind === 'running' && (
         <div>
-          <p>Preparing your video…</p>
+          <p>{state.label ?? 'Preparing your video…'}</p>
           <div className="export-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={state.progress}>
             <span style={{ width: `${state.progress}%` }} />
           </div>
           <p>{state.frame ? `Rendering frame ${state.frame.n} of ${state.frame.of}` : `${state.progress}% complete`}</p>
-          <button type="button" onClick={() => abort.current?.abort()}>
+          <button type="button" onClick={cancel}>
             Cancel
           </button>
         </div>
@@ -180,7 +237,8 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
         <div>
           <a href={state.url} download={state.name}>
             Download {state.name}
-          </a>{' '}
+          </a>
+          {state.size ? ` (${(state.size / 1_000_000).toFixed(1)} MB)` : ''}{' '}
           <button type="button" onClick={dismiss}>
             Dismiss
           </button>

@@ -5,6 +5,11 @@ import { disposeObject3D } from './dispose';
 import { buildGeometry } from './geometry';
 import { normalizeGltf, pickClip, type LoadedGltf } from './gltf';
 import { makeMaterial, makeUnlitMaterial } from './materials';
+import { buildCaustics } from './caustics';
+import { buildLiquid } from './liquid';
+import { buildMirror } from './mirror';
+import { buildRunners, roundProfile } from './runners';
+import { buildSmoke } from './smoke';
 import { buildSwarm } from './swarm';
 import { buildText3D, type Text3DResult } from '../text/build';
 import { recordText3DStats } from '../text/debug';
@@ -21,6 +26,8 @@ export interface ObjectBuildContext {
   gltfs?: ReadonlyMap<string, LoadedGltf>;
   /** Loaded fonts by asset id (from `preloadThreeAssets`). */
   fonts?: ReadonlyMap<string, Font>;
+  /** The size of the frame the scene is drawn in (a mirror floor draws its reflection to match). */
+  viewport?: { width: number; height: number };
 }
 
 export interface BuiltObject {
@@ -76,6 +83,7 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
   let textResult: Text3DResult | undefined;
   let flipMaterial: THREE.MeshBasicMaterial | THREE.MeshStandardMaterial | undefined;
   let swarmTime: ((t: number) => void) | undefined;
+  let disposeMirror: (() => void) | undefined;
 
   if (spec.geometry.type === 'gltf') {
     shared = true;
@@ -111,6 +119,24 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
       disposeText = text.dispose;
       textResult = text;
     }
+  } else if (spec.geometry.type === 'mirror') {
+    const mirror = buildMirror({ size: spec.geometry.size, strength: spec.geometry.strength, fade: spec.geometry.fade, ...(spec.geometry.blur !== undefined ? { blur: spec.geometry.blur } : {}), viewport: ctx.viewport ?? { width: 512, height: 512 } });
+    root.add(mirror);
+    disposeMirror = () => mirror.dispose();
+  } else if (spec.geometry.type === 'caustics') {
+    const rig = buildCaustics({ size: spec.geometry.size, strength: spec.geometry.strength, fade: spec.geometry.fade, scale: spec.geometry.scale, color: spec.material.color });
+    root.add(rig.mesh);
+    swarmTime = rig.setTime;
+  } else if (spec.geometry.type === 'smoke') {
+    // Vapour changes every frame and faces the camera, so like a liquid it is never fitted.
+    const rig = buildSmoke({ form: spec.geometry.form, duration: spec.geometry.duration, size: spec.geometry.size, color: spec.material.color, opacity: spec.material.opacity, ...(spec.geometry.seed !== undefined ? { seed: spec.geometry.seed } : {}) });
+    root.add(rig.mesh);
+    swarmTime = rig.setTime;
+  } else if (spec.geometry.type === 'liquid') {
+    // A liquid changes shape every frame, so it is never fitted: its box is `size` across, on the origin.
+    const rig = buildLiquid(spec.geometry, makeMaterial(spec.material, ctx.textures));
+    root.add(rig.mesh);
+    swarmTime = rig.setTime;
   } else {
     const geometry = buildGeometry(spec.geometry);
     let material: THREE.Material | THREE.Material[];
@@ -118,7 +144,10 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
       material = makeUnlitMaterial(spec.material, ctx.textures);
     } else {
       material = makeMaterial(spec.material, ctx.textures);
-      if (spec.geometry.type === 'extrude' && spec.geometry.sideColor) {
+      if (spec.geometry.type === 'extrude' && spec.geometry.section !== undefined) {
+        // A solid body wears the photo all round; where the outline has a gap (a strap, a handle) the picture is clear, so those pixels are cut away.
+        material.alphaTest = 0.5;
+      } else if (spec.geometry.type === 'extrude' && spec.geometry.sideColor) {
         // Caps carry the map, the sides a plain colour.
         material = [material, makeMaterial({ ...spec.material, map: undefined, color: spec.geometry.sideColor }, ctx.textures)];
       }
@@ -142,6 +171,16 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
       swarmTime = swarm.setTime;
     } else {
       root.add(mesh);
+      if (!spec.material.unlit && (spec.material.condensation ?? 0) > 0) {
+        // A wet, round body has drops running down it (a box or a card keeps its still beads only).
+        mesh.updateMatrix();
+        const round = roundProfile(geometry, mesh.matrix);
+        if (round) {
+          const runners = buildRunners({ ...round, amount: spec.material.condensation ?? 0 });
+          root.add(runners.mesh);
+          swarmTime = runners.setTime;
+        }
+      }
     }
   }
 
@@ -189,6 +228,7 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
     mixer?.stopAllAction();
     root.removeFromParent();
     disposeText?.();
+    disposeMirror?.();
     // A glTF clone shares geometry, materials and textures with the loaded asset, so it frees
     // nothing itself (the rig disposes the loaded glTF once). `onlyOwned` leaves shared resources.
     disposeObject3D(root, shared ? { onlyOwned: true } : {});

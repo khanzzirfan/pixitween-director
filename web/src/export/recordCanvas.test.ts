@@ -5,7 +5,7 @@ import type { ExportError } from './types';
 type Track = { kind: string; stop: ReturnType<typeof vi.fn> };
 const track = (kind: string): Track => ({ kind, stop: vi.fn() });
 
-function setup(o: { times?: number[]; audio?: boolean; fireError?: string; onGetTime?: (n: number) => void; clock?: () => number } = {}) {
+function setup(o: { times?: number[]; audio?: boolean; fireError?: string; noStart?: boolean; onGetTime?: (n: number) => void; clock?: () => number } = {}) {
   const events: string[] = [];
   const times = o.times ?? [0, 0.5, 1, 1.5, 1.94];
   let reads = 0;
@@ -42,7 +42,7 @@ function setup(o: { times?: number[]; audio?: boolean; fireError?: string; onGet
       events.push('recorder.start');
       this.ondataavailable?.({ data: new Blob(['aaaa']) });
       this.ondataavailable?.({ data: new Blob(['bb']) });
-      this.onstart?.();
+      if (!o.noStart) this.onstart?.();
       if (o.fireError) this.onerror?.({ error: { message: o.fireError } });
     }
   }
@@ -103,6 +103,20 @@ describe('recording', () => {
 });
 
 describe('guards', () => {
+  it('fails instead of hanging when the recorder never starts', async () => {
+    vi.useFakeTimers();
+    try {
+      const s = setup({ noStart: true });
+      const p = recordCanvas(s.opts, s.deps).catch((e) => e);
+      await vi.advanceTimersByTimeAsync(9000);
+      const err = (await p) as ExportError;
+      expect(err.code).toBe('recorder-error');
+      expect(err.message).toMatch(/did not start/);
+      expect(s.recorders[0]!.stop).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('rejects when the tab is hidden and removes the listener', async () => {
     const add = vi.spyOn(document, 'addEventListener');
     const remove = vi.spyOn(document, 'removeEventListener');

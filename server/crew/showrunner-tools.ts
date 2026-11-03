@@ -204,8 +204,10 @@ export async function finishGate(crew: CrewCtx, ctx: ToolCtx): Promise<FinishGat
 }
 
 /** Makes the film ready when the gate passes; the accepted findings are listed in the note. */
-export async function finishFilm(crew: CrewCtx, ctx: ToolCtx, summary: string): Promise<ToolResult> {
-  const gate = await finishGate(crew, ctx);
+export async function finishFilm(crew: CrewCtx, ctx: ToolCtx, summary: string, o: { force?: boolean } = {}): Promise<ToolResult> {
+  let gate = await finishGate(crew, ctx);
+  // out of time: what is built ships, and what the gate would still block is listed as accepted (a film with nothing built still fails)
+  if (!gate.pass && o.force && !gate.block.some((b) => b.startsWith('nothing is built'))) gate = { pass: true, block: [], accepted: [...gate.accepted, ...gate.block.map((b) => `${b} (out of time)`)] };
   if (!gate.pass) return fail(gate.block.join(', '));
   // a round product gets the cinematic cut (real camera, ingredient splashes, animated price card); anything else keeps the 2D finish
   const cinematic = process.env.CINEMATIC_CUT === '0' ? false : await cinematicCut(ctx, (line) => crew.emit({ type: 'showrunner.say', kind: 'note', text: line })).catch(() => false);

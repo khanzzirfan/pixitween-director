@@ -57,7 +57,7 @@ describe('preset names', () => {
   });
 
   it('exposes one effect type list with a scope per type', () => {
-    expect(EFFECT_TYPES).toHaveLength(19);
+    expect(EFFECT_TYPES).toHaveLength(21);
     expect(EFFECT_SCOPES.dof).toBe('three');
     expect(EFFECT_SCOPES.glow).toBe('2d');
     expect(EFFECT_SCOPES.bloom).toBe('any');

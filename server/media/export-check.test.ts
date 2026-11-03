@@ -23,6 +23,12 @@ describe('frozenPairs', () => {
     const out = frozenPairs([gray(0), gray(200), gray(200), gray(0)], [0, 1, 2, 3]);
     expect(out).toEqual(['frozen: frames at 1.00 s and 2.00 s are identical']);
   });
+  it('does not report a still end card after a film that moved', () => {
+    expect(frozenPairs([gray(0), gray(200), gray(100), gray(100), gray(100)], [0, 1, 2, 3, 4])).toEqual([]);
+  });
+  it('still reports a film that is frozen from the start', () => {
+    expect(frozenPairs([gray(50), gray(50), gray(50)], [0, 1, 2])).toHaveLength(2);
+  });
 });
 
 describe('checkExport', () => {

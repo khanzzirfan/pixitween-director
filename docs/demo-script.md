@@ -17,7 +17,7 @@ A three-minute screen recording: one product CSV becomes a wall of checked, edit
 
 **0:00** Every product in a store needs a video ad. Almost none have one, because a freelancer charges per video and every price change means another invoice.
 
-**0:15** Shelfreel is a crew of Muse agents. I drop in one photo and say the brief. Muse Voice Transcribe hears me, Muse Wonder writes the storyboard, and Muse Spark builders work on four scenes at once. I ask for a sunset scene while they work, and only that scene is built.
+**0:15** MuseReels is a crew of Muse agents. I drop in one photo and say the brief. Muse Voice Transcribe hears me, Muse Wonder writes the storyboard, and Muse Spark builders work on four scenes at once. I ask for a sunset scene while they work, and only that scene is built.
 
 **0:55** Now the whole catalog. I drop in a product CSV and its photos. SAM 3.1 cuts each product out once. Muse Image paints one set per look, a tabletop, a pedestal, a room, and a vision read of each set finds the surface, so every product stands on the table instead of floating in front of the wall. Then every product gets its own ad: its name, its price badge, its brand, straight from the feed, so the price is never invented.
 
@@ -25,7 +25,7 @@ A three-minute screen recording: one product CSV becomes a wall of checked, edit
 
 **2:10** And because it is layers, not a video file, a price change is an edit. I change twenty-four dollars to nineteen. Only that clip is rebuilt, in about a second, and the cost counter does not move.
 
-**2:30** A catalog of products in minutes, for cents per product, every ad checked. Shelfreel: your whole catalog, as ads.
+**2:30** A catalog of products in minutes, for cents per product, every ad checked. MuseReels: your whole catalog, as ads.
 
 ## Shot list
 

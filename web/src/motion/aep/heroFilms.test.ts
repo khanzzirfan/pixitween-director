@@ -5,6 +5,7 @@ import { buildCinematicFilm } from '../../../../server/authoring/cinematic-film'
 import { floorCatalogBoard } from '../../../../server/authoring/catalog-board';
 import type { AepCompositionJson } from '@shared/aep';
 import { aepToMotion } from './index';
+import { THREE_TWEENS_MAX } from '@engine/schema';
 
 // The catalog hero films (server/authoring/board-clip.ts) cut by keeping each shot's layers inside the shot's own frames; the player
 // times keys from a layer's in-point, so a key outside the shot breaks the film. Every floor board, in every aspect, must convert.
@@ -108,7 +109,7 @@ describe('a film with every camera move keeps the world within the engine limits
       const out = aepToMotion(comp as unknown as AepCompositionJson);
       expect(out.warnings.filter((w) => /exceed|dropped/.test(w))).toEqual([]);
       const world = walk(out.doc)[0];
-      expect(world.tweens.length).toBeLessThanOrEqual(64);
+      expect(world.tweens.length).toBeLessThanOrEqual(THREE_TWEENS_MAX);
     });
 });
 

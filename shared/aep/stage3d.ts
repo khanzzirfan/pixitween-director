@@ -81,11 +81,15 @@ export function refineProp3DLayer(
     if (prop.attach) issue(`prop3d '${prop.id}' swarm cannot be attached`, ["swarm"]);
     if (isCard) issue(`prop3d '${prop.id}' card swarms are not supported`, ["swarm"]);
     if (prop.role === "product") issue(`prop3d '${prop.id}' product cannot be a swarm`, ["swarm"]);
+    if (prop.source.type === "liquid") issue(`prop3d '${prop.id}' a liquid is one surface, not a swarm`, ["swarm"]);
+    if (prop.source.type === "smoke") issue(`prop3d '${prop.id}' smoke makes its own puffs, it is not a swarm`, ["swarm"]);
     if (swarm.motion === "orbit" && !swarm.orbit) {
       issue(`prop3d '${prop.id}' orbit swarm needs swarm.orbit`, ["swarm", "orbit"]);
     }
   }
 
+  if (prop.source.type === "smoke" && prop.role === "product") issue(`prop3d '${prop.id}' the product cannot be smoke`, ["source"]);
+  if (prop.source.type === "liquid" && prop.role === "product") issue(`prop3d '${prop.id}' the product cannot be a liquid`, ["source"]);
   if (prop.source.type === "primitive" && prop.source.round !== undefined && prop.source.shape !== "box") {
     issue(`prop3d '${prop.id}' round is only valid for a box`, ["source", "round"]);
   }
@@ -112,10 +116,16 @@ export function usesCinematicFields(
     if (keyed(layer.camera.fov)) return "camera.fov keyframes";
     if (layer.set?.ground === "none") return "set.ground \"none\"";
     if (layer.set?.wall === false) return "set.wall false";
+    if (layer.set?.reflection) return "set.reflection";
+    if (layer.set?.caustics) return "set.caustics";
+    if (layer.post) return "stage3d post";
+    if (layer.shotTransitions?.length) return "stage3d shotTransitions";
     return null;
   }
   if (layer.kind === "prop3d") {
     if (layer.source.type === "card") return "prop3d card source";
+    if (layer.source.type === "liquid") return "prop3d liquid source";
+    if (layer.source.type === "smoke") return "prop3d smoke source";
     if (layer.source.type === "primitive" && layer.source.round !== undefined) return "prop3d source.round";
     if (layer.material) return "prop3d material";
     if (layer.swarm) return "prop3d swarm";

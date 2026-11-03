@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ColorSchema, IdSchema, SecondsSchema, Vec3Schema } from './scalars';
 import { LayerBaseShape } from './layers2d';
+import { EffectSchema, TweenSchema } from './parts';
 import { ShotSpecSchema } from './shot';
 
 // The shot vocabulary lives in its own leaf module (it is what an author writes); it is re-exported
@@ -26,13 +27,14 @@ export type LightingPreset = (typeof LIGHTING_PRESETS)[number];
 
 export const LightingPresetSchema = z.enum(LIGHTING_PRESETS);
 
-export const LIGHTING_ENVIRONMENTS = ['room', 'none'] as const;
+// What the shiny things reflect: the three.js room, or one of the engine's own studios (softbox strips, a ring light, a low sunset), or nothing.
+export const LIGHTING_ENVIRONMENTS = ['room', 'softbox', 'ring', 'sunset', 'none'] as const;
 
 export type LightingEnvironment = (typeof LIGHTING_ENVIRONMENTS)[number];
 
 export const LightingEnvironmentSchema = z.enum(LIGHTING_ENVIRONMENTS);
 
-export const GEOMETRY_3D_TYPES = ['box', 'sphere', 'cylinder', 'torus', 'plane', 'gltf', 'text3d', 'extrude', 'lathe'] as const;
+export const GEOMETRY_3D_TYPES = ['box', 'sphere', 'cylinder', 'torus', 'plane', 'gltf', 'text3d', 'extrude', 'lathe', 'liquid', 'mirror', 'smoke', 'caustics'] as const;
 
 export type Geometry3DType = (typeof GEOMETRY_3D_TYPES)[number];
 
@@ -98,6 +100,11 @@ export const ExtrudeGeometrySchema = z
     bevel: z.number().min(0).optional(),
     /** Colour of the extruded sides; the front and back caps take the material (and its map). */
     sideColor: ColorSchema.optional(),
+    /**
+     * Builds a solid body instead of a slab: every row of the outline is swept round into a cross-section (an ellipse at 2, boxier above, up to a near-rectangle),
+     * as deep as `depth` is to the widest row, so the product has a back and sides and can turn all the way round. The photo wraps the front and, read the right way, the back.
+     */
+    section: z.number().min(1).max(6).optional(),
   })
   .strict();
 
@@ -114,6 +121,61 @@ export const LatheGeometrySchema = z
   })
   .strict();
 
+export const LIQUID_GEOMETRY_FORMS = ['crown', 'pour', 'blobs', 'vortex'] as const;
+
+// A moving liquid (metaballs that flow together and apart): a crown splash, a pouring stream or floating
+// blobs, timed to `duration` seconds from the object's start. It changes shape every frame, so it is not
+// fitted: `size` is the edge of the box it plays in, standing on the object's origin. Its look is the
+// object's material (a glossy physical surface; transmission for a clear liquid).
+export const LiquidGeometrySchema = z
+  .object({
+    type: z.literal('liquid'),
+    form: z.enum(LIQUID_GEOMETRY_FORMS),
+    size: z.number().positive(),
+    duration: z.number().positive(),
+    seed: z.number().int().optional(),
+    resolution: z.number().int().min(24).max(64).optional(),
+  })
+  .strict();
+
+// A glossy floor: the scene reflected in a plane, soft and fading away from the middle (where the product stands). Laid flat by the
+// object's rotation like a plane ([-90, 0, 0]), a hair above the floor it shines on.
+export const MirrorGeometrySchema = z
+  .object({
+    type: z.literal('mirror'),
+    size: z.tuple([z.number().positive(), z.number().positive()]),
+    strength: z.number().min(0).max(1),
+    fade: z.number().positive().max(10),
+    blur: z.number().min(0).max(1).optional(),
+  })
+  .strict();
+
+// Caustics: the rippling net of light a glass of liquid throws on the floor, added over the floor, strongest round the middle and gone
+// at `fade` metres, tinted by the material's colour. Laid flat by the object's rotation like a plane ([-90, 0, 0]).
+export const CausticsGeometrySchema = z
+  .object({
+    type: z.literal('caustics'),
+    size: z.tuple([z.number().positive(), z.number().positive()]),
+    strength: z.number().min(0).max(1),
+    fade: z.number().positive().max(10),
+    scale: z.number().positive().max(200),
+  })
+  .strict();
+
+export const SMOKE_GEOMETRY_FORMS = ['steam', 'cloud', 'powder'] as const;
+
+// Soft vapour, timed to `duration` seconds from the object's start: steam rising, a cloud of smoke that wraps and clears, or a burst of fine
+// powder. Puffs that face the camera, tinted by the material's colour; like a liquid it is never fitted: `size` is the edge of its box.
+export const SmokeGeometrySchema = z
+  .object({
+    type: z.literal('smoke'),
+    form: z.enum(SMOKE_GEOMETRY_FORMS),
+    size: z.number().positive(),
+    duration: z.number().positive(),
+    seed: z.number().int().optional(),
+  })
+  .strict();
+
 export const Geometry3DSchema = z.discriminatedUnion('type', [
   BoxGeometrySchema,
   SphereGeometrySchema,
@@ -124,6 +186,10 @@ export const Geometry3DSchema = z.discriminatedUnion('type', [
   Text3DGeometrySchema,
   ExtrudeGeometrySchema,
   LatheGeometrySchema,
+  LiquidGeometrySchema,
+  MirrorGeometrySchema,
+  SmokeGeometrySchema,
+  CausticsGeometrySchema,
 ]);
 
 export type Geometry3D = z.output<typeof Geometry3DSchema>;
@@ -146,6 +212,8 @@ export const MaterialSchema = z
     transmission: z.number().min(0).max(1).optional(),
     ior: z.number().min(1).max(2.333).optional(),
     thickness: z.number().min(0).optional(),
+    /** Beads of water on the surface (a cold can), 0 dry to 1 soaked. Needs a lit material. */
+    condensation: z.number().min(0).max(1).optional(),
   })
   .strict();
 
@@ -250,6 +318,9 @@ export const Light3DSchema = z
     position: Vec3Schema.default([3, 5, 4]),
     target: Vec3Schema.default([0, 0, 0]),
     castShadow: z.boolean().default(false),
+    /** Spot lights only: the cone's half-angle in degrees, and how soft its edge is (0 hard, 1 fully soft). */
+    angle: z.number().min(1).max(89).optional(),
+    penumbra: z.number().min(0).max(1).optional(),
   })
   .strict()
   .refine((light) => !isPresetLightId(light.id), {
@@ -318,6 +389,7 @@ export const Lighting3DSchema = z
     keyColor: ColorSchema.optional(),
     fillIntensity: z.number().min(0).optional(),
     rimIntensity: z.number().min(0).optional(),
+    rimColor: ColorSchema.optional(),
     ambient: z.number().min(0).optional(),
   })
   .strict()
@@ -340,9 +412,46 @@ export const Shadow3DSchema = z
   })
   .strict();
 
+// A shader transition between the layer's own shots (an open gl-transitions shader by name). From `at` seconds on the
+// layer's clock it plays for `duration` seconds: the old shot's last camera pose is mixed into the new shot.
+export const Transition3DSchema = z
+  .object({
+    at: z.number().min(0),
+    duration: z.number().min(0.05).max(2),
+    name: z.string().min(1).max(40),
+    params: z.record(z.string(), z.union([z.number(), z.boolean(), z.array(z.number()).min(2).max(4)])).optional(),
+  })
+  .strict();
+
+// Motion blur: while a layer is exported frame by frame, each frame inside a span is drawn `samples` times across the shutter's open time and
+// the pictures are averaged. `shutter` is the share of a frame's time the shutter stays open (0.5 is the film look). Spans are in the layer's seconds.
+export const MotionBlur3DSchema = z
+  .object({
+    samples: z.number().int().min(2).max(16).default(6),
+    spans: z.array(z.object({ from: z.number().min(0), to: z.number().positive(), shutter: z.number().min(0).max(1) }).strict()).max(16),
+  })
+  .strict();
+
+// Speed ramps: inside a span the world's own motion (liquids, smoke, swarms, life) runs on a speed curve instead of the clock (slow motion that
+// snaps back). `rates` are points of the curve: `at` the share of the span, `rate` the speed there. The span's ends keep real time. Seconds on the layer's clock.
+export const TimeWarp3DSchema = z
+  .object({
+    from: z.number().min(0),
+    to: z.number().positive(),
+    rates: z.array(z.object({ at: z.number().min(0).max(1), rate: z.number().min(0.05).max(4) }).strict()).min(1).max(6),
+  })
+  .strict();
+
+/** A three layer holds a whole film's camera, light and product moves as tweens, so it may hold more than a 2D layer's 64. */
+export const THREE_TWEENS_MAX = 192;
+/** The depth of field, the glows, the grade, the streak, the fringe, the vignette and the grain of a finished film add up to more than a 2D layer's 8 effects. */
+export const THREE_EFFECTS_MAX = 12;
+
 export const ThreeLayerSchema = z
   .object({
     ...LayerBaseShape,
+    tweens: z.array(TweenSchema).max(THREE_TWEENS_MAX).default([]),
+    effects: z.array(EffectSchema).max(THREE_EFFECTS_MAX).default([]),
     type: z.literal('three'),
     width: z.number().int().min(16).max(2048),
     height: z.number().int().min(16).max(2048),
@@ -354,9 +463,16 @@ export const ThreeLayerSchema = z
     objects: z.array(Object3DSchema).min(1).max(50),
     /** Tone-mapping exposure (ACES input scale). */
     exposure: z.number().positive().max(4).default(1),
+    /** Shader transitions at the cuts between the layer's shots (a camera path with cuts). */
+    transitions: z.array(Transition3DSchema).max(8).optional(),
+    /** Motion blur for frame-by-frame export. */
+    motionBlur: MotionBlur3DSchema.optional(),
+    /** Speed ramps for the world's own motion. */
+    timeWarp: z.array(TimeWarp3DSchema).max(8).optional(),
   })
   .strict();
 
+export type Transition3D = z.output<typeof Transition3DSchema>;
 export type Light3D = z.output<typeof Light3DSchema>;
 export type Material = z.output<typeof MaterialSchema>;
 

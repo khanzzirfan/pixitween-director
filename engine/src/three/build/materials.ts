@@ -1,6 +1,7 @@
 // Ported from reacthub-pixitweenjs src/components/AepComposition/model3d/threeUtils.ts (MIT).
 import * as THREE from 'three';
 import { type Material } from '../../schema/layer3d';
+import { wet } from './condensation';
 
 // Standard material, or physical when the spec asks for clearcoat or transmission (the cheaper
 // standard material keeps plain scenes building quickly).
@@ -39,6 +40,7 @@ export function makeMaterial(spec: Material, textures: ReadonlyMap<string, THREE
   }
   if (spec.opacity < 1) material.depthWrite = false;
   material.shadowSide = THREE.FrontSide;
+  if (spec.condensation) wet(material, spec.condensation);
   return material;
 }
 

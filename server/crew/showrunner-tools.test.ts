@@ -5,6 +5,7 @@ import type { ToolDef, ToolResult } from '@shared/tools';
 import { addLayer, setTransform } from '../authoring/api';
 import { readDirector, sceneIds } from '../authoring/meta';
 import type { Comp } from '../authoring/types';
+import { autoFinish } from './showrunner';
 import { createBoardTools, withoutGenerate } from './showrunner-tools';
 import { makeTestCrew } from './test-helpers';
 
@@ -235,6 +236,17 @@ describe('say, ask, finish', () => {
     expect(r.ok).toBe(false);
     expect(!r.ok && r.error).toContain('text-off-frame');
     expect((await t.film.films.get(t.film.filmId)).status).not.toBe('ready');
+  });
+
+  it('out of time, autoFinish ships what is built and lists what the gate would still block', async () => {
+    const t = await setup();
+    await t.run('reviseStoryboard', { ops: add(2) });
+    t.crew.extraChecks = async () => [{ kind: 'text-off-frame', sceneId: 's2' }];
+    expect(await autoFinish(t.crew)).toBe(false);
+    expect(await autoFinish(t.crew, { force: true })).toBe(true);
+    expect((await t.film.films.get(t.film.filmId)).status).toBe('ready');
+    await settle();
+    expect(t.events.find((e) => e.type === 'showrunner.say')).toMatchObject({ text: expect.stringContaining('text-off-frame (s2) (out of time)') });
   });
 
   it('finish waits for a safe-area finding until the fix cap is spent, then accepts it', async () => {

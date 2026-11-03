@@ -8,12 +8,13 @@ describe('floor library', () => {
   it('gives a coffee drink beans, ice, a splash and milk, led by the coffee group', () => {
     expect(ingredientsFor('Coffee Co. Cold Brew', 'drinks')).toEqual(['bean', 'ice', 'splash', 'milk']);
     expect(floorElements('Coffee Co. Mocha Cold Brew').map((e) => e.id)).toEqual(['bean', 'ice', 'splash', 'milk', 'cocoa']);
-    expect(ingredientsFor('Stone Mug', 'home')).toEqual(['ice', 'splash']);
+    expect(ingredientsFor('Stone Mug', 'home')).toEqual(['spark', 'dust']);
+    expect(ingredientsFor('Clear Water Swim Goggles', 'swim summer')).toEqual(['water', 'sand', 'shell']);
   });
   it('has prompts that pass the lint, keep text out and ask for a plain backdrop', () => {
     for (const e of Object.values(FLOOR)) {
       const p = elementPrompt(e);
-      if (e.glass) {
+      if (e.glass || e.use === 'liquid' || e.use === 'vapour') {
         expect(p).toBeNull();
         continue;
       }
@@ -23,8 +24,10 @@ describe('floor library', () => {
     }
   });
   it('asks for a row of stages on a wide picture for a flipbook and one centred piece otherwise', () => {
-    expect(elementPrompt(FLOOR.splash!)).toMatchObject({ size: '1536x1024' });
-    expect(elementPrompt(FLOOR.splash!)!.prompt).toMatch(/4 stages of .* in one horizontal row from left to right/);
+    expect(elementPrompt(FLOOR.spark!)).toMatchObject({ size: '1536x1024' });
+    expect(elementPrompt(FLOOR.spark!)!.prompt).toMatch(/3 stages of .* in one horizontal row from left to right/);
+    // a liquid is drawn by the engine, so it has no picture
+    expect(elementPrompt(FLOOR.splash!)).toBeNull();
     expect(elementPrompt(FLOOR.bean!)).toMatchObject({ size: '1024x1024' });
     expect(elementPrompt(FLOOR.bean!)!.prompt).toMatch(/^One roasted coffee bean, glossy .*, centred on a plain white studio backdrop/);
   });
@@ -50,11 +53,33 @@ describe('sanitizeElements', () => {
   });
 });
 
+describe('liquids', () => {
+  it('a liquid needs its colour, keeps whether it is clear, and plays in a 20-42 cm box', () => {
+    const r = sanitizeElements([
+      { id: 'cold-brew', name: 'cold brew', use: 'liquid', color: '#3B2314', look: 'glossy dark cold brew coffee', pieces: 3, sizeM: 0.9 },
+      { id: 'perfume', name: 'perfume', use: 'liquid', color: '#f4d58d', clear: true, look: 'clear golden perfume', pieces: 1, sizeM: 0.3 },
+      { id: 'juice', name: 'juice', use: 'liquid', look: 'fresh orange juice', pieces: 1, sizeM: 0.3 },
+      { id: 'bean', name: 'bean', use: 'solid', color: '#000000', look: 'a roasted coffee bean', pieces: 1, sizeM: 0.02 },
+    ]);
+    expect(r.elements[0]).toMatchObject({ use: 'liquid', color: '#3b2314', pieces: 1, sizeM: 0.42 });
+    expect(r.elements[1]).toMatchObject({ clear: true });
+    expect(r.elements.find((e) => e.id === 'bean')?.color).toBeUndefined();
+    expect(r.dropped).toEqual(['juice: a liquid needs its colour (#rrggbb)']);
+  });
+  it('a liquid costs nothing to draw and the engine makes it, with no picture', async () => {
+    const image = vi.fn();
+    const a = await makeElement({} as never, FLOOR.water!, { image });
+    expect(a).toMatchObject({ use: 'liquid', procedural: 'liquid', clear: true, frames: [] });
+    expect(image).not.toHaveBeenCalled();
+    expect(elementKey(FLOOR.splash!)).not.toBe(elementKey({ ...FLOOR.splash!, color: '#ffffff' }));
+  });
+});
+
 describe('costs and keys', () => {
   it('a picture costs a Muse image and a SAM call; glass and made elements cost nothing', () => {
     const els = floorElements('Coffee Co. Cold Brew', 'drinks');
-    expect(elementCostUsd(els)).toBeCloseTo(3 * 0.0125, 4); // bean, splash, milk; ice is glass
-    expect(elementCostUsd(els, new Set([elementKey(FLOOR.splash!), elementKey(FLOOR.milk!)]))).toBeCloseTo(0.0125, 4);
+    expect(elementCostUsd(els)).toBeCloseTo(0.0125, 4); // the bean; ice is glass, splash and milk are liquids
+    expect(elementCostUsd(els, new Set([elementKey(FLOOR.bean!)]))).toBe(0);
   });
   it('the key changes when the description changes', () => {
     expect(elementKey(FLOOR.bean!)).not.toBe(elementKey({ ...FLOOR.bean!, look: 'a green coffee bean, matte' }));
@@ -84,7 +109,7 @@ describe('makeElement', () => {
     const image = vi.fn(async () => sharp({ create: { width: 64, height: 64, channels: 3, background: '#ffffff' } }).png().toBuffer());
     const segmentImage = vi.fn(async () => []);
     const ctx = { filmId: 'f', ledger: { add: vi.fn() }, emit: vi.fn(), meta: { sam: { segmentImage } }, assets: {} } as unknown as ToolCtx;
-    await expect(makeElement(ctx, { ...FLOOR.splash!, name: 'cold brew splash' }, { image })).rejects.toThrow(/no cold brew splash found in the sheet \(tried "cold brew splash", "splash" and a white key\)/);
+    await expect(makeElement(ctx, { ...FLOOR.spark!, name: 'cold brew splash' }, { image })).rejects.toThrow(/no cold brew splash found in the sheet \(tried "cold brew splash", "splash" and a white key\)/);
     expect(image).toHaveBeenCalledTimes(1);
     expect(segmentImage.mock.calls.map((c) => (c as unknown[])[1])).toEqual(['cold brew splash', 'splash']);
   });
@@ -98,7 +123,7 @@ describe('makeElement', () => {
     let n = 0;
     const assets = { put: vi.fn(async () => ({ id: `ast_${++n}` })) };
     const ctx = { filmId: 'f', ledger: { add: vi.fn() }, emit: vi.fn(), meta: { sam: { segmentImage } }, assets } as unknown as ToolCtx;
-    const a = await makeElement(ctx, { ...FLOOR.splash!, name: 'cold brew splash', pieces: 1 }, { image: async () => png });
+    const a = await makeElement(ctx, { ...FLOOR.spark!, name: 'cold brew splash', pieces: 1 }, { image: async () => png });
     expect(segmentImage).toHaveBeenCalledTimes(2);
     expect(a.frames).toHaveLength(1);
   });

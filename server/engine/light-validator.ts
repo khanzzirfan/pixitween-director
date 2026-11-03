@@ -124,10 +124,26 @@ function validateComp(c: unknown, path: string, issues: CompositionIssue[]): voi
       if (!cinematic && cam && (Array.isArray(cam.fov) || (isObj(l.set) && (l.set.ground === 'none' || l.set.wall === false)))) {
         issues.push({ path: `${lp}.camera`, message: `an animated fov, ground "none" and wall false require schema >= 1.12.0 (got ${String(version)})` });
       }
+      if (isObj(l.set) && l.set.reflection !== undefined) {
+        if (!cinematic) issues.push({ path: `${lp}.set.reflection`, message: `set.reflection needs schema >= 1.12.0 (got ${String(version)})` });
+        if (l.set.ground === 'none') issues.push({ path: `${lp}.set.reflection`, message: 'set.reflection needs a ground to shine on (ground is none)' });
+      }
+      if (isObj(l.set) && l.set.caustics !== undefined) {
+        if (!cinematic) issues.push({ path: `${lp}.set.caustics`, message: `set.caustics needs schema >= 1.12.0 (got ${String(version)})` });
+        if (l.set.ground === 'none') issues.push({ path: `${lp}.set.caustics`, message: 'set.caustics needs a ground to fall on (ground is none)' });
+      }
+      if (l.shotTransitions !== undefined) {
+        if (!cinematic) issues.push({ path: `${lp}.shotTransitions`, message: `stage3d shotTransitions need schema >= 1.12.0 (got ${String(version)})` });
+        if (!Array.isArray(l.shotTransitions) || l.shotTransitions.length > 8) issues.push({ path: `${lp}.shotTransitions`, message: 'stage3d shotTransitions is a list of at most 8 transitions' });
+      }
+      if (l.post !== undefined) {
+        if (!cinematic) issues.push({ path: `${lp}.post`, message: `stage3d post needs schema >= 1.12.0 (got ${String(version)})` });
+        if (!isObj(l.post)) issues.push({ path: `${lp}.post`, message: 'stage3d post is an object: bloom, vignette, grain, aberration, grade' });
+      }
     }
     if (l.kind === 'prop3d' && typeof version === 'string' && /^\d+\.\d+\.\d+$/.test(version) && !versionAtLeast(version, CINEMATIC_MIN_VERSION)) {
       const src = isObj(l.source) ? l.source : undefined;
-      if (l.swarm !== undefined || l.material !== undefined || src?.type === 'card' || src?.round !== undefined) issues.push({ path: lp, message: `prop3d swarm, material, card and source.round need schema >= 1.12.0 (got ${version})` });
+      if (l.swarm !== undefined || l.material !== undefined || src?.type === 'card' || src?.type === 'liquid' || src?.type === 'smoke' || src?.round !== undefined) issues.push({ path: lp, message: `prop3d swarm, material, card, liquid, smoke and source.round need schema >= 1.12.0 (got ${version})` });
     }
     if (l.kind === 'prop3d' && isObj(l.source) && l.source.round !== undefined) {
       const round = l.source.round;
@@ -139,6 +155,14 @@ function validateComp(c: unknown, path: string, issues: CompositionIssue[]): voi
       const front = isObj(l.textures) ? l.textures.front : undefined;
       if (!frames.length && typeof front !== 'string') issues.push({ path: `${lp}.source`, message: `card '${String(l.id)}' needs textures.front or source.frames` });
       for (const f of [...frames, ...(typeof front === 'string' ? [front] : [])]) if (typeof f !== 'string' || !(f in assets)) issues.push({ path: `${lp}.source`, message: `card '${String(l.id)}' references unknown assetId '${String(f)}' in this composition's assets` });
+    }
+    if (l.kind === 'prop3d' && isObj(l.source) && l.source.type === 'smoke') {
+      if (!['steam', 'cloud', 'powder'].includes(String(l.source.form))) issues.push({ path: `${lp}.source.form`, message: `smoke '${String(l.id)}' form is steam, cloud or powder` });
+      if (l.swarm !== undefined) issues.push({ path: `${lp}.swarm`, message: `smoke '${String(l.id)}' makes its own puffs, it is not a swarm` });
+    }
+    if (l.kind === 'prop3d' && isObj(l.source) && l.source.type === 'liquid') {
+      if (!['crown', 'pour', 'blobs', 'vortex'].includes(String(l.source.form))) issues.push({ path: `${lp}.source.form`, message: `liquid '${String(l.id)}' form is crown, pour, blobs or vortex` });
+      if (l.swarm !== undefined) issues.push({ path: `${lp}.swarm`, message: `liquid '${String(l.id)}' is one surface, not a swarm` });
     }
     if (l.kind === 'prop3d' && isObj(l.swarm) && (!Number.isInteger(l.swarm.count) || (l.swarm.count as number) < 1 || (l.swarm.count as number) > CINEMATIC_LIMITS.perSwarm)) {
       issues.push({ path: `${lp}.swarm.count`, message: `a swarm holds 1 to ${CINEMATIC_LIMITS.perSwarm} copies` });

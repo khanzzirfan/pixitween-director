@@ -30,7 +30,7 @@ const OBJECT_PROPS = [
   'position.x', 'position.y', 'position.z', 'rotation.x', 'rotation.y', 'rotation.z', 'scale', 'scale.x', 'scale.y', 'scale.z',
   'material.color', 'material.emissive', 'material.emissiveIntensity', 'material.roughness', 'material.metalness', 'material.opacity',
 ];
-const LIGHT_PROPS = ['intensity', 'color', 'position.x', 'position.y', 'position.z'];
+const LIGHT_PROPS = ['intensity', 'color', 'position.x', 'position.y', 'position.z', 'target.x', 'target.y', 'target.z', 'angle'];
 
 function distance(a: string, b: string): number {
   const row = Array.from({ length: b.length + 1 }, (_, i) => i);
