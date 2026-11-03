@@ -49,6 +49,11 @@ export function readUserKey(headers: Headers): string | undefined {
  * When a code is configured and they sent neither, the request is refused.
  */
 export function resolveAccess(headers: Headers, env: Env): { ok: true; access: Access } | { ok: false } {
+  // LOCALHOST_RUN: the owner is on their own machine, so no code or visitor key is needed. A key the page sends still wins.
+  if (env.LOCALHOST_RUN) {
+    const own = readUserKey(headers);
+    return { ok: true, access: own ? { source: 'user', key: own } : { source: 'server', key: env.metaApiKey } };
+  }
   if (codeMatches(headers, env.DIRECTOR_PASSCODE)) return { ok: true, access: { source: 'code', key: env.metaApiKey } };
   const own = readUserKey(headers);
   if (own) return { ok: true, access: { source: 'user', key: own } };

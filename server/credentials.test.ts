@@ -27,6 +27,11 @@ it('a visitor key is used when the code is missing or wrong', () => {
   expect(wrong).toEqual({ ok: true, access: { source: 'user', key: 'visitor-key-123' } });
 });
 
+it('LOCALHOST_RUN lets a request through with no code and no key, even when a code is set', () => {
+  const resolved = resolveAccess(new Headers(), env({ LOCALHOST_RUN: 'true', DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' }));
+  expect(resolved).toEqual({ ok: true, access: { source: 'server', key: 'server-key-123' } });
+});
+
 it('refuses a deployed request that has neither a code nor a key', () => {
   expect(resolveAccess(new Headers(), env({ DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' })).ok).toBe(false);
   expect(resolveAccess(new Headers({ [MUSE_KEY_HEADER]: 'short' }), env({ DIRECTOR_PASSCODE: 'studio-code' })).ok).toBe(false);
