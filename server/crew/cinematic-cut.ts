@@ -5,7 +5,8 @@ import { ASPECT_SIZES } from '@shared/composition';
 import type { ToolCtx } from '@shared/tools';
 import { cutout } from '../art/cutout';
 import { dominantAccent } from '../art/palette';
-import { planBoard, reviewBoard } from '../authoring/beatsheet';
+import { planBoard, reviewBoard, type CinematicBoard } from '../authoring/beatsheet';
+import { renderKeyFrames, reviewEnabled, reviewFrames } from './frame-review';
 import { prepareRound } from '../authoring/catalog-clip';
 import { buildCinematicFilm, type CinematicInput } from '../authoring/cinematic-film';
 import { elementKey, makeElement, type IngredientAsset } from '../authoring/ingredients';
@@ -239,7 +240,7 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
   const flat = prep.shape === 'other';
 
   const t = prep.texture;
-  const comp = buildCinematicFilm({
+  const build = (board: CinematicBoard) => buildCinematicFilm({
     aspect: film.aspect,
     sheet: board.sheet,
     ...(board.tone ? { tone: board.tone } : {}),
@@ -256,6 +257,9 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     ...(board.endCard ? { endCard: board.endCard } : {}),
     ...(board.light ? { light: board.light } : {}),
     ...(board.blur !== undefined ? { blur: board.blur } : {}),
+    ...(board.grade ? { grade: board.grade } : {}),
+    ...(board.bokeh !== undefined ? { bokeh: board.bokeh } : {}),
+    ...(board.aperture !== undefined ? { aperture: board.aperture } : {}),
     ...(bed ? { music: { id: bed.id, src: bed.url } } : {}),
     title,
     ...(prices ? { price: prices.price, ...(prices.was !== undefined ? { wasPrice: prices.was } : {}) } : {}),
@@ -263,6 +267,14 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     accent: parts.accent,
     ingredients: parts.ingredients,
   });
+  let comp = build(board);
+  if (reviewEnabled()) {
+    // Muse looks at six frames of what it wrote and may revise the board once; the pictures it needs are already made
+    const photoRef = film.assets.find((a) => a.role === 'product-photo');
+    const photo = photoRef ? await ctx.assets.read(photoRef.id).catch(() => undefined) : undefined;
+    const seen = await reviewFrames(ctx, { board, title, brief: film.brief.text, ...(photo ? { photo } : {}), flat, render: (times) => renderKeyFrames(comp, times), log });
+    if (seen.revised) comp = build(seen.board);
+  }
   const r = await ctx.films.commit(ctx.filmId, comp, 'director', 'cinematic cut: camera moves, element splashes, animated price card');
   return r.ok;
 }

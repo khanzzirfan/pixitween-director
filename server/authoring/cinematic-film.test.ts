@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
 import { checkBeatSheet, defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
-import { ELEVATION, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, finishPost, shaderCuts, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
+import { ELEVATION, rampKeysFor, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, finishPost, shaderCuts, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
 import { CAMERA, LIGHT, MATERIALS } from './cinematic-rules';
 import { SPACE_EM } from './text-width';
 import { FLOOR, floorElements, glassAsset, liquidAsset, vapourAsset, type IngredientAsset } from './ingredients';
@@ -359,6 +359,56 @@ describe('buildCinematicFilm', () => {
   it('fits other aspects and throws on an empty sheet', () => {
     for (const aspect of ['16:9', '1:1'] as const) expect(() => buildCinematicFilm(input({ aspect }))).not.toThrow();
     expect(() => buildCinematicFilm(input({ sheet: { beats: [] } }))).toThrow(/at least one beat/);
+  });
+});
+
+describe('speed ramps', () => {
+  it('gets fewer keys as the tween budget fills, and none when fewer than two fit', () => {
+    expect(rampKeysFor(0, 0, 10)).toBe(0);
+    expect(rampKeysFor(1, 0, 10)).toBe(CAMERA.rampKeys);
+    const B = CAMERA.tweenBudget;
+    expect(rampKeysFor(6, 6, B - 30)).toBeLessThan(CAMERA.rampKeys);
+    expect(rampKeysFor(6, 6, B - 5)).toBe(0);
+  });
+  const SLOW = [{ at: 0, rate: 1 }, { at: 0.3, rate: 0.2 }, { at: 0.7, rate: 0.2 }, { at: 1, rate: 1 }];
+  const ramped = (extra: object = {}): BeatSheet => ({ beats: sheet.beats.map((b, n) => (n === 1 ? { ...b, seconds: 2, ramp: SLOW, ...extra } : b)) });
+  it('a ramped shot is sampled along its curve and still starts and ends where it did', () => {
+    const plain = planCamera(ramped({ ramp: undefined }), 30);
+    const plan = shakeCamera(planCamera(ramped(), 30), 0);
+    const f = plan.beats[1]!;
+    const ks = plan.position.filter((k) => k.t >= f.start && k.t <= f.end);
+    expect(ks).toHaveLength(CAMERA.rampKeys + 2);
+    expect(ks[0]!.v).toEqual(plain.position.find((k) => k.t === f.start)!.v);
+    expect(ks.at(-1)!.v).toEqual(plain.position.find((k) => k.t === f.end)!.v);
+    // the middle of the shot is slow: the camera covers less ground there than a linear shot would
+    expect(plan.position.length).toBeGreaterThan(plain.position.length);
+  });
+  it('a shot with no ramp is left exactly as it was, and a plain film is not sampled at all', () => {
+    const plain = planCamera(sheet, 30);
+    expect(shakeCamera(plain, 0)).toBe(plain);
+  });
+  it('the world carries the ramp as a span of frames with its curve, and a film with none carries no span', () => {
+    const c = buildCinematicFilm(input({ sheet: ramped() }));
+    const f = planCamera(ramped(), 30).beats[1]!;
+    expect((world(c) as any).timeWarp).toEqual([{ startFrame: f.start, durationFrames: f.end - f.start + 1, rates: SLOW }]);
+    expect((world(buildCinematicFilm(input())) as any).timeWarp).toBeUndefined();
+    expect(lightValidate(c).ok).toBe(true);
+  });
+  it('a ramped spin is sampled along the curve and ends where the turn ends', () => {
+    const c = buildCinematicFilm(input({ sheet: ramped({ spin: { degrees: 180 }, product: undefined }) }));
+    const can = props(c).find((l) => l.role === 'product')!;
+    const ks = (can.rotation as Array<{ t: number; v: number[] }>).filter((k) => k.t >= 0);
+    expect(ks.length).toBeGreaterThan(CAMERA.rampKeys);
+    for (let n = 1; n < ks.length; n++) expect(ks[n]!.t).toBeGreaterThan(ks[n - 1]!.t);
+  });
+  it('stays inside the tween budget with ramps on every shot', () => {
+    const all: BeatSheet = { beats: sheet.beats.map((b) => ({ ...b, ramp: SLOW, spin: { degrees: 90, tilt: 10 } })) };
+    const c = buildCinematicFilm(input({ sheet: all, handheld: true }));
+    expect(lightValidate(c).ok).toBe(true);
+    const can = props(c).find((l) => l.role === 'product')!;
+    const segs = (ks: unknown): number => (Array.isArray(ks) ? Math.max(0, ks.length - 1) : 0);
+    const w = world(c) as any;
+    expect(segs(w.camera.position) + segs(can.rotation) + segs(can.position) + segs(w.camera.focus.distance)).toBeLessThanOrEqual(CAMERA.tweenBudget);
   });
 });
 
@@ -821,10 +871,11 @@ describe('cuts carry the motion', () => {
 describe('the handheld tremor', () => {
   const plan = planCamera(sheet, 30);
   it('affords up to three keys a shot, fewer as the world fills up, none when it is full', () => {
+    const B = CAMERA.tweenBudget;
     expect(shakeKeysPerShot(7, 10)).toBe(3);
-    expect(shakeKeysPerShot(7, 20)).toBe(2);
-    expect(shakeKeysPerShot(7, 25)).toBe(1);
-    expect(shakeKeysPerShot(10, 40)).toBe(0);
+    expect(shakeKeysPerShot(7, B - 45)).toBe(2);
+    expect(shakeKeysPerShot(7, B - 38)).toBe(1);
+    expect(shakeKeysPerShot(10, B - 20)).toBe(0);
     expect(shakeKeysPerShot(0, 0)).toBe(3);
   });
   it('leaves every cut and hold exactly where the plan put it, and keeps position and lens keys on the same frames', () => {
@@ -1045,5 +1096,164 @@ describe('Muse directs the product, the light and the shutter', () => {
     expect(motionBlur(even, planCamera(even, 30), 1)!.samples).toBeGreaterThan(motionBlur(even, planCamera(even, 30), 0.1)!.samples);
     const post = (world(buildCinematicFilm(input({ sheet: sh, blur: 0.5 }))) as any).post;
     expect(post.motionBlur.shots[0]).toMatchObject({ startFrame: 0, shutter: 0.9 });
+  });
+});
+
+describe('camera paths, the seeded tremor and focus pulls', () => {
+  const beat = (extra: object = {}): any => ({ size: 'medium', move: 'push', seconds: 2, angle: 'eye', phase: 'build', product: 'still', ...extra });
+  const hold = beat({ move: 'hold', phase: 'close' });
+  const via = { camera: { from: { around: -40, fill: 0.4 }, via: [{ around: 0, height: 20, fill: 0.6 }, { around: 30, height: 5, fill: 0.5 }], to: { around: 60, fill: 0.8 } } };
+  it('a camera path through waypoints is sampled, starts and ends on its own ends, and bends away from the straight line', () => {
+    const s: BeatSheet = { beats: [beat(via), hold] };
+    const straight = planCamera({ beats: [beat({ camera: via.camera && { from: via.camera.from, to: via.camera.to } }), hold] }, 30);
+    const plan = shakeCamera(planCamera(s, 30), 0);
+    const f = plan.beats[0]!;
+    expect(f.via).toHaveLength(2);
+    const ks = plan.position.filter((k) => k.t >= f.start && k.t <= f.end);
+    expect(ks).toHaveLength(2 * 2 + 2 + 2);
+    expect(ks[0]!.v).toEqual(straight.position[0]!.v);
+    expect(ks.at(-1)!.v).toEqual(straight.position[1]!.v);
+    // the height waypoint lifts the camera over the straight path at the middle
+    const top = Math.max(...ks.slice(1, -1).map((k) => k.v[1]));
+    expect(top).toBeGreaterThan(Math.max(ks[0]!.v[1], ks.at(-1)!.v[1]));
+    // the focus follows the product along the curve: one key for each camera key
+    expect(plan.focus.filter((k) => k.t >= f.start && k.t <= f.end)).toHaveLength(ks.length);
+  });
+  it('a film with no waypoints keeps its focus keys, and a pulled focus runs from one target to another', () => {
+    const plain = planCamera({ beats: [beat(), hold] }, 30);
+    expect(shakeCamera(plain, 2).focus).toBe(plain.focus);
+    const pulled = planCamera({ beats: [beat({ camera: { focus: { from: 'far', to: 'product', aperture: 0.9 } } }), hold] }, 30);
+    const f = pulled.beats[0]!;
+    expect(pulled.focus[0]!.v).toBeCloseTo(f.from.d + CAMERA.farFocus, 3);
+    expect(pulled.focus[1]!.v).toBeCloseTo(f.to.d, 3);
+    expect(f.aperture).toBe(0.9);
+  });
+  it('the tremor follows its seed, its amount and a shot\'s own multiplier', () => {
+    const s: BeatSheet = { beats: [beat(), beat({ camera: { shake: 0 } }), hold] };
+    const base = planCamera(s, 30);
+    const a = shakeCamera(base, 2);
+    const same = shakeCamera(base, 2, CAMERA.rampKeys, { seed: 0, amount: 1 });
+    expect(same.position).toEqual(a.position);
+    const other = shakeCamera(base, 2, CAMERA.rampKeys, { seed: 7 });
+    expect(other.position).not.toEqual(a.position);
+    const hard = shakeCamera(base, 2, CAMERA.rampKeys, { amount: 2 });
+    const f = base.beats[0]!;
+    const dev = (p: typeof a, ref: typeof a) => p.position.filter((k) => k.t > f.start && k.t < f.end).reduce((sum, k, n) => sum + Math.abs(k.v[0] - ref.position.filter((x) => x.t > f.start && x.t < f.end)[n]!.v[0]), 0);
+    const calm = shakeCamera(base, 2, CAMERA.rampKeys, { amount: 0.001 });
+    expect(dev(hard, calm)).toBeGreaterThan(dev(a, calm));
+    // shake 0 on the second shot leaves it exactly as planned
+    const g = base.beats[1]!;
+    expect(a.position.filter((k) => k.t >= g.start && k.t <= g.end)).toHaveLength(2);
+  });
+  it('the film writes the tremor as an object, the aperture per shot and the bokeh on the lens', () => {
+    const s: BeatSheet = { beats: [beat({ camera: { focus: { aperture: 0.8 } } }), beat(), hold] };
+    const w = world(buildCinematicFilm(input({ sheet: s, handheld: { amount: 0.5, keys: 4, seed: 9 }, bokeh: 0.6, aperture: 0.2 }))) as any;
+    expect(w.camera.focus.bokeh).toBe(0.6);
+    const ap = w.camera.focus.aperture as Array<{ t: number; v: number }>;
+    expect(ap.find((k) => k.t === 0)!.v).toBe(0.8);
+    expect(ap.at(-1)!.v).toBe(0.2);
+    expect((world(buildCinematicFilm(input({ sheet: { beats: [beat(), hold] } }))) as any).camera.focus.aperture).toBe(0.3);
+    expect(w.camera.position.length).toBeGreaterThan(planCamera(s, 30).position.length);
+  });
+  it('a handheld of amount 0 is a locked camera', () => {
+    const s: BeatSheet = { beats: [beat(), hold] };
+    const locked = world(buildCinematicFilm(input({ sheet: s, handheld: { amount: 0 } }))) as any;
+    expect(locked.camera.position).toHaveLength(planCamera(s, 30).position.length);
+  });
+});
+
+describe('the colour grade', () => {
+  const calm = { glow: 'none', grain: 'none', vignette: 'none', fringe: false, floor: 'none', wet: 'none', caustics: 'none' } as const;
+  it('writes the tone, the split toning, the streak and the halation into the world\'s post, and nothing for an empty grade', () => {
+    expect(finishPost(calm, 100, {})).toBeUndefined();
+    const post = finishPost(calm, 100, { exposure: 0.1, contrast: 0.2, saturation: -0.3, hue: 12, shadows: '#0a5a6a', split: 0.7, streak: { color: '#88aaff', strength: 1.2, reach: 0.4 }, halation: 0.5 })!;
+    expect(post.grade).toEqual({ brightness: 0.1, contrast: 0.2, saturation: -0.3, hue: 12 });
+    // one tint named: the other side takes the warm default
+    expect(post.splitTone).toEqual({ shadows: '#0a5a6a', highlights: '#ffb877', amount: 0.7 });
+    expect(post.streak).toEqual({ strength: 1.2, color: '#88aaff', reach: 0.4 });
+    expect(post.halation).toBe(0.5);
+  });
+  it('is carried by the film, and a film with no grade has none of it', () => {
+    const w = world(buildCinematicFilm(input({ grade: { highlights: '#ffd0a0', halation: 0.4 } }))) as any;
+    expect(w.post.splitTone.highlights).toBe('#ffd0a0');
+    expect(w.post.halation).toBe(0.4);
+    expect((world(buildCinematicFilm(input())) as any).post?.splitTone).toBeUndefined();
+  });
+  it('a letterbox is two bars that lift for the end hold, never more than 30 % of the height each', () => {
+    const shapes = (c: any) => layers(c).filter((l) => l.kind === 'shape');
+    const base = (aspect: any) => shapes(buildCinematicFilm(input({ aspect }))).length;
+    const wide = shapes(buildCinematicFilm(input({ aspect: '16:9', grade: { letterbox: 2.39 } })));
+    expect(wide.length).toBe(base('16:9') + 2);
+    const bar = wide.find((l: any) => l.transform.opacity?.length === 3 && l.transform.opacity[0].v === 1 && l.transform.opacity[2].v === 0) as any;
+    expect(bar).toBeDefined();
+    const tall = shapes(buildCinematicFilm(input({ aspect: '9:16', grade: { letterbox: 2.6 } })));
+    expect(tall.length).toBe(base('9:16') + 2);
+    const barOf = (l: any) => l.transform.opacity?.length === 3 && l.transform.opacity[0].v === 1 && l.transform.opacity[2].v === 0;
+    const heights = tall.filter(barOf).map((l: any) => l.path?.size?.[1] ?? 0);
+    expect(heights).toHaveLength(2);
+    expect(Math.max(...heights)).toBeLessThanOrEqual(1920 * 0.3 + 1);
+  });
+});
+
+describe('cuts inside the scene: flash, pass and match', () => {
+  const beat = (extra: object = {}): any => ({ size: 'medium', move: 'push', seconds: 1.5, angle: 'eye', phase: 'build', product: 'still', ...extra });
+  const hold = beat({ move: 'hold', phase: 'close', seconds: 2 });
+  it('a pass cut plunges the shot before at the product and the shot after pulls out of the crop', () => {
+    const s: BeatSheet = { beats: [beat(), beat({ cut: 'pass', size: 'close' }), hold] };
+    const plain = planCamera({ beats: [beat(), beat({ size: 'close' }), hold] }, 30);
+    const plan = planCamera(s, 30);
+    const [a, b] = plan.beats;
+    // the first shot arrives where it would have, then ends on a crop of the product's surface
+    expect(a!.via).toHaveLength(1);
+    expect(a!.via![0]).toEqual(plain.beats[0]!.to);
+    expect(a!.to.d).toBeCloseTo(framingDistance(CAMERA.passFill), 4);
+    expect(a!.knots).toEqual([1 - CAMERA.passTail]);
+    // the next shot starts exactly there and ends where it would have
+    expect(b!.from).toEqual(a!.to);
+    expect(b!.to).toEqual(plain.beats[1]!.to);
+    // the shot after the pass still continues from the arrival, not from the plunge (a hold stays on the framing)
+    expect(plan.beats[2]!.from.d).toBeCloseTo(plain.beats[2]!.from.d, 4);
+  });
+  it('the plunge is sampled so the camera reaches the arrival at the end of its knot and then closes in', () => {
+    const s: BeatSheet = { beats: [beat({ seconds: 2 }), beat({ cut: 'pass', size: 'close' }), hold] };
+    const cam = shakeCamera(planCamera(s, 30), 0);
+    const f = cam.beats[0]!;
+    const ks = cam.position.filter((k) => k.t >= f.start && k.t <= f.end);
+    expect(ks.length).toBe(1 * 2 + 2 + 3 + 2);
+    const dist = (v: number[]) => Math.hypot(v[0]!, v[1]! - PRODUCT_Y, v[2]!);
+    const ds = ks.map((k) => dist(k.v));
+    expect(ds.at(-1)!).toBeLessThan(ds[0]! * 0.5);
+    expect(ds.at(-1)!).toBeCloseTo(framingDistance(CAMERA.passFill), 2);
+    // it closes in through the last part of the shot, never backing away
+    const tail = ds.slice(Math.floor(ds.length * 0.7));
+    for (let n = 1; n < tail.length; n++) expect(tail[n]!).toBeLessThanOrEqual(tail[n - 1]! + 1e-6);
+  });
+  it('a match cut starts the shot as close and on the same lens as the last ended, with another angle', () => {
+    const s: BeatSheet = { beats: [beat({ camera: { to: { fill: 0.7, lens: 24 } } }), beat({ cut: 'match', move: 'orbit', angle: 'high' }), hold] };
+    const plan = planCamera(s, 30);
+    expect(plan.beats[1]!.from.d).toBeCloseTo(plan.beats[0]!.to.d, 6);
+    expect(plan.beats[1]!.from.fov).toBe(24);
+    expect(plan.beats[1]!.from.el).not.toBe(plan.beats[0]!.to.el);
+    // a start Muse wrote itself wins
+    const own: BeatSheet = { beats: [s.beats[0]!, beat({ cut: 'match', camera: { from: { fill: 0.3 } } }), hold] };
+    expect(planCamera(own, 30).beats[1]!.from.d).toBeCloseTo(framingDistance(0.3, 24), 3);
+  });
+  it('a flash cut gets a full-frame layer that peaks at the cut and fades fast; none of the three is a shader cut', () => {
+    const s: BeatSheet = { beats: [beat(), beat({ cut: 'flash' }), beat({ cut: 'match' }), beat({ cut: 'pass' }), hold] };
+    const cam = planCamera(s, 30);
+    expect(shaderCuts(s, cam, 30)).toEqual([]);
+    const shapes = (c: any) => layers(c).filter((l) => l.kind === 'shape');
+    const n = (sheet2: BeatSheet) => shapes(buildCinematicFilm(input({ sheet: sheet2 }))).length;
+    const plain: BeatSheet = { beats: s.beats.map((b) => ({ ...b, cut: undefined })) };
+    expect(n(s)).toBe(n(plain) + 1);
+    const c = buildCinematicFilm(input({ sheet: s }));
+    const flash = shapes(c).find((l: any) => Array.isArray(l.transform.opacity) && l.transform.opacity.some((k: any) => Math.abs(k.t - cam.beats[1]!.start) <= 1 && (Array.isArray(k.v) ? k.v[0] : k.v) === 1));
+    expect(flash).toBeDefined();
+    expect(lightValidate(c).ok).toBe(true);
+  });
+  it('they do not count in the three-cut limit, and a fourth shader cut still does', () => {
+    const many = (cut: any): BeatSheet => ({ beats: [beat(), beat({ cut }), beat({ cut }), beat({ cut }), beat({ cut }), hold] });
+    expect(checkBeatSheet(many('flash'), []).join(' ')).not.toMatch(/at most 3 cuts/);
+    expect(checkBeatSheet(many('zoom'), []).join(' ')).toMatch(/at most 3 cuts/);
   });
 });

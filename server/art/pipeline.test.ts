@@ -5,7 +5,7 @@ import { addLayer, addScene, newFilmComposition, registerAsset } from '../author
 import { makeTestFilm } from '../test-utils/film';
 import { imageSize } from '../media/image';
 import { runTool } from '../tools/registry';
-import { cutout, ownAlpha, selectObject, studioKey } from './cutout';
+import { cutout, ownAlpha, plainKey, selectObject, studioKey } from './cutout';
 import { lintPrompt, extractBrandTerms } from './lint';
 import { coverCrop } from './stills';
 import type { SamObject } from '@shared/ports';
@@ -77,6 +77,30 @@ it('keeps a light product on a white sweep whole: only backdrop joined to the ed
   const inside = keyed!.alpha[(18 + 10) * 100 + 50]!;
   expect(inside).toBe(255);
   expect(keyed!.alpha[5 * 100 + 5]).toBe(0);
+});
+
+it('keys a product on a plain coloured backdrop once SAM has found nothing, and refuses a busy border', async () => {
+  const t = await makeTestFilm();
+  const product = await sharp({ create: { width: 30, height: 40, channels: 3, background: '#2a6f3c' } }).png().toBuffer();
+  const source = await sharp({ create: { width: 100, height: 100, channels: 3, background: '#b09070' } }).composite([{ input: product, left: 35, top: 30 }]).png().toBuffer();
+  const keyed = await plainKey(source);
+  expect(keyed?.objectId).toBe('plain-key');
+  expect(keyed?.bounds).toEqual({ left: 35, top: 30, right: 65, bottom: 70 });
+  // SAM is asked (and finds nothing) before the colour key is used
+  let asked = 0;
+  (t.ctx.meta.sam as { segmentImage: unknown }).segmentImage = async () => {
+    asked++;
+    return [];
+  };
+  const cut = await cutout(t.ctx, { source, noun: 'bottle', alsoTry: ['flask'], sceneId: 's1' });
+  expect(cut.objectId).toBe('plain-key');
+  expect(asked).toBe(3);
+  // a border of stripes is not a backdrop
+  const stripes = await sharp({ create: { width: 100, height: 100, channels: 3, background: '#ffffff' } })
+    .composite(Array.from({ length: 10 }, (_, k) => ({ input: { create: { width: 5, height: 100, channels: 3 as const, background: '#202020' } }, left: k * 10, top: 0 })))
+    .png()
+    .toBuffer();
+  expect(await plainKey(stripes)).toBeUndefined();
 });
 
 it('uses the photo\'s own clear background as the mask, with no SAM call', async () => {

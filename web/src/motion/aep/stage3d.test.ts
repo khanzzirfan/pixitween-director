@@ -296,6 +296,20 @@ describe('convertWorld lighting, focus and shadow', () => {
     expect((convertWorld(cine(), [], ctx).layer as any).motionBlur).toBeUndefined();
   });
 
+  it('an animated aperture becomes dof tweens, and bokeh rides on the effect', () => {
+    const w = { ...cine(), camera: { ...(cine() as any).camera, focus: { distance: 1.2, aperture: [{ t: 0, v: 0.2 }, { t: 30, v: 0.9 }], bokeh: 0.6 } } } as unknown as AepStage3DLayer;
+    const { layer } = convertWorld(w, [], ctx);
+    expect(layer.effects).toEqual([{ id: 'dof', type: 'stageDof', params: { aperture: 0.2, focusDistance: 1.2, bokeh: 0.6 } }]);
+    expect(layer.tweens.filter((t) => t.target === 'effect:dof').some((t) => 'aperture' in t.to)).toBe(true);
+  });
+
+  it('turns speed-ramp spans into seconds on the layer clock', () => {
+    const rates = [{ at: 0, rate: 1 }, { at: 0.5, rate: 0.2 }, { at: 1, rate: 1 }];
+    const w = { ...cine(), timeWarp: [{ startFrame: 30, durationFrames: 15, rates }] } as unknown as AepStage3DLayer;
+    expect((convertWorld(w, [], ctx).layer as any).timeWarp).toEqual([{ from: 1, to: 1.5, rates }]);
+    expect((convertWorld(cine(), [], ctx).layer as any).timeWarp).toBeUndefined();
+  });
+
   it('an animated camera target becomes lookAt tweens, with no warning', () => {
     const w = { ...cine(), camera: { position: [0, 0.4, 1], target: [{ t: 0, v: [0, 0.08, 0] }, { t: 10, v: [0.04, 0.12, 0] }], fov: 14 } } as unknown as AepStage3DLayer;
     const { layer, warnings } = convertWorld(w, [], ctx);

@@ -35,6 +35,7 @@ uniform float cameraFar;
 uniform float focusDistance;
 uniform float aperture;
 uniform float maxBlurPx;
+uniform float bokeh;
 
 float distanceAt(vec2 uv) {
   float depth = texture2D(depthBuffer, uv).x;
@@ -59,7 +60,10 @@ void main() {
       vec2 uv = vUv + vec2(cos(a), sin(a)) * r * texel;
       // A tap only spreads onto this pixel if its own blur reaches this far.
       float w = clamp(cocAt(uv) / max(r, 0.001), 0.0, 1.0);
-      sum += texture2D(inputBuffer, uv) * w;
+      vec4 tap = texture2D(inputBuffer, uv);
+      // bokeh: a bright tap counts for more, so a point of light spreads into a visible disc instead of a faint haze
+      w *= 1.0 + bokeh * 6.0 * smoothstep(0.75, 1.6, dot(tap.rgb, vec3(0.2126, 0.7152, 0.0722)));
+      sum += tap * w;
       weight += w;
     }
   }
@@ -70,7 +74,7 @@ export class StageDofPass extends Pass {
   private readonly material: THREE.ShaderMaterial;
   private readonly view: THREE.PerspectiveCamera | null;
 
-  constructor(camera: THREE.Camera, aperture: number, focusDistance: number) {
+  constructor(camera: THREE.Camera, aperture: number, focusDistance: number, bokeh = 0) {
     super('StageDofPass');
     this.needsDepthTexture = true;
     this.view = (camera as THREE.PerspectiveCamera).isPerspectiveCamera ? (camera as THREE.PerspectiveCamera) : null;
@@ -84,6 +88,7 @@ export class StageDofPass extends Pass {
         focusDistance: { value: focusDistance },
         aperture: { value: aperture },
         maxBlurPx: { value: DOF_MAX_BLUR_PX },
+        bokeh: { value: bokeh },
       },
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
@@ -109,6 +114,15 @@ export class StageDofPass extends Pass {
 
   set aperture(value: number) {
     this.material.uniforms.aperture.value = value;
+  }
+
+  /** How much bright points of light spread into discs (0 none, 1 strong). */
+  get bokeh(): number {
+    return this.material.uniforms.bokeh.value as number;
+  }
+
+  set bokeh(value: number) {
+    this.material.uniforms.bokeh.value = value;
   }
 
   override setDepthTexture(depthTexture: THREE.Texture): void {

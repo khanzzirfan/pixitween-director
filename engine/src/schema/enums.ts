@@ -83,6 +83,8 @@ export const EFFECT_SCOPES = {
   dof: 'three',
   gaussianBlur: 'any',
   stageDof: 'three',
+  splitTone: 'any',
+  lensStreak: 'any',
 } as const satisfies Record<string, EffectScope>;
 
 export type EffectType = keyof typeof EFFECT_SCOPES;

@@ -11,6 +11,7 @@ import type { AppDeps } from '../deps';
 import { encodeFrames, frameName } from '../../media/encode';
 import { checkExport, type ExportExpect } from '../../media/export-check';
 import { hasFfmpeg } from '../../media/ffmpeg';
+import { registerFilmExportRoutes } from './film-exports';
 
 const MAX_OPEN = 2;
 const IDLE_MS = 10 * 60_000;
@@ -43,6 +44,7 @@ export interface ExportRouteOptions {
 }
 
 export function registerExportRoutes(app: Hono, _deps: AppDeps, opts: ExportRouteOptions = {}): void {
+  registerFilmExportRoutes(app, _deps);
   const encode = opts.encode ?? encodeFrames;
   const check = opts.check ?? checkExport;
   const ffmpegOk = opts.hasFfmpeg ?? hasFfmpeg;

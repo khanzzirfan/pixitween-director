@@ -521,6 +521,11 @@ describe('the set palette and the end card on a board', () => {
     const bad = parseBoard(board({ set: { look: 'beach', air: 'dust', palette: 'pink' } }));
     expect(bad.ok && bad.board.set).toEqual({ look: 'beach', air: 'dust' });
   });
+  it('reads a speed ramp, holding wild points to their range, and drops one that is not a list', () => {
+    const r = parseBoard(board({ beats: [{ size: 'wide', move: 'push', seconds: 2, ramp: [{ at: -1, rate: 1 }, { at: 0.4, rate: 0.01 }, { at: 3, rate: 9 }] }, { size: 'medium', move: 'hold', seconds: 2, ramp: 'slow' }] }));
+    expect(r.ok && r.board.sheet.beats[0]!.ramp).toEqual([{ at: 0, rate: 1 }, { at: 0.4, rate: 0.05 }, { at: 1, rate: 4 }]);
+    expect(r.ok && r.board.sheet.beats[1]!.ramp).toBeUndefined();
+  });
   it('reads the product spin, the light and the blur, holding wild numbers to their range', () => {
     const r = parseBoard(board({ light: { key: '#FFD7A3', rim: '#22CCDD' }, blur: 3, beats: [{ size: 'wide', move: 'push', seconds: 2, spin: { degrees: 900, ease: 'whip', tilt: -80, roll: 10, lift: 1 }, light: { from: -80, to: 70, elevation: 200, key: 0.5, rim: 2.5 }, blur: 0.8 }, { size: 'medium', move: 'hold', seconds: 2 }] }));
     expect(r.ok && r.board.light).toEqual({ key: '#ffd7a3', rim: '#22ccdd' });
@@ -540,5 +545,43 @@ describe('the set palette and the end card on a board', () => {
     const p = boardPrompt({ title: 'Mug', seconds: 8 }).system;
     for (const w of ["THE WORLD'S COLOURS are yours", 'set.palette', 'glow', 'texture', 'THE END CARD is styled by you', 'plate', 'price', 'align', 'pulse']) expect(p).toContain(w);
     expect(p).toMatch(/do not default to blue/);
+  });
+});
+
+describe('the camera written out: waypoints, a focus pull, a seeded tremor, the lens', () => {
+  const board = (extra: object) => ({ ...lemonBoard(), ...extra });
+  const beats = (camera: unknown) => [{ size: 'wide', move: 'push', seconds: 2, camera }, { size: 'medium', move: 'hold', seconds: 2 }];
+  it('reads waypoints (at most 3, held to range) and a shot\'s own shake', () => {
+    const r = parseBoard(board({ beats: beats({ via: [{ around: 400, fill: 0.5 }, {}, { height: 90 }, { lens: 5 }, { side: 3 }], shake: 9 }) }));
+    const cam = r.ok && r.board.sheet.beats[0]!.camera;
+    expect(cam && cam.via).toHaveLength(3);
+    expect(cam && cam.via![0]).toMatchObject({ around: 180, fill: 0.5 });
+    expect(cam && cam.shake).toBe(3);
+  });
+  it('reads a focus word or a focus pull, and drops a focus that is neither', () => {
+    const pull = parseBoard(board({ beats: beats({ focus: { from: 'far', to: 'near', aperture: 4 } }) }));
+    expect(pull.ok && pull.board.sheet.beats[0]!.camera!.focus).toEqual({ from: 'far', to: 'near', aperture: 1 });
+    const word = parseBoard(board({ beats: beats({ focus: 'rack' }) }));
+    expect(word.ok && word.board.sheet.beats[0]!.camera!.focus).toBe('rack');
+    const bad = parseBoard(board({ beats: beats({ focus: 'everywhere' }) }));
+    expect(bad.ok && bad.board.sheet.beats[0]!.camera!.focus).toBeUndefined();
+  });
+  it('reads the tremor as a flag or an object, and the lens', () => {
+    const o = parseBoard(board({ handheld: { amount: 5, keys: 40, seed: 12.4 }, bokeh: 2, aperture: -1, beats: beats(undefined) }));
+    expect(o.ok && o.board.handheld).toEqual({ amount: 3, keys: 6, seed: 12 });
+    expect(o.ok && o.board.bokeh).toBe(1);
+    expect(o.ok && o.board.aperture).toBe(0);
+    const f = parseBoard(board({ handheld: false, beats: beats(undefined) }));
+    expect(f.ok && f.board.handheld).toBe(false);
+  });
+});
+
+describe('the colour grade on a board', () => {
+  const board = (extra: object) => ({ ...lemonBoard(), ...extra });
+  it('reads a grade, holding numbers to range and dropping a bad colour, and none when it names nothing', () => {
+    const r = parseBoard(board({ grade: { exposure: 2, contrast: -1, saturation: 0.4, hue: 90, shadows: '#0A5A6A', highlights: 'orange', split: 3, streak: { color: '#88AAFF', strength: 9, reach: 0.01 }, halation: 0.5, letterbox: 5 } }));
+    expect(r.ok && r.board.grade).toEqual({ exposure: 0.3, contrast: 0, saturation: 0.4, hue: 40, shadows: '#0a5a6a', split: 1, streak: { color: '#88aaff', strength: 2, reach: 0.02 }, halation: 0.5, letterbox: 2.6 });
+    const none = parseBoard(board({ grade: {} }));
+    expect(none.ok && none.board.grade).toBeUndefined();
   });
 });

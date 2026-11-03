@@ -133,6 +133,41 @@ export async function studioKey(source: Buffer): Promise<SamObject | undefined> 
   }
 }
 
+/**
+ * The last resort when SAM finds nothing by any word: a product shot on a plain backdrop of any colour (a grey, a beige or a coloured sweep) is keyed
+ * by its distance from the border colour, keeping only what the backdrop's own edge does not reach. Returns nothing when the border is not one colour
+ * (nine tenths of its pixels within 40 of the median), or the key removes almost nothing or almost everything.
+ */
+export async function plainKey(source: Buffer): Promise<SamObject | undefined> {
+  try {
+    const { width, height } = await imageSize(source);
+    const rgb = await sharp(source).removeAlpha().raw().toBuffer();
+    const bg = backdropColor(rgb, width, height);
+    let near = 0;
+    let total = 0;
+    const probe = (x: number, y: number) => {
+      total++;
+      const i = (y * width + x) * 3;
+      if (Math.max(Math.abs(rgb[i]! - bg[0]), Math.abs(rgb[i + 1]! - bg[1]), Math.abs(rgb[i + 2]! - bg[2])) <= 40) near++;
+    };
+    for (let x = 0; x < width; x += 2) {
+      probe(x, 0);
+      probe(x, height - 1);
+    }
+    for (let y = 0; y < height; y += 2) {
+      probe(0, y);
+      probe(width - 1, y);
+    }
+    if (near / total < 0.9) return undefined;
+    const alpha = keepEnclosed(whiteKeyAlpha(rgb, width, height, bg), width, height);
+    const ink = inkBox(alpha, width, height);
+    if (!ink || ink.frac < 0.02 || ink.frac > 0.72) return undefined;
+    return { objectId: 'plain-key', bounds: ink.box, alpha: Buffer.from(alpha), confidence: 0.5 };
+  } catch {
+    return undefined;
+  }
+}
+
 export async function cutout(
   ctx: ToolCtx,
   o: { source: Buffer; noun: string; /** other words to ask SAM for when the first finds nothing, one call each, in order */ alsoTry?: string[]; sceneId?: string; minConfidence?: number; feather?: number; cacheKey?: string },
@@ -164,6 +199,8 @@ export async function cutout(
       object = selectObject(await ctx.meta.sam.segmentImage(o.source, generic), Math.min(o.minConfidence ?? 0.5, FALLBACK_CONFIDENCE));
       charge(ctx, 'sam-3.1', '1 image', PRICE.samImageUsd);
     }
+    // no word found it: a product on a plain backdrop can still be keyed by colour, for nothing
+    if (!object && !keyed) object = await plainKey(o.source);
     if (!object) throw new ArtError('no-object', `no ${o.noun} found in the photo`);
     if (object.alpha.length !== width * height)
       throw new ArtError('alpha-size-mismatch', `SAM alpha length ${object.alpha.length} does not match ${width}x${height}`);

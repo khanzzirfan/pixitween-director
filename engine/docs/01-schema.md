@@ -54,11 +54,11 @@ or a `data:` URL.
 | `rotation` | number (degrees) | 0 | clockwise |
 | `alpha` | 0 … 1 | 1 | |
 | `blendMode` | `normal \| add \| multiply \| screen` | `normal` | |
-| `effects` | `Effect[]` | `[]` | ≤ 8 per layer; `dof` only on `three` layers, `glow`/`dropShadow`/`outline` only on 2D layers ([05-effects.md](05-effects.md)) |
+| `effects` | `Effect[]` | `[]` | ≤ 8 per layer (≤ 12 on a `three` layer); `dof` only on `three` layers, `glow`/`dropShadow`/`outline` only on 2D layers ([05-effects.md](05-effects.md)) |
 | `enter` | PresetRef | – | entrance, placed at the layer's `start` |
 | `exit` | PresetRef | – | exit, placed to end at the layer's `end` |
 | `loop` | PresetRef | – | continuous motion between the end of `enter` and the start of `exit` |
-| `tweens` | `Tween[]` | `[]` | ≤ 64 per layer |
+| `tweens` | `Tween[]` | `[]` | ≤ 64 per layer (≤ 192 on a `three` layer) |
 
 ## Layer types
 
