@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { boardPrompt } from '../authoring/beatsheet';
-import { pricesIn } from './cinematic-cut';
+import sharp from 'sharp';
+import { isProductTitle, isStraightCylinder, pricesIn, productNoun, topLuma } from './cinematic-cut';
 
 describe('pricesIn', () => {
   it('shows the lowest price and keeps the highest as the one it was', () => {
@@ -22,5 +23,47 @@ describe('boardPrompt', () => {
   });
   it('asks without a brief line when there is none', () => {
     expect(boardPrompt({ title: 'Cold Brew', seconds: 8 }).user).not.toContain("client's brief");
+  });
+});
+
+describe('productNoun', () => {
+  it('looks for the last word of the product name', () => {
+    expect(productNoun('Clear Water Swim Goggles')).toBe('goggles');
+    expect(productNoun('Sun Cooler 24L')).toBe('cooler');
+  });
+  it('falls back to "product" when the name has no word to look for', () => {
+    expect(productNoun('X1')).toBe('product');
+  });
+});
+
+describe('topLuma', () => {
+  it('measures the top third, where the end card words sit', async () => {
+    const png = await sharp({ create: { width: 30, height: 30, channels: 3, background: '#000000' } })
+      .composite([{ input: await sharp({ create: { width: 30, height: 10, channels: 3, background: '#ffffff' } }).png().toBuffer(), left: 0, top: 0 }])
+      .png()
+      .toBuffer();
+    expect(await topLuma(png)).toBeCloseTo(1, 2);
+  });
+});
+
+describe('isStraightCylinder', () => {
+  const shape = (svg: string) => sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="300">${svg}</svg>`)).png().toBuffer();
+  it('takes a can, straight from top to bottom', async () => {
+    expect(await isStraightCylinder(await shape('<rect x="10" y="0" width="80" height="300" rx="8" fill="#123"/>'))).toBe(true);
+  });
+  it('refuses a bottle with a neck and cap, so it keeps its own outline', async () => {
+    expect(await isStraightCylinder(await shape('<rect x="38" y="0" width="24" height="70" fill="#a80"/><rect x="10" y="70" width="80" height="230" fill="#123"/>'))).toBe(false);
+  });
+});
+
+describe('isProductTitle', () => {
+  it('takes a short real name and refuses a title that is the brief, or a sentence with a price', () => {
+    const brief = 'Cold brew for energy, excitment, refreshment. $4.00 as $5.50 before,';
+    expect(isProductTitle('Coffee Co. Cold Brew', brief)).toBe(true);
+    expect(isProductTitle(brief, brief)).toBe(false);
+    expect(isProductTitle('Cold brew for energy, excitment, refreshment', brief)).toBe(false);
+    expect(isProductTitle('', brief)).toBe(false);
+    expect(isProductTitle(undefined, brief)).toBe(false);
+    expect(isProductTitle('Cold Brew', 'Cold brew for energy')).toBe(true);
   });
 });

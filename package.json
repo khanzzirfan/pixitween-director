@@ -66,6 +66,7 @@
     "@modelcontextprotocol/sdk": "1.32.2",
     "audiomotion-analyzer": "^4.5.4",
     "better-sqlite3": "^13.0.3",
+    "gl-transitions": "^2.2.0",
     "gsap": "^3.15.0",
     "hono": "^4.13.14",
     "lottie-web": "^5.13.0",

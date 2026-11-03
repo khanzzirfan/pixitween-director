@@ -7,7 +7,7 @@ import { type Geometry3D } from '../../schema/layer3d';
 // centred on the origin (BoxGeometry and PlaneGeometry are already centred). glTF geometry is loaded
 // asynchronously elsewhere, so it is not part of this union.
 
-export type PrimitiveGeometry = Exclude<Geometry3D, { type: 'gltf' | 'text3d' }>;
+export type PrimitiveGeometry = Exclude<Geometry3D, { type: 'gltf' | 'text3d' | 'liquid' | 'mirror' | 'smoke' | 'caustics' }>;
 
 // Segment counts from the spec (engine/docs/04-three.md): a sphere is 48 x 32, a cylinder has 48
 // radial segments and a torus is 32 radial x 96 tubular, so primitives stay smooth without being

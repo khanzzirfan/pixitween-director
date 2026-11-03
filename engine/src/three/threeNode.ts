@@ -9,6 +9,7 @@ import type { ThreeLayer } from '../schema/layer3d';
 import type { ShotSpec } from '../schema/shot';
 import { frameShot as frameShotBySpec } from './camera/frameShot';
 import { samplePath } from './camera/path';
+import { TransitionRenderer, loadGlTransitions, usable, type GlTransitionLib } from './transition';
 import { applyRig, ZERO_RIG_OFFSETS, type RigOffsets } from './camera/rig';
 import { resolveUnitTargets } from './text/targets';
 import { parseUnitTarget } from '../schema/scalars';
@@ -283,6 +284,16 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
   // A path owns the lens only when it says something about it; otherwise the layer's lens stands.
   const pathOwnsFov = layer.camera.path?.keys.some((key) => key.fov !== undefined) ?? false;
 
+  // Shader transitions: the gl-transitions list loads on first use; the renderer holds the old shot's picture and the mix.
+  const transitions = layer.transitions ?? [];
+  let glLib: GlTransitionLib | null = null;
+  let mixer: TransitionRenderer | null = null;
+  const glLoad: Promise<void> | null = transitions.length
+    ? loadGlTransitions().then((lib) => {
+        glLib = lib;
+      }, () => {})
+    : null;
+
   let resolveReady: () => void = () => {};
   let rejectReady: (error: unknown) => void = () => {};
   const ready = new Promise<void>((resolve, reject) => {
@@ -465,43 +476,65 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
         entry.mixer.setTime(clipTime(localSec, entry.clip.duration, entry.animation));
       }
 
-      // A path declares the camera, so it is sampled every update (statelessly, from the local
-      // time alone) and lands before the camera looks at its target.
-      const path = layer.camera.path;
-      if (path) {
-        const sample = samplePath(path, localSec, layer.camera.fov);
-        rig.restPosition.set(sample.position[0], sample.position[1], sample.position[2]);
-        rig.lookAt.set(sample.lookAt[0], sample.lookAt[1], sample.lookAt[2]);
-        if (pathOwnsFov) rig.camera.fov = sample.fov;
-      }
+      // The camera at `cameraSec` on its path, the world at `localSec`. A path declares the camera, so it is sampled
+      // statelessly from the time alone and lands before the camera looks at its target.
+      const pose = (cameraSec: number): void => {
+        if (!rig) return;
+        const path = layer.camera.path;
+        if (path) {
+          const sample = samplePath(path, cameraSec, layer.camera.fov);
+          rig.restPosition.set(sample.position[0], sample.position[1], sample.position[2]);
+          rig.lookAt.set(sample.lookAt[0], sample.lookAt[1], sample.lookAt[2]);
+          if (pathOwnsFov) rig.camera.fov = sample.fov;
+        }
+        // The camera stands on its rest pose; the rig moves (pan, tilt, roll, dolly, truck, pedestal)
+        // ride on top of it.
+        applyRig(rig.camera, { position: rig.restPosition, lookAt: rig.lookAt }, rigOffsets);
+        if (rig.camera.fov !== lastFov) {
+          lastFov = rig.camera.fov;
+          rig.camera.updateProjectionMatrix();
+        }
+        // Life, swarms, flipbooks and billboards; billboards need the camera's final orientation.
+        rig.camera.updateMatrixWorld(true);
+        rig.tick(localSec);
+      };
 
-      // The camera stands on its rest pose; the rig moves (pan, tilt, roll, dolly, truck, pedestal)
-      // ride on top of it.
-      applyRig(rig.camera, { position: rig.restPosition, lookAt: rig.lookAt }, rigOffsets);
-      if (rig.camera.fov !== lastFov) {
-        lastFov = rig.camera.fov;
-        rig.camera.updateProjectionMatrix();
-      }
-      // Life, swarms, flipbooks and billboards; billboards need the camera's final orientation.
-      rig.camera.updateMatrixWorld(true);
-      rig.tick(localSec);
+      // A transition is playing when its window holds this time and its shader is known and usable.
+      const active = renderer && glLib ? transitions.find((t) => localSec >= t.at && localSec < t.at + t.duration) : undefined;
+      const def = active ? glLib!.find(active.name) : undefined;
 
       try {
-        // A test chain ignores the renderer; a real one always has it.
-        renderChain(chain, renderer);
+        if (active && def && usable(def) && renderer) {
+          mixer ??= new TransitionRenderer(width, height);
+          // the old shot's last picture: its camera pose just before the cut, the world as it is now
+          pose(Math.max(0, active.at - 1e-3));
+          renderChain(chain, renderer);
+          mixer.copy(renderer, target.texture, mixer.from);
+          // the new shot, then the mix of the two put back into the layer's own target
+          pose(localSec);
+          renderChain(chain, renderer);
+          mixer.mix(renderer, def, target.texture, (localSec - active.at) / active.duration, active.params);
+          mixer.copy(renderer, mixer.out.texture, target);
+        } else {
+          pose(localSec);
+          // A test chain ignores the renderer; a real one always has it.
+          renderChain(chain, renderer);
+        }
         settleReady();
       } catch (error) {
         reportError(error);
       }
     },
 
-    ready,
+    ready: glLoad ? Promise.all([ready, glLoad]).then(() => undefined) : ready,
 
     destroy() {
       if (destroyed) return;
       destroyed = true;
       chain?.dispose();
       chain = null;
+      mixer?.dispose();
+      mixer = null;
       rig?.dispose();
       rig = null;
       target.dispose();
@@ -580,27 +613,32 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
     }
   };
 
-  const preloaded = ctx.preloaded?.get(layer.id);
-  if (preloaded) {
-    buildRig(preloaded);
-  } else if (needsAsyncAssets(layer)) {
-    preloadThreeAssets(layer, ctx.doc)
-      .then((assets) => {
-        if (destroyed) {
-          for (const loaded of assets.textures.values()) loaded.dispose();
-          for (const gltf of assets.gltfs.values()) disposeObject3D(gltf.scene);
-          return;
-        }
-        buildRig(assets);
-      })
-      .catch((error) => {
-        if (destroyed || readySettled) return;
-        readySettled = true;
-        rejectReady(error);
-      });
-  } else {
-    buildRig();
-  }
+  const startRig = (): void => {
+    const preloaded = ctx.preloaded?.get(layer.id);
+    if (preloaded) {
+      buildRig(preloaded);
+    } else if (needsAsyncAssets(layer)) {
+      preloadThreeAssets(layer, ctx.doc)
+        .then((assets) => {
+          if (destroyed) {
+            for (const loaded of assets.textures.values()) loaded.dispose();
+            for (const gltf of assets.gltfs.values()) disposeObject3D(gltf.scene);
+            return;
+          }
+          buildRig(assets);
+        })
+        .catch((error) => {
+          if (destroyed || readySettled) return;
+          readySettled = true;
+          rejectReady(error);
+        });
+    } else {
+      buildRig();
+    }
+  };
+  // The rig is built at once (tweens bind to its objects as soon as the timeline is made); a layer with transitions only holds its
+  // `ready` until the shader list is in, so the first frame that is rendered for export or a seek already has them.
+  startRig();
 
   return node;
 }

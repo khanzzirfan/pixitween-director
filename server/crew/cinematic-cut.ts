@@ -1,11 +1,16 @@
+import { readFile } from 'node:fs/promises';
+import { isFakeDirector } from '../agent/fake-director';
+import sharp from 'sharp';
+import { ASPECT_SIZES } from '@shared/composition';
 import type { ToolCtx } from '@shared/tools';
 import { cutout } from '../art/cutout';
 import { dominantAccent } from '../art/palette';
 import { planBoard, reviewBoard } from '../authoring/beatsheet';
 import { prepareRound } from '../authoring/catalog-clip';
-import { buildCinematicFilm } from '../authoring/cinematic-film';
+import { buildCinematicFilm, type CinematicInput } from '../authoring/cinematic-film';
 import { elementKey, makeElement, type IngredientAsset } from '../authoring/ingredients';
-import { newPrepareCache } from '../product3d/prepare';
+import { groundColor, renderBackdrop, renderDot } from '../authoring/set-art';
+import { newPrepareCache, prepareProduct3D, type Prepared3D } from '../product3d/prepare';
 
 const FALLBACK_ACCENT = '#3d4a5c';
 /** Elements drawn so far in this process, by key: a second film with the same beans or splash pays nothing. */
@@ -21,6 +26,14 @@ export function pricesIn(text: string): { price: number; was?: number } | undefi
   return was > price ? { price, was } : { price };
 }
 
+/** True when a film's stored title is a real name: short, and not the brief itself (a film with no title is named after its brief). */
+export function isProductTitle(title: string | undefined, brief: string): boolean {
+  const t = title?.trim();
+  if (!t || t.split(/\s+/).length > 6 || /[$€£¥₹\d]/.test(t)) return false;
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return !norm(brief).startsWith(norm(t)) || norm(t).split(' ').length <= 3;
+}
+
 /** A short name for the end card: the one Muse reads off the pack, else the brief's first words (a brief is a sentence, not a name). */
 async function productName(ctx: ToolCtx, photo: Buffer, brief: string): Promise<string> {
   try {
@@ -34,43 +47,172 @@ async function productName(ctx: ToolCtx, photo: Buffer, brief: string): Promise<
   return brief.split(/[,.—-]/)[0]!.trim().split(/\s+/).slice(0, 4).join(' ').slice(0, 32) || 'New';
 }
 
+/** The relative luminance of a picture's top third, where the end card's words sit. */
+export async function topLuma(png: Buffer): Promise<number> {
+  const img = sharp(png);
+  const { width = 1, height = 1 } = await img.metadata();
+  const top = await img.extract({ left: 0, top: 0, width, height: Math.max(1, Math.round(height / 3)) }).removeAlpha().png().toBuffer();
+  const { channels } = await sharp(top).stats();
+  const lin = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return Math.round((0.2126 * lin(channels[0]!.mean) + 0.7152 * lin(channels[1]!.mean) + 0.0722 * lin(channels[2]!.mean)) * 1000) / 1000;
+}
+
+/** The word the cut-out looks for: the last word of the product's name ("Clear Water Swim Goggles" -> "goggles"). */
+export function productNoun(title: string): string {
+  const w = title.toLowerCase().replace(/[^a-z\s-]/g, ' ').trim().split(/\s+/).filter((x) => x.length > 2);
+  return w[w.length - 1] ?? 'product';
+}
+
+/** The narrowest row of the top part of a pack, over its body's typical width, below which it has a neck, shoulders or a cap. */
+export const STRAIGHT_SHARE = 0.85;
+
 /**
- * The cinematic cut of a round product film (a can or a bottle): Muse writes a board from the photo, each ingredient is drawn once, and the
- * film is built as one stage3d world with a real camera (push, pull, orbit, dolly-zoom), ingredient splashes and an animated price end card.
- * Returns false, and changes nothing, when the film has no photo, no price, or the product is not a tall round pack: the 2D film then stands.
+ * Whether a cut-out is a straight cylinder from top to bottom (a can), read off its outline: the widths of its rows in the top fifth stay
+ * close to the median width of its body. A bottle's neck, a perfume's shoulders and cap, a tube's crimp all fail it, and those keep their own
+ * outline as a flat cut-out instead of becoming a plain can.
  */
-export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = () => {}): Promise<boolean> {
+export async function isStraightCylinder(png: Buffer): Promise<boolean> {
+  const { data, info } = await sharp(png).ensureAlpha().extractChannel('alpha').raw().toBuffer({ resolveWithObject: true });
+  const widths: number[] = [];
+  for (let y = 0; y < info.height; y++) {
+    let left = -1;
+    let right = -1;
+    for (let x = 0; x < info.width; x++) {
+      if (data[y * info.width + x]! > 128) {
+        if (left < 0) left = x;
+        right = x;
+      }
+    }
+    if (left >= 0) widths.push(right - left + 1);
+  }
+  if (widths.length < 10) return false;
+  const body = [...widths.slice(Math.floor(widths.length * 0.3), Math.floor(widths.length * 0.9))].sort((a, b) => a - b);
+  const median = body[Math.floor(body.length / 2)]!;
+  // the very top rows are the rim's curve on any can: skip them
+  const top = widths.slice(Math.floor(widths.length * 0.04), Math.max(Math.floor(widths.length * 0.04) + 1, Math.floor(widths.length * 0.2)));
+  return Math.min(...top) >= median * STRAIGHT_SHARE;
+}
+
+/**
+ * The product in 3D: a tall straight cylinder (a can) wears its unwrapped label; anything else, a bottle with a neck or a cap included, is a
+ * thick cut-out of its photo, extruded from its own outline.
+ */
+async function prepareProduct(ctx: ToolCtx, photo: Buffer, noun: string): Promise<{ cutId: string; prep: Prepared3D } | undefined> {
+  const cut = await cutout(ctx, { source: photo, noun, sceneId: 'cinematic' }).catch(() => (noun === 'product' ? undefined : cutout(ctx, { source: photo, noun: 'product', sceneId: 'cinematic' })));
+  if (!cut) return undefined;
+  const c = { id: cut.cutout.id, width: cut.cutout.width ?? 0, height: cut.cutout.height ?? 0 };
+  const straight = await isStraightCylinder(await ctx.assets.read(c.id)).catch(() => false);
+  const round = straight ? await prepareRound(ctx.assets, c, 'can', prepared).catch(() => undefined) : undefined;
+  if (round) return { cutId: c.id, prep: round };
+  const flat = await prepareProduct3D(ctx.assets, { cutoutAssetId: c.id, shape: 'other' }, prepared).catch(() => undefined);
+  return flat && flat.contour && flat.contour.length >= 3 ? { cutId: c.id, prep: flat } : undefined;
+}
+
+/** Everything slow the cut needs, made once per film: the 3D product, the board, its element pictures, the set and the music. */
+interface CinematicParts {
+  title: string;
+  prep: Prepared3D;
+  accent: string;
+  board: ReturnType<typeof reviewBoard>['board'];
+  ingredients: Record<string, IngredientAsset>;
+  set: CinematicInput['set'];
+  bed?: { id: string; url: string };
+}
+
+/** Parts started early (startCinematic), by film id, so the finish only builds. */
+const early = new Map<string, Promise<CinematicParts | undefined>>();
+
+async function prepareParts(ctx: ToolCtx, log: (line: string) => void): Promise<CinematicParts | undefined> {
   const film = await ctx.films.get(ctx.filmId);
   const photoRef = film.assets.find((a) => a.role === 'product-photo');
-  if (!photoRef) return false;
-  const words = [film.brief.text, ...(film.storyboard?.scenes.map((s) => s.text ?? '') ?? [])].join(' ');
-  const prices = pricesIn(words);
-  if (!prices) return false;
-
+  if (!photoRef) return undefined;
   const photo = await ctx.assets.read(photoRef.id);
-  const cut = await cutout(ctx, { source: photo, noun: 'can', sceneId: 'cinematic' });
-  const c = { id: cut.cutout.id, width: cut.cutout.width ?? 0, height: cut.cutout.height ?? 0 };
-  const prep = await prepareRound(ctx.assets, c, 'can', prepared);
-  if (!prep || prep.shape === 'other') return false;
-  const accent = await dominantAccent(await ctx.assets.read(c.id));
+  const title = isProductTitle(film.title, film.brief.text) ? film.title!.trim() : await productName(ctx, photo, film.brief.text);
+  const made = await prepareProduct(ctx, photo, productNoun(title));
+  if (!made) return undefined;
+  const { prep } = made;
+  const flat = prep.shape === 'other';
+  const accent = await dominantAccent(await ctx.assets.read(made.cutId));
 
-  const title = await productName(ctx, photo, film.brief.text);
-  const planned = await planBoard(ctx, { title, brief: film.brief.text, category: 'drinks', photo, seconds: Math.min(10, film.storyboard?.durationSec ?? 8) });
+  const planned = await planBoard(ctx, { title, brief: film.brief.text, photo, seconds: Math.min(10, film.storyboard?.durationSec ?? 8), flat });
   const { board } = reviewBoard(planned.board);
-  log(`board by ${planned.source}: ${board.concept}`);
+  log(`board by ${planned.source}: ${board.concept}${flat ? ' (flat cut-out)' : ''}`);
+  if (planned.source === 'floor') log(`Muse's board was not used: ${planned.violations.slice(0, 4).join('; ')}`);
+  else if (planned.violations.length) log(`Muse's board kept; taste rules it still breaks: ${planned.violations.slice(0, 4).join('; ')}`);
 
   const ingredients: Record<string, IngredientAsset> = {};
-  for (const e of board.elements) {
-    const key = elementKey(e);
+  await Promise.all(
+    board.elements.map(async (e) => {
+      const key = elementKey(e);
+      try {
+        const made = drawn.get(key) ?? (await makeElement(ctx, e, { cache: prepared }));
+        drawn.set(key, made);
+        ingredients[e.id] = { ...made, kind: e.id };
+      } catch (err) {
+        // the film plays without an element that could not be drawn
+        log(`element ${e.id} failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }),
+  );
+
+  // the board's world: a backdrop drawn for its look, the floor in the same light, and the soft dot the bokeh is made of
+  let set: CinematicInput['set'];
+  if (board.set) {
     try {
-      const made = drawn.get(key) ?? (await makeElement(ctx, e, { cache: prepared }));
-      drawn.set(key, made);
-      ingredients[e.id] = { ...made, kind: e.id };
+      const size = ASPECT_SIZES[film.aspect];
+      const art = await renderBackdrop({ look: board.set.look, ratio: size.width / size.height, ...(board.tone ? { tone: board.tone } : {}), ...(board.key ? { key: board.key } : {}) });
+      const bd = await ctx.assets.put(art.png, 'image/png', { role: 'plate', width: art.width, height: art.height });
+      const backdrop = { id: bd.id, src: ctx.assets.url(bd.id), width: art.width, height: art.height };
+      let dot: { id: string; src: string; width: number; height: number } | undefined;
+      if (board.set.air === 'bokeh') {
+        const d = await renderDot();
+        const da = await ctx.assets.put(d.png, 'image/png', { role: 'cutout', width: d.width, height: d.height });
+        dot = { id: da.id, src: ctx.assets.url(da.id), width: d.width, height: d.height };
+      }
+      set = { look: board.set.look, air: board.set.air, backdrop, ground: groundColor(board.set.look, board.tone, board.key), ...(dot ? { dot } : {}), skyLuma: await topLuma(art.png) };
     } catch (err) {
-      // the film plays without an element that could not be drawn
-      log(`element ${e.id} failed: ${err instanceof Error ? err.message : String(err)}`);
+      log(`set not drawn: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
+  const bed = await ctx.assets.put(await readFile(new URL('./media/bed.wav', import.meta.url)), 'audio/wav', { role: 'audio' }).catch(() => undefined);
+  return { title, prep, accent: accent.chroma > 0.05 ? accent.hex : FALLBACK_ACCENT, board, ingredients, set, ...(bed ? { bed: { id: bed.id, url: bed.url } } : {}) };
+}
+
+/**
+ * Starts the slow part of the cut (cut-out, board, element pictures, set) as the film starts, so it runs while the crew builds and the
+ * finish only assembles. Any brief with a product photo gets it; a price, when the brief names one, lands on the end card. Never throws.
+ */
+export function startCinematic(ctx: ToolCtx, briefText: string, log: (line: string) => void = () => {}): void {
+  // the fake director makes no Meta calls, and the cut is all Meta calls (board, cut-out, element pictures)
+  if (process.env.CINEMATIC_CUT === '0' || isFakeDirector() || early.has(ctx.filmId)) return;
+  const p = prepareParts(ctx, log).catch((err) => {
+    log(`cinematic prep failed: ${err instanceof Error ? err.message : String(err)}`);
+    return undefined;
+  });
+  early.set(ctx.filmId, p);
+}
+
+/**
+ * The cinematic cut of a product film: Muse writes a board from the photo, each element is drawn once, and the film is built as one
+ * stage3d world with a real camera (push, pull, orbit, dolly-zoom, truck), element splashes, the board's set and an animated price end card.
+ * A round pack turns in 3D; any other product is a thick cut-out that drops in and swings. Uses the parts startCinematic began, when it did.
+ * Returns false, and changes nothing, when the film has no photo or the product cannot be cut out: the 2D film then stands. Without a price
+ * in the brief the end card carries the name and tagline alone.
+ */
+export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = () => {}): Promise<boolean> {
+  if (isFakeDirector()) return false;
+  const film = await ctx.films.get(ctx.filmId);
+  const words = [film.brief.text, ...(film.storyboard?.scenes.map((s) => s.text ?? '') ?? [])].join(' ');
+  const prices = pricesIn(words);
+  const pending = early.get(ctx.filmId);
+  early.delete(ctx.filmId);
+  const parts = (pending ? await pending : undefined) ?? (await prepareParts(ctx, log));
+  if (!parts) return false;
+  const { prep, board, set, bed, title } = parts;
+  const flat = prep.shape === 'other';
 
   const t = prep.texture;
   const comp = buildCinematicFilm({
@@ -82,13 +224,18 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     shape: prep.shape,
     side: prep.side,
     productAspect: prep.aspect,
+    ...(flat ? { contour: prep.contour!, ...(prep.focus ? { focus: prep.focus } : {}) } : {}),
+    ...(set ? { set } : {}),
+    ...(board.tagline ? { tagline: board.tagline } : {}),
+    ...(board.handheld !== undefined ? { handheld: board.handheld } : {}),
+    ...(board.finish ? { finish: board.finish } : {}),
+    ...(bed ? { music: { id: bed.id, src: bed.url } } : {}),
     title,
-    price: prices.price,
-    ...(prices.was !== undefined ? { wasPrice: prices.was } : {}),
+    ...(prices ? { price: prices.price, ...(prices.was !== undefined ? { wasPrice: prices.was } : {}) } : {}),
     currency: 'USD',
-    accent: accent.chroma > 0.05 ? accent.hex : FALLBACK_ACCENT,
-    ingredients,
+    accent: parts.accent,
+    ingredients: parts.ingredients,
   });
-  const r = await ctx.films.commit(ctx.filmId, comp, 'director', 'cinematic cut: camera moves, ingredient splashes, animated price card');
+  const r = await ctx.films.commit(ctx.filmId, comp, 'director', 'cinematic cut: camera moves, element splashes, animated price card');
   return r.ok;
 }
