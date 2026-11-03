@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
 import { checkBeatSheet, defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
-import { ELEVATION, rampKeysFor, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, SOLID, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, finishPost, shaderCuts, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
+import { ELEVATION, rampKeysFor, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, SOLID, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, finishPost, shaderCuts, cutParams, spotLights, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
 import { CAMERA, LIGHT, MATERIALS, SURFACES } from './cinematic-rules';
 import { SPACE_EM } from './text-width';
 import { FLOOR, floorElements, glassAsset, liquidAsset, vapourAsset, type IngredientAsset } from './ingredients';
@@ -1282,5 +1282,41 @@ describe('cuts inside the scene: flash, pass and match', () => {
     const many = (cut: any): BeatSheet => ({ beats: [beat(), beat({ cut }), beat({ cut }), beat({ cut }), beat({ cut }), hold] });
     expect(checkBeatSheet(many('flash'), []).join(' ')).not.toMatch(/at most 3 cuts/);
     expect(checkBeatSheet(many('zoom'), []).join(' ')).toMatch(/at most 3 cuts/);
+  });
+});
+
+describe('cutParams', () => {
+  it('turns a shot direction into the direction of a travelling cut, and leaves other cuts alone', () => {
+    expect(cutParams('lenswhip', undefined, 'up')).toEqual({ params: { direction: [0, 1] } });
+    expect(cutParams('leak', undefined, 'left')).toEqual({ params: { direction: [-1, 0] } });
+    expect(cutParams('whip', undefined, undefined)).toEqual({});
+    expect(cutParams('swirl', undefined, 'left')).toEqual({});
+    expect(cutParams('defocus', { blurSize: 0.04 }, 'left')).toEqual({ params: { blurSize: 0.04 } });
+  });
+});
+
+describe('reflection studio', () => {
+  it('the world lights its reflections with the board\'s studio, and leaves the preset\'s own when none is written', () => {
+    expect(JSON.stringify(buildCinematicFilm(input({ reflect: 'ring' })))).toContain('"environment":"ring"');
+    expect(JSON.stringify(buildCinematicFilm(input()))).not.toContain('"environment"');
+  });
+});
+
+describe('spot lights', () => {
+  it('stand on the side the board names at the book\'s distance, aimed at the product, in the board\'s colour and strength', () => {
+    const [left, behind] = spotLights([{ side: 'left', strength: 2, cone: 18, color: '#88aaff' }, { side: 'behind' }]) as any[];
+    expect(left.position[0]).toBeLessThan(0);
+    expect(left.intensity).toBe(10);
+    expect(left.angle).toBe(18);
+    expect(left.color).toBe('#88aaff');
+    expect(left.target).toEqual([0, PRODUCT_Y, 0]);
+    expect(behind.position[2]).toBeLessThan(0);
+    expect(behind.angle).toBe(24);
+    expect(behind.id).toBe('spot2');
+  });
+  it('the world carries them, at most two, and none without the board asking', () => {
+    const world = (o: Partial<CinematicInput>) => JSON.stringify(buildCinematicFilm(input(o)));
+    expect(world({})).not.toContain('"spots"');
+    expect((world({ spots: [{ side: 'left' }, { side: 'right' }, { side: 'above' }] }).match(/"id":"spot\d"/g) ?? []).length).toBe(2);
   });
 });

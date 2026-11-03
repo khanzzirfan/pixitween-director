@@ -449,7 +449,7 @@ const aepModel3DLightingSchema = z
       })
       .strict()
       .optional(),
-    environment: z.enum(["room", "none"]).optional(),
+    environment: z.enum(["room", "softbox", "ring", "sunset", "none"]).optional(),
   })
   .strict();
 
@@ -615,7 +615,7 @@ const aepStageLightsSchema = z
       .strict()
       .optional(),
     ambient: aepAnimatableOf(z.number().min(0)).optional(),
-    environment: z.enum(["room", "none"]).optional(),
+    environment: z.enum(["room", "softbox", "ring", "sunset", "none"]).optional(),
     spots: z
       .array(aepStageSpotSchema)
       .max(STAGE3D_LIMITS.spots, `stage3d allows at most ${STAGE3D_LIMITS.spots} spot lights`)

@@ -136,3 +136,16 @@ describe('disposeLightingRig', () => {
     for (const spy of spies) expect(spy).toHaveBeenCalledOnce();
   });
 });
+describe('studio environments', () => {
+  it('each studio is a lit scene of its own: a dome and bright shapes brighter than white', async () => {
+    const { buildStudio } = await import('./lighting');
+    for (const kind of ['softbox', 'ring', 'sunset'] as const) {
+      const scene = buildStudio(kind);
+      const meshes: THREE.Mesh[] = [];
+      scene.traverse((c) => { if ((c as THREE.Mesh).isMesh) meshes.push(c as THREE.Mesh); });
+      expect(meshes.length, kind).toBeGreaterThanOrEqual(2);
+      const hot = meshes.filter((m) => Math.max(...(m.material as THREE.MeshBasicMaterial).color.toArray()) > 1);
+      expect(hot.length, kind).toBeGreaterThanOrEqual(1);
+    }
+  });
+});

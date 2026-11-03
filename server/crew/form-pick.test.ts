@@ -69,6 +69,19 @@ describe('the 2D or 3D pick', () => {
   });
 });
 
+describe('the burnt floor', () => {
+  it('sends a measurably burnt 3D cut back to 2D without asking Muse', async () => {
+    const sharp = (await import('sharp')).default;
+    const white = await sharp({ create: { width: 40, height: 70, channels: 3, background: '#ffffff' } }).jpeg().toBuffer();
+    const seen: Buffer[][] = [];
+    const pick = await pickForm(ctxWith({ better: 'A', clear: true }, seen), { filmId: 'f', title: 't', render2d: async () => frames('flat'), render3d: async () => Array.from({ length: PICK_FRAMES }, () => white) });
+    expect(pick).toMatchObject({ better: '2d', clear: true });
+    expect(pick.why).toMatch(/burnt out/);
+    expect(seen).toHaveLength(0);
+    expect(keeps3d(pick)).toBe(false);
+  });
+});
+
 describe('saving both cuts', () => {
   const flat = { id: 'flat' } as never;
   const solid = { id: 'solid' } as never;

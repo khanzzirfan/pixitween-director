@@ -135,7 +135,7 @@ You should see `"metaConfigured":true` and `"ffmpeg":true`.
 1. Drop a product photo anywhere on the page, or press the 📎 button. You can add up to 6 photos: the first is the hero, and the film cuts between the rest. You can also add none, and it will make one.
 2. Press 🎙, say what you want, then press ■ to stop. Up to 60 seconds. For example: *"A ten-second vertical ad for this beach towel. Bright, summery, by the pool. End on the price, twenty-nine dollars."*
 3. Listen back if you like. Then press **Send now** in the chat, or **Make film**. Nothing is sent until you press one.
-4. Pick 9:16, 16:9 or 1:1 before you send. Vertical 9:16 is the default.
+4. Films are always vertical 9:16 reels; there is no size to pick.
 
 Prefer typing? Write the brief in the box and press Enter.
 
@@ -229,7 +229,7 @@ npx tsx scripts/demo-film.ts load data-fake
 | The voice brief fails, or `ffmpeg: false` | Install ffmpeg (see [Run it locally](#1-run-it-locally)), then restart. |
 | 🎙 does nothing | Allow the microphone for `localhost:5173` in the browser's site settings. |
 | You recorded, but nothing happens | A recording is not sent on its own: press **Send now** or **Make film**. |
-| Asked for a passcode | `DIRECTOR_PASSCODE` is set in `.env`. Clear it, or enter it. |
+| Asked for a passcode | Open Settings (the gear) and enter the Director code, or your own Muse key. |
 | Port 8787 or 5173 already in use | Stop the other process, or set `PORT` in `.env`. |
 | A film stops early with "Out of time" or a budget message | The crew finishes with what is built once the per-film budget is spent. Raise `CREW_FILM_BUDGET_USD` in `.env` (default 1.50). |
 
@@ -254,7 +254,7 @@ npx tsx scripts/demo-film.ts load data-fake
 | `npm run r8:fixtures` | regenerate the engine's R8 test fixtures (`fixtures/r8`) |
 | `npm run live -- <name> [--yes]` | live checks that spend money; a dry run unless `--yes` is passed |
 
-Optional settings in `.env`: `PRODUCT_3D=true` turns on 3D product shots, `CREW_FILM_BUDGET_USD` sets the budget per film, and `DIRECTOR_PASSCODE` puts a passcode on a public deployment.
+Optional settings in `.env`: `PRODUCT_3D=true` turns on 3D product shots, `CREW_FILM_BUDGET_USD` sets the budget per film, and `DIRECTOR_PASSCODE` is the code that spends the server Muse key. Visitors without that code use their own key from Settings. A Fal, Higgsfield, or Revana key saved in Settings is spent only for that browser session and only from the IP that saved it. `REVANA_API_KEY` is for local scripts; it is not handed to other visitors.
 
 ---
 

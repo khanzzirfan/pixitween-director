@@ -2,6 +2,7 @@ import type { Buffer } from 'node:buffer';
 import type { AepCompositionJson } from '@shared/aep';
 import type { FilmStore } from '@shared/ports';
 import type { ToolCtx } from '@shared/tools';
+import { isBurnt, measureExposure } from './frame-review';
 
 // A last look before the 3D film replaces the 2D one. Both are drawn at the same share of their length, Muse is shown the product photo and the two
 // sets side by side (which set comes first is fixed per film, not always 3D first, so its order does not lean the choice), and it says which is the
@@ -80,6 +81,9 @@ export async function pickForm(ctx: ToolCtx, o: PickInput): Promise<FormPick> {
   try {
     const [flat, solid] = await Promise.all([o.render2d(PICK_SHARES), o.render3d(PICK_SHARES)]);
     if (flat.length !== PICK_FRAMES || solid.length !== PICK_FRAMES) return { better: '3d', clear: true, why: 'frames could not be drawn' };
+    // a floor under Muse's look: 3D frames that measure as burnt out never replace the 2D film, whatever Muse would say
+    const exposure = await measureExposure(solid);
+    if (isBurnt(exposure)) return { better: '2d', clear: true, why: `the 3D frames are burnt out (average brightness ${exposure.mean}, ${Math.round(exposure.hot * 100)}% near white)` };
     const aIs3d = threeDFirst(o.filmId);
     const images = [...(o.photo ? [o.photo] : []), ...(aIs3d ? solid : flat), ...(aIs3d ? flat : solid)];
     const raw = await ctx.meta.spark.reviewImages(images, pickPrompt({ title: o.title, ...(o.brief ? { brief: o.brief } : {}), withPhoto: Boolean(o.photo) }));

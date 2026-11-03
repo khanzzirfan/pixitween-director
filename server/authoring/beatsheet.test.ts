@@ -1,7 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
-import { choosesFlat, defaultFinish, boardPrompt, checkBeatSheet, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, isFailureText, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
+import { choosesFlat, defaultFinish, boardPrompt, checkBeatSheet, CUTS, IN_SCENE_CUTS, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, isFailureText, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
 import { TEXT_RULES } from './cinematic-rules';
 import { FORM_VERDICTS, verdictLines } from './form-verdicts';
 import { floorElements } from './ingredients';
@@ -640,5 +640,45 @@ describe('the colour grade on a board', () => {
     expect(r.ok && r.board.grade).toEqual({ exposure: 0.3, contrast: 0, saturation: 0.4, hue: 40, shadows: '#0a5a6a', split: 1, streak: { color: '#88aaff', strength: 2, reach: 0.02 }, halation: 0.5, letterbox: 2.6 });
     const none = parseBoard(board({ grade: {} }));
     expect(none.ok && none.board.grade).toBeUndefined();
+  });
+});
+
+describe('shader cut vocabulary', () => {
+  it('every shader cut word is a board cut, and every board cut is a plain, in-scene or shader cut', async () => {
+    const { CUT_SHADERS } = await import('./cinematic-rules');
+    const words = Object.keys(CUT_SHADERS).filter((k) => k !== 'max');
+    for (const w of words) expect(CUTS).toContain(w);
+    for (const c of CUTS) expect(['hard', 'wipe', 'cloud', ...IN_SCENE_CUTS, ...words]).toContain(c);
+  });
+
+  it('every shader a cut names exists in the engine and can run there (no second picture needed)', async () => {
+    const { CUT_SHADERS } = await import('./cinematic-rules');
+    const { loadGlTransitions, usable } = await import('../../engine/src/three/transition');
+    const lib = await loadGlTransitions();
+    for (const [word, d] of Object.entries(CUT_SHADERS)) {
+      if (word === 'max') continue;
+      const t = lib.find((d as { shader: string }).shader);
+      expect(t, word).toBeDefined();
+      expect(usable(t!), word).toBe(true);
+    }
+  });
+});
+
+describe('reflect option', () => {
+  it('keeps a known reflection studio, and drops one it does not know', () => {
+    const r = parseBoard(JSON.stringify({ ...lemonBoard(), reflect: 'softbox' }));
+    expect(r.ok && r.board.reflect).toBe('softbox');
+    const bad = parseBoard(JSON.stringify({ ...lemonBoard(), reflect: 'disco' }));
+    expect(bad.ok && bad.board.reflect).toBeUndefined();
+  });
+});
+
+describe('spots option', () => {
+  it('keeps up to two spots with known sides, and clamps their numbers', () => {
+    const r = parseBoard(JSON.stringify({ ...lemonBoard(), spots: [{ side: 'behind', strength: 9, cone: 200 }, { side: 'left' }] }));
+    expect(r.ok && r.board.spots?.map((s) => s.side)).toEqual(['behind', 'left']);
+    expect(r.ok && r.board.spots?.[0]?.strength).toBeLessThanOrEqual(3);
+    const bad = parseBoard(JSON.stringify({ ...lemonBoard(), spots: [{ side: 'inside' }] }));
+    expect(bad.ok && bad.board.spots).toBeUndefined();
   });
 });

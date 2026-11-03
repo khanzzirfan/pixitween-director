@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
+import { CINEMATIC_TRANSITIONS } from './cinematicTransitions';
 
 // Shader transitions between a three layer's own shots, using the open gl-transitions collection
 // (https://gl-transitions.com, MIT). Each transition is a GLSL `transition(uv)` function that mixes
@@ -24,7 +25,7 @@ export interface GlTransitionLib {
 export async function loadGlTransitions(): Promise<GlTransitionLib> {
   const mod = (await import('gl-transitions')) as unknown as { default?: GlTransition[] } & GlTransition[];
   const list: GlTransition[] = Array.isArray(mod.default) ? mod.default : (mod as unknown as GlTransition[]);
-  const byName = new Map(list.map((t) => [t.name, t] as const));
+  const byName = new Map([...list, ...CINEMATIC_TRANSITIONS].map((t) => [t.name, t] as const));
   return { find: (name) => byName.get(name) };
 }
 

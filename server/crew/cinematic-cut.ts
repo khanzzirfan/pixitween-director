@@ -275,6 +275,8 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     ...(board.blur !== undefined ? { blur: board.blur } : {}),
     ...(board.grade ? { grade: board.grade } : {}),
     ...(board.bokeh !== undefined ? { bokeh: board.bokeh } : {}),
+    ...(board.reflect ? { reflect: board.reflect } : {}),
+    ...(board.spots?.length ? { spots: board.spots } : {}),
     ...(board.aperture !== undefined ? { aperture: board.aperture } : {}),
     ...(bed ? { music: { id: bed.id, src: bed.url } } : {}),
     title,
@@ -290,7 +292,7 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     // Muse looks at six frames of what it wrote and may revise the board once; the pictures it needs are already made
     const photoRef = film.assets.find((a) => a.role === 'product-photo');
     const photo = photoRef ? await ctx.assets.read(photoRef.id).catch(() => undefined) : undefined;
-    const seen = await reviewFrames(ctx, { board, title, brief: film.brief.text, ...(photo ? { photo } : {}), flat, render: (times) => renderKeyFrames(comp, times), log });
+    const seen = await reviewFrames(ctx, { board, title, brief: film.brief.text, ...(photo ? { photo } : {}), flat, render: (times, revised) => renderKeyFrames(revised ? build(revised) : comp, times), log });
     if (seen.revised) comp = build(seen.board);
     // a last look: Muse sees both cuts, and the film goes back to its 2D cut only when that cut clearly wins (the 3D one broke the product)
     flatCut = (await finishedComposition(ctx.films, ctx.filmId, ctx.assets).catch(() => undefined)) as AepCompositionJson | undefined;

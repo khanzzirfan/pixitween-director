@@ -7,7 +7,7 @@ import { defaultFinish, type Grade, type FocusTarget, type Handheld, type ShotFo
 import type { IngredientAsset } from './ingredients';
 import { shade, type ClipAsset, type Rect } from './retail-clip';
 import { addScene } from './scenes';
-import { CAMERA, CUT_SHADERS, FINISH, LIGHT, MATERIALS, SURFACES, type Surface } from './cinematic-rules';
+import { CAMERA, CUT_SHADERS, FINISH, LIGHT, MATERIALS, SPOT, SURFACES, type Surface } from './cinematic-rules';
 import { WALL, type SetAir, type SetLook } from './set-art';
 import { setKeyframes } from './transform';
 import { rampProgress, type RatePoint } from '@engine/core/speedRamp';
@@ -92,6 +92,10 @@ export interface CinematicInput {
   grade?: Grade;
   /** How much bright points of light spread into discs where the lens is out of focus (0 none, 1 strong). Absent means none. */
   bokeh?: number;
+  /** Spot lights on the product, each a pool of light from one side. Absent means none. */
+  spots?: Array<{ side: 'left' | 'right' | 'above' | 'behind' | 'front'; color?: string; strength?: number; cone?: number; soft?: number }>;
+  /** What shiny things reflect. Absent means the studio preset's own (the room). */
+  reflect?: 'room' | 'softbox' | 'ring' | 'sunset' | 'none';
   /** The lens's base aperture, 0 sharp everywhere to 1 shallow. Absent means APERTURE. */
   aperture?: number;
   /** The board's set: a backdrop picture on the wall behind the product, the floor colour, and the air. Without it the product floats on the plain field. */
@@ -1058,6 +1062,8 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     shadow: { opacity: i.set ? LIGHT.shadow : 0.45, softness: 0.7 },
     lights: {
       preset: 'studio',
+      ...(i.reflect ? { environment: i.reflect } : {}),
+      ...(i.spots?.length ? { spots: spotLights(i.spots) } : {}),
       key: { azimuth: lp?.azimuth ?? [key(0, -70, EASE_IN_OUT), key(land, -70, EASE_IN_OUT), key(Math.max(turnEnd, land + 6), 45, LINEAR), key(frames, 45)], elevation: lp?.elevation ?? 55, color: i.light?.key ?? keyColor, ...(lp?.key ? { intensity: lp.key } : i.set ? { intensity: setLight.key } : {}) },
       ...(i.set ? { fill: { intensity: setLight.fill }, ambient: setLight.ambient } : {}),
       rim: { ...(i.light?.rim ? { color: i.light.rim } : {}), intensity: lp?.rim ?? [key(0, i.set ? setLight.rim : 0.6, EASE_IN_OUT), key(Math.max(turnEnd, land + 6), i.set ? setLight.rim : 0.6, EASE_IN_OUT), key(frames, i.set ? setLight.rimEnd : 1.4)] },
@@ -1266,6 +1272,29 @@ export function floorLight(f: Finish): { caustics?: Obj } {
   return { caustics: { strength: FINISH.caustics[f.caustics], fade: FINISH.caustics.fade, scale: FINISH.caustics.scale } };
 }
 
+/** The world's spot lights for a board's spots: each stands on its side of the product at the book's distance, aimed at the product's middle. */
+export function spotLights(spots: NonNullable<CinematicInput['spots']>): Obj[] {
+  return spots.slice(0, SPOT.max).map((s, n) => {
+    const [x, y, z] = SPOT.sides[s.side];
+    return {
+      id: `spot${n + 1}`,
+      position: [r2(x * SPOT.distance), r2(PRODUCT_Y + y), r2(z * SPOT.distance)],
+      target: [0, r2(PRODUCT_Y), 0],
+      intensity: r2((s.strength ?? 1) * SPOT.power),
+      angle: Math.round(s.cone ?? SPOT.cone.default),
+      penumbra: r2(s.soft ?? SPOT.soft),
+      ...(s.color ? { color: s.color } : {}),
+    };
+  });
+}
+
+/** The params a shader cut carries: the book's own, with the shot's `dir` turned into the shader's direction vector for the cuts that travel. */
+export function cutParams(cut: string, own: Record<string, number> | undefined, dir: 'left' | 'right' | 'up' | 'down' | undefined): { params?: Obj } {
+  const v = dir ? { left: [-1, 0], right: [1, 0], up: [0, 1], down: [0, -1] }[dir] : undefined;
+  if (v && (cut === 'whip' || cut === 'lenswhip' || cut === 'leak')) return { params: { ...own, direction: v } };
+  return own ? { params: own } : {};
+}
+
 /** The world's shader transitions: a cut that names one (zoom, ripple, swirl...) plays it from the first frame of its shot, for as long as the book says or the shot allows. */
 export function shaderCuts(sheet: BeatSheet, cam: CameraPlan, fps: number): Obj[] {
   const out: Obj[] = [];
@@ -1273,7 +1302,7 @@ export function shaderCuts(sheet: BeatSheet, cam: CameraPlan, fps: number): Obj[
     const def = n > 0 && b.cut && b.cut !== 'hard' && b.cut !== 'wipe' && b.cut !== 'cloud' && b.cut !== 'flash' && b.cut !== 'pass' && b.cut !== 'match' ? CUT_SHADERS[b.cut] : undefined;
     if (!def) return;
     const f = cam.beats[n]!;
-    out.push({ startFrame: f.start, durationFrames: Math.max(2, Math.min(Math.round(def.seconds * fps), Math.round((f.end - f.start) * 0.8))), name: def.shader });
+    out.push({ startFrame: f.start, durationFrames: Math.max(2, Math.min(Math.round(def.seconds * fps), Math.round((f.end - f.start) * 0.8))), name: def.shader, ...cutParams(b.cut!, 'params' in def ? def.params : undefined, b.dir) });
   });
   return out.slice(0, CUT_SHADERS.max);
 }

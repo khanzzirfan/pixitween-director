@@ -1,0 +1,48 @@
+.set-back {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(6 6 12 / 62%);
+  backdrop-filter: blur(8px);
+}
+.set-dialog {
+  width: min(480px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+  padding: 22px 22px 18px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--card);
+  color: var(--fg);
+  box-shadow: 0 30px 80px rgb(0 0 0 / 45%);
+}
+.set-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.set-kicker { margin: 0; font-size: 11px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.set-dialog h2 { margin: 2px 0 0; font-size: 22px; letter-spacing: -.04em; }
+.set-x { width: 32px; height: 32px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: 22px; line-height: 1; }
+.set-x:hover { background: color-mix(in srgb, var(--muted) 12%, transparent); color: var(--fg); }
+.set-lead, .set-note { margin: 12px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.set-field { display: grid; gap: 6px; margin-top: 14px; font-size: 13px; font-weight: 700; }
+.set-field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.set-saved { color: var(--accent); font-size: 11px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.set-remove { border: 0; padding: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; }
+.set-remove:hover { color: var(--fg); }
+.set-status.is-locked { background: color-mix(in srgb, var(--danger, #b42318) 12%, var(--card)); }
+.set-field input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 11px 12px;
+  background: color-mix(in srgb, var(--bg) 70%, var(--card));
+  color: var(--fg);
+  font-weight: 500;
+}
+.set-status { margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; font-size: 13px; font-weight: 650; background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+.set-status.is-none { background: color-mix(in srgb, var(--danger, #b42318) 12%, var(--card)); }
+.set-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.set-ghost, .set-save { border-radius: 12px; padding: 9px 14px; font-weight: 700; }
+.set-ghost { border: 1px solid var(--border); background: transparent; color: var(--fg); }
+.set-save { border: 0; background: var(--accent); color: var(--bg); }

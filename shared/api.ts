@@ -2,6 +2,8 @@ import type { FilmId, FilmState, FilmVersion } from './composition';
 import type { GallerySummary } from './gallery';
 
 export const PASSCODE_HEADER = 'x-director-passcode';
+/** A visitor's own Muse key. Sent only when they have not saved a Director code. */
+export const MUSE_KEY_HEADER = 'x-muse-api-key';
 
 export interface CreateFilmResponse {
   filmId: FilmId;
@@ -76,4 +78,37 @@ export interface ExportStartResponse {
 }
 export interface ExportCheckResponse {
   problems: string[];
+}
+
+/** Video providers a visitor can paste in Settings. Each key is stored for that browser session and that IP only. */
+export const VIDEO_PROVIDERS = ['fal', 'higgsfield', 'revana'] as const;
+export type VideoProvider = (typeof VIDEO_PROVIDERS)[number];
+
+export interface VideoKeyStatus {
+  fal: boolean;
+  higgsfield: boolean;
+  revana: boolean;
+}
+
+/** Omitted fields stay as they are. A name in `clear` removes that key. Values are write-only. */
+export interface VideoKeyUpdate {
+  fal?: string;
+  higgsfield?: string;
+  revana?: string;
+  clear?: VideoProvider[];
+}
+
+/** A 9:16 reel. The server spends only the key saved for this browser session and this IP. */
+export interface VideoCreateRequest {
+  provider: VideoProvider;
+  prompt: string;
+  imageUrl?: string;
+  duration?: number;
+}
+
+export interface VideoJobResponse {
+  id: string;
+  provider: VideoProvider;
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  videoUrl?: string;
 }

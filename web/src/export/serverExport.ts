@@ -1,6 +1,7 @@
 // Owned by E1. The server path of the MP4 export, for browsers without WebCodecs H.264: upload one JPEG per frame, let the server's ffmpeg
 // encode them, and read back the MP4 with the server's own check of it.
-import { PASSCODE_HEADER, type ExportStartResponse } from '@shared/api';
+import type { ExportStartResponse } from '@shared/api';
+import { credentialHeaders } from '../settings/access';
 import { captureFrames } from './frameExport';
 import type { RecordOptions } from './recordCanvas';
 import { ExportError, type ExportDriver } from './types';
@@ -10,12 +11,7 @@ export const NO_FFMPEG_MESSAGE = 'This server has no ffmpeg, so it cannot build 
 export const BUSY_MESSAGE = 'The server is busy with another export. Try again in a minute.';
 
 function passcodeHeader(): Record<string, string> {
-  try {
-    const p = localStorage.getItem('director.passcode');
-    return p ? { [PASSCODE_HEADER]: p } : {};
-  } catch {
-    return {};
-  }
+  return credentialHeaders();
 }
 
 export function toJpeg(canvas: HTMLCanvasElement, quality = 0.9): Promise<Blob> {

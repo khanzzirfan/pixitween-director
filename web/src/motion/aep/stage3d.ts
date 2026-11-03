@@ -367,7 +367,26 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
   lightValue(lights?.ambient, 'ambient');
   if (lights?.key?.color) lighting.keyColor = lights.key.color;
   if (lights?.rim?.color) lighting.rimColor = lights.rim.color;
-  if (lights?.spots?.length) warnings.push(`layer ${world.id}: lights.spots are not supported yet`);
+  // Spot lights become the engine's own lights (key, fill, rim and ambient are the preset's); their aim, level and cone follow their keyframes.
+  const spots = (lights?.spots ?? []).map((s) => {
+    const own = (value: AepAnimatable<number | number[]>, props: string[]) =>
+      propertyTweens(value, { fps: ctx.fps, inPoint: world.inPoint, props }).tweens.map((t) => ({ ...t, ...{ target: `light:${s.id}` } }));
+    if (isKeyframed(s.intensity)) lightTweens.push(...own(s.intensity, ['intensity']));
+    if (isKeyframed(s.position)) lightTweens.push(...own(s.position, ['position.x', 'position.y', 'position.z']));
+    if (isKeyframed(s.target)) lightTweens.push(...own(s.target, ['target.x', 'target.y', 'target.z']));
+    if (s.angle !== undefined && isKeyframed(s.angle)) lightTweens.push(...own(s.angle, ['angle']));
+    return {
+      id: s.id,
+      type: 'spot' as const,
+      intensity: first(s.intensity),
+      position: first(s.position) as Vec3,
+      target: first(s.target) as Vec3,
+      castShadow: s.castShadow ?? false,
+      ...(s.color ? { color: s.color } : {}),
+      ...(s.angle !== undefined ? { angle: first(s.angle) } : {}),
+      ...(s.penumbra !== undefined ? { penumbra: s.penumbra } : {}),
+    };
+  });
 
   const style = world.style;
   if (style?.shading === 'toon' || style?.outline) {
@@ -577,7 +596,7 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
       far: 200,
     },
     lighting: { preset: lightingPreset, environment: lights?.environment, ...lighting },
-    lights: [],
+    lights: spots,
     shadow: {
       enabled: shadowOpacity > 0,
       opacity: catcherOpacity,

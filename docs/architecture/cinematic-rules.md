@@ -24,8 +24,9 @@ The board prompt offers Muse the options in this book, the checker only catches 
 - A set is lit like the reference ads, by the board's key level: a mid key is one key at 4, a rim of 1.5 (2.4 in the end hold) that outlines the product, fill 0.35; a low key keeps the mood (key 3.4, fill 0.2, a 45% vignette) and a high key opens up (fill 0.6). The cut-out's side face is lifted 40% toward white so no black outline shows, and the backdrop's horizon is never near white.
 - In the end hold the product stands at most 56% of the frame's height (the shot before it, whose framing the hold keeps, is held to the same), so the name, tagline and price never sit on it.
 - A flat, wide product never fills more than 90% of the frame's width, and a flat cut-out is built as a solid body, so it turns as far as the spin says.
-- A cut may play a shader transition (zoom, whip, ripple, swirl, glitch, burn, streak); at most 3 cuts in a film are anything but a plain cut, and never the first shot's.
+- A cut may play a shader transition (zoom, whip, lenswhip, spin, punch, ripple, swirl, glitch, burn, leak, streak, iris, dream, defocus, melt); at most 3 cuts in a film are anything but a plain cut, and never the first shot's.
 - Three cuts happen inside the scene and cost no second render, so they are not counted in that limit: flash (a hot flash of the key light that fades in 0.14 s), pass (the shot before plunges at the product over its last 28% until the product fills the frame, and this shot pulls out of that crop) and match (this shot starts as close and on the same lens as the one before ended, so the product keeps its size and place while the angle jumps).
+- A board may add up to 2 spot lights, each 0.9 m from the product on a side Muse names (left, right, above, behind, front), aimed at its middle: strength is 0.2 to 3 times 5 in engine units, the cone 10 to 60 degrees (24 unless written) and the edge 0.6 soft unless written. The board also picks what shiny things reflect: room, softbox, ring, sunset or none.
 - The finish is the screen grade over the world: glow (0.55 soft, 1.1 strong; it swells 35% in the end hold), grain (0.07 fine, 0.15 heavy), vignette (0.35 soft, 0.62 strong), an optional colour fringe of 0.0007 and the floor's shine (a reflection of the product, 0.2 matte, 0.42 glossy, 0.65 mirror, fading out 0.3 to 0.55 m from it; only on a set) and wet (beads of condensation on the product, 0.4 light, 0.9 heavy, for a cold drink or a fresh, dewy product) and caustics (light rippling on the floor round the product the way a glass of liquid or a pool throws it, 0.35 soft, 0.7 bright, for drinks, water and anything fresh or aquatic; only on a set); the board picks the levels, and a board that picks none gets them from its key level.
 - The rendered film must move: a moving shot's picture changes at least 0.40% a step (0.1 s), the price hold at least 0.20%, and at least 85% of the film is live.
 
@@ -89,11 +90,19 @@ The board prompt offers Muse the options in this book, the checker only catches 
 | `cloud` | a bloom of light across the cut |
 | `zoom` | a zoom blur: the lens rushes through the cut |
 | `whip` | a whip pan: a fast sideways smear into the next shot |
+| `lenswhip` | a whip with colour fringing, like a real lens at speed |
+| `spin` | the frame spins through a turn as it blurs |
+| `punch` | a push-in with a hot flash at the swap, an impact |
 | `ripple` | a water drop ripple spreads across the cut |
 | `swirl` | a swirl twists the old shot into the new |
 | `glitch` | a digital glitch tears the picture across the cut |
 | `burn` | a warm film burn washes through the cut |
+| `leak` | a warm band of light sweeps across and leaves the new shot behind it |
 | `streak` | light streaks sweep across the cut |
+| `iris` | a camera aperture closes and opens on the next shot |
+| `dream` | a soft wavering dissolve |
+| `defocus` | the old shot goes out of focus and the new one racks sharp |
+| `melt` | the bright parts melt away into the next shot |
 | `flash` | a hot flash of the key light that fades at once (inside the scene) |
 | `pass` | the product passes the lens: the shot before plunges at it until it fills the frame and this shot pulls out of that crop (inside the scene) |
 | `match` | a match cut on shape: this shot opens with the product as large and on the lens the last one ended on, the angle jumping (inside the scene) |

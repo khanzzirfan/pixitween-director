@@ -54,6 +54,13 @@ it('enforces the passcode on mutating routes only', async () => {
     expect((await ok.json()).error).toBe('film_not_ready');
   }
   expect((await app.request('/api/local-mode')).status).not.toBe(401); // GET is never blocked
+  const own = await app.request(path, {
+    method: 'POST',
+    body: JSON.stringify({ message: 'hi' }),
+    headers: { 'content-type': 'application/json', 'x-director-passcode': 'nope', 'x-muse-api-key': 'visitor-key-123' },
+  });
+  expect(own.status).toBe(409);
+  expect((await own.json()).error).toBe('film_not_ready');
 });
 
 it('lets mutating routes through when no passcode is set', async () => {
