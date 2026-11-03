@@ -80,6 +80,7 @@ export const MotionStage = forwardRef<MotionHandle, MotionStageProps>(function M
       },
       readPixel: (x: number, y: number) => innerRef.current?.readPixel(x, y) ?? [0, 0, 0, 0],
       pick: (x: number, y: number) => innerRef.current?.pick(x, y) ?? null,
+      blurAt: (sec: number) => innerRef.current?.blurAt(sec) ?? null,
     }),
     [],
   );

@@ -19,4 +19,5 @@ export const playerToDriver = (h: ExportPlayerHandle): ExportDriver => ({
   pause: () => h.pause(),
   seek: (sec) => h.seek(sec),
   getTime: () => h.getTime(),
+  ...(h.blurAt ? { blurAt: (sec: number) => h.blurAt!(sec) } : {}),
 });

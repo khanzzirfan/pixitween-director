@@ -508,3 +508,37 @@ describe('a dolly-zoom is never framed as a macro', () => {
     expect(effectiveSizes(sheet)).toEqual(['wide', 'close', 'close']);
   });
 });
+
+describe('the set palette and the end card on a board', () => {
+  const board = (extra: object) => ({ ...lemonBoard(), ...extra });
+  it('reads a palette: colours lower-cased, numbers pulled into range, a bad colour dropped', () => {
+    const r = parseBoard(board({ set: { look: 'night', air: 'none', palette: { top: '#4A0A1C', horizon: 'red', ground: '#101010', glow: { x: 4, y: 0.1, color: '#FF3B8D', size: 9 }, band: { color: '#102030', height: 0.9 }, texture: 'rays', accent: '#ffb347' } } }));
+    expect(r.ok && r.board.set?.palette).toEqual({ top: '#4a0a1c', ground: '#101010', glow: { x: 1, y: 0.3, color: '#ff3b8d', size: 0.7 }, band: { color: '#102030', height: 0.3 }, texture: 'rays', accent: '#ffb347' });
+  });
+  it('a bad texture or palette is dropped and the set stands', () => {
+    const r = parseBoard(board({ set: { look: 'beach', air: 'dust', palette: { texture: 'lasers' } } }));
+    expect(r.ok && r.board.set).toEqual({ look: 'beach', air: 'dust', palette: {} });
+    const bad = parseBoard(board({ set: { look: 'beach', air: 'dust', palette: 'pink' } }));
+    expect(bad.ok && bad.board.set).toEqual({ look: 'beach', air: 'dust' });
+  });
+  it('reads the product spin, the light and the blur, holding wild numbers to their range', () => {
+    const r = parseBoard(board({ light: { key: '#FFD7A3', rim: '#22CCDD' }, blur: 3, beats: [{ size: 'wide', move: 'push', seconds: 2, spin: { degrees: 900, ease: 'whip', tilt: -80, roll: 10, lift: 1 }, light: { from: -80, to: 70, elevation: 200, key: 0.5, rim: 2.5 }, blur: 0.8 }, { size: 'medium', move: 'hold', seconds: 2 }] }));
+    expect(r.ok && r.board.light).toEqual({ key: '#ffd7a3', rim: '#22ccdd' });
+    expect(r.ok && r.board.blur).toBe(1);
+    expect(r.ok && r.board.sheet.beats[0]).toMatchObject({ spin: { degrees: 720, ease: 'whip', tilt: -40, roll: 10, lift: 1 }, light: { from: -80, to: 70, elevation: 85, key: 0.5, rim: 2.5 }, blur: 0.8 });
+    const odd = parseBoard(board({ light: { key: 'gold' }, beats: [{ size: 'wide', move: 'push', seconds: 2, spin: 'fast', light: 'bright' }, { size: 'medium', move: 'hold', seconds: 2 }] }));
+    expect(odd.ok && odd.board.light).toBeUndefined();
+    expect(odd.ok && odd.board.sheet.beats[0]!.spin).toBeUndefined();
+  });
+  it('reads the end card choices and ignores the ones it does not know', () => {
+    const r = parseBoard(board({ endCard: { plate: 'bar', price: 'tag', align: 'left', text: 'upper', weight: 'light', accent: '#E0AA3E', pulse: false, mood: 'x' } }));
+    expect(r.ok && r.board.endCard).toEqual({ plate: 'bar', price: 'tag', align: 'left', text: 'upper', weight: 'light', accent: '#e0aa3e', pulse: false });
+    const odd = parseBoard(board({ endCard: { plate: 'neon', price: 'coin' } }));
+    expect(odd.ok && odd.board.endCard).toBeUndefined();
+  });
+  it('the prompt offers the palette and the end card as options', () => {
+    const p = boardPrompt({ title: 'Mug', seconds: 8 }).system;
+    for (const w of ["THE WORLD'S COLOURS are yours", 'set.palette', 'glow', 'texture', 'THE END CARD is styled by you', 'plate', 'price', 'align', 'pulse']) expect(p).toContain(w);
+    expect(p).toMatch(/do not default to blue/);
+  });
+});

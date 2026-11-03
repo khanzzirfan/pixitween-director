@@ -3,7 +3,7 @@ import { ASPECT_SIZES } from '@shared/composition';
 import { newFilmComposition, registerAsset } from './composition';
 import { addLayer, type AddLayerOptions } from './layers';
 import { readDirector, writeDirector, sceneMeta } from './meta';
-import { defaultFinish, effectiveAngles, effectiveSizes, totalSeconds, EASES, type Angle, type Beat, type BeatSheet, type CameraPoint, type Finish, type KeyLevel, type ShotSize, type Tone } from './beatsheet';
+import { defaultFinish, type BoardLight, type EndCard, effectiveAngles, effectiveSizes, totalSeconds, type EASES, type Angle, type Beat, type BeatSheet, type CameraPoint, type Finish, type KeyLevel, type ShotSize, type Tone } from './beatsheet';
 import type { IngredientAsset } from './ingredients';
 import { shade, type ClipAsset, type Rect } from './retail-clip';
 import { addScene } from './scenes';
@@ -65,6 +65,12 @@ export interface CinematicInput {
   accent: string;
   /** The screen grade over the world. Absent means the one its key level gets. */
   finish?: Finish;
+  /** The end card's style, Muse's choice. Absent means a centred pill, a round disc and the product's own accent. */
+  endCard?: EndCard;
+  /** The colours of the key and rim lights, Muse's choice. Absent means the key follows the tone and the rim is white. */
+  light?: BoardLight;
+  /** Motion blur for the film: the share of a frame the shutter stays open (a shot's own `blur` replaces it). Absent means none. */
+  blur?: number;
   /** The ingredients made for this product, by kind. A beat whose kind is missing plays without it. */
   ingredients?: Record<string, IngredientAsset>;
   /** The line under the name in the end hold (at most six words); the shots' own words come from the sheet. */
@@ -585,6 +591,39 @@ function uniq<T>(ks: Array<Key<T>>): Array<Key<T>> {
   return out;
 }
 
+/** The light as Muse directs it, shot by shot: keys for the key light's direction and height and the key and rim strengths, only for what a shot names. */
+export interface LightPlan {
+  azimuth?: Array<Key<number>>;
+  elevation?: Array<Key<number>>;
+  key?: Array<Key<number>>;
+  rim?: Array<Key<number>>;
+}
+export function lightKeys(sheet: BeatSheet, cam: CameraPlan, base: { azimuth: number; elevation: number; key: number; rim: number }): LightPlan | undefined {
+  const plan: LightPlan = {};
+  const track = (name: keyof LightPlan, pick: (b: Beat) => [number | undefined, number | undefined], start: number, scale = 1): void => {
+    const ks: Array<Key<number>> = [];
+    let last = start;
+    cam.beats.forEach((f, n) => {
+      const [a, b] = pick(sheet.beats[n]!);
+      if (a === undefined && b === undefined) return;
+      const v0 = (a ?? last) * scale;
+      const v1 = (b ?? a ?? last) * scale;
+      if (v0 === v1) ks.push(key(f.start, r2(v0), undefined, true));
+      else ks.push(key(f.start, r2(v0), EASE_IN_OUT), key(f.end, r2(v1), EASE_IN_OUT));
+      last = b ?? a ?? last;
+    });
+    if (!ks.length) return;
+    // before the first shot that names it, the light is what the film began with
+    if (ks[0]!.t > 0) ks.unshift(key(0, r2(start * scale), undefined, true));
+    plan[name] = uniq(ks);
+  };
+  track('azimuth', (b) => [b.light?.from, b.light?.to ?? b.light?.from], base.azimuth);
+  track('elevation', (b) => [b.light?.elevation, b.light?.elevation], base.elevation);
+  track('key', (b) => [b.light?.key, b.light?.key], 1, base.key);
+  track('rim', (b) => [b.light?.rim, b.light?.rim], 1, base.rim);
+  return Object.keys(plan).length ? plan : undefined;
+}
+
 /**
  * The product's turn and rise, from the shots' product field: a drop-in rises from above spinning (once the lens has settled), a turn swings
  * it 45 degrees through the shot, still holds the yaw it has, and the label macro faces the lens (yaw 0) at its middle.
@@ -597,7 +636,27 @@ function productMoves(sheet: BeatSheet, cam: CameraPlan, land: number, frames: n
   const yaw: Array<Key<V3>> = [key(0, [4, at, 0])];
   const rise: Array<Key<V3>> = [key(0, [0, 0, 0])];
   cam.beats.forEach((f, n) => {
-    const pm = sheet.beats[n]!.product ?? 'still';
+    const beat = sheet.beats[n]!;
+    const pm = beat.product ?? 'still';
+    const sp = beat.spin;
+    const spun = !!sp && pm !== 'drop' && [sp.degrees, sp.tilt, sp.roll, sp.lift].some((v) => v !== undefined && v !== 0);
+    if (spun && sp) {
+      // Muse wrote the product's motion out: a turn of `degrees` over the shot, and a lean, a roll and a toss that peak at its middle
+      const e = EASE_OF[sp.ease ?? 'smooth'];
+      const from = at;
+      const turn = sp.degrees ?? 0;
+      at = from + turn;
+      const mid = Math.round((f.start + f.end) / 2);
+      const hasMid = (sp.tilt || sp.roll || sp.lift) && mid > f.start + 1 && mid < f.end - 1;
+      yaw.push(key(f.start, [4, from, 0], e));
+      if (hasMid) {
+        // the middle key rides the eased curve (its value at half the time) and is linear through, so the turn keeps its shape
+        yaw.push(key(mid, [r(4 + (sp.tilt ?? 0)), r(from + turn * bezierAt(e, 0.5)), r(sp.roll ?? 0)], LINEAR));
+        if (sp.lift) rise.push(key(f.start, [0, 0, 0], EASE_OUT), key(mid, [0, r(sp.lift * PRODUCT_H), 0], LINEAR), key(f.end, [0, 0, 0], EASE_IN_OUT));
+      }
+      yaw.push(key(f.end, [4, at, 0], e));
+      return;
+    }
     if (pm === 'drop') {
       const dur = Math.max(3, Math.min(land, f.end - f.start));
       if (f.start > 0) rise.push(key(f.start - 1, [0, 0, 0], undefined, true));
@@ -760,6 +819,9 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   yaw.push(key(Math.max(turnEnd, (yaw.at(-1)?.t ?? 0) + 3), [4, 22, 0], EASE_IN_OUT), key(frames, [4, 16, 0]));
   let rise: Array<Key<V3>> = [key(0, [0, CAMERA.dropFrom, 0], EASE_OUT), key(land, [0, 0, 0])];
   if (i.sheet.beats.some((b) => b.product)) ({ yaw, rise } = productMoves(i.sheet, cam, land, frames, flat));
+  // the light Muse directs shot by shot (the film's own sweep when it names none)
+  const lp = lightKeys(i.sheet, cam, { azimuth: -70, elevation: 55, key: i.set ? setLight.key : 3.2, rim: i.set ? setLight.rim : 0.6 });
+  const lightTweens = lp ? Object.values(lp).reduce((sum, ks) => sum + Math.max(0, ks.length - 1), 0) : 0;
   // the label macro looks at the label: the camera and its target both move over the label's spot for that shot, and go back for the next
   let target: V3 | Array<Key<V3>> = [0, PRODUCT_Y, 0];
   let macroShift: { beat: BeatFrames; x: number; y: number } | undefined;
@@ -787,7 +849,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   }
   if (i.handheld) {
     // what the camera leaves for itself: the product's turn and rise, the camera's aim, the light's keys, and a few more
-    const others = yaw.length + rise.length + (typeof target[0] === 'object' ? target.length : 0) + 8;
+    const others = yaw.length + rise.length + (typeof target[0] === 'object' ? target.length : 0) + 8 + lightTweens;
     cam = shakeCamera(cam, shakeKeysPerShot(cam.beats.length, others));
   }
   if (macroShift) {
@@ -829,14 +891,14 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     camera: { position: cam.position, target, fov: cam.fov, focus: { distance: cam.focus, aperture: APERTURE } },
     set: i.set ? { ground: i.set.ground, groundSize: [...CAMERA.groundSize], wall: { distance: WALL.distance, height: WALL.height }, backdrop: i.set.backdrop.id, ...floorShine(i.finish ?? defaultFinish(keyLevel)), ...floorLight(i.finish ?? defaultFinish(keyLevel)) } : { ground: 'none', wall: false },
     style: { shading: 'pbr', exposure },
-    post: finishPost(i.finish ?? defaultFinish(keyLevel), cam.beats.at(-1)!.start),
+    post: ((post, blur) => (post || blur ? { ...post, ...(blur ? { motionBlur: blur } : {}) } : undefined))(finishPost(i.finish ?? defaultFinish(keyLevel), cam.beats.at(-1)!.start), motionBlur(i.sheet, cam, i.blur)),
     ...(shaderCuts(i.sheet, cam, fps).length ? { shotTransitions: shaderCuts(i.sheet, cam, fps) } : {}),
     shadow: { opacity: i.set ? LIGHT.shadow : 0.45, softness: 0.7 },
     lights: {
       preset: 'studio',
-      key: { azimuth: [key(0, -70, EASE_IN_OUT), key(land, -70, EASE_IN_OUT), key(Math.max(turnEnd, land + 6), 45, LINEAR), key(frames, 45)], elevation: 55, color: keyColor, ...(i.set ? { intensity: setLight.key } : {}) },
+      key: { azimuth: lp?.azimuth ?? [key(0, -70, EASE_IN_OUT), key(land, -70, EASE_IN_OUT), key(Math.max(turnEnd, land + 6), 45, LINEAR), key(frames, 45)], elevation: lp?.elevation ?? 55, color: i.light?.key ?? keyColor, ...(lp?.key ? { intensity: lp.key } : i.set ? { intensity: setLight.key } : {}) },
       ...(i.set ? { fill: { intensity: setLight.fill }, ambient: setLight.ambient } : {}),
-      rim: { intensity: [key(0, i.set ? setLight.rim : 0.6, EASE_IN_OUT), key(Math.max(turnEnd, land + 6), i.set ? setLight.rim : 0.6, EASE_IN_OUT), key(frames, i.set ? setLight.rimEnd : 1.4)] },
+      rim: { ...(i.light?.rim ? { color: i.light.rim } : {}), intensity: lp?.rim ?? [key(0, i.set ? setLight.rim : 0.6, EASE_IN_OUT), key(Math.max(turnEnd, land + 6), i.set ? setLight.rim : 0.6, EASE_IN_OUT), key(frames, i.set ? setLight.rimEnd : 1.4)] },
     },
   };
   c = insertStage(c, world, [can, ...props.map((p) => p.layer), ...air.cards]);
@@ -845,10 +907,17 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   c.version = SCHEMA as never;
   ((c.precomps as Record<string, Obj>)[ID] as Obj).version = SCHEMA;
 
+  // the end card as Muse styled it: every choice has a plain default (a centred pill, a round disc, the product's own accent)
+  const ec = i.endCard ?? {};
+  const accent = ec.accent ?? i.accent;
+  const caps = (t: string): string => (ec.text === 'upper' ? t.toUpperCase() : t);
+  const baseWeight = ec.weight === 'light' ? 300 : ec.weight === 'bold' ? 700 : 500;
+  const leftAlign = ec.align === 'left';
+  const margin = W * 0.08;
   // copy: brand over the first shots, gone for the macro, then brand, name and price in the end hold
   // dark type on a bright world, white on a dark one: measured on the backdrop behind the words when there is one, else read from the key
   const bright = i.set?.skyLuma !== undefined ? i.set.skyLuma > BRIGHT_SKY : keyLevel === 'high';
-  const ink = bright ? shade(i.accent, 0.8) : '#ffffff';
+  const ink = bright ? shade(accent, 0.8) : '#ffffff';
   const top = H * (portrait ? 0.13 : 0.1);
   // the product in the end hold: how high and wide it really stands (the wide lens and the camera height make it a little bigger than its fill)
   const fill = Math.min(fillIn(sizes.at(-1) ?? 'medium'), holdFill);
@@ -862,7 +931,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   const hasTag = !!i.tagline?.trim();
   const nameCy = Math.max(hasTag ? H * 0.045 + u * 0.1 : H * 0.07 + u * 0.11, Math.min(top + u * 0.11 - (hasTag ? u * 0.03 : 0), canTop - nameSize * 0.9 - (hasTag ? u * 0.05 : 0)));
   if (i.brand) {
-    const bm = add(c, { role: 'caption', kind: 'text', text: i.brand.toUpperCase(), z: 0.2, style: { size: Math.round(u * 0.032), weight: 700, color: bright ? shade(i.accent, 0.5) : tint(i.accent, 0.6), align: 'center' }, box: { x: W * 0.1, y: nameCy - u * 0.11, w: W * 0.8, h: u * 0.045 } });
+    const bm = add(c, { role: 'caption', kind: 'text', text: i.brand.toUpperCase(), z: 0.2, style: { size: Math.round(u * 0.032), weight: 700, color: bright ? shade(accent, 0.5) : tint(accent, 0.6), align: leftAlign ? 'left' : 'center' }, box: { x: W * 0.1, y: nameCy - u * 0.11, w: W * 0.8, h: u * 0.045 } });
     const fade: Array<[number, number]> = [[0, 0], [0.3, 0], [0.6, 1]];
     if (macro) fade.push([r2(macro.start / fps - 0.1), 1], [r2(macro.start / fps), 0], [r2(macro.end / fps), 0]);
     // the end card carries the name, the tagline and the price; the brand shows again there only when there is no tagline
@@ -870,7 +939,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     else fade.push([r2(holdStart - 0.1), fade.at(-1)![1]], [r2(holdStart), 0]);
     c = setKeyframes(bm.c, bm.id, 'opacity', dedupe(fade), 'easeOut');
   }
-  const nm = words(c, ID, name, { cx: portrait ? W / 2 : W * 0.4, cy: nameCy, maxW: W * 0.84, size: nameSize, color: ink, boldLast: true, z: 0.2 });
+  const nm = words(c, ID, caps(name), { cx: portrait ? W / 2 : W * 0.4, cy: nameCy, maxW: W * 0.84, size: nameSize, color: ink, boldLast: true, z: 0.2, weight: baseWeight, ...(leftAlign ? { left: margin } : {}) });
   c = popWords(nm.c, nm.ids, nameCy, holdStart + 0.1, D);
   const light = ink === '#ffffff';
   for (const id of nm.ids) c = shadowed(c, id, light);
@@ -881,14 +950,14 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   if (tag) {
     const tagCy = nameCy + nameSize * 0.6 + u * 0.034;
     const tagSize = Math.round(u * 0.036);
-    const tg = words(c, ID, tag, { cx: portrait ? W / 2 : W * 0.4, cy: tagCy, maxW: W * 0.8, size: tagSize, color: bright ? shade(i.accent, 0.55) : tint(i.accent, 0.75), z: 0.2 });
+    const tg = words(c, ID, caps(tag), { cx: portrait ? W / 2 : W * 0.4, cy: tagCy, maxW: W * 0.8, size: tagSize, color: bright ? shade(accent, 0.55) : tint(accent, 0.75), z: 0.2, ...(leftAlign ? { left: margin } : {}) });
     c = popWords(tg.c, tg.ids, tagCy, holdStart + 0.45, D);
     for (const id of tg.ids) c = shadowed(c, id, light);
     const ts = wordsSpan(c, tg.ids);
     span = { left: Math.min(span.left, ts.left), right: Math.max(span.right, ts.right) };
     plateBottom = tagCy + tagSize * 0.9;
   }
-  c = plate(c, span, nameCy - nameSize * 0.75, plateBottom, light, holdStart + 0.1, D);
+  if (ec.plate !== 'none') c = plate(c, ec.plate === 'bar' ? { left: 0, right: W } : span, nameCy - nameSize * 0.75, plateBottom, light, holdStart + 0.1, D, undefined, ec.plate === 'bar');
 
   // the shots' own words: a hook line, a feeling; popped in the lower third, gone before the cut (never in the macro or the last shot)
   const textCy = H * (portrait ? 0.8 : 0.84);
@@ -896,11 +965,11 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     const f = cam.beats[n]!;
     if (!b.text || n === cam.beats.length - 1 || f.size === 'macro') return;
     const size = Math.round(u * 0.085);
-    const line = words(c, ID, b.text, { cx: W / 2, cy: textCy, maxW: W * 0.84, size, color: ink, boldLast: true, z: 0.2 });
+    const line = words(c, ID, caps(b.text), { cx: W / 2, cy: textCy, maxW: W * 0.84, size, color: ink, boldLast: true, z: 0.2, weight: baseWeight });
     const outAt = Math.max(f.start / fps + 0.5, (f.end + 1) / fps - 0.1);
     c = popWords(line.c, line.ids, textCy, f.start / fps + 0.06, D, outAt);
     for (const id of line.ids) c = shadowed(c, id, light);
-    c = plate(c, wordsSpan(c, line.ids), textCy - size * 0.75, textCy + size * 0.75, light, f.start / fps + 0.06, D, outAt);
+    if (ec.plate !== 'none') c = plate(c, ec.plate === 'bar' ? { left: 0, right: W } : wordsSpan(c, line.ids), textCy - size * 0.75, textCy + size * 0.75, light, f.start / fps + 0.06, D, outAt, ec.plate === 'bar');
   });
 
   // the price disc beside the can when there is room for it, else under it; never over it (no disc when the brief names no price)
@@ -915,21 +984,29 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     const dcx = !portrait ? W * 0.75 : beside ? pcx + pw / 2 + gap + (ddUse * 1.06) / 2 : pcx;
     const dcy = !portrait ? pcy : beside ? pcy + ph * 0.18 : Math.min(H - ddUse * 0.62, pcy + ph / 2 + gap + ddUse * 0.55);
     const rd = ddUse * 1.06;
-    const ring = shape(c, { x: dcx - rd / 2, y: dcy - rd / 2, w: rd, h: rd }, tint(i.accent, 0.6), 0.32, { kind: 'ellipse', size: [rd, rd] });
-    const disc = shape(ring.c, { x: dcx - ddUse / 2, y: dcy - ddUse / 2, w: ddUse, h: ddUse }, i.accent, 0.3, { kind: 'ellipse', size: [ddUse, ddUse] });
+    // the price's shape: a round disc with a ring, a rounded tag, or none at all (big plain type)
+    const priceKind = ec.price ?? 'disc';
+    const tagW = ddUse * 1.5;
+    const tagH = ddUse * 0.58;
+    const ring = priceKind === 'disc' ? shape(c, { x: dcx - rd / 2, y: dcy - rd / 2, w: rd, h: rd }, tint(accent, 0.6), 0.32, { kind: 'ellipse', size: [rd, rd] }) : { c, id: '' };
+    const disc =
+      priceKind === 'disc' ? shape(ring.c, { x: dcx - ddUse / 2, y: dcy - ddUse / 2, w: ddUse, h: ddUse }, accent, 0.3, { kind: 'ellipse', size: [ddUse, ddUse] })
+      : priceKind === 'tag' ? shape(ring.c, { x: dcx - tagW / 2, y: dcy - tagH / 2, w: tagW, h: tagH }, accent, 0.3, { kind: 'rect', size: [tagW, tagH], roundness: Math.round(tagH * 0.28) })
+      : { c: ring.c, id: '' };
+    const onPrice = priceKind === 'plain' ? ink : inkOn(accent);
     const beat = 60 / (i.bpm ?? 120);
     const pulse: Array<[number, number]> = [[0, 0], [r2(holdStart), 0], [r2(holdStart + 0.25), 1.18], [r2(holdStart + 0.45), 1]];
-    for (let t = holdStart + 0.45 + 2 * beat; t + 0.25 <= D; t += 2 * beat) pulse.push([r2(t - 0.2), 1], [r2(t), 1.1], [r2(t + 0.25), 1]);
-    c = setKeyframes(disc.c, disc.id, 'scale', pulse, 'easeInOut');
-    c = setKeyframes(c, ring.id, 'scale', pulse, 'easeInOut');
+    if (ec.pulse !== false) for (let t = holdStart + 0.45 + 2 * beat; t + 0.25 <= D; t += 2 * beat) pulse.push([r2(t - 0.2), 1], [r2(t), 1.1], [r2(t + 0.25), 1]);
+    c = disc.id ? setKeyframes(disc.c, disc.id, 'scale', pulse, 'easeInOut') : disc.c;
+    if (ring.id) c = setKeyframes(c, ring.id, 'scale', pulse, 'easeInOut');
     const was = i.wasPrice !== undefined && i.wasPrice > price ? formatPrice(i.wasPrice, i.currency) : undefined;
     const ps = Math.round(Math.min(ddUse * 0.3, (ddUse * 0.82) / (priceText.length * 0.6)));
-    const pr = add(c, { role: 'caption', kind: 'text', text: priceText, z: 0.15, style: { size: ps, weight: 800, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - ddUse / 2, y: dcy - ps * 0.6 + (was ? ps * 0.25 : 0), w: ddUse, h: ps * 1.2 } });
+    const pr = add(c, { role: 'caption', kind: 'text', text: priceText, z: 0.15, style: { size: ps, weight: 800, color: onPrice, align: 'center' }, box: { x: dcx - ddUse / 2, y: dcy - ps * 0.6 + (was ? ps * 0.25 : 0), w: ddUse, h: ps * 1.2 } });
     c = setKeyframes(pr.c, pr.id, 'scale', pulse, 'easeInOut');
     if (was) {
       const ws = Math.round(ps * 0.55);
       const wy = dcy - ps * 0.55;
-      const old = add(c, { role: 'caption', kind: 'text', text: was, z: 0.15, style: { size: ws, weight: 500, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - ddUse / 2, y: wy - ws * 0.6, w: ddUse, h: ws * 1.2 } });
+      const old = add(c, { role: 'caption', kind: 'text', text: was, z: 0.15, style: { size: ws, weight: 500, color: onPrice, align: 'center' }, box: { x: dcx - ddUse / 2, y: wy - ws * 0.6, w: ddUse, h: ws * 1.2 } });
       c = setKeyframes(old.c, old.id, 'scale', pulse, 'easeInOut');
       const lw = was.length * ws * 0.56;
       const line = shape(c, { x: dcx - lw / 2, y: wy - Math.max(2, ws * 0.05), w: lw, h: Math.max(3, ws * 0.1) }, '#ff5a6e', 0.1);
@@ -996,10 +1073,11 @@ function wordsSpan(c: Comp, ids: string[]): { left: number; right: number } {
  * A soft, rounded plate under words, in the tone opposite their ink, so they read whatever the world behind them does (a bright sky, pale
  * sand, a light studio). It fades in with the first word and out with the line.
  */
-function plate(c: Comp, span: { left: number; right: number }, top: number, bottom: number, dark: boolean, at: number, D: number, outAt?: number): Comp {
-  const pad = (bottom - top) * 0.45;
+function plate(c: Comp, span: { left: number; right: number }, top: number, bottom: number, dark: boolean, at: number, D: number, outAt?: number, bar = false): Comp {
+  // a pill hugs the words with a rounded end; a bar runs the full width of the span (the frame) with square ends
+  const pad = bar ? 0 : (bottom - top) * 0.45;
   const box = { x: span.left - pad, y: top, w: span.right - span.left + pad * 2, h: bottom - top };
-  const s = shape(c, box, dark ? PLATE.dark : PLATE.light, 0.25, { kind: 'rect', size: [box.w, box.h], roundness: Math.round(box.h / 2) });
+  const s = shape(c, box, dark ? PLATE.dark : PLATE.light, 0.25, { kind: 'rect', size: [box.w, box.h], roundness: bar ? 0 : Math.round(box.h / 2) });
   const cap = (t: number) => Math.min(r2(t), r2(D - 0.05));
   const a = cap(Math.max(0.06, at));
   const op: Array<[number, number]> = [[0, 0], [a, 0], [cap(a + 0.15), PLATE.opacity]];
@@ -1048,6 +1126,21 @@ export function finishPost(f: Finish, holdFrame: number): Obj | undefined {
   if (f.grain !== 'none') post.grain = { opacity: FINISH.grain[f.grain] };
   if (f.fringe) post.aberration = { offset: FINISH.fringe };
   return Object.keys(post).length ? post : undefined;
+}
+
+/**
+ * The world's motion blur: for each shot, the share of a frame the shutter stays open (the shot's own `blur`, else the film's, else none).
+ * An exact export draws a blurred frame several times across that time and averages them; a wider shutter gets more pictures to stay smooth.
+ */
+export function motionBlur(sheet: BeatSheet, cam: CameraPlan, film: number | undefined): Obj | undefined {
+  const shots: Array<{ startFrame: number; durationFrames: number; shutter: number }> = [];
+  cam.beats.forEach((f, n) => {
+    const shutter = r2(sheet.beats[n]!.blur ?? film ?? 0);
+    if (shutter > 0.02) shots.push({ startFrame: f.start, durationFrames: Math.max(1, f.end - f.start + 1), shutter });
+  });
+  if (!shots.length) return undefined;
+  const widest = Math.max(...shots.map((s) => s.shutter));
+  return { samples: Math.min(10, Math.max(4, Math.round(4 + widest * 8))), shots };
 }
 
 /** Keyframe pairs at least `gap` seconds apart (the director refuses two keys on one frame): a key too close to the one before is dropped, the first wins. */

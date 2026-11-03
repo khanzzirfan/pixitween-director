@@ -76,7 +76,7 @@ function StageCheck() {
   };
   // the frame-capture script (scripts/lib/film-frames.ts) drives the page through this
   useEffect(() => {
-    (window as unknown as { __stage?: unknown }).__stage = { seek, whenReady: (s: number) => player.current?.whenReady(s) };
+    (window as unknown as { __stage?: unknown }).__stage = { seek, whenReady: (s: number) => player.current?.whenReady(s), blurAt: (s: number) => player.current?.blurAt?.(s) ?? null, canvas: () => player.current?.getCanvas() ?? null };
   });
   const hashAt = async (sec: number, rect?: [number, number, number, number]) => {
     await seek(sec);

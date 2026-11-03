@@ -605,7 +605,7 @@ const aepStageLightsSchema = z
       .strict()
       .optional(),
     rim: z
-      .object({ intensity: aepAnimatableOf(z.number().min(0)).optional() })
+      .object({ intensity: aepAnimatableOf(z.number().min(0)).optional(), color: aepColorSchema.optional() })
       .strict()
       .optional(),
     ambient: aepAnimatableOf(z.number().min(0)).optional(),
@@ -672,6 +672,16 @@ const aepStagePostSchema = z
     vignette: z.object({ offset: z.number().min(0).max(1).optional(), darkness: z.number().min(0).max(1) }).strict().optional(),
     grain: z.object({ opacity: z.number().min(0).max(0.5) }).strict().optional(),
     aberration: z.object({ offset: z.number().min(0).max(0.01) }).strict().optional(),
+    // Motion blur at export: each frame inside a span is drawn `samples` times across the shutter's open time (a share of the frame, 0 to 1) and averaged.
+    motionBlur: z
+      .object({
+        samples: z.number().int().min(2).max(16).optional(),
+        shots: z
+          .array(z.object({ startFrame: z.number().finite().min(0), durationFrames: z.number().finite().positive(), shutter: z.number().min(0).max(1) }).strict())
+          .max(16),
+      })
+      .strict()
+      .optional(),
     grade: z
       .object({
         brightness: z.number().min(-0.5).max(0.5).optional(),

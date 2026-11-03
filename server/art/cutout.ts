@@ -135,15 +135,28 @@ export async function studioKey(source: Buffer): Promise<SamObject | undefined> 
 
 export async function cutout(
   ctx: ToolCtx,
-  o: { source: Buffer; noun: string; sceneId?: string; minConfidence?: number; feather?: number; cacheKey?: string },
+  o: { source: Buffer; noun: string; /** other words to ask SAM for when the first finds nothing, one call each, in order */ alsoTry?: string[]; sceneId?: string; minConfidence?: number; feather?: number; cacheKey?: string },
 ): Promise<{ cutout: AssetRef; mask: AssetRef; bounds: SamObject['bounds']; confidence?: number; objectId: string }> {
   if (o.cacheKey && cache.has(o.cacheKey)) return cache.get(o.cacheKey)!;
   const pending = (async () => {
     const { width, height } = await imageSize(o.source);
     // a photo already cut out keeps its own edge; a studio pack shot is keyed; anything else goes to SAM
     const keyed = (await ownAlpha(o.source)) ?? (await studioKey(o.source));
-    let object = keyed ?? selectObject(await ctx.meta.sam.segmentImage(o.source, o.noun), o.minConfidence ?? 0.5);
-    if (!keyed) charge(ctx, 'sam-3.1', '1 image', PRICE.samImageUsd);
+    // SAM answers to the word it is given (it finds "goggles" at 0.9 and "product" at nothing), so each word is tried in turn; a word that
+    // finds something only just under the bar is kept, and used when no word clears it
+    const bar = o.minConfidence ?? 0.5;
+    let object = keyed;
+    let loose: SamObject | undefined;
+    if (!keyed) {
+      for (const word of [o.noun, ...(o.alsoTry ?? [])]) {
+        const found = await ctx.meta.sam.segmentImage(o.source, word);
+        charge(ctx, 'sam-3.1', '1 image', PRICE.samImageUsd);
+        object = selectObject(found, bar);
+        if (object) break;
+        loose ??= selectObject(found, Math.min(bar, FALLBACK_CONFIDENCE));
+      }
+      object ??= loose;
+    }
     // the name asked for is a guess (a model's word, or the last word of a product title): when SAM finds nothing by it, ask once
     // more for the most general word, a little less strictly, before giving up
     if (!object && !keyed) {

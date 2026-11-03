@@ -16,6 +16,8 @@ export interface MotionHandle {
   whenReady(timeoutSec: number): Promise<boolean>;
   renderFrame(frame: number): Promise<HTMLCanvasElement>;
   readPixel(x: number, y: number): [number, number, number, number];
+  /** The motion blur at `sec` for a frame-by-frame export (shutter 0 to 1, pictures to average), or null when sharp. */
+  blurAt(sec: number): { shutter: number; samples: number } | null;
   /** Front-most layer id at a doc-space pixel (y down), or null. */
   pick(x: number, y: number): string | null;
   /** The runtime behind the player, for capture (engine/src/runtime/capture.ts). */
@@ -156,6 +158,7 @@ export const MotionPlayer = forwardRef<MotionHandle, MotionPlayerProps>(function
       },
       readPixel: (x: number, y: number) => runtimeRef.current?.readPixel(x, y) ?? [0, 0, 0, 0],
       pick: (x: number, y: number) => runtimeRef.current?.pick(x, y) ?? null,
+      blurAt: (sec: number) => runtimeRef.current?.blurAt(sec) ?? null,
       getRuntime: () => runtimeRef.current,
     }),
     [],

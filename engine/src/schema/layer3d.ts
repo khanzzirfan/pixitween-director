@@ -379,6 +379,7 @@ export const Lighting3DSchema = z
     keyColor: ColorSchema.optional(),
     fillIntensity: z.number().min(0).optional(),
     rimIntensity: z.number().min(0).optional(),
+    rimColor: ColorSchema.optional(),
     ambient: z.number().min(0).optional(),
   })
   .strict()
@@ -412,6 +413,15 @@ export const Transition3DSchema = z
   })
   .strict();
 
+// Motion blur: while a layer is exported frame by frame, each frame inside a span is drawn `samples` times across the shutter's open time and
+// the pictures are averaged. `shutter` is the share of a frame's time the shutter stays open (0.5 is the film look). Spans are in the layer's seconds.
+export const MotionBlur3DSchema = z
+  .object({
+    samples: z.number().int().min(2).max(16).default(6),
+    spans: z.array(z.object({ from: z.number().min(0), to: z.number().positive(), shutter: z.number().min(0).max(1) }).strict()).max(16),
+  })
+  .strict();
+
 export const ThreeLayerSchema = z
   .object({
     ...LayerBaseShape,
@@ -428,6 +438,8 @@ export const ThreeLayerSchema = z
     exposure: z.number().positive().max(4).default(1),
     /** Shader transitions at the cuts between the layer's shots (a camera path with cuts). */
     transitions: z.array(Transition3DSchema).max(8).optional(),
+    /** Motion blur for frame-by-frame export. */
+    motionBlur: MotionBlur3DSchema.optional(),
   })
   .strict();
 

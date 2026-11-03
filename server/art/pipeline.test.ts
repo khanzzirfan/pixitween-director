@@ -110,6 +110,23 @@ describe('SAM cutout and placeProduct tool', () => {
     expect(cut.cutout.width).toBeGreaterThan(0);
     expect(t.ledger.total(t.filmId)).toBeCloseTo(0.005);
   });
+  it('tries the other words in order, and keeps a find just under the bar when no word clears it', async () => {
+    const t = await makeTestFilm();
+    const source = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#777777' } }).png().toBuffer();
+    const real = t.meta.sam.segmentImage;
+    const asked: string[] = [];
+    t.meta.sam.segmentImage = async (img: Buffer, noun: string) => {
+      asked.push(noun);
+      const found = await real(img, noun);
+      return noun === 'goggles' ? found.map((o) => ({ ...o, confidence: 0.92 })) : noun === 'swim' ? found.map((o) => ({ ...o, confidence: 0.42 })) : [];
+    };
+    await cutout(t.ctx, { source, noun: 'water', alsoTry: ['goggles', 'swim'], sceneId: 's1' });
+    expect(asked).toEqual(['water', 'goggles']);
+    asked.length = 0;
+    await cutout(t.ctx, { source, noun: 'water', alsoTry: ['swim', 'lens'], sceneId: 's1' });
+    // no word cleared 0.5, but "swim" found something at 0.42: it is used, and the general word is not asked
+    expect(asked).toEqual(['water', 'swim', 'lens']);
+  });
   it('caches cutouts by key and records one SAM charge', async () => {
     const t = await makeTestFilm();
     const source = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#777777' } })

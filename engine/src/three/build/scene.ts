@@ -71,10 +71,10 @@ export function buildScene(layer: ThreeLayer, ctx: SceneContext = {}): ThreeRig 
   const lookAt = new THREE.Vector3(layer.camera.lookAt[0], layer.camera.lookAt[1], layer.camera.lookAt[2]);
   camera.lookAt(lookAt);
 
-  const { keyAzimuth, keyElevation, keyIntensity, keyColor, fillIntensity, rimIntensity, ambient } = layer.lighting;
+  const { keyAzimuth, keyElevation, keyIntensity, keyColor, fillIntensity, rimIntensity, rimColor, ambient } = layer.lighting;
   const lightingConfig = resolveLightingConfig(
     layer.lighting.preset,
-    { keyAzimuth, keyElevation, keyIntensity, keyColor, fillIntensity, rimIntensity },
+    { keyAzimuth, keyElevation, keyIntensity, keyColor, fillIntensity, rimIntensity, rimColor },
     layer.lighting.environment,
   );
   if (ambient !== undefined) lightingConfig.ambientIntensity = ambient;

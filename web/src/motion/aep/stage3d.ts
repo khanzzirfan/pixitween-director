@@ -366,6 +366,7 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
   lightValue(lights?.rim?.intensity, 'rimIntensity');
   lightValue(lights?.ambient, 'ambient');
   if (lights?.key?.color) lighting.keyColor = lights.key.color;
+  if (lights?.rim?.color) lighting.rimColor = lights.rim.color;
   if (lights?.spots?.length) warnings.push(`layer ${world.id}: lights.spots are not supported yet`);
 
   const style = world.style;
@@ -408,6 +409,13 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
   if (post?.aberration) effects.push({ id: 'fringe', type: 'chromaticAberration', params: { offsetX: post.aberration.offset, offsetY: post.aberration.offset } });
   if (post?.vignette) effects.push({ id: 'vignette', type: 'vignette', params: { offset: post.vignette.offset ?? 0.3, darkness: post.vignette.darkness } });
   if (post?.grain) effects.push({ id: 'grain', type: 'noise', params: { opacity: post.grain.opacity } });
+
+  const motionBlur = post?.motionBlur?.shots.length
+    ? {
+        samples: post.motionBlur.samples ?? 6,
+        spans: post.motionBlur.shots.map((s) => ({ from: Math.max(0, (s.startFrame - world.inPoint) / ctx.fps), to: Math.max(0.01, (s.startFrame + s.durationFrames - world.inPoint) / ctx.fps), shutter: s.shutter })),
+      }
+    : undefined;
 
   const objects: Object3D[] = [];
   const set = world.set;
@@ -552,6 +560,7 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
     background: 'transparent' as const,
     effects,
     ...(shotTransitions.length ? { transitions: shotTransitions } : {}),
+    ...(motionBlur ? { motionBlur } : {}),
     camera: {
       position: first(world.camera.position) as Vec3,
       lookAt: first(world.camera.target) as Vec3,
