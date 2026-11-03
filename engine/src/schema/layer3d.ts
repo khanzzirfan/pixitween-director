@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ColorSchema, IdSchema, SecondsSchema, Vec3Schema } from './scalars';
 import { LayerBaseShape } from './layers2d';
+import { EffectSchema, TweenSchema } from './parts';
 import { ShotSpecSchema } from './shot';
 
 // The shot vocabulary lives in its own leaf module (it is what an author writes); it is re-exported
@@ -427,9 +428,26 @@ export const MotionBlur3DSchema = z
   })
   .strict();
 
+// Speed ramps: inside a span the world's own motion (liquids, smoke, swarms, life) runs on a speed curve instead of the clock (slow motion that
+// snaps back). `rates` are points of the curve: `at` the share of the span, `rate` the speed there. The span's ends keep real time. Seconds on the layer's clock.
+export const TimeWarp3DSchema = z
+  .object({
+    from: z.number().min(0),
+    to: z.number().positive(),
+    rates: z.array(z.object({ at: z.number().min(0).max(1), rate: z.number().min(0.05).max(4) }).strict()).min(1).max(6),
+  })
+  .strict();
+
+/** A three layer holds a whole film's camera, light and product moves as tweens, so it may hold more than a 2D layer's 64. */
+export const THREE_TWEENS_MAX = 192;
+/** The depth of field, the glows, the grade, the streak, the fringe, the vignette and the grain of a finished film add up to more than a 2D layer's 8 effects. */
+export const THREE_EFFECTS_MAX = 12;
+
 export const ThreeLayerSchema = z
   .object({
     ...LayerBaseShape,
+    tweens: z.array(TweenSchema).max(THREE_TWEENS_MAX).default([]),
+    effects: z.array(EffectSchema).max(THREE_EFFECTS_MAX).default([]),
     type: z.literal('three'),
     width: z.number().int().min(16).max(2048),
     height: z.number().int().min(16).max(2048),
@@ -445,6 +463,8 @@ export const ThreeLayerSchema = z
     transitions: z.array(Transition3DSchema).max(8).optional(),
     /** Motion blur for frame-by-frame export. */
     motionBlur: MotionBlur3DSchema.optional(),
+    /** Speed ramps for the world's own motion. */
+    timeWarp: z.array(TimeWarp3DSchema).max(8).optional(),
   })
   .strict();
 

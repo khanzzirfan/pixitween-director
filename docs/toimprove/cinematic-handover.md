@@ -108,3 +108,18 @@ Each item must be exposed as a Muse option, not a rule (rule 1).
 - AEP schema and converter: `shared/aep/layer.ts`, `web/src/motion/aep/stage3d.ts`
 - Engine: `engine/src/three/build/*` (lighting, condensation, runners, smoke), `engine/src/runtime/MotionRuntime.ts`
 - Export: `web/src/export/frameExport.ts`, `serverExport.ts`, `playerCanvas.ts`
+
+## Added 2026-11-03 (second agent): items 4-9 of the quality list
+
+All uncommitted, all Muse options (nothing forced). Rule book sentences are in `cinematic-rules.ts` (doc regenerated).
+
+- **Speed ramps** `Beat.ramp` (points of at/rate). Math: `engine/src/core/speedRamp.ts`. Camera and spin are sampled along the curve (`shakeCamera`, `productMoves`); the world's own motion (liquid, smoke, swarms) follows through `world.timeWarp` -> three layer `timeWarp` -> `warpClock` in `threeNode.ts`.
+- **Camera** `camera.via` (waypoints, Catmull-Rom in pose space), `camera.focus` as `{from,to,aperture}` over near/product/far (real depth of field), `camera.shake`; board `handheld` may be `{amount,keys,seed}`, `bokeh`, `aperture` (animatable; `stageDof` got a bokeh weight).
+- **Grade** board `grade` (tone, split toning, lens streak, halation, letterbox). New engine effects `splitTone` and `lensStreak` (`engine/src/effects/custom/grade.ts`). Letterbox is two 2D bars that lift for the end hold.
+- **Cuts inside the scene** `flash`, `pass` (camera plunges into the product, next shot pulls out), `match` (same size and lens, new angle). They do not count in the 3-shader-cut limit.
+- **Frame review** `server/crew/frame-review.ts`: after the film is built, 6 frames are drawn (headless Chromium on the web server, about 27 s) and Muse critiques them; if it names problems the board is revised once (elements and set stay). On unless `FRAME_REVIEW=0`; off in tests. Needs the web server (`EXPORT_RENDER_BASE` or port 5173).
+- **Cut-out** `plainKey` colour-key fallback in `server/art/cutout.ts` after every SAM word fails.
+- **Limits raised for three layers**: tweens 64 -> 192 (`THREE_TWEENS_MAX`), effects 8 -> 12 (`THREE_EFFECTS_MAX`); `CAMERA.tweenBudget` is 190.
+- Verified by frames (in `debug/`): grade/streak/halation/bokeh (`grade-check-strip.png`), pass plunge (`pass-strip.png`). Not verified live: a full Muse run with the review loop, ramps/via on a real film.
+- Known failing tests not from this work: `plate-map` (missing asset file in `data/`), `director.test`, `films.test` (89 warnings count); `board-clip` times out only under load.
+- Reference worth porting next: `clippy-pixijs-nodejs/src/filters/customTransitions.ts` (shape wipes in the same gl-transitions format) and `shaders/animatedVfxShaders.ts` (light leak, VHS, glitch wave...).

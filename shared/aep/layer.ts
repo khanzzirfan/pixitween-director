@@ -528,7 +528,9 @@ const aepStageCameraSchema = z
     focus: z
       .object({
         distance: aepAnimatableOf(z.number().positive()),
-        aperture: z.number().min(0).max(1),
+        // Animatable: an aperture that opens for a shot gives it a shallow focus. Bokeh makes bright points spread into discs.
+        aperture: aepAnimatableOf(z.number().min(0).max(1)),
+        bokeh: z.number().min(0).max(1).optional(),
       })
       .strict()
       .optional(),
@@ -684,6 +686,18 @@ const aepStagePostSchema = z
       })
       .strict()
       .optional(),
+    // Split toning: a tint in the shadows and another in the highlights (`amount` 0 to 1, `balance` moves the line between them).
+    splitTone: z
+      .object({ shadows: aepColorSchema, highlights: aepColorSchema, amount: z.number().min(0).max(1).optional(), balance: z.number().min(-1).max(1).optional() })
+      .strict()
+      .optional(),
+    // An anamorphic lens streak: every bright light draws a horizontal line of `color` across the frame (`reach` a share of its width).
+    streak: z
+      .object({ color: aepColorSchema.optional(), strength: z.number().min(0).max(2), threshold: z.number().min(0).max(1.5).optional(), reach: z.number().min(0.02).max(0.6).optional() })
+      .strict()
+      .optional(),
+    // A soft glow round the highlights (halation): a wide, low bloom over the picture, 0 to 1.
+    halation: z.number().min(0).max(1).optional(),
     grade: z
       .object({
         brightness: z.number().min(-0.5).max(0.5).optional(),
@@ -693,6 +707,16 @@ const aepStagePostSchema = z
       })
       .strict()
       .optional(),
+  })
+  .strict();
+
+// Speed ramps: from `startFrame` for `durationFrames` the world's own motion (liquids, smoke, swarms) runs on a speed curve
+// (`at` the share of the span, `rate` the speed there: 1 normal, 0.2 a fifth). The span's ends keep real time. Composition frames.
+const aepStageTimeWarpSchema = z
+  .object({
+    startFrame: z.number().finite().min(0),
+    durationFrames: z.number().finite().positive(),
+    rates: z.array(z.object({ at: z.number().min(0).max(1), rate: z.number().min(0.05).max(4) }).strict()).min(1).max(6),
   })
   .strict();
 
@@ -727,6 +751,7 @@ const aepStage3DLayerSchema = z
     style: aepStageStyleSchema.optional(),
     post: aepStagePostSchema.optional(),
     shotTransitions: z.array(aepStageShotTransitionSchema).max(8).optional(),
+    timeWarp: z.array(aepStageTimeWarpSchema).max(8).optional(),
   })
   .strict();
 

@@ -38,6 +38,9 @@ export const VOCAB = {
     glitch: 'a digital glitch tears the picture across the cut',
     burn: 'a warm film burn washes through the cut',
     streak: 'light streaks sweep across the cut',
+    flash: 'a hot flash of the key light that fades at once (inside the scene)',
+    pass: 'the product passes the lens: the shot before plunges at it until it fills the frame and this shot pulls out of that crop (inside the scene)',
+    match: 'a match cut on shape: this shot opens with the product as large and on the lens the last one ended on, the angle jumping (inside the scene)',
   },
   actions: { fall: 'drop through the frame', burst: 'fly outward', orbit: 'circle the product', drift: 'float (a liquid floats round the product as wobbling drops)', splash: 'a liquid crowns up round the product and breaks into drops (a card plays its stages)', swirl: 'a liquid winds round the product in a spiral ribbon (a card drifts and rolls)', pour: 'a liquid falls in a stream beside the product into a pool', rise: 'a vapour rises in soft wisps behind the product', wrap: 'a vapour rolls round the product as a cloud and clears' },
   looks: {
@@ -186,8 +189,16 @@ export const CAMERA = {
   shakeAmount: 0.007,
   /** the most tremor keys a shot may take */
   shakeKeysMax: 3,
+  /** A shot with a speed ramp is sampled along its curve at this many keys between its ends (each costs a tween). */
+  rampKeys: 5,
   /** a layer may hold 64 tweens; the tremor must leave room for everything else */
-  tweenBudget: 62,
+  tweenBudget: 190,
+  /** How far behind the product the lens focuses when it pulls to the far set, in metres (the wall's distance). */
+  farFocus: 3.2,
+  /** A pass cut ends the shot before it by plunging at the product until it fills this much of the frame's height (a crop of its surface)... */
+  passFill: 3,
+  /** ...over the last share of that shot. */
+  passTail: 0.28,
   /** the speed a cut leaves and enters at, as a share of the shot's mean speed: never from a stop */
   minCutSpeed: 0.5,
   /** with a set, a high camera looks down this many degrees: steeper and the frame holds only floor, the horizon and the sea leave it */
@@ -238,12 +249,16 @@ export function ruleSentences(): string[] {
     `A cut lands while the camera is moving: the shot before leaves, and the shot after enters, at at least ${pct(C.minCutSpeed)} of its mean speed (a hold and the end of a whip are exempt).`,
     `The tremor is ${pct(C.shakeAmount)} of the camera distance, at most ${C.shakeKeysMax} keys a shot, and is dropped when the world's ${C.tweenBudget}-tween budget has no room.`,
     `The product's motion, the light and the shutter are Muse's: a shot's spin is up to two full turns either way, with a lean up to 40 degrees, a roll up to 30 and a toss up to two product heights at the middle of the shot; a shot's light slides the key between any two directions, sets its height (5 to 85 degrees) and its strength and the rim's strength (up to 2.5 and 3 times the film's); the key and rim colours are any #rrggbb; and the shutter is 0 to 1 of a frame's time, per film or per shot, drawn as 4 to 10 pictures averaged in an exact export. Light keys count in the world's ${C.tweenBudget}-tween budget, so the tremor gives way to them. Nothing is on unless Muse writes it.`,
+    `The colour grade is Muse's: exposure, contrast, saturation and hue, split-toning tints (any #rrggbb) with a strength and a balance, a horizontal lens streak, halation (a soft glow round the highlights) and a letterbox of 1.85 to 2.6 whose bars stop at 30% of the frame's height and lift for the end hold.`,
+    `The camera's path may pass through up to 3 waypoints (a smooth curve through them, sampled at 2 keys a waypoint plus 2); the tremor can be written out (amount 0 to 3 times the usual, 1 to 6 keys a shot, a seed) and set per shot (0 locks the shot); a focus pull runs between the near things, the product and the far set (${C.farFocus} m behind the product), with an aperture of 0 to 1 per shot or per film and bokeh of 0 to 1 that lets bright points spread into discs.`,
+    `A shot's speed ramp is a curve of up to 5 points (rate 0.05 to 4 times normal); the shot keeps its length and its end, so cuts do not move. The camera and the product's spin are sampled along it at ${C.rampKeys} keys between the ends (counted in the tween budget) and the world's own motion runs on the same curve.`,
     `At most ${T.maxShots} shots carry words, each ${T.minWords} to ${T.maxWords} words and about ${T.wordsPerSecond} words a second at most; never a price or a number; the tagline is at most ${T.taglineWords} words. The end card says at most ${T.endCardItems} things: with a tagline the name, the tagline and the price, without one the brand, the name and the price.`,
     `With a set the high camera looks down ${C.highAngleSet} degrees, so the horizon and the sea stay in the frame; a glass piece is at most ${C.glassMax * 100} cm, and a burst flies up and away from the lens. Ice is a clear cube with its corners rounded to ${pct(MATERIALS.iceRound)} of its side and a wet shine; spray is clear round drops, never cubes.`,
     `A set is lit like the reference ads, by the board's key level: a mid key is one key at ${L.key}, a rim of ${L.rim} (${L.rimEnd} in the end hold) that outlines the product, fill ${L.fill}; a low key keeps the mood (key ${LIGHT.low.key}, fill ${LIGHT.low.fill}, a ${pct(LIGHT.low.vignette)} vignette) and a high key opens up (fill ${LIGHT.high.fill}). The cut-out's side face is lifted ${pct(LIGHT.sideLift)} toward white so no black outline shows, and the backdrop's horizon is never near white.`,
     `In the end hold the product stands at most ${pct(C.maxHoldHeight)} of the frame's height (the shot before it, whose framing the hold keeps, is held to the same), so the name, tagline and price never sit on it.`,
     `A flat, wide product never fills more than ${pct(C.maxWidthShare)} of the frame's width, and a flat cut-out is built as a solid body, so it turns as far as the spin says.`,
     `A cut may play a shader transition (${Object.keys(CUT_SHADERS).filter((k) => k !== 'max').join(', ')}); at most ${CUT_SHADERS.max} cuts in a film are anything but a plain cut, and never the first shot's.`,
+    `Three cuts happen inside the scene and cost no second render, so they are not counted in that limit: flash (a hot flash of the key light that fades in 0.14 s), pass (the shot before plunges at the product over its last ${pct(C.passTail)} until the product fills the frame, and this shot pulls out of that crop) and match (this shot starts as close and on the same lens as the one before ended, so the product keeps its size and place while the angle jumps).`,
     `The finish is the screen grade over the world: glow (${FINISH.glow.soft.intensity} soft, ${FINISH.glow.strong.intensity} strong; it swells ${pct(FINISH.holdSwell - 1)} in the end hold), grain (${FINISH.grain.fine} fine, ${FINISH.grain.heavy} heavy), vignette (${FINISH.vignette.soft} soft, ${FINISH.vignette.strong} strong), an optional colour fringe of ${FINISH.fringe} and the floor's shine (a reflection of the product, ${FINISH.floor.matte.strength} matte, ${FINISH.floor.glossy.strength} glossy, ${FINISH.floor.mirror.strength} mirror, fading out ${FINISH.floor.matte.fade} to ${FINISH.floor.mirror.fade} m from it; only on a set) and wet (beads of condensation on the product, ${FINISH.wet.light} light, ${FINISH.wet.heavy} heavy, for a cold drink or a fresh, dewy product) and caustics (light rippling on the floor round the product the way a glass of liquid or a pool throws it, ${FINISH.caustics.soft} soft, ${FINISH.caustics.bright} bright, for drinks, water and anything fresh or aquatic; only on a set); the board picks the levels, and a board that picks none gets them from its key level.`,
     `The rendered film must move: a moving shot's picture changes at least ${(MOTION_RULES.minShot * 100).toFixed(2)}% a step (${MOTION_RULES.stepSec} s), the price hold at least ${(MOTION_RULES.minHold * 100).toFixed(2)}%, and at least ${pct(MOTION_RULES.minLive)} of the film is live.`,
   ];

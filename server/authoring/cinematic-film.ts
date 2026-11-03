@@ -3,13 +3,14 @@ import { ASPECT_SIZES } from '@shared/composition';
 import { newFilmComposition, registerAsset } from './composition';
 import { addLayer, type AddLayerOptions } from './layers';
 import { readDirector, writeDirector, sceneMeta } from './meta';
-import { defaultFinish, type BoardLight, type EndCard, effectiveAngles, effectiveSizes, totalSeconds, type EASES, type Angle, type Beat, type BeatSheet, type CameraPoint, type Finish, type KeyLevel, type ShotSize, type Tone } from './beatsheet';
+import { defaultFinish, type Grade, type FocusTarget, type Handheld, type ShotFocus, type BoardLight, type EndCard, effectiveAngles, effectiveSizes, totalSeconds, type EASES, type Angle, type Beat, type BeatSheet, type CameraPoint, type Finish, type KeyLevel, type ShotSize, type Tone } from './beatsheet';
 import type { IngredientAsset } from './ingredients';
 import { shade, type ClipAsset, type Rect } from './retail-clip';
 import { addScene } from './scenes';
 import { CAMERA, CUT_SHADERS, FINISH, LIGHT, MATERIALS } from './cinematic-rules';
 import { WALL, type SetAir, type SetLook } from './set-art';
 import { setKeyframes } from './transform';
+import { rampProgress, type RatePoint } from '@engine/core/speedRamp';
 import type { Aspect, Comp, Obj } from './types';
 import { inkOn, tint, words } from './variant-film';
 
@@ -80,7 +81,13 @@ export interface CinematicInput {
   /** The line under the name in the end hold (at most six words); the shots' own words come from the sheet. */
   tagline?: string;
   /** A live, hand-held tremor over the camera's moves (the board's choice). It is dropped when the world's 64-tween budget has no room for it. */
-  handheld?: boolean;
+  handheld?: boolean | Handheld;
+  /** The colour grade over the world: tone, split toning, a lens streak, halation, a letterbox. Absent means none of them. */
+  grade?: Grade;
+  /** How much bright points of light spread into discs where the lens is out of focus (0 none, 1 strong). Absent means none. */
+  bokeh?: number;
+  /** The lens's base aperture, 0 sharp everywhere to 1 shallow. Absent means APERTURE. */
+  aperture?: number;
   /** The board's set: a backdrop picture on the wall behind the product, the floor colour, and the air. Without it the product floats on the plain field. */
   set?: { look: SetLook; air: SetAir; backdrop: ClipAsset; ground: string; /** the soft dot the bokeh lights are drawn with */ dot?: ClipAsset; /** how bright the backdrop is where the words sit (its top third), 0 to 1: it picks dark or light type */ skyLuma?: number };
   /** The board's light: the key light's colour and how dark or bright the world is. */
@@ -149,6 +156,16 @@ export interface BeatFrames {
   move: Beat['move'];
   from: Pose;
   to: Pose;
+  /** The shot's speed curve, when Muse wrote one. */
+  ramp?: RatePoint[];
+  /** Poses the camera passes through between `from` and `to`; the path is a smooth curve through them. */
+  via?: Pose[];
+  /** Where each pose of the path (`from`, the `via`s, `to`) falls in the shot, 0 to 1 (the `via`s' and the end's; the start is 0). Absent means evenly spaced. */
+  knots?: number[];
+  /** The shot's own aperture, when its focus names one. */
+  aperture?: number;
+  /** The shot's hand-held tremor as a multiple of the film's, when Muse wrote one. */
+  shake?: number;
 }
 export interface CameraPlan {
   beats: BeatFrames[];
@@ -177,6 +194,11 @@ function withPoint(pose: Pose, pt: CameraPoint | undefined, cap: number): Pose {
   return { d: r(d), az: pt.around ?? pose.az, fov, el: pt.height ?? pose.el, ...(x !== undefined ? { x } : {}) };
 }
 
+/** Where the lens focuses for a target at a pose: the near things (a piece falling toward it), the product, or the far set behind it. */
+export const focusOn = (target: FocusTarget, pose: Pose): number => (target === 'near' ? Math.max(pose.d * 0.45, pose.d - 0.1) : target === 'far' ? pose.d + CAMERA.farFocus : pose.d);
+
+const mixPose = (a: Pose, b: Pose, u: number): Pose => ({ d: a.d + (b.d - a.d) * u, az: a.az + (b.az - a.az) * u, fov: a.fov + (b.fov - a.fov) * u, el: a.el + (b.el - a.el) * u, x: (a.x ?? 0) + ((b.x ?? 0) - (a.x ?? 0)) * u });
+
 /**
  * The camera for a sheet. Every shot is a cut: it starts at its own pose and moves to its arrival pose. A push comes in from 35 % further
  * away, a pull from 30 % closer, a hold creeps in (CAMERA.holdCreep), an orbit swings 44 degrees round the product, and a dolly-zoom widens the lens from 30 to 80
@@ -202,6 +224,7 @@ export function planCamera(sheet: BeatSheet, fps: number, o: { maxFill?: number;
   let cur: Pose = { d: framingDistance(FILL.medium), az: 0, fov: FOV_BASE, el: ELEVATION.eye };
   let clock = 0;
   let swings = 0;
+  let plunge: Pose | undefined;
   const frames = Math.round(totalSeconds(sheet) * fps);
   sheet.beats.forEach((b, i) => {
     const start = Math.round(clock * fps);
@@ -219,6 +242,9 @@ export function planCamera(sheet: BeatSheet, fps: number, o: { maxFill?: number;
     let to: Pose;
     let ease: Bez = EASE_THROUGH;
     let rack = false;
+    let via: Pose[] | undefined;
+    let shake: number | undefined;
+    let pull: ShotFocus | undefined;
     switch (b.move) {
       case 'push':
         from = { d: arrive * (i === 0 ? PUSH_FROM.hook : size === 'wide' ? PUSH_FROM.wide : PUSH_FROM.later), az: az0, fov: FOV_BASE, el };
@@ -270,6 +296,11 @@ export function planCamera(sheet: BeatSheet, fps: number, o: { maxFill?: number;
         ease = EASE_IN_OUT;
       }
     }
+    // in-scene cuts change where a shot starts, before Muse's own numbers lay over it. match: it starts as close and on the same lens as the shot before
+    // ended, so the product keeps its size and place on the screen and only the angle jumps. pass: it starts where the shot before plunged to, a crop of the
+    // product's own surface
+    if (i > 0 && b.cut === 'match') from = { ...from, d: cur.d, fov: cur.fov, ...(cur.x !== undefined ? { x: cur.x } : {}) };
+    if (i > 0 && b.cut === 'pass' && plunge) from = { ...plunge };
     // Muse's own numbers lay over the move's preset: the move is only where a shot starts from when Muse wrote nothing
     if (b.camera) {
       const capShot = i >= lastIdx - 1 ? Math.min(o.maxFill ?? Infinity, o.holdFill ?? Infinity) : (o.maxFill ?? Infinity);
@@ -277,14 +308,35 @@ export function planCamera(sheet: BeatSheet, fps: number, o: { maxFill?: number;
       to = withPoint(to, b.camera.to, capShot);
       if (b.camera.ease) ease = EASE_OF[b.camera.ease];
       if (b.camera.focus) rack = b.camera.focus === 'rack';
+      // the waypoints: each starts from where the straight path would be at its share of the way, then Muse's own numbers lay over it
+      const pts = b.camera.via ?? [];
+      if (pts.length) via = pts.map((pt, j) => withPoint(mixPose(from, to, (j + 1) / (pts.length + 1)), pt, capShot));
+      if (b.camera.shake !== undefined) shake = b.camera.shake;
+      if (typeof b.camera.focus === 'object') {
+        pull = b.camera.focus;
+        rack = false;
+      }
     }
-    beats.push({ start, end, size, move: b.move, from, to });
+    plunge = undefined;
+    const arrival = to;
+    let knots: number[] | undefined;
+    if (!last && sheet.beats[i + 1]?.cut === 'pass') {
+      // the shot ends by plunging at the product until it fills the frame: the cut hides in its surface, and the next shot pulls out of it
+      plunge = withPoint(to, { fill: CAMERA.passFill }, Infinity);
+      const mine = via ?? [];
+      const reach = 1 - CAMERA.passTail;
+      via = [...mine, arrival];
+      knots = [...mine.map((_, j) => ((j + 1) / (mine.length + 1)) * reach * 0.9), reach];
+      to = plunge;
+    }
+    beats.push({ start, end, size, move: b.move, from, to, ...(knots ? { knots } : {}), ...(b.ramp ? { ramp: b.ramp } : {}), ...(via ? { via } : {}), ...(pull?.aperture !== undefined ? { aperture: pull.aperture } : {}), ...(shake !== undefined ? { shake } : {}) });
     position.push(key(start, positionOf(from), ease), key(end, positionOf(to), ease, !last));
     fov.push(key(start, from.fov, ease), key(end, to.fov, ease, !last));
     // the product stays in focus: the focus distance is the camera's distance to it
     // the product stays in focus, except in a rack: the focus starts at the near lights (about half the way) and runs back to the product
-    focus.push(key(start, r(rack ? to.d * 0.5 : from.d), ease), key(end, r(to.d), ease, !last));
-    cur = to;
+    // a written focus pull names what the lens is on at each end; a rack is the old near-to-product pull
+    focus.push(key(start, r(pull ? focusOn(pull.from ?? 'product', from) : rack ? to.d * 0.5 : from.d), ease), key(end, r(pull ? focusOn(pull.to ?? 'product', to) : to.d), ease, !last));
+    cur = arrival;
   });
   return { beats, position, fov, focus, frames };
 }
@@ -317,44 +369,107 @@ const TWEEN_BUDGET = CAMERA.tweenBudget;
  * shot with n tremor keys costs n + 2 (its segments and the hold to the next cut), plus 2 for the focus; the product and the light take theirs.
  * Zero means there is no room and the film plays steady.
  */
-export function shakeKeysPerShot(shots: number, otherTweens: number): number {
-  return Math.max(0, Math.min(CAMERA.shakeKeysMax, Math.floor((TWEEN_BUDGET - otherTweens) / Math.max(1, shots)) - 4));
+export function shakeKeysPerShot(shots: number, otherTweens: number, most: number = CAMERA.shakeKeysMax): number {
+  return Math.max(0, Math.min(most, Math.floor((TWEEN_BUDGET - otherTweens) / Math.max(1, shots)) - 4));
 }
 
 /**
- * The tremor: each shot that may carry one is sampled along its own eased path at `perShot` points, and every point is nudged a little in x and
- * y (a deterministic pattern, so the same board shakes the same way). The path is the planned one, so a cut and a hold meet it exactly: only
- * the keys between a shot's ends move. The segments are linear, since the ease is in the samples (a through-ease is nearly linear anyway).
+ * How many keys a ramped shot gets between its ends: as many as the rule book allows, fewer when the world's tween budget is short, and none
+ * when fewer than two would fit (the shot then plays straight, but the world's own motion still follows the ramp). `others` is what the rest of the
+ * film already takes; each ramped shot costs one tween a key for the camera and two for a spin that also tosses.
  */
-export function shakeCamera(plan: CameraPlan, perShot: number): CameraPlan {
-  if (perShot < 1) return plan;
+export function rampKeysFor(rampShots: number, spinShots: number, others: number): number {
+  const perKey = rampShots + 2 * spinShots;
+  if (perKey < 1) return 0;
+  const k = Math.min(CAMERA.rampKeys, Math.floor((TWEEN_BUDGET - others) / perKey));
+  return k < 2 ? 0 : k;
+}
+
+/**
+ * The camera between a shot's ends. A shot is sampled along its path when it has something to show there: a tremor (a few small nudges), a speed
+ * ramp (the ease runs over the progress the ramp reached) or a curved path (a smooth curve through the poses Muse named). Every sample is the
+ * planned path's own value plus the nudge, so a cut and a hold meet it exactly: only the keys between a shot's ends move. The segments are
+ * linear, since the ease is in the samples (a through-ease is nearly linear anyway). The tremor is a deterministic pattern of the shot, the key and
+ * the seed, so the same board shakes the same way and another seed shakes another way.
+ */
+export function shakeCamera(plan: CameraPlan, perShot: number, rampKeys: number = CAMERA.rampKeys, hand: { amount?: number; seed?: number } = {}): CameraPlan {
+  const curved = plan.beats.some((b) => b.via?.length);
+  if (perShot < 1 && !curved && !(rampKeys >= 1 && plan.beats.some((b) => b.ramp))) return plan;
   const position: Array<Key<V3>> = [];
   const fov: Array<Key<number>> = [];
+  const focus: Array<Key<number>> = [];
+  const seed = (hand.seed ?? 0) * 13;
   plan.beats.forEach((b, n) => {
     const p0 = plan.position[n * 2]!;
     const p1 = plan.position[n * 2 + 1]!;
     const f0 = plan.fov[n * 2]!;
     const f1 = plan.fov[n * 2 + 1]!;
-    if (!SHAKY.has(b.move) || p1.t - p0.t < 4 * (perShot + 1)) {
+    const d0 = plan.focus[n * 2]!;
+    const d1 = plan.focus[n * 2 + 1]!;
+    // a shaky shot is sampled at the tremor's keys, a ramped one at the ramp's, a curved one at two a waypoint (the most of them)
+    const shake = (hand.amount ?? 1) * (b.shake ?? 1);
+    const shaky = perShot >= 1 && shake > 0 && SHAKY.has(b.move);
+    const inner = Math.max(shaky ? perShot : 0, b.ramp ? rampKeys : 0, pathKeysOf(b));
+    if (inner < 1 || p1.t - p0.t < 4 * (inner + 1)) {
       position.push(p0, p1);
       fov.push(f0, f1);
+      focus.push(d0, d1);
       return;
     }
     const e: Bez = p0.easeOut ?? LINEAR;
-    const amp = SHAKE_AMOUNT * b.to.d;
-    for (let k = 0; k <= perShot + 1; k++) {
-      const u = k / (perShot + 1);
-      const w = bezierAt(e, u);
-      const t = k === 0 ? p0.t : k === perShot + 1 ? p1.t : Math.round(p0.t + u * (p1.t - p0.t));
-      const edge = k === 0 || k === perShot + 1;
-      const wob = (axis: number) => (edge ? 0 : (Math.sin((n * 7 + k * 3 + axis * 5) * 1.7) * 0.6 + Math.cos((n * 3 + k * 5 + axis) * 2.3) * 0.4) * amp);
-      const v: V3 = [r(p0.v[0] + (p1.v[0] - p0.v[0]) * w + wob(0)), r(p0.v[1] + (p1.v[1] - p0.v[1]) * w + wob(1)), r(p0.v[2] + (p1.v[2] - p0.v[2]) * w)];
-      const lens = r(f0.v + (f1.v - f0.v) * w);
+    const amp = shaky ? SHAKE_AMOUNT * b.to.d * shake : 0;
+    const path = b.via?.length ? [b.from, ...b.via, b.to] : undefined;
+    // the focus follows the product when both its ends do; a pull between other targets runs straight between its ends
+    const follows = Math.abs(d0.v - b.from.d) < 1e-3 && Math.abs(d1.v - b.to.d) < 1e-3;
+    for (let k = 0; k <= inner + 1; k++) {
+      const u = k / (inner + 1);
+      // a ramp bends the shot's time: the ease then runs over the progress the ramp reached, not over the clock
+      const w = bezierAt(e, b.ramp ? rampProgress(b.ramp, u) : u);
+      const t = k === 0 ? p0.t : k === inner + 1 ? p1.t : Math.round(p0.t + u * (p1.t - p0.t));
+      const edge = k === 0 || k === inner + 1;
+      const wob = (axis: number) => (edge ? 0 : (Math.sin((n * 7 + k * 3 + axis * 5 + seed) * 1.7) * 0.6 + Math.cos((n * 3 + k * 5 + axis + seed) * 2.3) * 0.4) * amp);
+      const pose = path ? curveAt(path, w, b.knots) : undefined;
+      const base: V3 = pose ? positionOf(pose) : [p0.v[0] + (p1.v[0] - p0.v[0]) * w, p0.v[1] + (p1.v[1] - p0.v[1]) * w, p0.v[2] + (p1.v[2] - p0.v[2]) * w];
+      const v: V3 = [r(base[0] + wob(0)), r(base[1] + wob(1)), r(base[2])];
+      const lens = r(pose ? pose.fov : f0.v + (f1.v - f0.v) * w);
       position.push(key(t, v, undefined, edge && k > 0 && !!p1.hold));
       fov.push(key(t, lens, undefined, edge && k > 0 && !!f1.hold));
+      if (pose) focus.push(key(t, r(follows ? pose.d : d0.v + (d1.v - d0.v) * w), undefined, edge && k > 0 && !!d1.hold));
     }
+    // a curved shot's focus was sampled with the camera; a straight one keeps its two keys
+    if (!path) focus.push(d0, d1);
   });
-  return { ...plan, position, fov };
+  return { ...plan, position, fov, focus: curved ? focus : plan.focus };
+}
+
+/** The keys a curved shot is sampled at between its ends: two a waypoint and two more, and three more for a plunge, whose end is quick. */
+export const pathKeysOf = (b: BeatFrames): number => (b.via?.length ? b.via.length * 2 + 2 + (b.knots ? 3 : 0) : 0);
+
+/** A smooth curve through the poses (a Catmull-Rom spline over distance, azimuth, lens, height and sideways slide), at share `u` of the way along it. */
+function curveAt(path: Pose[], u: number, knots?: number[]): Pose {
+  const segs = path.length - 1;
+  let i: number;
+  let t: number;
+  if (knots && knots.length === segs) {
+    // the poses fall where `knots` say: the segment holding `u`, and how far along it
+    const at = [0, ...knots];
+    i = 0;
+    while (i < segs - 1 && u > at[i + 1]!) i++;
+    t = Math.min(1, Math.max(0, (u - at[i]!) / Math.max(1e-6, at[i + 1]! - at[i]!)));
+  } else {
+    const x = Math.min(segs - 1e-9, Math.max(0, u * segs));
+    i = Math.floor(x);
+    t = x - i;
+  }
+  const at = (j: number): Pose => path[Math.min(path.length - 1, Math.max(0, j))]!;
+  const spline = (pick: (q: Pose) => number): number => {
+    const p0 = pick(at(i - 1));
+    const p1 = pick(at(i));
+    const p2 = pick(at(i + 1));
+    const p3 = pick(at(i + 2));
+    return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
+  };
+  return { d: Math.max(0.05, spline((q) => q.d)), az: spline((q) => q.az), fov: Math.min(95, Math.max(10, spline((q) => q.fov))), el: spline((q) => q.el), x: spline((q) => q.x ?? 0) };
 }
 
 /** How fast a segment starts and ends, as a share of its mean speed: the slope of its ease at both ends. A key without an ease is linear (1 and 1). */
@@ -635,7 +750,7 @@ export function lightKeys(sheet: BeatSheet, cam: CameraPlan, base: { azimuth: nu
 /** How far a flat cut-out swings to either side on a turn: it shows only its front, so it rocks from one side to the other inside 30 degrees. */
 const FLAT_SWING = 25;
 
-function productMoves(sheet: BeatSheet, cam: CameraPlan, land: number, frames: number, flat = false): { yaw: Array<Key<V3>>; rise: Array<Key<V3>> } {
+function productMoves(sheet: BeatSheet, cam: CameraPlan, land: number, frames: number, flat = false, rampKeys: number = CAMERA.rampKeys): { yaw: Array<Key<V3>>; rise: Array<Key<V3>> } {
   let at = -28;
   const yaw: Array<Key<V3>> = [key(0, [4, at, 0])];
   const rise: Array<Key<V3>> = [key(0, [0, 0, 0])];
@@ -652,6 +767,19 @@ function productMoves(sheet: BeatSheet, cam: CameraPlan, land: number, frames: n
       at = from + turn;
       const mid = Math.round((f.start + f.end) / 2);
       const hasMid = (sp.tilt || sp.roll || sp.lift) && mid > f.start + 1 && mid < f.end - 1;
+      if (beat.ramp && rampKeys >= 2 && f.end - f.start >= 4 * (rampKeys + 1)) {
+        // a speed ramp bends the shot's time, so the turn is sampled along it: every key is the turn's value at the progress the ramp has reached
+        const n = rampKeys + 1;
+        for (let k = 0; k <= n; k++) {
+          const w = rampProgress(beat.ramp, k / n);
+          const t = k === 0 ? f.start : k === n ? f.end : Math.round(f.start + (k / n) * (f.end - f.start));
+          // the lean, roll and toss peak where the shot's motion is half done
+          const bump = 1 - Math.abs(2 * w - 1);
+          yaw.push(key(t, [r(4 + (sp.tilt ?? 0) * bump), r(from + turn * bezierAt(e, w)), r((sp.roll ?? 0) * bump)], LINEAR));
+          if (sp.lift) rise.push(key(t, [0, r(sp.lift * PRODUCT_H * Math.sin(Math.PI * w)), 0], LINEAR));
+        }
+        return;
+      }
       yaw.push(key(f.start, [4, from, 0], e));
       if (hasMid) {
         // the middle key rides the eased curve (its value at half the time) and is linear through, so the turn keeps its shape
@@ -691,7 +819,7 @@ function productMoves(sheet: BeatSheet, cam: CameraPlan, land: number, frames: n
 function cutLayers(c: Comp, sheet: BeatSheet, cam: CameraPlan, fps: number, [W, H]: [number, number], dark: string, light: string): Comp {
   let out = c;
   const D = totalSeconds(sheet);
-  for (const [kind, color, peak, lead, tail] of [['wipe', dark, 1, 0.08, 0.12], ['cloud', light, 0.85, 0.05, 0.22]] as const) {
+  for (const [kind, color, peak, lead, tail] of [['wipe', dark, 1, 0.08, 0.12], ['cloud', light, 0.85, 0.05, 0.22], ['flash', tint(light, 0.8), 1, 0.05, 0.14]] as const) {
     const ks: Array<[number, number]> = [[0, 0]];
     cam.beats.forEach((f, n) => {
       if (n === 0 || sheet.beats[n]!.cut !== kind) return;
@@ -702,6 +830,22 @@ function cutLayers(c: Comp, sheet: BeatSheet, cam: CameraPlan, fps: number, [W, 
     // z counts depth: the world is 5 and the copy under 1, so 4 lies over the world and under the copy
     const layer = shape(out, { x: 0, y: 0, w: W, h: H }, color, 4);
     out = setKeyframes(layer.c, layer.id, 'opacity', dedupe(ks), 'easeOut');
+  }
+  return out;
+}
+
+/**
+ * Black bars to a wide ratio, over the world and under the copy. The picture is W / ratio high, so each bar is half of what is left; in a tall frame that
+ * would eat the product, so a bar stops at LETTERBOX_MAX of the height. The bars lift when the end hold starts, so the name, tagline and price have the whole frame.
+ */
+export const LETTERBOX_MAX = 0.3;
+export function letterbox(c: Comp, ratio: number, [W, H]: [number, number], holdStart: number, D: number): Comp {
+  const bar = Math.min(H * LETTERBOX_MAX, Math.max(0, (H - W / ratio) / 2));
+  if (bar < 2) return c;
+  let out = c;
+  for (const y of [0, H - bar]) {
+    const layer = shape(out, { x: 0, y, w: W, h: bar }, '#000000', 3);
+    out = setKeyframes(layer.c, layer.id, 'opacity', dedupe([[0, 1], [r2(Math.max(0.05, holdStart)), 1], [r2(Math.min(D, holdStart + 0.3)), 0]]), 'easeOut');
   }
   return out;
 }
@@ -818,14 +962,18 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   // the product: lands from above in the first shot, then turns slowly; during the macro the label faces the camera
   const land = Math.round(0.8 * fps);
   const turnEnd = Math.max(land + 6, Math.round((cam.beats.find((b) => b.move === 'dolly-zoom')?.start ?? holdBeat.start) ));
+  // the light Muse directs shot by shot (the film's own sweep when it names none)
+  const lp = lightKeys(i.sheet, cam, { azimuth: -70, elevation: 55, key: i.set ? setLight.key : 3.2, rim: i.set ? setLight.rim : 0.6 });
+  const lightTweens = lp ? Object.values(lp).reduce((sum, ks) => sum + Math.max(0, ks.length - 1), 0) : 0;
+  // ramped shots are sampled along their curve, as densely as the tween budget allows
+  const rampShots = i.sheet.beats.filter((b) => b.ramp).length;
+  const spinRamps = i.sheet.beats.filter((b) => b.ramp && b.spin).length;
+  const rampKeys = rampKeysFor(rampShots, spinRamps, cam.beats.length * 4 + lightTweens + 8 + 5);
   let yaw: Array<Key<V3>> = [key(0, [4, -250, -24], EASE_OUT), key(land, [4, -28, 0], EASE_IN_OUT)];
   if (macro && macro.start > land + 3) yaw.push(key(Math.round((macro.start + macro.end) / 2), [4, 0, 0], EASE_IN_OUT));
   yaw.push(key(Math.max(turnEnd, (yaw.at(-1)?.t ?? 0) + 3), [4, 22, 0], EASE_IN_OUT), key(frames, [4, 16, 0]));
   let rise: Array<Key<V3>> = [key(0, [0, CAMERA.dropFrom, 0], EASE_OUT), key(land, [0, 0, 0])];
-  if (i.sheet.beats.some((b) => b.product)) ({ yaw, rise } = productMoves(i.sheet, cam, land, frames, flat));
-  // the light Muse directs shot by shot (the film's own sweep when it names none)
-  const lp = lightKeys(i.sheet, cam, { azimuth: -70, elevation: 55, key: i.set ? setLight.key : 3.2, rim: i.set ? setLight.rim : 0.6 });
-  const lightTweens = lp ? Object.values(lp).reduce((sum, ks) => sum + Math.max(0, ks.length - 1), 0) : 0;
+  if (i.sheet.beats.some((b) => b.product)) ({ yaw, rise } = productMoves(i.sheet, cam, land, frames, flat, rampKeys));
   // the label macro looks at the label: the camera and its target both move over the label's spot for that shot, and go back for the next
   let target: V3 | Array<Key<V3>> = [0, PRODUCT_Y, 0];
   let macroShift: { beat: BeatFrames; x: number; y: number } | undefined;
@@ -851,10 +999,14 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
       ]);
     }
   }
-  if (i.handheld) {
-    // what the camera leaves for itself: the product's turn and rise, the camera's aim, the light's keys, and a few more
-    const others = yaw.length + rise.length + (typeof target[0] === 'object' ? target.length : 0) + 8 + lightTweens;
-    cam = shakeCamera(cam, shakeKeysPerShot(cam.beats.length, others));
+  // the hand-held tremor: a plain true is the usual sway, an object sets its amount, keys a shot and seed; an amount of 0 is a locked camera
+  const hand: Handheld = typeof i.handheld === 'object' ? i.handheld : {};
+  const handheld = i.handheld === true || (typeof i.handheld === 'object' && (hand.amount ?? 1) > 0);
+  if (handheld || cam.beats.some((b) => b.ramp || b.via?.length)) {
+    // what the camera leaves for itself: the product's turn and rise, the camera's aim, the light's keys, the samples of the ramped and curved shots, and a few more
+    const curvedKeys = cam.beats.reduce((sum, b) => sum + 2 * pathKeysOf(b), 0);
+    const others = yaw.length + rise.length + (typeof target[0] === 'object' ? target.length : 0) + 8 + lightTweens + rampKeys * rampShots + curvedKeys;
+    cam = shakeCamera(cam, handheld ? shakeKeysPerShot(cam.beats.length, others, hand.keys ?? CAMERA.shakeKeysMax) : 0, rampKeys, hand);
   }
   if (macroShift) {
     // the tremor's own keys inside the macro move with it, so the shake rides on the aimed path
@@ -891,11 +1043,12 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     outPoint: frames,
     transform: { position: [W / 2, H / 2], anchor: [W / 2, H / 2], scale: [1, 1], rotation: 0, opacity: 1 },
     viewport: { width: W, height: H },
-    camera: { position: cam.position, target, fov: cam.fov, focus: { distance: cam.focus, aperture: APERTURE } },
+    camera: { position: cam.position, target, fov: cam.fov, focus: { distance: cam.focus, aperture: apertureKeys(cam, i.aperture ?? APERTURE), ...(i.bokeh ? { bokeh: r2(i.bokeh) } : {}) } },
     set: i.set ? { ground: i.set.ground, groundSize: [...CAMERA.groundSize], wall: { distance: WALL.distance, height: WALL.height }, backdrop: i.set.backdrop.id, ...floorShine(i.finish ?? defaultFinish(keyLevel)), ...floorLight(i.finish ?? defaultFinish(keyLevel)) } : { ground: 'none', wall: false },
     style: { shading: 'pbr', exposure },
-    post: ((post, blur) => (post || blur ? { ...post, ...(blur ? { motionBlur: blur } : {}) } : undefined))(finishPost(i.finish ?? defaultFinish(keyLevel), cam.beats.at(-1)!.start), motionBlur(i.sheet, cam, i.blur)),
+    post: ((post, blur) => (post || blur ? { ...post, ...(blur ? { motionBlur: blur } : {}) } : undefined))(finishPost(i.finish ?? defaultFinish(keyLevel), cam.beats.at(-1)!.start, i.grade), motionBlur(i.sheet, cam, i.blur)),
     ...(shaderCuts(i.sheet, cam, fps).length ? { shotTransitions: shaderCuts(i.sheet, cam, fps) } : {}),
+    ...(speedRamps(cam).length ? { timeWarp: speedRamps(cam) } : {}),
     shadow: { opacity: i.set ? LIGHT.shadow : 0.45, softness: 0.7 },
     lights: {
       preset: 'studio',
@@ -906,6 +1059,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   };
   c = insertStage(c, world, [can, ...props.map((p) => p.layer), ...air.cards]);
   c = cutLayers(c, i.sheet, cam, fps, [W, H], fieldColor, keyColor);
+  if (i.grade?.letterbox) c = letterbox(c, i.grade.letterbox, [W, H], holdStart, D);
   c = structuredClone(c);
   c.version = SCHEMA as never;
   ((c.precomps as Record<string, Obj>)[ID] as Obj).version = SCHEMA;
@@ -1110,7 +1264,7 @@ export function floorLight(f: Finish): { caustics?: Obj } {
 export function shaderCuts(sheet: BeatSheet, cam: CameraPlan, fps: number): Obj[] {
   const out: Obj[] = [];
   sheet.beats.forEach((b, n) => {
-    const def = n > 0 && b.cut && b.cut !== 'hard' && b.cut !== 'wipe' && b.cut !== 'cloud' ? CUT_SHADERS[b.cut] : undefined;
+    const def = n > 0 && b.cut && b.cut !== 'hard' && b.cut !== 'wipe' && b.cut !== 'cloud' && b.cut !== 'flash' && b.cut !== 'pass' && b.cut !== 'match' ? CUT_SHADERS[b.cut] : undefined;
     if (!def) return;
     const f = cam.beats[n]!;
     out.push({ startFrame: f.start, durationFrames: Math.max(2, Math.min(Math.round(def.seconds * fps), Math.round((f.end - f.start) * 0.8))), name: def.shader });
@@ -1118,8 +1272,19 @@ export function shaderCuts(sheet: BeatSheet, cam: CameraPlan, fps: number): Obj[
   return out.slice(0, CUT_SHADERS.max);
 }
 
+/** The lens aperture over the film: the film's own, or a step to a shot's own where its focus names one (a shot's aperture holds until the next shot's first frame). */
+export function apertureKeys(cam: CameraPlan, base: number): number | Array<Key<number>> {
+  if (!cam.beats.some((f) => f.aperture !== undefined)) return r2(base);
+  return uniq(cam.beats.flatMap((f) => [key(f.start, r2(f.aperture ?? base), undefined, true), key(f.end, r2(f.aperture ?? base), undefined, true)]));
+}
+
+/** The world's speed ramps: the stretch of frames each ramped shot covers, and its curve, so the world's own motion (a splash, steam, falling pieces) follows the camera. */
+export function speedRamps(cam: CameraPlan): Obj[] {
+  return cam.beats.flatMap((f) => (f.ramp ? [{ startFrame: f.start, durationFrames: Math.max(1, f.end - f.start + 1), rates: f.ramp.map((p) => ({ at: r2(p.at), rate: r2(p.rate) })) }] : [])).slice(0, 8);
+}
+
 /** The world's `post` for a finish: levels to numbers, and the glow swelling when the end hold starts (at `holdFrame`). Undefined when nothing is on. */
-export function finishPost(f: Finish, holdFrame: number): Obj | undefined {
+export function finishPost(f: Finish, holdFrame: number, grade?: Grade): Obj | undefined {
   const post: Obj = {};
   if (f.glow !== 'none') {
     const g = FINISH.glow[f.glow];
@@ -1128,6 +1293,18 @@ export function finishPost(f: Finish, holdFrame: number): Obj | undefined {
   if (f.vignette !== 'none') post.vignette = { darkness: FINISH.vignette[f.vignette] };
   if (f.grain !== 'none') post.grain = { opacity: FINISH.grain[f.grain] };
   if (f.fringe) post.aberration = { offset: FINISH.fringe };
+  if (grade) {
+    const tone: Obj = {};
+    if (grade.exposure) tone.brightness = r2(grade.exposure);
+    if (grade.contrast) tone.contrast = r2(grade.contrast);
+    if (grade.saturation) tone.saturation = r2(grade.saturation);
+    if (grade.hue) tone.hue = r2(grade.hue);
+    if (Object.keys(tone).length) post.grade = tone;
+    // split toning needs a tint on at least one side; the other falls back to the cold-shadow, warm-highlight pair
+    if (grade.shadows || grade.highlights) post.splitTone = { shadows: grade.shadows ?? '#1d4a6b', highlights: grade.highlights ?? '#ffb877', amount: r2(grade.split ?? 0.5), ...(grade.balance ? { balance: r2(grade.balance) } : {}) };
+    if (grade.streak) post.streak = { strength: r2(grade.streak.strength ?? 0.5), ...(grade.streak.color ? { color: grade.streak.color } : {}), ...(grade.streak.reach !== undefined ? { reach: r2(grade.streak.reach) } : {}) };
+    if (grade.halation) post.halation = r2(grade.halation);
+  }
   return Object.keys(post).length ? post : undefined;
 }
 

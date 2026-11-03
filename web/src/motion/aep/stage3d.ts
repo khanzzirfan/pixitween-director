@@ -5,7 +5,7 @@ import type { AepLayer } from '@shared/aep/layer';
 import type { AepAssetMap } from '@shared/aep/asset';
 import type { AepAnimatable } from '@shared/aep/transform';
 import type { AepRotationUnit } from '@shared/aep/rotation';
-import type { Object3D, ThreeLayer } from '@engine/schema';
+import { THREE_TWEENS_MAX, type Object3D, type ThreeLayer } from '@engine/schema';
 import { isKeyframed, propertyTweens, type ConvertedTween } from './keyframes';
 import { mapBaseLayer } from './baseLayer';
 import { sanitizeId } from './sanitizeId';
@@ -376,7 +376,7 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
   if (world.set?.fog) warnings.push(`layer ${world.id}: set.fog is not supported yet`);
 
   // Depth of field: the library's circle-of-confusion pass, focus distance keyframed on the world.
-  const effects: Array<{ id: string; type: string; params: Record<string, number> }> = [];
+  const effects: Array<{ id: string; type: string; params: Record<string, number | string> }> = [];
   // Shader transitions at the cuts: composition frames become seconds on the world's own clock.
   const shotTransitions = (world.shotTransitions ?? []).map((t) => ({
     at: Math.max(0, (t.startFrame - world.inPoint) / ctx.fps),
@@ -386,11 +386,14 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
   }));
   const focusTweens: ConvertedTween[] = [];
   const focus = world.camera.focus;
-  if (focus && (focus.aperture ?? 0) > 0) {
-    effects.push({ id: 'dof', type: 'stageDof', params: { aperture: focus.aperture ?? 0, focusDistance: first(focus.distance) } });
+  if (focus && (isKeyframed(focus.aperture) || (first(focus.aperture) ?? 0) > 0)) {
+    effects.push({ id: 'dof', type: 'stageDof', params: { aperture: first(focus.aperture), focusDistance: first(focus.distance), ...(focus.bokeh ? { bokeh: focus.bokeh } : {}) } });
     focusTweens.push(
       ...propertyTweens(focus.distance, { fps: ctx.fps, inPoint: world.inPoint, props: ['focusDistance'] }).tweens.map((t) => ({ ...t, ...{ target: 'effect:dof' } })),
     );
+    if (isKeyframed(focus.aperture)) {
+      focusTweens.push(...propertyTweens(focus.aperture, { fps: ctx.fps, inPoint: world.inPoint, props: ['aperture'] }).tweens.map((t) => ({ ...t, ...{ target: 'effect:dof' } })));
+    }
   }
 
   // The finish: bloom, vignette, grain, fringe and grade over the rendered world, after the depth of field. Bloom's intensity can swell.
@@ -401,15 +404,19 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
       focusTweens.push(...propertyTweens(post.bloom.intensity, { fps: ctx.fps, inPoint: world.inPoint, props: ['intensity'] }).tweens.map((t) => ({ ...t, ...{ target: 'effect:bloom' } })));
     }
   }
+  if (post?.halation) effects.push({ id: 'halation', type: 'bloom', params: { intensity: Math.round(post.halation * 90) / 100, threshold: 0.3, radius: 0.95 } });
+  if (post?.streak) effects.push({ id: 'streak', type: 'lensStreak', params: { strength: post.streak.strength, ...(post.streak.color ? { color: post.streak.color } : {}), ...(post.streak.threshold !== undefined ? { threshold: post.streak.threshold } : {}), ...(post.streak.reach !== undefined ? { reach: post.streak.reach } : {}) } });
   if (post?.grade) {
     const g = post.grade;
     if (g.brightness !== undefined || g.contrast !== undefined) effects.push({ id: 'grade', type: 'brightnessContrast', params: { brightness: g.brightness ?? 0, contrast: g.contrast ?? 0 } });
     if (g.hue !== undefined || g.saturation !== undefined) effects.push({ id: 'tone', type: 'hueSaturation', params: { hue: g.hue ?? 0, saturation: g.saturation ?? 0 } });
   }
+  if (post?.splitTone) effects.push({ id: 'split', type: 'splitTone', params: { shadows: post.splitTone.shadows, highlights: post.splitTone.highlights, ...(post.splitTone.amount !== undefined ? { amount: post.splitTone.amount } : {}), ...(post.splitTone.balance !== undefined ? { balance: post.splitTone.balance } : {}) } });
   if (post?.aberration) effects.push({ id: 'fringe', type: 'chromaticAberration', params: { offsetX: post.aberration.offset, offsetY: post.aberration.offset } });
   if (post?.vignette) effects.push({ id: 'vignette', type: 'vignette', params: { offset: post.vignette.offset ?? 0.3, darkness: post.vignette.darkness } });
   if (post?.grain) effects.push({ id: 'grain', type: 'noise', params: { opacity: post.grain.opacity } });
 
+  const timeWarp = (world.timeWarp ?? []).map((w) => ({ from: Math.max(0, (w.startFrame - world.inPoint) / ctx.fps), to: Math.max(0.01, (w.startFrame + w.durationFrames - world.inPoint) / ctx.fps), rates: w.rates }));
   const motionBlur = post?.motionBlur?.shots.length
     ? {
         samples: post.motionBlur.samples ?? 6,
@@ -542,7 +549,7 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
       ...focusTweens,
     ].map((t) => ({ repeat: 0, yoyo: false, ...t })),
   );
-  if (tweens.length > 64) warnings.push(`layer ${world.id}: ${tweens.length} tweens exceed the engine limit of 64`);
+  if (tweens.length > THREE_TWEENS_MAX) warnings.push(`layer ${world.id}: ${tweens.length} tweens exceed the engine limit of ${THREE_TWEENS_MAX}`);
 
   // The library's floor: a shadow-only catcher at 0.55 under `ground: "none"`, darkened by the key
   // light's shadow strength (the world's shadow opacity), over the whole ground size.
@@ -553,7 +560,7 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
     ...base,
     id,
     anchor: [0.5, 0.5] as [number, number],
-    tweens: tweens.slice(0, 64),
+    tweens: tweens.slice(0, THREE_TWEENS_MAX),
     type: 'three' as const,
     width: clampSize(width),
     height: clampSize(height),
@@ -561,6 +568,7 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
     effects,
     ...(shotTransitions.length ? { transitions: shotTransitions } : {}),
     ...(motionBlur ? { motionBlur } : {}),
+    ...(timeWarp.length ? { timeWarp } : {}),
     camera: {
       position: first(world.camera.position) as Vec3,
       lookAt: first(world.camera.target) as Vec3,

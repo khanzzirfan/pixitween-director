@@ -23,6 +23,7 @@ import {
 import * as THREE from 'three';
 import type { EffectScope, EffectType } from '../schema';
 import { GlowEffect } from './custom/glow';
+import { LensStreakEffect, SplitToneEffect } from './custom/grade';
 import { DropShadowEffect } from './custom/dropShadow';
 import { OutlineEffect2D } from './custom/outline';
 import { GaussianBlurPass } from './custom/gaussianBlur';
@@ -421,7 +422,7 @@ const gaussianBlur: EffectDef<GaussianBlurPass> = {
   },
 };
 
-const STAGE_DOF_DEFAULTS = { aperture: 0.3, focusDistance: 1 };
+const STAGE_DOF_DEFAULTS = { aperture: 0.3, focusDistance: 1, bokeh: 0 };
 
 /** The stage world's depth of field (circle-of-confusion gather); focusDistance in world units. */
 const stageDof: EffectDef<StageDofPass> = {
@@ -430,11 +431,50 @@ const stageDof: EffectDef<StageDofPass> = {
   defaults: STAGE_DOF_DEFAULTS,
   create: (params, { camera }) => {
     const p = { ...STAGE_DOF_DEFAULTS, ...params };
-    return new StageDofPass(camera, num(p.aperture), num(p.focusDistance));
+    return new StageDofPass(camera, num(p.aperture), num(p.focusDistance), num(p.bokeh));
   },
   tweenable: {
     aperture: field((e) => e.aperture, (e, v) => (e.aperture = v)),
     focusDistance: field((e) => e.focusDistance, (e, v) => (e.focusDistance = v)),
+    bokeh: field((e) => e.bokeh, (e, v) => (e.bokeh = v)),
+  },
+};
+
+const SPLIT_TONE_DEFAULTS = { shadows: '#1d4a6b', highlights: '#ffb877', amount: 0.5, balance: 0 };
+
+const colorParam = <E>(read: (e: E) => string, write: (e: E, v: string) => void): TweenableParam<E> => ({ kind: 'color', get: read, set: (e, v) => write(e, String(v)) });
+
+const splitTone: EffectDef<SplitToneEffect> = {
+  type: 'splitTone',
+  scope: 'any',
+  defaults: SPLIT_TONE_DEFAULTS,
+  create: (params) => {
+    const p = { ...SPLIT_TONE_DEFAULTS, ...params };
+    return new SplitToneEffect({ shadows: String(p.shadows), highlights: String(p.highlights), amount: num(p.amount), balance: num(p.balance) });
+  },
+  tweenable: {
+    shadows: colorParam((e) => e.shadows, (e, v) => (e.shadows = v)),
+    highlights: colorParam((e) => e.highlights, (e, v) => (e.highlights = v)),
+    amount: field((e) => e.amount, (e, v) => (e.amount = v)),
+    balance: field((e) => e.balance, (e, v) => (e.balance = v)),
+  },
+};
+
+const LENS_STREAK_DEFAULTS = { color: '#7fb2ff', strength: 0.5, threshold: 0.8, reach: 0.3 };
+
+const lensStreak: EffectDef<LensStreakEffect> = {
+  type: 'lensStreak',
+  scope: 'any',
+  defaults: LENS_STREAK_DEFAULTS,
+  create: (params) => {
+    const p = { ...LENS_STREAK_DEFAULTS, ...params };
+    return new LensStreakEffect({ color: String(p.color), strength: num(p.strength), threshold: num(p.threshold), reach: num(p.reach) });
+  },
+  tweenable: {
+    color: colorParam((e) => e.color, (e, v) => (e.color = v)),
+    strength: field((e) => e.strength, (e, v) => (e.strength = v)),
+    threshold: field((e) => e.threshold, (e, v) => (e.threshold = v)),
+    reach: field((e) => e.reach, (e, v) => (e.reach = v)),
   },
 };
 
@@ -532,6 +572,8 @@ export const EFFECTS: Partial<Record<EffectType, EffectDef>> = {
   blur,
   gaussianBlur,
   stageDof,
+  splitTone,
+  lensStreak,
   dof,
   glow,
   dropShadow,

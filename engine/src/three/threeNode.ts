@@ -15,6 +15,7 @@ import { resolveUnitTargets } from './text/targets';
 import { parseUnitTarget } from '../schema/scalars';
 import { disposeObject3D } from './build/dispose';
 import { clipTime } from './build/gltf';
+import { warpClock } from '../core/speedRamp';
 import { buildScene, LIGHTING_TWEEN_PROPS, preloadThreeAssets, type PreloadedThreeAssets, type ThreeRig } from './build/scene';
 
 // A `three` layer as a MotionNode (engine/docs/04-three.md): the rig renders through its effect chain
@@ -496,7 +497,7 @@ function buildThreeNode(layer: ThreeLayer, ctx: NodeContext, parentStart: number
         }
         // Life, swarms, flipbooks and billboards; billboards need the camera's final orientation.
         rig.camera.updateMatrixWorld(true);
-        rig.tick(localSec);
+        rig.tick(warpClock(layer.timeWarp, localSec));
       };
 
       // A transition is playing when its window holds this time and its shader is known and usable.
