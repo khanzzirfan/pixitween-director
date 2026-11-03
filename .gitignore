@@ -27,3 +27,7 @@ data=s19-hero3d/
 
 ## commandcode
 .commandcode/
+# demo recording and cut (local only)
+docs/demo/
+scripts/demo-cut.py
+scripts/demo-record.ts

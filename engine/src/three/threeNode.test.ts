@@ -97,6 +97,12 @@ describe('createThreeNode', () => {
     expect((plane.material as THREE.MeshBasicMaterial).map).toBe(chains[0].options.output?.texture);
   });
 
+  it('binds object targets at once on a layer with shader transitions (the rig does not wait for the shader list), and holds ready for it', async () => {
+    const node = create(makeLayer({ transitions: [{ at: 1, duration: 0.4, name: 'CrossZoom' }] }));
+    expect(node.resolveTarget('object:b', 'rotation.y')?.kind).toBe('deg');
+    await expect(node.ready).resolves.toBeUndefined();
+  });
+
   it('resolves object, camera, light and effect targets and refuses bad ones', () => {
     const node = create();
     expect(node.resolveTarget('object:b', 'rotation.y')?.kind).toBe('deg');

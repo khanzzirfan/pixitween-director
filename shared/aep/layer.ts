@@ -559,6 +559,27 @@ const aepStageSetSchema = z
       })
       .strict()
       .optional(),
+    // A glossy floor: the world reflected in the ground, soft, strongest under the product and gone at `fade`
+    // metres from it (schema 1.12.0). Needs a ground.
+    reflection: z
+      .object({
+        strength: z.number().min(0).max(1),
+        fade: z.number().positive().max(10).optional(),
+        blur: z.number().min(0).max(1).optional(),
+      })
+      .strict()
+      .optional(),
+    // Caustics: the rippling net of light a glass of liquid throws on the floor, strongest round the product and gone at `fade`
+    // metres; `scale` is ripples per metre (schema 1.12.0). Needs a ground.
+    caustics: z
+      .object({
+        strength: z.number().min(0).max(1),
+        fade: z.number().positive().max(10).optional(),
+        scale: z.number().positive().max(200).optional(),
+        color: aepColorSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -634,6 +655,47 @@ const aepStageStyleSchema = z
   })
   .strict();
 
+// The finish: screen effects over the whole rendered world, the way a commercial is graded. bloom lets bright
+// things glow (the halo behind a can, a hot rim), vignette darkens the corners, grain is fine film noise,
+// aberration fringes the colours at the edges, grade shifts brightness, contrast, saturation and hue.
+// Bloom's intensity can be keyframed (a glow that swells in the end hold). Schema 1.12.0.
+const aepStagePostSchema = z
+  .object({
+    bloom: z
+      .object({
+        intensity: aepAnimatableOf(z.number().min(0).max(4)),
+        threshold: z.number().min(0).max(1).optional(),
+        radius: z.number().min(0).max(1).optional(),
+      })
+      .strict()
+      .optional(),
+    vignette: z.object({ offset: z.number().min(0).max(1).optional(), darkness: z.number().min(0).max(1) }).strict().optional(),
+    grain: z.object({ opacity: z.number().min(0).max(0.5) }).strict().optional(),
+    aberration: z.object({ offset: z.number().min(0).max(0.01) }).strict().optional(),
+    grade: z
+      .object({
+        brightness: z.number().min(-0.5).max(0.5).optional(),
+        contrast: z.number().min(0).max(0.5).optional(),
+        saturation: z.number().min(-1).max(1).optional(),
+        hue: z.number().min(-180).max(180).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+// Shader transitions at the cuts between the world's own shots (an open gl-transitions shader by name, e.g. CrossZoom,
+// Ripple, Swirl, GlitchDisplace, FilmBurn). From `startFrame` it plays for `durationFrames`: the old shot's last camera
+// pose mixes into the new shot. Composition frames. Schema 1.12.0.
+const aepStageShotTransitionSchema = z
+  .object({
+    startFrame: z.number().finite().min(0),
+    durationFrames: z.number().finite().positive(),
+    name: z.string().min(1).max(40),
+    params: z.record(z.string(), z.union([z.number(), z.boolean(), z.array(z.number()).min(2).max(4)])).optional(),
+  })
+  .strict();
+
 // The WORLD: camera, set, lights, shadow, style. The only stage layer that
 // renders; actor3d / prop3d members name it with `stage` and are gathered into
 // its Three scene. Bare ZodObject so it can join the discriminated union;
@@ -651,6 +713,8 @@ const aepStage3DLayerSchema = z
     lights: aepStageLightsSchema.optional(),
     shadow: aepStageShadowSchema.optional(),
     style: aepStageStyleSchema.optional(),
+    post: aepStagePostSchema.optional(),
+    shotTransitions: z.array(aepStageShotTransitionSchema).max(8).optional(),
   })
   .strict();
 
@@ -705,6 +769,8 @@ const aepProp3DMaterialSchema = z
     ior: z.number().min(1).max(2.333).optional(),
     thickness: z.number().min(0).optional(),
     opacity: z.number().min(0).max(1).optional(),
+    // Beads of water on the surface (a cold can), 0 dry to 1 soaked. Schema 1.12.0.
+    condensation: z.number().min(0).max(1).optional(),
   })
   .strict();
 
@@ -717,6 +783,30 @@ const aepProp3DCardSourceSchema = z
     fps: z.number().positive().max(60).optional(),
     // default false: hold the last frame.
     loop: z.boolean().optional(),
+  })
+  .strict();
+
+// A moving liquid: metaballs that flow together and apart, timed to the prop's in/out points. crown is a
+// splash rising into a ring that breaks into drops; pour is a stream falling into a pool; blobs float and
+// merge round the middle. `size` is the edge of the box it plays in, standing on the prop's position; its
+// look is the prop's material (a glossy colour, or transmission for a clear liquid). Prop3d-only.
+export const PROP3D_LIQUID_FORMS = ["crown", "pour", "blobs", "vortex"] as const;
+const aepProp3DLiquidSourceSchema = z
+  .object({
+    type: z.literal("liquid"),
+    form: z.enum(PROP3D_LIQUID_FORMS),
+    seed: z.number().int().optional(),
+  })
+  .strict();
+
+// Soft vapour: steam rising, a cloud of smoke that wraps and clears, or a burst of fine powder, timed to the prop's
+// in/out points and tinted by material.color. `size` is the edge of its box, standing on the prop's position. Prop3d-only.
+export const PROP3D_SMOKE_FORMS = ["steam", "cloud", "powder"] as const;
+const aepProp3DSmokeSourceSchema = z
+  .object({
+    type: z.literal("smoke"),
+    form: z.enum(PROP3D_SMOKE_FORMS),
+    seed: z.number().int().optional(),
   })
   .strict();
 
@@ -771,7 +861,7 @@ const aepProp3DLayerSchema = z
     kind: z.literal("prop3d"),
     // "product" marks the hero object for Director / critic / lint; rendering is identical.
     role: z.enum(["prop", "product"]).optional(),
-    source: z.union([aepModel3DSourceSchema, aepProp3DCardSourceSchema]),
+    source: z.union([aepModel3DSourceSchema, aepProp3DCardSourceSchema, aepProp3DLiquidSourceSchema, aepProp3DSmokeSourceSchema]),
     textures: aepModel3DTexturesSchema.optional(),
     size: z.number().positive().optional(),
     position: aepAnimatableOf(stageVec3).optional(),
@@ -795,6 +885,7 @@ export type AepActor3DLayer = z.infer<typeof aepActor3DLayerSchema>;
 export type AepProp3DLayer = z.infer<typeof aepProp3DLayerSchema>;
 export type AepProp3DSource = AepProp3DLayer["source"];
 export type AepProp3DCardSource = z.infer<typeof aepProp3DCardSourceSchema>;
+export type AepProp3DLiquidSource = z.infer<typeof aepProp3DLiquidSourceSchema>;
 export type AepProp3DMaterial = z.infer<typeof aepProp3DMaterialSchema>;
 export type AepProp3DSwarm = z.infer<typeof aepProp3DSwarmSchema>;
 export type AepStageMemberLayer = AepActor3DLayer | AepProp3DLayer;

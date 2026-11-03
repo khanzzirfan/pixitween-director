@@ -108,9 +108,9 @@ export function pushDoneNudge(crew: CrewCtx): void {
 }
 
 /** Auto-finish. Returns false when the gate refuses, so the caller keeps the session going. */
-export async function autoFinish(crew: CrewCtx): Promise<boolean> {
+export async function autoFinish(crew: CrewCtx, o: { force?: boolean } = {}): Promise<boolean> {
   const film = await crew.films.get(crew.filmId);
-  const r = await finishFilm(crew, crew.toolCtx, `${film.storyboard?.scenes.length ?? 0} scenes built and checked`);
+  const r = await finishFilm(crew, crew.toolCtx, `${film.storyboard?.scenes.length ?? 0} scenes built and checked`, o);
   if (!r.ok) return false;
   crew.emit({ type: 'showrunner.say', kind: 'note', text: WRAPPING });
   return true;

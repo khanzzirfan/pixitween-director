@@ -20,6 +20,19 @@
       "port": 5173
     },
     {
+      "name": "web-check",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--config",
+        "web/vite.config.ts",
+        "--port",
+        "5199",
+        "--strictPort"
+      ],
+      "port": 5199
+    },
+    {
       "name": "dev-fake",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

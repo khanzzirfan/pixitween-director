@@ -1,10 +1,11 @@
 import { Buffer } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
-import { boardPrompt, checkBeatSheet, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
+import { defaultFinish, boardPrompt, checkBeatSheet, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
 import { TEXT_RULES } from './cinematic-rules';
 import { floorElements } from './ingredients';
-import { EXAMPLES, pickExamples, referenceDeck } from './reference-deck';
+import { EXAMPLES, filmLines, nearestFilms, pickExamples, referenceDeck } from './reference-deck';
+import type { FilmSnapshot } from '../corpus/films';
 
 const els = floorElements('Coffee Co. Cold Brew', 'drinks');
 const sheetOf = (beats: BeatSheet['beats']): BeatSheet => ({ beats });
@@ -28,13 +29,13 @@ describe('defaultBeatSheet', () => {
     // a single element cannot fill two shots, so the checker asks for a second; the floor sheet still plays it
     expect(defaultBeatSheet(sets[2]!).beats.filter((b) => b.ingredient)).toHaveLength(1);
   });
-  it('runs 8 s, ends on a hold of 12-37 %, and uses only the elements it was given', () => {
+  it('runs 8 s, ends on a hold, and uses only the elements it was given', () => {
     const s = defaultBeatSheet(els);
     expect(totalSeconds(s)).toBe(8);
     const last = s.beats.at(-1)!;
     expect(last.move).toBe('hold');
-    expect(last.seconds / 8).toBeGreaterThanOrEqual(0.12);
-    expect(last.seconds / 8).toBeLessThanOrEqual(0.37);
+    expect(last.seconds / 8).toBeGreaterThanOrEqual(0.1);
+    expect(last.seconds / 8).toBeLessThanOrEqual(0.5);
     for (const b of s.beats) if (b.ingredient) expect(els.map((e) => e.id)).toContain(b.ingredient.kind);
   });
 });
@@ -47,45 +48,32 @@ describe('checkBeatSheet', () => {
     return c;
   };
   it.each([
-    ['the first shot is too long', (b: BeatSheet['beats']) => (b[0]!.seconds = 2), /hook/],
     ['a shot is too short', (b: BeatSheet['beats']) => (b[1]!.seconds = 0.2), /shot 2 lasts/],
     ['the last shot is not a hold', (b: BeatSheet['beats']) => (b.at(-1)!.move = 'push'), /must be a hold/],
     ['the hold is too short', (b: BeatSheet['beats']) => (b.at(-1)!.seconds = 0.5), /end hold/],
     ['a shot uses an unknown element', (b: BeatSheet['beats']) => (b[0]!.ingredient = { kind: 'dragon', action: 'fall' }), /not one of the elements/],
-    ['a card is asked to fall', (b: BeatSheet['beats']) => (b[1]!.ingredient = { kind: 'splash', action: 'fall' }), /can only splash, swirl/],
-    ['the macro carries an element', (b: BeatSheet['beats']) => (b[2]!.ingredient = { kind: 'bean', action: 'drift' }), /label macro/],
+    ['a liquid is asked to fall', (b: BeatSheet['beats']) => (b[1]!.ingredient = { kind: 'splash', action: 'fall' }), /a liquid element \("splash"\) can only splash, pour, swirl/],
     ['the last shot has an element', (b: BeatSheet['beats']) => (b.at(-1)!.ingredient = { kind: 'bean', action: 'drift' }), /last shot clear/],
-    ['the opener is a dolly-zoom', (b: BeatSheet['beats']) => (b[0]!.move = 'dolly-zoom'), /not the opener/],
-    ['an element is never used', (b: BeatSheet['beats']) => (b[4]!.ingredient = undefined), /"milk" is never used/],
   ])('flags: %s', (_name, fn, re) => {
     expect(checkBeatSheet(mutate(fn), els).join('|')).toMatch(re);
   });
-  it('flags three shots of the same size in a row, not counting a hold or a dolly-zoom, which continue the shot before', () => {
-    const s = sheetOf([
-      { size: 'wide', move: 'push', seconds: 1 },
-      { size: 'wide', move: 'push', seconds: 1, ingredient: { kind: 'bean', action: 'fall' } },
-      { size: 'wide', move: 'push', seconds: 1, ingredient: { kind: 'ice', action: 'orbit' } },
-      { size: 'macro', move: 'push', seconds: 1 },
-      { size: 'wide', move: 'push', seconds: 1 },
-      { size: 'wide', move: 'hold', seconds: 2 },
-    ]);
-    expect(checkBeatSheet(s, els).join('|')).toMatch(/shots 1 to 3 are all wide/);
+  it('keeps the size rules of a hold and a dolly-zoom for the camera, and checks no taste', () => {
     expect(effectiveSizes(sheetOf([{ size: 'close', move: 'push', seconds: 1 }, { size: 'wide', move: 'hold', seconds: 1 }]))).toEqual(['close', 'close']);
     expect(effectiveSizes(sheetOf([{ size: 'close', move: 'push', seconds: 1 }, { size: 'wide', move: 'orbit', seconds: 1 }]))).toEqual(['close', 'wide']);
-    const run = sheetOf([
-      { size: 'wide', move: 'push', seconds: 1, ingredient: { kind: 'bean', action: 'fall' } },
-      { size: 'macro', move: 'push', seconds: 1 },
-      { size: 'medium', move: 'push', seconds: 1, ingredient: { kind: 'ice', action: 'orbit' } },
-      { size: 'medium', move: 'dolly-zoom', seconds: 1 },
-      { size: 'medium', move: 'hold', seconds: 2 },
-    ]);
-    expect(checkBeatSheet(run, els).join('|')).not.toMatch(/alternate/);
   });
-  it('requires a macro, a wide and push-in to lead', () => {
-    const s = mutate((b) => b.forEach((x) => { if (x.move === 'push') x.move = 'pull'; }));
-    expect(checkBeatSheet(s, els).join('|')).toMatch(/push-in leads/);
-    const noMacro = mutate((b) => (b[2]!.size = 'close'));
-    expect(checkBeatSheet(noMacro, els).join('|')).toMatch(/label macro shot/);
+  it('lets Muse choose the shape: three same-size shots, no macro, no wide, no truck, no push, a dolly-zoom first, an element nobody uses, a long hook', () => {
+    const s = sheetOf([
+      { size: 'wide', move: 'dolly-zoom', seconds: 3 },
+      { size: 'wide', move: 'orbit', seconds: 2, ingredient: { kind: 'bean', action: 'drift' } },
+      { size: 'wide', move: 'pull', seconds: 2 },
+      { size: 'wide', move: 'hold', seconds: 2 },
+    ]);
+    expect(checkBeatSheet(s, els)).toEqual([]);
+    expect(checkBeatSheet(sheetOf([{ size: 'macro', move: 'orbit', seconds: 3, ingredient: { kind: 'bean', action: 'drift' }, text: 'Look closer' }, { size: 'medium', move: 'hold', seconds: 2 }, { size: 'medium', move: 'hold', seconds: 2 }]), els).filter((x) => /macro|text/.test(x))).toEqual([]);
+  });
+  it('still stops what would break the film: too few shots, too short a film, a bad element', () => {
+    expect(checkBeatSheet(sheetOf([{ size: 'wide', move: 'push', seconds: 1 }, { size: 'wide', move: 'hold', seconds: 1 }]), els).join('|')).toMatch(/use 3 to 14 shots/);
+    expect(checkBeatSheet(sheetOf([{ size: 'wide', move: 'push', seconds: 0.5 }, { size: 'wide', move: 'push', seconds: 0.5 }, { size: 'wide', move: 'hold', seconds: 0.5 }]), els).join('|')).toMatch(/at least|must run 4/);
   });
 });
 
@@ -153,6 +141,20 @@ describe('parseBoard', () => {
   });
 });
 
+describe('parseBoard finish', () => {
+  const base = () => lemonBoard();
+  it('reads the finish Muse chose, mends a bad word to a default and leaves it absent when not asked', () => {
+    const a = parseBoard({ ...base(), finish: { glow: 'strong', grain: 'heavy', vignette: 'none', fringe: true, floor: 'mirror', wet: 'heavy', caustics: 'bright' } });
+    expect(a.ok && a.board.finish).toEqual({ glow: 'strong', grain: 'heavy', vignette: 'none', fringe: true, floor: 'mirror', wet: 'heavy', caustics: 'bright' });
+    const b = parseBoard({ ...base(), finish: { glow: 'blinding', grain: 'fine', vignette: 'soft' } });
+    expect(b.ok && b.board.finish).toEqual({ glow: 'soft', grain: 'fine', vignette: 'soft', fringe: false, floor: 'matte', wet: 'none', caustics: 'none' });
+    const c = parseBoard(base());
+    expect(c.ok && c.board.finish).toBeUndefined();
+    expect(defaultFinish('low').glow).toBe('strong');
+    expect(defaultFinish('high').vignette).toBe('none');
+  });
+});
+
 describe('parseBoard tagline', () => {
   it('drops a tagline over the rule book\'s word count instead of cutting it mid-phrase', () => {
     const board = floorBoard({ title: 'Beach Towel', category: 'summer' });
@@ -178,19 +180,65 @@ describe('reference deck', () => {
 });
 
 describe('pickExamples', () => {
-  it('shows a coffee product the seasoning and the yogurt, not the latte', () => {
-    const shown = pickExamples('drinks Coffee Co. Cold Brew coffee latte').map((e) => e.product);
-    expect(shown.join('|')).not.toMatch(/latte/i);
+  it('shows a coffee product other products, not a coffee maker', () => {
+    const shown = pickExamples('home Pour-over coffee maker glass steel coffee').map((e) => e.product);
+    expect(shown.join('|')).not.toMatch(/coffee maker/i);
     expect(shown).toHaveLength(2);
   });
-  it('shows a yogurt product the latte and the seasoning', () => {
-    expect(pickExamples('dairy fruit yogurt cup berry').map((e) => e.product).join('|')).not.toMatch(/yogurt/i);
+  it('shows a running shoe other products, not a shoe', () => {
+    expect(pickExamples('sport running shoe white mesh sole').map((e) => e.product).join('|')).not.toMatch(/shoe/i);
   });
-  it('is stable, and puts only the chosen examples in the prompt', () => {
+  it('is stable, and different products meet different examples, never one fixed pair', () => {
     expect(pickExamples('x')).toEqual(pickExamples('x'));
-    const deck = referenceDeck('drinks Coffee Co. Cold Brew coffee latte');
-    expect(deck).toMatch(/Emberhouse/);
-    expect(deck).not.toMatch(/Nocturne/);
+    const pairs = new Set(['candle', 'laptop', 'sofa', 'handbag', 'toothpaste', 'skateboard', 'tea', 'lamp'].map((w) => pickExamples(`gadget ${w}`).map((e) => e.product).join('|')));
+    expect(pairs.size).toBeGreaterThan(2);
+  });
+  it('the worked boards differ in shape: shot counts, lengths and the moves they use', () => {
+    const shape = EXAMPLES.map((e) => `${e.board.beats.length}`);
+    expect(new Set(shape).size).toBeGreaterThan(2);
+    expect(EXAMPLES.filter((e) => e.board.beats.some((b) => (b as { camera?: unknown }).camera)).length).toBeGreaterThan(2);
+  });
+});
+
+const film = (slug: string, subject: string, moves: string[]): FilmSnapshot => ({
+  slug, title: 'pin title', fps: 30, width: 720, height: 1280, duration_s: moves.length, frames: 0, arc: {}, moves: {},
+  review: { kind: 'product-ad', subject, summary: `${subject}, shot in a dark studio.`, beats: [], shot_labels: moves.map((_m, i) => ({ shot: i + 1, scale: 'close', beat: 'hook', note: `shot ${i + 1} note` })), learn: ['one idea per film'] },
+  shots: moves.map((move, i) => ({ idx: i + 1, start_s: i, end_s: i + 1, dur_s: 1, enters_via: 'cut', move, ease: 'none', zoom_pct: 0, pan_pct: 0, tilt_pct: 0, jitter: 0, luma: 0, contrast: 0, saturation: 0, warmth: 1, key_style: 'low-key', temperature: 'warm', hue: 'amber', dof_ratio: 0 })),
+});
+
+describe('nearestFilms', () => {
+  const films = [
+    film('a', 'Black oud perfume bottle with smoke', ['push-in', 'static', 'pull-out']),
+    film('b', 'Orange sneaker floating on grey', ['push-in', 'pan left', 'pull-out', 'tilt up']),
+    film('c', 'Iced coffee can with beans', ['push-in', 'push-in', 'push-in']),
+  ];
+  it('picks the films whose subject shares the most words with the product, from any kind of product', () => {
+    expect(nearestFilms('Oud Noir perfume bottles, dark and warm', 1, films)[0]!.slug).toBe('a');
+    expect(nearestFilms('running sneakers', 1, films)[0]!.slug).toBe('b');
+    expect(nearestFilms('cold brew coffee', 1, films)[0]!.slug).toBe('c');
+  });
+  it('shows the most varied films when nothing matches, and is stable', () => {
+    expect(nearestFilms('camping stove', 1, films)[0]!.slug).toBe('b');
+    expect(nearestFilms('camping stove', 3, films)).toEqual(nearestFilms('camping stove', 3, films));
+  });
+  it('writes each film as its measured shots and lessons, and says when none match', () => {
+    const lines = filmLines(films[1]!);
+    expect(lines).toContain('Real film: Orange sneaker floating on grey');
+    expect(lines).toContain('1.0s close pan left [hook]: shot 2 note');
+    expect(lines).toContain('Lesson: one idea per film');
+    expect(referenceDeck('perfume bottle', films)).toContain('REAL FILMS NEAREST THIS PRODUCT');
+    expect(referenceDeck('camping stove', films)).toContain('the corpus has none of this kind of product');
+  });
+});
+
+describe('boardPrompt: options, not orders', () => {
+  const p = boardPrompt({ title: 'Citrus Soda', seconds: 8 }).system;
+  it('offers the camera as numbers Muse writes, with what each means', () => {
+    for (const w of ['THE CAMERA is yours', 'camera.from', 'fill', 'height', 'around', 'lens', 'side', 'camera.ease', 'camera.focus', 'place', 'scale']) expect(p).toContain(w);
+  });
+  it('orders no shape: no required macro, wide, push share, move mix, dolly-zoom reveal, peak position or hook length', () => {
+    for (const bad of [/include a (label )?macro/i, /at least one wide/i, /most moving shots push/i, /at least \d different (camera )?moves/i, /use the dolly-zoom once/i, /exactly one shot is peak/i, /at most 1\.5 s/, /never three of the same size/i]) expect(p).not.toMatch(bad);
+    expect(p).toMatch(/Everything else is yours/);
   });
 });
 
@@ -199,15 +247,23 @@ describe('boardPrompt', () => {
     const p = boardPrompt({ title: 'Citrus Soda', brand: 'Zest', category: 'soda', seconds: 8 });
     expect(p.system).toMatch(/shown the product photo/);
     expect(p.system).toMatch(/2 to 4 real things that belong round THIS product/);
-    expect(p.system).toMatch(/hook of at most 1.5 s/);
-    // the reference deck: craft rules and two worked boards that themselves pass the checker
-    expect(p.system).toMatch(/HOW THE BEST ADS ARE CUT/);
-    expect(p.system).toMatch(/ONE idea/);
-    expect(p.system).toMatch(/TWO WORKED BOARDS/);
+    expect(p.system).toMatch(/3-14 shots/);
+    // the reference deck: observations to choose from and worked boards that themselves pass the checker
+    expect(p.system).toMatch(/WHAT THE BEST ADS DO/);
+    expect(p.system).toMatch(/not rules/);
+    expect(p.system).toMatch(/WORKED BOARDS/);
+    expect(p.system).toMatch(/REAL FILMS/);
     expect(p.user).toContain('Citrus Soda by Zest (soda)');
-    expect(boardPrompt({ title: 'x', seconds: 8, violations: ['use 5 to 10 shots (got 3)'] }).user).toContain('- use 5 to 10 shots (got 3)');
+    expect(boardPrompt({ title: 'x', seconds: 8, violations: ['use 3 to 14 shots (got 2)'] }).user).toContain('- use 3 to 14 shots (got 2)');
   });
 });
+
+const lemon = (): BeatSheet => parseBoardOrThrow(lemonBoard()).sheet;
+const parseBoardOrThrow = (b: unknown) => {
+  const r = parseBoard(JSON.stringify(b));
+  if (!r.ok) throw new Error(r.reason);
+  return r.board;
+};
 
 describe('planBoard', () => {
   const ctx = (replies: Array<unknown | Error>) => {
@@ -245,13 +301,21 @@ describe('planBoard', () => {
     expect(c.reviewImages).toHaveBeenCalledTimes(2);
     expect((c.reviewImages.mock.calls[1] as unknown as [unknown, string])[1]).toContain('broke these rules');
   });
-  it('sends a board with an element nobody uses back for a fix', async () => {
-    const unused = lemonBoard();
-    unused.elements.push({ id: 'mint', name: 'mint leaf', use: 'solid', look: 'fresh mint leaf with fine veins, slightly curled', pieces: 1, sizeM: 0.035 });
-    const c = ctx([unused, lemonBoard()]);
+  it('takes Muse\'s board as written when it only breaks taste: no truck, no macro, an unused element', async () => {
+    const odd = lemonBoard();
+    odd.beats = odd.beats.map((b) => ({ ...b, move: b.move === 'truck' ? 'push' : b.move, size: b.size === 'macro' ? 'close' : b.size }));
+    odd.elements.push({ id: 'mint', name: 'mint leaf', use: 'solid', look: 'fresh mint leaf with fine veins, slightly curled', pieces: 1, sizeM: 0.035 });
+    const c = ctx([odd]);
     const r = await planBoard(c.ctx, { title: 'Citrus Soda', photo });
     expect(r.source).toBe('muse');
-    expect((c.reviewImages.mock.calls[1] as unknown as [unknown, string])[1]).toContain('"mint" is never used');
+    expect(c.reviewImages).toHaveBeenCalledTimes(1);
+    expect(r.violations).toEqual([]);
+    expect(r.board.sheet.beats.map((b) => b.move)).toEqual(odd.beats.map((b) => b.move));
+  });
+  it('flags more than three cuts that are not a plain cut: each renders the world twice', () => {
+    const many: BeatSheet = { beats: lemon().beats.map((b, n) => (n >= 1 && n <= 4 ? { ...b, cut: 'swirl' as const } : b)) };
+    const v = checkBeatSheet(many, parseBoardOrThrow(lemonBoard()).elements);
+    expect(v.join(' ')).toContain('at most 3 cuts that are not a plain cut');
   });
   it('falls back to the floor board after two bad boards or a failed call', async () => {
     const bad = { ...lemonBoard(), beats: [{ size: 'wide', move: 'push', seconds: 1 }] };
@@ -261,6 +325,15 @@ describe('planBoard', () => {
     expect(a.board.elements.map((e) => e.id)).toEqual(['bean', 'ice', 'splash', 'milk']);
     expect(checkBeatSheet(a.board.sheet, a.board.elements)).toEqual([]);
     expect((await planBoard(ctx([new Error('down')]).ctx, { title: 'x', photo })).source).toBe('floor');
+  });
+  it('tries a failed call once more before falling back', async () => {
+    const c = ctx([new Error('busy'), lemonBoard()]);
+    const r = await planBoard(c.ctx, { title: 'Citrus Soda', photo });
+    expect(r.source).toBe('muse');
+    expect(c.reviewImages).toHaveBeenCalledTimes(2);
+    const down = await planBoard(ctx([new Error('down'), new Error('down')]).ctx, { title: 'x', photo });
+    expect(down.source).toBe('floor');
+    expect(down.violations.join(' ')).toContain('the call failed: down');
   });
   it('the floor board names the product and passes the checker', () => {
     const b = floorBoard({ title: 'Coffee Co. Mocha Cold Brew' });
@@ -278,30 +351,6 @@ describe('shot fields (angle, phase, product, cut)', () => {
     expect(effectiveSizes(s)[6]).toBe('wide');
     expect(effectiveAngles(s)[6]).toBe(s.beats[5]!.angle);
   });
-  it('two shots alike in size, height and move are one shot with a jump', () => {
-    const s = base();
-    s.beats[1] = { ...s.beats[0]!, ingredient: s.beats[1]!.ingredient };
-    s.beats[1]!.phase = 'build';
-    expect(checkBeatSheet(s, els).join('|')).toMatch(/shots 1 and 2 look the same/);
-  });
-  it('wants more than one camera height once any shot names one', () => {
-    const s = base();
-    for (const b of s.beats) b.angle = 'eye';
-    s.beats[1]!.size = 'close';
-    expect(checkBeatSheet(s, els).join('|')).toMatch(/vary the camera height/);
-  });
-  it('holds the phases to the hook-peak-close shape, the peak at 35-80 %', () => {
-    const s = base();
-    s.beats[0]!.phase = 'build';
-    expect(checkBeatSheet(s, els).join('|')).toMatch(/phase hook/);
-    const t = base();
-    t.beats[4]!.phase = 'build';
-    expect(checkBeatSheet(t, els).join('|')).toMatch(/exactly one shot has the phase peak/);
-    const u = base();
-    u.beats[4]!.phase = 'build';
-    u.beats[1]!.phase = 'peak';
-    expect(checkBeatSheet(u, els).join('|')).toMatch(/peak shot starts at 1\d%/);
-  });
   it('lets an old sheet without phases pass, and keeps the product still in the last shot', () => {
     const s = base();
     for (const b of s.beats) delete b.phase;
@@ -309,19 +358,25 @@ describe('shot fields (angle, phase, product, cut)', () => {
     s.beats.at(-1)!.product = 'drop';
     expect(checkBeatSheet(s, els).join('|')).toMatch(/holds still in the last shot/);
   });
-  it('a macro that plays inside a push counts for the no-element rule by its played size; a dolly-zoom is a close, so it takes elements', () => {
+  it('no longer asks for a hook, a peak or a close phase', () => {
     const s = base();
-    s.beats[5]!.size = 'macro';
-    expect(checkBeatSheet(s, els).join('|')).not.toMatch(/shot 6 is a label macro/);
-    s.beats[5]!.ingredient = { kind: 'ice', action: 'drift' };
-    expect(checkBeatSheet(s, els).join('|')).not.toMatch(/shot 6 is a label macro/);
-    s.beats[1]!.size = 'macro';
-    s.beats[1]!.ingredient = { kind: 'ice', action: 'drift' };
-    expect(checkBeatSheet(s, els).join('|')).toMatch(/shot 2 is a label macro/);
+    s.beats[0]!.phase = 'build';
+    s.beats[4]!.phase = 'build';
+    expect(checkBeatSheet(s, els)).toEqual([]);
   });
 });
 
 describe('reviewBoard and the mending retry', () => {
+  it('a shot that used an element the safety pass dropped plays without it, and the board stands', () => {
+    const b = parseBoardOrThrow(lemonBoard());
+    const withBad = { ...b, elements: [...b.elements.filter((e) => e.id !== 'ice'), { id: 'ice', name: 'Nike ice', use: 'solid' as const, look: 'a Nike logo ice cube, clear', pieces: 1, sizeM: 0.03 }] };
+    const r = reviewBoard(withBad);
+    expect(r.dropped.join(' ')).toContain('ice');
+    expect(r.hard).toEqual([]);
+    expect(r.board.sheet.beats.some((x) => x.ingredient?.kind === 'ice')).toBe(false);
+    expect(r.board.sheet.beats.some((x) => x.ingredient?.kind === 'lemon-slice')).toBe(true);
+  });
+
   it('passes a good board and names what a hand edit broke', () => {
     const b = floorBoard({ title: 'Coffee Co. Cold Brew', category: 'drinks' });
     expect(reviewBoard(b).violations).toEqual([]);
@@ -417,11 +472,9 @@ describe('the words on a board', () => {
     expect(base.beats.some((b) => b.text)).toBe(false);
     expect(checkBeatSheet(withText({ 0: 'Pack the car', 3: 'Feel the summer' }), els3)).toEqual([]);
   });
-  it('allows only the rule book\'s few shots with words, never the last or a macro', () => {
+  it('allows only the rule book\'s few shots with words, never the last', () => {
     expect(checkBeatSheet(withText({ 0: 'One', 1: 'Two', 3: 'Three' }), els3).join('|')).toMatch(new RegExp(`at most ${TEXT_RULES.maxShots} shots carry text`));
     expect(checkBeatSheet(withText({ 6: 'Buy it now' }), els3).join('|')).toMatch(/last shot carries no text/);
-    const macro = base.beats.findIndex((b) => b.size === 'macro');
-    expect(checkBeatSheet(withText({ [macro]: 'Look closer' }), els3).join('|')).toMatch(/label macro; keep words out/);
   });
   it('holds the words to what a shot can say: the rule book\'s most, and about three a second', () => {
     expect(checkBeatSheet(withText({ 0: 'one two three four five six' }), els3).join('|')).toMatch(new RegExp(`at most ${TEXT_RULES.maxWords} words`));

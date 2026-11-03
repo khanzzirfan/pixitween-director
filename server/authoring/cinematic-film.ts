@@ -3,11 +3,11 @@ import { ASPECT_SIZES } from '@shared/composition';
 import { newFilmComposition, registerAsset } from './composition';
 import { addLayer, type AddLayerOptions } from './layers';
 import { readDirector, writeDirector, sceneMeta } from './meta';
-import { effectiveAngles, effectiveSizes, totalSeconds, type Angle, type Beat, type BeatSheet, type KeyLevel, type ShotSize, type Tone } from './beatsheet';
+import { defaultFinish, effectiveAngles, effectiveSizes, totalSeconds, EASES, type Angle, type Beat, type BeatSheet, type CameraPoint, type Finish, type KeyLevel, type ShotSize, type Tone } from './beatsheet';
 import type { IngredientAsset } from './ingredients';
 import { shade, type ClipAsset, type Rect } from './retail-clip';
 import { addScene } from './scenes';
-import { CAMERA, LIGHT, MATERIALS } from './cinematic-rules';
+import { CAMERA, CUT_SHADERS, FINISH, LIGHT, MATERIALS } from './cinematic-rules';
 import { WALL, type SetAir, type SetLook } from './set-art';
 import { setKeyframes } from './transform';
 import type { Aspect, Comp, Obj } from './types';
@@ -27,6 +27,8 @@ export const SCHEMA = '1.12.0';
 const ID = 'cine';
 export const PRODUCT_H = 0.16;
 export const PRODUCT_Y = PRODUCT_H / 2;
+/** The largest stage card (metres) that plays in front of the product; a bigger one plays behind it. */
+const CARD_FRONT_MAX = 0.18;
 export const FOV_BASE = CAMERA.fovBase;
 export const FOV_WIDE = CAMERA.fovWide;
 /** Camera height as an angle above the product's centre: low looks up at it, high looks down. */
@@ -35,6 +37,8 @@ export const ELEVATION: Record<Angle, number> = { low: -3, eye: 7, high: 28 };
 export const FILL: Record<ShotSize, number> = { wide: 0.32, medium: 0.5, close: 0.8, macro: 1.5 };
 /** The lens blur. Low enough that the can's edges stay crisp in every shot; the focus distance follows the camera. */
 export const APERTURE = 0.3;
+/** A backdrop brighter than this (relative luminance of its top third) takes dark type. */
+export const BRIGHT_SKY = 0.45;
 /** Engine limits (STAGE3D_LIMITS in aep-32). */
 export const LIMITS = { props: 12, instances: 400, swarm: 200 } as const;
 
@@ -53,11 +57,14 @@ export interface CinematicInput {
   /** The outline in the front texture's own pixels; required for shape 'other'. */
   contour?: Array<[number, number]>;
   title: string;
-  price: number;
+  /** The price on the end disc; without one the end card is the name and tagline alone. */
+  price?: number;
   wasPrice?: number;
   currency?: string;
   brand?: string;
   accent: string;
+  /** The screen grade over the world. Absent means the one its key level gets. */
+  finish?: Finish;
   /** The ingredients made for this product, by kind. A beat whose kind is missing plays without it. */
   ingredients?: Record<string, IngredientAsset>;
   /** The line under the name in the end hold (at most six words); the shots' own words come from the sheet. */
@@ -65,7 +72,7 @@ export interface CinematicInput {
   /** A live, hand-held tremor over the camera's moves (the board's choice). It is dropped when the world's 64-tween budget has no room for it. */
   handheld?: boolean;
   /** The board's set: a backdrop picture on the wall behind the product, the floor colour, and the air. Without it the product floats on the plain field. */
-  set?: { look: SetLook; air: SetAir; backdrop: ClipAsset; ground: string; /** the soft dot the bokeh lights are drawn with */ dot?: ClipAsset };
+  set?: { look: SetLook; air: SetAir; backdrop: ClipAsset; ground: string; /** the soft dot the bokeh lights are drawn with */ dot?: ClipAsset; /** how bright the backdrop is where the words sit (its top third), 0 to 1: it picks dark or light type */ skyLuma?: number };
   /** The board's light: the key light's colour and how dark or bright the world is. */
   tone?: Tone;
   key?: KeyLevel;
@@ -99,7 +106,7 @@ interface Key<T> {
 const key = <T>(t: number, v: T, e?: Bez, hold?: boolean): Key<T> => ({ t, v, ...(e ? { easeIn: e, easeOut: e } : {}), ...(hold ? { hold: true } : {}) });
 
 /** Distance from the target that makes the product fill `fill` of the frame's height at lens `fov`. */
-export const framingDistance = (fill: number, fov = FOV_BASE, productH = PRODUCT_H): number => productH / (fill * 2 * Math.tan(rad(fov) / 2));
+export const framingDistance = (fill: number, fov: number = FOV_BASE, productH = PRODUCT_H): number => productH / (fill * 2 * Math.tan(rad(fov) / 2));
 
 interface Pose {
   /** metres from the target */
@@ -139,6 +146,25 @@ export interface CameraPlan {
   fov: Array<Key<number>>;
   focus: Array<Key<number>>;
   frames: number;
+}
+
+/** A fill from here up is a crop of the label, which no cap holds back. */
+const MACRO_FROM = 1.2;
+/** The curve each ease word names (Muse's `camera.ease`). */
+const EASE_OF: Record<(typeof EASES)[number], Bez> = { through: EASE_THROUGH, snap: EASE_HOOK, smooth: EASE_IN_OUT, linear: LINEAR, whip: EASE_WHIP, float: [0.6, 0, 0.4, 1] };
+
+/**
+ * One end of the camera as Muse wrote it, laid over the pose the move gave. fill sets the distance for the lens in force; a lens change
+ * without a fill keeps the product's size (the distance follows the lens, as in a dolly-zoom); side slides the camera by a share of its
+ * distance. Only safety bounds the numbers (the parse already pulled them into range); a macro crop is the one place fill may pass 1.
+ */
+function withPoint(pose: Pose, pt: CameraPoint | undefined, cap: number): Pose {
+  if (!pt) return pose;
+  const fov = pt.lens ?? pose.fov;
+  const keepSize = pt.lens !== undefined && pt.fill === undefined ? (pose.d * Math.tan(rad(pose.fov / 2))) / Math.tan(rad(fov / 2)) : undefined;
+  const d = pt.fill !== undefined ? framingDistance(pt.fill >= MACRO_FROM ? pt.fill : Math.min(pt.fill, cap), fov) : (keepSize ?? pose.d);
+  const x = pt.side !== undefined ? r(pt.side * d) : pose.x;
+  return { d: r(d), az: pt.around ?? pose.az, fov, el: pt.height ?? pose.el, ...(x !== undefined ? { x } : {}) };
 }
 
 /**
@@ -233,6 +259,14 @@ export function planCamera(sheet: BeatSheet, fps: number, o: { maxFill?: number;
         from = { d: cur.d * CAMERA.holdCreep, az: cur.az, fov: cur.fov, el: cur.el, ...(cur.x !== undefined ? { x: cur.x } : {}) };
         ease = EASE_IN_OUT;
       }
+    }
+    // Muse's own numbers lay over the move's preset: the move is only where a shot starts from when Muse wrote nothing
+    if (b.camera) {
+      const capShot = i >= lastIdx - 1 ? Math.min(o.maxFill ?? Infinity, o.holdFill ?? Infinity) : (o.maxFill ?? Infinity);
+      from = withPoint(from, b.camera.from, capShot);
+      to = withPoint(to, b.camera.to, capShot);
+      if (b.camera.ease) ease = EASE_OF[b.camera.ease];
+      if (b.camera.focus) rack = b.camera.focus === 'rack';
     }
     beats.push({ start, end, size, move: b.move, from, to });
     position.push(key(start, positionOf(from), ease), key(end, positionOf(to), ease, !last));
@@ -407,11 +441,42 @@ function ingredientProp(i: number, b: Beat, f: BeatFrames, a: IngredientAsset | 
   const inPoint = f.start;
   const base = { id, name: `${a.kind} ${act}`, kind: 'prop3d', stage: `${ID}:world`, inPoint, outPoint: Math.min(f.end + (act === 'fall' || act === 'burst' ? 12 : 1), 10 ** 6) };
   const sec = b.seconds;
+  // Muse's own size and depth for the element; its default depth is the one the kind plays at
+  const size = r(a.sizeM * (b.ingredient.scale ?? 1));
+  const depth = (dflt: number): number => (b.ingredient!.place === 'front' ? 0.08 : b.ingredient!.place === 'behind' ? -0.07 : b.ingredient!.place === 'around' ? 0 : dflt);
+
+  if (a.use === 'liquid') {
+    // real liquid, drawn by the engine round the product: a crown splash, a stream pouring beside it, or drops floating round it
+    const form = act === 'pour' ? 'pour' : act === 'swirl' ? 'vortex' : act === 'drift' ? 'blobs' : act === 'splash' ? 'crown' : undefined;
+    if (!form) return undefined;
+    const look = a.clear
+      ? { color: a.color ?? '#d8eef8', roughness: 0.02, clearcoat: 1, transmission: 0.92, ior: 1.33, thickness: 0.06 }
+      : { color: a.color ?? '#4a2a16', roughness: 0.05, clearcoat: 1 };
+    return {
+      beat: i,
+      instances: 1,
+      layer: { ...base, outPoint: f.end + 1, source: { type: 'liquid', form, seed: 3 + (hash(i + 7) % 97) }, size, position: [form === 'pour' ? 0.015 : 0, 0, depth(0)], material: look, castShadow: true },
+    };
+  }
+
+  if (a.use === 'vapour') {
+    // soft vapour drawn by the engine, never off an open top: steam rises behind the product and towers over it, a cloud rolls round
+    // it and clears, powder bursts out behind it
+    const form = act === 'rise' ? 'steam' : act === 'wrap' ? 'cloud' : act === 'burst' ? 'powder' : undefined;
+    if (!form) return undefined;
+    const position = form === 'cloud' ? [0, 0, -0.04] : form === 'steam' ? [0.015, 0, -0.07] : [0, 0, -0.05];
+    return {
+      beat: i,
+      instances: 1,
+      layer: { ...base, ...(form === 'powder' ? {} : { outPoint: f.end + 1 }), source: { type: 'smoke', form, seed: 3 + (hash(i + 7) % 97) }, size, position: [position[0]!, position[1]!, depth(position[2]!)], material: { color: a.color ?? '#f2ece4', opacity: 1 } },
+    };
+  }
 
   if (a.use === 'card') {
     if (act === 'splash') {
+      // a stage card plays in front of the product only while it is small; a big one would bury it, so it glows from behind instead
       const source: Obj = a.frames.length > 1 ? { type: 'card', frames: a.frames.map((x) => x.id), fps: 24 } : { type: 'card' };
-      return { beat: i, instances: 1, layer: { ...base, source, ...(a.frames.length > 1 ? {} : { textures: { front: a.frames[0]!.id } }), size: a.sizeM, position: [0, 0.01, 0.06], lit: false } };
+      return { beat: i, instances: 1, layer: { ...base, source, ...(a.frames.length > 1 ? {} : { textures: { front: a.frames[0]!.id } }), size, position: [0, 0.01, depth(size > CARD_FRONT_MAX ? -0.04 : 0.06)], lit: false } };
     }
     // swirl: drifts across behind the product and rolls a little
     return {
@@ -421,8 +486,8 @@ function ingredientProp(i: number, b: Beat, f: BeatFrames, a: IngredientAsset | 
         ...base,
         source: { type: 'card' },
         textures: { front: a.frames[0]!.id },
-        size: a.sizeM,
-        position: [key(inPoint, [-0.06, r(PRODUCT_Y - a.sizeM / 2 + 0.02), -0.07]), key(f.end, [0.06, r(PRODUCT_Y - a.sizeM / 2 + 0.05), -0.07])],
+        size,
+        position: [key(inPoint, [-0.06, r(PRODUCT_Y - size / 2 + 0.02), depth(-0.07)]), key(f.end, [0.06, r(PRODUCT_Y - size / 2 + 0.05), depth(-0.07)])],
         rotation: [key(inPoint, [0, 0, -10]), key(f.end, [0, 0, 16])],
       },
     };
@@ -445,7 +510,7 @@ function ingredientProp(i: number, b: Beat, f: BeatFrames, a: IngredientAsset | 
         : act === 'orbit'
           ? { count, seed, motion: 'orbit', emitter: { shape: 'point', center: [0, PRODUCT_Y, 0] }, orbit: { radius: 0.13, angularSpeed: 40, height: 0.12, bob: 0.01 }, spin: 60, growFrames: 6, sizeJitter: 0.25 }
           : { count, seed, motion: 'drift', emitter: { shape: 'sphere', center: [0, PRODUCT_Y, 0], radius: 0.25 }, drift: {}, spin: 40, sizeJitter: 0.3 };
-  return { beat: i, instances: count, layer: { ...base, source, size: glass ? Math.min(a.sizeM, CAMERA.glassMax) : a.sizeM, ...look, swarm } };
+  return { beat: i, instances: count, layer: { ...base, source, size: glass ? Math.min(size, CAMERA.glassMax) : size, ...look, swarm } };
 }
 
 /**
@@ -470,6 +535,15 @@ function airProps(set: NonNullable<CinematicInput['set']>, sheet: BeatSheet, cam
       swarm: { count: 70, seed: 77, motion: 'burst', emitter: { shape: 'point', center: [0, 0.01, 0.1] }, direction: [0, 1, 0.25], spread: 55, speed: 0.75, drag: 1.5, gravity: 2.2, spin: 0, stagger: r2(Math.min(0.3, (f.end - f.start) / 30 / 3)), sizeJitter: 0.5 },
     };
     return { planned: [{ beat: at, layer, instances: 70 }], cards: [] };
+  }
+  if (set.air === 'smoke') {
+    // two slow plumes behind the product from the first frame to the last; the engine fades each in and out of its own length
+    const plume = (n: number, x: number, z: number, size: number, seed: number): Planned => ({
+      beat: -1,
+      instances: 0,
+      layer: { ...base, id: `${ID}:air-smoke${n}`, name: 'smoke', source: { type: 'smoke', form: 'steam', seed }, size, position: [x, 0, z], material: { color: '#b9aea3', opacity: 1 }, castShadow: false },
+    });
+    return { planned: [plume(0, -0.05, -0.13, 0.42, 21), plume(1, 0.06, -0.18, 0.5, 58)], cards: [] };
   }
   if (set.air === 'bokeh' && set.dot) {
     // x, y, z at the start and the end, size, opacity: round the edges of the frame, in front of and behind the product
@@ -739,7 +813,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
       : { type: 'primitive', shape: i.shape, proportions: { width: 1, height: r2(aspect) } },
     textures: flat ? { front: i.texture.id, side: i.set ? tint(i.side, LIGHT.sideLift) : i.side } : { label: i.texture.id, side: i.side },
     size: r(fitSize),
-    material: flat ? { roughness: 0.5, metalness: 0.05, clearcoat: 0.25 } : { roughness: 0.3, metalness: 0.6, clearcoat: 0.8 },
+    material: { ...(flat ? { roughness: 0.5, metalness: 0.05, clearcoat: 0.25 } : { roughness: 0.3, metalness: 0.6, clearcoat: 0.8 }), ...wetLook(i.finish ?? defaultFinish(keyLevel)) },
     position: rise,
     rotation: yaw,
   };
@@ -753,8 +827,10 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     transform: { position: [W / 2, H / 2], anchor: [W / 2, H / 2], scale: [1, 1], rotation: 0, opacity: 1 },
     viewport: { width: W, height: H },
     camera: { position: cam.position, target, fov: cam.fov, focus: { distance: cam.focus, aperture: APERTURE } },
-    set: i.set ? { ground: i.set.ground, groundSize: [...CAMERA.groundSize], wall: { distance: WALL.distance, height: WALL.height }, backdrop: i.set.backdrop.id } : { ground: 'none', wall: false },
+    set: i.set ? { ground: i.set.ground, groundSize: [...CAMERA.groundSize], wall: { distance: WALL.distance, height: WALL.height }, backdrop: i.set.backdrop.id, ...floorShine(i.finish ?? defaultFinish(keyLevel)), ...floorLight(i.finish ?? defaultFinish(keyLevel)) } : { ground: 'none', wall: false },
     style: { shading: 'pbr', exposure },
+    post: finishPost(i.finish ?? defaultFinish(keyLevel), cam.beats.at(-1)!.start),
+    ...(shaderCuts(i.sheet, cam, fps).length ? { shotTransitions: shaderCuts(i.sheet, cam, fps) } : {}),
     shadow: { opacity: i.set ? LIGHT.shadow : 0.45, softness: 0.7 },
     lights: {
       preset: 'studio',
@@ -770,7 +846,9 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   ((c.precomps as Record<string, Obj>)[ID] as Obj).version = SCHEMA;
 
   // copy: brand over the first shots, gone for the macro, then brand, name and price in the end hold
-  const ink = keyLevel === 'high' ? shade(i.accent, 0.8) : '#ffffff';
+  // dark type on a bright world, white on a dark one: measured on the backdrop behind the words when there is one, else read from the key
+  const bright = i.set?.skyLuma !== undefined ? i.set.skyLuma > BRIGHT_SKY : keyLevel === 'high';
+  const ink = bright ? shade(i.accent, 0.8) : '#ffffff';
   const top = H * (portrait ? 0.13 : 0.1);
   // the product in the end hold: how high and wide it really stands (the wide lens and the camera height make it a little bigger than its fill)
   const fill = Math.min(fillIn(sizes.at(-1) ?? 'medium'), holdFill);
@@ -784,7 +862,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   const hasTag = !!i.tagline?.trim();
   const nameCy = Math.max(hasTag ? H * 0.045 + u * 0.1 : H * 0.07 + u * 0.11, Math.min(top + u * 0.11 - (hasTag ? u * 0.03 : 0), canTop - nameSize * 0.9 - (hasTag ? u * 0.05 : 0)));
   if (i.brand) {
-    const bm = add(c, { role: 'caption', kind: 'text', text: i.brand.toUpperCase(), z: 0.2, style: { size: Math.round(u * 0.032), weight: 700, color: keyLevel === 'high' ? shade(i.accent, 0.5) : tint(i.accent, 0.6), align: 'center' }, box: { x: W * 0.1, y: nameCy - u * 0.11, w: W * 0.8, h: u * 0.045 } });
+    const bm = add(c, { role: 'caption', kind: 'text', text: i.brand.toUpperCase(), z: 0.2, style: { size: Math.round(u * 0.032), weight: 700, color: bright ? shade(i.accent, 0.5) : tint(i.accent, 0.6), align: 'center' }, box: { x: W * 0.1, y: nameCy - u * 0.11, w: W * 0.8, h: u * 0.045 } });
     const fade: Array<[number, number]> = [[0, 0], [0.3, 0], [0.6, 1]];
     if (macro) fade.push([r2(macro.start / fps - 0.1), 1], [r2(macro.start / fps), 0], [r2(macro.end / fps), 0]);
     // the end card carries the name, the tagline and the price; the brand shows again there only when there is no tagline
@@ -798,53 +876,66 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   for (const id of nm.ids) c = shadowed(c, id, light);
   // the tagline, small under the name, a beat after it
   const tag = i.tagline?.trim();
+  let span = wordsSpan(c, nm.ids);
+  let plateBottom = nameCy + nameSize * 0.75;
   if (tag) {
     const tagCy = nameCy + nameSize * 0.6 + u * 0.034;
-    const tg = words(c, ID, tag, { cx: portrait ? W / 2 : W * 0.4, cy: tagCy, maxW: W * 0.8, size: Math.round(u * 0.036), color: keyLevel === 'high' ? shade(i.accent, 0.55) : tint(i.accent, 0.75), z: 0.2 });
+    const tagSize = Math.round(u * 0.036);
+    const tg = words(c, ID, tag, { cx: portrait ? W / 2 : W * 0.4, cy: tagCy, maxW: W * 0.8, size: tagSize, color: bright ? shade(i.accent, 0.55) : tint(i.accent, 0.75), z: 0.2 });
     c = popWords(tg.c, tg.ids, tagCy, holdStart + 0.45, D);
     for (const id of tg.ids) c = shadowed(c, id, light);
+    const ts = wordsSpan(c, tg.ids);
+    span = { left: Math.min(span.left, ts.left), right: Math.max(span.right, ts.right) };
+    plateBottom = tagCy + tagSize * 0.9;
   }
+  c = plate(c, span, nameCy - nameSize * 0.75, plateBottom, light, holdStart + 0.1, D);
 
   // the shots' own words: a hook line, a feeling; popped in the lower third, gone before the cut (never in the macro or the last shot)
   const textCy = H * (portrait ? 0.8 : 0.84);
   i.sheet.beats.forEach((b, n) => {
     const f = cam.beats[n]!;
     if (!b.text || n === cam.beats.length - 1 || f.size === 'macro') return;
-    const line = words(c, ID, b.text, { cx: W / 2, cy: textCy, maxW: W * 0.84, size: Math.round(u * 0.085), color: ink, boldLast: true, z: 0.2 });
-    c = popWords(line.c, line.ids, textCy, f.start / fps + 0.06, D, Math.max(f.start / fps + 0.5, (f.end + 1) / fps - 0.1));
+    const size = Math.round(u * 0.085);
+    const line = words(c, ID, b.text, { cx: W / 2, cy: textCy, maxW: W * 0.84, size, color: ink, boldLast: true, z: 0.2 });
+    const outAt = Math.max(f.start / fps + 0.5, (f.end + 1) / fps - 0.1);
+    c = popWords(line.c, line.ids, textCy, f.start / fps + 0.06, D, outAt);
     for (const id of line.ids) c = shadowed(c, id, light);
+    c = plate(c, wordsSpan(c, line.ids), textCy - size * 0.75, textCy + size * 0.75, light, f.start / fps + 0.06, D, outAt);
   });
 
-  // the price disc beside the can when there is room for it, else under it; never over it
-  const priceText = formatPrice(i.price, i.currency);
-  const gap = u * 0.03;
-  const room = W - W * 0.03 - (pcx + pw / 2 + gap);
-  const dd = Math.min(u * 0.27, Math.max(room / 1.06, 0));
-  const beside = portrait ? dd >= u * 0.19 : true;
-  const ddUse = beside ? (portrait ? dd : u * 0.27) : u * 0.24;
-  const dcx = !portrait ? W * 0.75 : beside ? pcx + pw / 2 + gap + (ddUse * 1.06) / 2 : pcx;
-  const dcy = !portrait ? pcy : beside ? pcy + ph * 0.18 : Math.min(H - ddUse * 0.62, pcy + ph / 2 + gap + ddUse * 0.55);
-  const rd = ddUse * 1.06;
-  const ring = shape(c, { x: dcx - rd / 2, y: dcy - rd / 2, w: rd, h: rd }, tint(i.accent, 0.6), 0.32, { kind: 'ellipse', size: [rd, rd] });
-  const disc = shape(ring.c, { x: dcx - ddUse / 2, y: dcy - ddUse / 2, w: ddUse, h: ddUse }, i.accent, 0.3, { kind: 'ellipse', size: [ddUse, ddUse] });
-  const beat = 60 / (i.bpm ?? 120);
-  const pulse: Array<[number, number]> = [[0, 0], [r2(holdStart), 0], [r2(holdStart + 0.25), 1.18], [r2(holdStart + 0.45), 1]];
-  for (let t = holdStart + 0.45 + 2 * beat; t + 0.25 <= D; t += 2 * beat) pulse.push([r2(t - 0.2), 1], [r2(t), 1.1], [r2(t + 0.25), 1]);
-  c = setKeyframes(disc.c, disc.id, 'scale', pulse, 'easeInOut');
-  c = setKeyframes(c, ring.id, 'scale', pulse, 'easeInOut');
-  const was = i.wasPrice !== undefined && i.wasPrice > i.price ? formatPrice(i.wasPrice, i.currency) : undefined;
-  const ps = Math.round(Math.min(ddUse * 0.3, (ddUse * 0.82) / (priceText.length * 0.6)));
-  const pr = add(c, { role: 'caption', kind: 'text', text: priceText, z: 0.15, style: { size: ps, weight: 800, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - ddUse / 2, y: dcy - ps * 0.6 + (was ? ps * 0.25 : 0), w: ddUse, h: ps * 1.2 } });
-  c = setKeyframes(pr.c, pr.id, 'scale', pulse, 'easeInOut');
-  if (was) {
-    const ws = Math.round(ps * 0.55);
-    const wy = dcy - ps * 0.55;
-    const old = add(c, { role: 'caption', kind: 'text', text: was, z: 0.15, style: { size: ws, weight: 500, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - ddUse / 2, y: wy - ws * 0.6, w: ddUse, h: ws * 1.2 } });
-    c = setKeyframes(old.c, old.id, 'scale', pulse, 'easeInOut');
-    const lw = was.length * ws * 0.56;
-    const line = shape(c, { x: dcx - lw / 2, y: wy - Math.max(2, ws * 0.05), w: lw, h: Math.max(3, ws * 0.1) }, '#ff5a6e', 0.1);
-    c = setKeyframes(line.c, line.id, 'opacity', [[0, 0], [r2(holdStart + 0.3), 0], [r2(holdStart + 0.5), 1]], 'easeOut');
-    c = setKeyframes(c, line.id, 'scale', pulse, 'easeInOut');
+  // the price disc beside the can when there is room for it, else under it; never over it (no disc when the brief names no price)
+  if (i.price !== undefined) {
+    const price = i.price;
+    const priceText = formatPrice(price, i.currency);
+    const gap = u * 0.03;
+    const room = W - W * 0.03 - (pcx + pw / 2 + gap);
+    const dd = Math.min(u * 0.27, Math.max(room / 1.06, 0));
+    const beside = portrait ? dd >= u * 0.19 : true;
+    const ddUse = beside ? (portrait ? dd : u * 0.27) : u * 0.24;
+    const dcx = !portrait ? W * 0.75 : beside ? pcx + pw / 2 + gap + (ddUse * 1.06) / 2 : pcx;
+    const dcy = !portrait ? pcy : beside ? pcy + ph * 0.18 : Math.min(H - ddUse * 0.62, pcy + ph / 2 + gap + ddUse * 0.55);
+    const rd = ddUse * 1.06;
+    const ring = shape(c, { x: dcx - rd / 2, y: dcy - rd / 2, w: rd, h: rd }, tint(i.accent, 0.6), 0.32, { kind: 'ellipse', size: [rd, rd] });
+    const disc = shape(ring.c, { x: dcx - ddUse / 2, y: dcy - ddUse / 2, w: ddUse, h: ddUse }, i.accent, 0.3, { kind: 'ellipse', size: [ddUse, ddUse] });
+    const beat = 60 / (i.bpm ?? 120);
+    const pulse: Array<[number, number]> = [[0, 0], [r2(holdStart), 0], [r2(holdStart + 0.25), 1.18], [r2(holdStart + 0.45), 1]];
+    for (let t = holdStart + 0.45 + 2 * beat; t + 0.25 <= D; t += 2 * beat) pulse.push([r2(t - 0.2), 1], [r2(t), 1.1], [r2(t + 0.25), 1]);
+    c = setKeyframes(disc.c, disc.id, 'scale', pulse, 'easeInOut');
+    c = setKeyframes(c, ring.id, 'scale', pulse, 'easeInOut');
+    const was = i.wasPrice !== undefined && i.wasPrice > price ? formatPrice(i.wasPrice, i.currency) : undefined;
+    const ps = Math.round(Math.min(ddUse * 0.3, (ddUse * 0.82) / (priceText.length * 0.6)));
+    const pr = add(c, { role: 'caption', kind: 'text', text: priceText, z: 0.15, style: { size: ps, weight: 800, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - ddUse / 2, y: dcy - ps * 0.6 + (was ? ps * 0.25 : 0), w: ddUse, h: ps * 1.2 } });
+    c = setKeyframes(pr.c, pr.id, 'scale', pulse, 'easeInOut');
+    if (was) {
+      const ws = Math.round(ps * 0.55);
+      const wy = dcy - ps * 0.55;
+      const old = add(c, { role: 'caption', kind: 'text', text: was, z: 0.15, style: { size: ws, weight: 500, color: inkOn(i.accent), align: 'center' }, box: { x: dcx - ddUse / 2, y: wy - ws * 0.6, w: ddUse, h: ws * 1.2 } });
+      c = setKeyframes(old.c, old.id, 'scale', pulse, 'easeInOut');
+      const lw = was.length * ws * 0.56;
+      const line = shape(c, { x: dcx - lw / 2, y: wy - Math.max(2, ws * 0.05), w: lw, h: Math.max(3, ws * 0.1) }, '#ff5a6e', 0.1);
+      c = setKeyframes(line.c, line.id, 'opacity', [[0, 0], [r2(holdStart + 0.3), 0], [r2(holdStart + 0.5), 1]], 'easeOut');
+      c = setKeyframes(c, line.id, 'scale', pulse, 'easeInOut');
+    }
   }
 
   if (i.music) {
@@ -874,12 +965,89 @@ function popWords(c: Comp, ids: string[], cy: number, at: number, D: number, out
   ids.forEach((id, n) => {
     const a = cap(Math.max(0.06, at + n * 0.07));
     const op: Array<[number, number]> = [[0, 0], [a, 0], [cap(a + 0.1), 1]];
-    if (outAt !== undefined && outAt > a + 0.4) op.push([cap(outAt), 1], [cap(outAt + 0.12), 0]);
+    // a line is on screen at least 0.4 s; a short shot's line still goes, it never stays on into the next shot
+    if (outAt !== undefined) op.push([cap(Math.max(outAt, a + 0.4)), 1], [cap(Math.max(outAt, a + 0.4) + 0.12), 0]);
     c = setKeyframes(c, id, 'opacity', dedupe(op), 'easeOut');
     c = setKeyframes(c, id, 'scale', dedupe([[0, 0.6], [a, 0.6], [cap(a + 0.15), 1.12], [cap(a + 0.28), 1]]), 'easeOut');
     c = setKeyframes(c, id, 'y', dedupe([[0, r2(cy + 26)], [a, r2(cy + 26)], [cap(a + 0.22), r2(cy)]]), 'easeOut');
   });
   return c;
+}
+
+/** How strong the plate under a line of words is: enough that the type reads on any set and light, soft enough to stay part of the frame. */
+export const PLATE = { opacity: 0.5, dark: '#0b0b12', light: '#ffffff' } as const;
+
+/** The horizontal span a row of words covers, from their centres and sizes. */
+function wordsSpan(c: Comp, ids: string[]): { left: number; right: number } {
+  let left = Infinity;
+  let right = -Infinity;
+  for (const id of ids) {
+    const l = layersOf(c).find((x) => x.id === id)!;
+    const p = l.transform.position;
+    const x = (Array.isArray(p) && typeof p[0] === 'object' ? p[0].v : p)[0] as number;
+    const half = (String(l.source ?? '').length * (l.style?.size ?? 40) * 0.62) / 2;
+    left = Math.min(left, x - half);
+    right = Math.max(right, x + half);
+  }
+  return { left, right };
+}
+
+/**
+ * A soft, rounded plate under words, in the tone opposite their ink, so they read whatever the world behind them does (a bright sky, pale
+ * sand, a light studio). It fades in with the first word and out with the line.
+ */
+function plate(c: Comp, span: { left: number; right: number }, top: number, bottom: number, dark: boolean, at: number, D: number, outAt?: number): Comp {
+  const pad = (bottom - top) * 0.45;
+  const box = { x: span.left - pad, y: top, w: span.right - span.left + pad * 2, h: bottom - top };
+  const s = shape(c, box, dark ? PLATE.dark : PLATE.light, 0.25, { kind: 'rect', size: [box.w, box.h], roundness: Math.round(box.h / 2) });
+  const cap = (t: number) => Math.min(r2(t), r2(D - 0.05));
+  const a = cap(Math.max(0.06, at));
+  const op: Array<[number, number]> = [[0, 0], [a, 0], [cap(a + 0.15), PLATE.opacity]];
+  if (outAt !== undefined) op.push([cap(Math.max(outAt, a + 0.4)), PLATE.opacity], [cap(Math.max(outAt, a + 0.4) + 0.12), 0]);
+  return setKeyframes(s.c, s.id, 'opacity', dedupe(op), 'easeOut');
+}
+
+/** The product's condensation for a finish's wet: nothing for `none`, else the book's amount. */
+export function wetLook(f: Finish): { condensation?: number } {
+  return f.wet === 'none' ? {} : { condensation: FINISH.wet[f.wet] };
+}
+
+/** The set's reflection for a finish's floor: nothing for a matte-less `none`, else the book's strength and fade. */
+export function floorShine(f: Finish): { reflection?: Obj } {
+  if (f.floor === 'none') return {};
+  const { strength, fade } = FINISH.floor[f.floor];
+  return { reflection: { strength, fade } };
+}
+
+/** The set's rippling floor light for a finish's caustics: nothing for `none`, else the book's brightness, fade and ripple size. */
+export function floorLight(f: Finish): { caustics?: Obj } {
+  if (!f.caustics || f.caustics === 'none') return {};
+  return { caustics: { strength: FINISH.caustics[f.caustics], fade: FINISH.caustics.fade, scale: FINISH.caustics.scale } };
+}
+
+/** The world's shader transitions: a cut that names one (zoom, ripple, swirl...) plays it from the first frame of its shot, for as long as the book says or the shot allows. */
+export function shaderCuts(sheet: BeatSheet, cam: CameraPlan, fps: number): Obj[] {
+  const out: Obj[] = [];
+  sheet.beats.forEach((b, n) => {
+    const def = n > 0 && b.cut && b.cut !== 'hard' && b.cut !== 'wipe' && b.cut !== 'cloud' ? CUT_SHADERS[b.cut] : undefined;
+    if (!def) return;
+    const f = cam.beats[n]!;
+    out.push({ startFrame: f.start, durationFrames: Math.max(2, Math.min(Math.round(def.seconds * fps), Math.round((f.end - f.start) * 0.8))), name: def.shader });
+  });
+  return out.slice(0, CUT_SHADERS.max);
+}
+
+/** The world's `post` for a finish: levels to numbers, and the glow swelling when the end hold starts (at `holdFrame`). Undefined when nothing is on. */
+export function finishPost(f: Finish, holdFrame: number): Obj | undefined {
+  const post: Obj = {};
+  if (f.glow !== 'none') {
+    const g = FINISH.glow[f.glow];
+    post.bloom = { intensity: [key(0, g.intensity), key(Math.max(1, holdFrame), g.intensity), key(holdFrame + 14, r2(g.intensity * FINISH.holdSwell), EASE_OUT)], threshold: g.threshold, radius: 0.7 };
+  }
+  if (f.vignette !== 'none') post.vignette = { darkness: FINISH.vignette[f.vignette] };
+  if (f.grain !== 'none') post.grain = { opacity: FINISH.grain[f.grain] };
+  if (f.fringe) post.aberration = { offset: FINISH.fringe };
+  return Object.keys(post).length ? post : undefined;
 }
 
 /** Keyframe pairs at least `gap` seconds apart (the director refuses two keys on one frame): a key too close to the one before is dropped, the first wins. */

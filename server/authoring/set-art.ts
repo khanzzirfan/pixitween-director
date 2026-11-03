@@ -9,8 +9,8 @@ import { tint } from './variant-film';
 // parallax: near things slide faster than far ones.
 
 export const SET_LOOKS = ['beach', 'pool', 'sunset', 'sky', 'studio', 'night', 'garden'] as const;
-/** none: clear air. dust: fine specks drifting round the product. bokeh: big soft lights drifting near the lens. spray: a burst of droplets in the peak shot. */
-export const SET_AIR = ['none', 'dust', 'bokeh', 'spray'] as const;
+/** none: clear air. dust: fine specks drifting round the product. bokeh: big soft lights drifting near the lens. spray: a burst of droplets in the peak shot. smoke: slow smoke drifting up behind the product the whole film. */
+export const SET_AIR = ['none', 'dust', 'bokeh', 'spray', 'smoke'] as const;
 export type SetLook = (typeof SET_LOOKS)[number];
 export type SetAir = (typeof SET_AIR)[number];
 

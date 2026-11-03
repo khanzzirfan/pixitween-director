@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { SET_AIR, SET_HELP, SET_LOOKS, WALL, groundColor, renderBackdrop, renderDot } from './set-art';
 
 describe('the set vocabulary', () => {
-  it('describes every look for Muse, and offers four kinds of air', () => {
+  it('describes every look for Muse, and offers five kinds of air', () => {
     expect(Object.keys(SET_HELP).sort()).toEqual([...SET_LOOKS].sort());
-    expect(SET_AIR).toEqual(['none', 'dust', 'bokeh', 'spray']);
+    expect(SET_AIR).toEqual(['none', 'dust', 'bokeh', 'spray', 'smoke']);
   });
 });
 

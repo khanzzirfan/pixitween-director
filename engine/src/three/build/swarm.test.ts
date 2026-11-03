@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import type { Swarm3D } from '../../schema/layer3d';
-import { createSwarmConstants, swarmPose } from './swarm';
+import { buildSwarm, createSwarmConstants, swarmPose } from './swarm';
 
 const burst: Swarm3D = {
   count: 12,
@@ -81,5 +81,13 @@ describe('swarm', () => {
     swarmPose(constants, 0, 0.5, matrix);
     expect(early).toBeLessThan(new THREE.Vector3().setFromMatrixScale(matrix).x);
     expect(new THREE.Vector3().setFromMatrixScale(matrix).x).toBeCloseTo(1, 5);
+  });
+  it('keeps every material of the source, so an extruded cut-out keeps its photo caps and its coloured sides', () => {
+    const caps = new THREE.MeshStandardMaterial({ color: '#ffffff' });
+    const sides = new THREE.MeshStandardMaterial({ color: '#85604d' });
+    const shape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(1, 0), new THREE.Vector2(1, 1)]);
+    const rig = buildSwarm(new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.3 }), [caps, sides]), burst);
+    expect(rig.mesh.material).toEqual([caps, sides]);
+    expect(rig.mesh.geometry.groups.length).toBe(2);
   });
 });

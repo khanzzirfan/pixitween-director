@@ -115,7 +115,7 @@ export function buildScene(layer: ThreeLayer, ctx: SceneContext = {}): ThreeRig 
   const built: BuiltObject[] = [];
   const gltfAssets = new Set<string>();
   for (const spec of layer.objects) {
-    const object = buildObject(spec, ctx);
+    const object = buildObject(spec, { ...ctx, viewport: { width: layer.width, height: layer.height } });
     warnings.push(...object.warnings);
     scene.add(object.root);
     objects.set(spec.id, object.root);

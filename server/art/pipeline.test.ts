@@ -5,7 +5,7 @@ import { addLayer, addScene, newFilmComposition, registerAsset } from '../author
 import { makeTestFilm } from '../test-utils/film';
 import { imageSize } from '../media/image';
 import { runTool } from '../tools/registry';
-import { cutout, selectObject, studioKey } from './cutout';
+import { cutout, ownAlpha, selectObject, studioKey } from './cutout';
 import { lintPrompt, extractBrandTerms } from './lint';
 import { coverCrop } from './stills';
 import type { SamObject } from '@shared/ports';
@@ -65,7 +65,51 @@ it('keys a product on a white studio background without calling SAM', async () =
   expect(cut.objectId).toBe('studio-key');
 });
 
+it('keeps a light product on a white sweep whole: only backdrop joined to the edge is keyed', async () => {
+  // a cream can with a dark band: the cream is close to the backdrop, but it is inside the outline
+  const can = await sharp({ create: { width: 30, height: 60, channels: 3, background: '#f2ece0' } })
+    .composite([{ input: await sharp({ create: { width: 30, height: 12, channels: 3, background: '#3b2113' } }).png().toBuffer(), left: 0, top: 30 }])
+    .png()
+    .toBuffer();
+  const outline = await sharp({ create: { width: 34, height: 64, channels: 3, background: '#555555' } }).composite([{ input: can, left: 2, top: 2 }]).png().toBuffer();
+  const source = await sharp({ create: { width: 100, height: 100, channels: 3, background: '#ffffff' } }).composite([{ input: outline, left: 33, top: 18 }]).png().toBuffer();
+  const keyed = await studioKey(source);
+  const inside = keyed!.alpha[(18 + 10) * 100 + 50]!;
+  expect(inside).toBe(255);
+  expect(keyed!.alpha[5 * 100 + 5]).toBe(0);
+});
+
+it('uses the photo\'s own clear background as the mask, with no SAM call', async () => {
+  const t = await makeTestFilm();
+  const source = await sharp({ create: { width: 60, height: 60, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 0 } } })
+    .composite([{ input: await sharp({ create: { width: 20, height: 40, channels: 4, background: { r: 240, g: 232, b: 218, alpha: 1 } } }).png().toBuffer(), left: 20, top: 10 }])
+    .png()
+    .toBuffer();
+  const own = await ownAlpha(source);
+  expect(own?.bounds).toEqual({ left: 20, top: 10, right: 40, bottom: 50 });
+  const cut = await cutout(t.ctx, { source, noun: 'can', sceneId: 's1' });
+  expect(cut.objectId).toBe('own-alpha');
+  expect(t.meta.calls.filter((call) => call.client === 'sam')).toHaveLength(0);
+  // a photo with no clear edge is not taken as cut out
+  expect(await ownAlpha(await sharp({ create: { width: 20, height: 20, channels: 4, background: { r: 9, g: 9, b: 9, alpha: 1 } } }).png().toBuffer())).toBeUndefined();
+});
+
 describe('SAM cutout and placeProduct tool', () => {
+  it('asks once more for "product", less strictly, when SAM finds nothing by the name asked for', async () => {
+    const t = await makeTestFilm();
+    const source = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#777777' } }).png().toBuffer();
+    const real = t.meta.sam.segmentImage;
+    const asked: string[] = [];
+    t.meta.sam.segmentImage = async (img: Buffer, noun: string) => {
+      asked.push(noun);
+      const found = await real(img, noun);
+      return noun === 'longboard' ? [] : found.map((o) => ({ ...o, confidence: 0.4 }));
+    };
+    const cut = await cutout(t.ctx, { source, noun: 'longboard', sceneId: 's1' });
+    expect(asked).toEqual(['longboard', 'product']);
+    expect(cut.cutout.width).toBeGreaterThan(0);
+    expect(t.ledger.total(t.filmId)).toBeCloseTo(0.005);
+  });
   it('caches cutouts by key and records one SAM charge', async () => {
     const t = await makeTestFilm();
     const source = await sharp({ create: { width: 64, height: 64, channels: 3, background: '#777777' } })

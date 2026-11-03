@@ -86,14 +86,23 @@ describe('light validator, cinematic stage (schema 1.12.0)', () => {
     layers(can).push(prop('ice', { source: { type: 'primitive', shape: 'can', round: 0.2 } }));
     expect(issues(can)).toMatch(/round is only valid for a box/);
   });
-  it('rejects a swarm, a material and a card below 1.12.0', () => {
-    for (const extra of [{ swarm: { count: 4 } }, { material: { roughness: 0.2 } }]) {
+  it('wants caustics and a reflection to have a ground, and a smoke form it knows', () => {
+    const c = base();
+    const w = layers(c).find((l) => l.kind === 'stage3d');
+    w.set = { ground: 'none', wall: false, caustics: { strength: 0.5 } };
+    expect(issues(c)).toMatch(/set\.caustics needs a ground/);
+    const d = base();
+    layers(d).push(prop('fog', { source: { type: 'smoke', form: 'fog' } }));
+    expect(issues(d)).toMatch(/form is steam, cloud or powder/);
+  });
+  it('rejects a swarm, a material, a card, a liquid and a smoke below 1.12.0', () => {
+    for (const extra of [{ swarm: { count: 4 } }, { material: { roughness: 0.2 } }, { source: { type: 'liquid', form: 'crown' } }, { source: { type: 'smoke', form: 'steam' } }]) {
       const c = base();
       c.version = '1.11.0';
       c.precomps.cine.version = '1.11.0';
       // the animated camera also fails; the prop's own message is what this test looks for
       layers(c).push(prop('x', extra));
-      expect(issues(c)).toMatch(/swarm, material, card and source\.round need schema >= 1\.12\.0/);
+      expect(issues(c)).toMatch(/swarm, material, card, liquid, smoke and source\.round need schema >= 1\.12\.0/);
     }
   });
 });

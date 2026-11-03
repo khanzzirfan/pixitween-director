@@ -165,6 +165,26 @@ export function convertProp(
     transparent = true;
     color = '#ffffff';
     if (frames.length > 1) flipbook = { frames: frames.map(sanitizeId), fps: source.fps ?? 12, loop: source.loop ?? false };
+  } else if (source.type === 'smoke') {
+    // Vapour faces the camera and changes every frame: never fitted, timed to the prop's life, tinted by its colour.
+    geometry = {
+      type: 'smoke',
+      form: source.form,
+      size: prop.size ?? PROP_DEFAULT_SIZE,
+      duration: Math.max(0.2, (prop.outPoint - prop.inPoint) / ctx.fps),
+      ...(source.seed !== undefined ? { seed: source.seed } : {}),
+    };
+    color = mat?.color ?? '#f2ece4';
+  } else if (source.type === 'liquid') {
+    // A liquid is never fitted (it changes shape every frame): `size` is the edge of its box, timed to the prop's life.
+    geometry = {
+      type: 'liquid',
+      form: source.form,
+      size: prop.size ?? PROP_DEFAULT_SIZE,
+      duration: Math.max(0.2, (prop.outPoint - prop.inPoint) / ctx.fps),
+      ...(source.seed !== undefined ? { seed: source.seed } : {}),
+    };
+    color = mat?.color ?? '#3b2314';
   } else if (source.type === 'extrude') {
     // The depth is read once, at the prop's in-point.
     const depth = sampleAt(source.depth, prop.inPoint, 100);
@@ -228,12 +248,13 @@ export function convertProp(
       transparent,
       // The library's props are always physical (clearcoat 0 by default).
       clearcoat: unlit ? undefined : (mat?.clearcoat ?? 0),
+      condensation: mat?.condensation,
       transmission: mat?.transmission,
       ior: mat?.ior,
       thickness: mat?.thickness,
     },
-    castShadow: prop.castShadow ?? !isCard,
-    fit: prop.size ?? PROP_DEFAULT_SIZE,
+    castShadow: prop.castShadow ?? (!isCard && source.type !== 'smoke'),
+    fit: source.type === 'liquid' || source.type === 'smoke' ? undefined : (prop.size ?? PROP_DEFAULT_SIZE),
     life: propLife(prop, clock, ctx),
     billboard: billboard || undefined,
     flipbook,
@@ -354,7 +375,14 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
   if (world.set?.fog) warnings.push(`layer ${world.id}: set.fog is not supported yet`);
 
   // Depth of field: the library's circle-of-confusion pass, focus distance keyframed on the world.
-  const effects: Array<{ id: string; type: 'stageDof'; params: Record<string, number> }> = [];
+  const effects: Array<{ id: string; type: string; params: Record<string, number> }> = [];
+  // Shader transitions at the cuts: composition frames become seconds on the world's own clock.
+  const shotTransitions = (world.shotTransitions ?? []).map((t) => ({
+    at: Math.max(0, (t.startFrame - world.inPoint) / ctx.fps),
+    duration: Math.max(0.05, t.durationFrames / ctx.fps),
+    name: t.name,
+    ...(t.params ? { params: t.params } : {}),
+  }));
   const focusTweens: ConvertedTween[] = [];
   const focus = world.camera.focus;
   if (focus && (focus.aperture ?? 0) > 0) {
@@ -363,6 +391,23 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
       ...propertyTweens(focus.distance, { fps: ctx.fps, inPoint: world.inPoint, props: ['focusDistance'] }).tweens.map((t) => ({ ...t, ...{ target: 'effect:dof' } })),
     );
   }
+
+  // The finish: bloom, vignette, grain, fringe and grade over the rendered world, after the depth of field. Bloom's intensity can swell.
+  const post = world.post;
+  if (post?.bloom) {
+    effects.push({ id: 'bloom', type: 'bloom', params: { intensity: first(post.bloom.intensity), threshold: post.bloom.threshold ?? 0.6, radius: post.bloom.radius ?? 0.7 } });
+    if (isKeyframed(post.bloom.intensity)) {
+      focusTweens.push(...propertyTweens(post.bloom.intensity, { fps: ctx.fps, inPoint: world.inPoint, props: ['intensity'] }).tweens.map((t) => ({ ...t, ...{ target: 'effect:bloom' } })));
+    }
+  }
+  if (post?.grade) {
+    const g = post.grade;
+    if (g.brightness !== undefined || g.contrast !== undefined) effects.push({ id: 'grade', type: 'brightnessContrast', params: { brightness: g.brightness ?? 0, contrast: g.contrast ?? 0 } });
+    if (g.hue !== undefined || g.saturation !== undefined) effects.push({ id: 'tone', type: 'hueSaturation', params: { hue: g.hue ?? 0, saturation: g.saturation ?? 0 } });
+  }
+  if (post?.aberration) effects.push({ id: 'fringe', type: 'chromaticAberration', params: { offsetX: post.aberration.offset, offsetY: post.aberration.offset } });
+  if (post?.vignette) effects.push({ id: 'vignette', type: 'vignette', params: { offset: post.vignette.offset ?? 0.3, darkness: post.vignette.darkness } });
+  if (post?.grain) effects.push({ id: 'grain', type: 'noise', params: { opacity: post.grain.opacity } });
 
   const objects: Object3D[] = [];
   const set = world.set;
@@ -376,6 +421,33 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
       rotation: [-90, 0, 0],
       scale: 1,
       material: { color: ground, roughness: 0.9, metalness: 0, emissive: '#000000', emissiveIntensity: 0, opacity: 1 },
+      castShadow: false,
+    } as Object3D);
+  }
+
+  if (set?.reflection && ground !== 'none') {
+    // A glossy floor over the ground, a hair above it: the world reflected, soft, fading away from the product.
+    const size = set.groundSize ?? DEFAULT_GROUND_SIZE;
+    objects.push({
+      id: 'mirror',
+      geometry: { type: 'mirror', size, strength: set.reflection.strength, fade: set.reflection.fade ?? 0.35, ...(set.reflection.blur !== undefined ? { blur: set.reflection.blur } : {}) },
+      position: [0, 0.0008, 0],
+      rotation: [-90, 0, 0],
+      scale: 1,
+      material: { color: '#ffffff', roughness: 1, metalness: 0, emissive: '#000000', emissiveIntensity: 0, opacity: 1 },
+      castShadow: false,
+    } as Object3D);
+  }
+
+  if (set?.caustics && ground !== 'none') {
+    // Light rippling on the floor round the product, added over the ground (and its reflection), a hair above both.
+    objects.push({
+      id: 'caustics',
+      geometry: { type: 'caustics', size: set.groundSize ?? DEFAULT_GROUND_SIZE, strength: set.caustics.strength, fade: set.caustics.fade ?? 0.3, scale: set.caustics.scale ?? 40 },
+      position: [0, 0.0012, 0],
+      rotation: [-90, 0, 0],
+      scale: 1,
+      material: { color: set.caustics.color ?? '#f4fbff', roughness: 1, metalness: 0, emissive: '#000000', emissiveIntensity: 0, opacity: 1 },
       castShadow: false,
     } as Object3D);
   }
@@ -479,6 +551,7 @@ export function convertWorld(world: AepStage3DLayer, members: AepLayer[], outerC
     height: clampSize(height),
     background: 'transparent' as const,
     effects,
+    ...(shotTransitions.length ? { transitions: shotTransitions } : {}),
     camera: {
       position: first(world.camera.position) as Vec3,
       lookAt: first(world.camera.target) as Vec3,

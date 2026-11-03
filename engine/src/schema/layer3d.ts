@@ -32,7 +32,7 @@ export type LightingEnvironment = (typeof LIGHTING_ENVIRONMENTS)[number];
 
 export const LightingEnvironmentSchema = z.enum(LIGHTING_ENVIRONMENTS);
 
-export const GEOMETRY_3D_TYPES = ['box', 'sphere', 'cylinder', 'torus', 'plane', 'gltf', 'text3d', 'extrude', 'lathe'] as const;
+export const GEOMETRY_3D_TYPES = ['box', 'sphere', 'cylinder', 'torus', 'plane', 'gltf', 'text3d', 'extrude', 'lathe', 'liquid', 'mirror', 'smoke', 'caustics'] as const;
 
 export type Geometry3DType = (typeof GEOMETRY_3D_TYPES)[number];
 
@@ -114,6 +114,61 @@ export const LatheGeometrySchema = z
   })
   .strict();
 
+export const LIQUID_GEOMETRY_FORMS = ['crown', 'pour', 'blobs', 'vortex'] as const;
+
+// A moving liquid (metaballs that flow together and apart): a crown splash, a pouring stream or floating
+// blobs, timed to `duration` seconds from the object's start. It changes shape every frame, so it is not
+// fitted: `size` is the edge of the box it plays in, standing on the object's origin. Its look is the
+// object's material (a glossy physical surface; transmission for a clear liquid).
+export const LiquidGeometrySchema = z
+  .object({
+    type: z.literal('liquid'),
+    form: z.enum(LIQUID_GEOMETRY_FORMS),
+    size: z.number().positive(),
+    duration: z.number().positive(),
+    seed: z.number().int().optional(),
+    resolution: z.number().int().min(24).max(64).optional(),
+  })
+  .strict();
+
+// A glossy floor: the scene reflected in a plane, soft and fading away from the middle (where the product stands). Laid flat by the
+// object's rotation like a plane ([-90, 0, 0]), a hair above the floor it shines on.
+export const MirrorGeometrySchema = z
+  .object({
+    type: z.literal('mirror'),
+    size: z.tuple([z.number().positive(), z.number().positive()]),
+    strength: z.number().min(0).max(1),
+    fade: z.number().positive().max(10),
+    blur: z.number().min(0).max(1).optional(),
+  })
+  .strict();
+
+// Caustics: the rippling net of light a glass of liquid throws on the floor, added over the floor, strongest round the middle and gone
+// at `fade` metres, tinted by the material's colour. Laid flat by the object's rotation like a plane ([-90, 0, 0]).
+export const CausticsGeometrySchema = z
+  .object({
+    type: z.literal('caustics'),
+    size: z.tuple([z.number().positive(), z.number().positive()]),
+    strength: z.number().min(0).max(1),
+    fade: z.number().positive().max(10),
+    scale: z.number().positive().max(200),
+  })
+  .strict();
+
+export const SMOKE_GEOMETRY_FORMS = ['steam', 'cloud', 'powder'] as const;
+
+// Soft vapour, timed to `duration` seconds from the object's start: steam rising, a cloud of smoke that wraps and clears, or a burst of fine
+// powder. Puffs that face the camera, tinted by the material's colour; like a liquid it is never fitted: `size` is the edge of its box.
+export const SmokeGeometrySchema = z
+  .object({
+    type: z.literal('smoke'),
+    form: z.enum(SMOKE_GEOMETRY_FORMS),
+    size: z.number().positive(),
+    duration: z.number().positive(),
+    seed: z.number().int().optional(),
+  })
+  .strict();
+
 export const Geometry3DSchema = z.discriminatedUnion('type', [
   BoxGeometrySchema,
   SphereGeometrySchema,
@@ -124,6 +179,10 @@ export const Geometry3DSchema = z.discriminatedUnion('type', [
   Text3DGeometrySchema,
   ExtrudeGeometrySchema,
   LatheGeometrySchema,
+  LiquidGeometrySchema,
+  MirrorGeometrySchema,
+  SmokeGeometrySchema,
+  CausticsGeometrySchema,
 ]);
 
 export type Geometry3D = z.output<typeof Geometry3DSchema>;
@@ -146,6 +205,8 @@ export const MaterialSchema = z
     transmission: z.number().min(0).max(1).optional(),
     ior: z.number().min(1).max(2.333).optional(),
     thickness: z.number().min(0).optional(),
+    /** Beads of water on the surface (a cold can), 0 dry to 1 soaked. Needs a lit material. */
+    condensation: z.number().min(0).max(1).optional(),
   })
   .strict();
 
@@ -340,6 +401,17 @@ export const Shadow3DSchema = z
   })
   .strict();
 
+// A shader transition between the layer's own shots (an open gl-transitions shader by name). From `at` seconds on the
+// layer's clock it plays for `duration` seconds: the old shot's last camera pose is mixed into the new shot.
+export const Transition3DSchema = z
+  .object({
+    at: z.number().min(0),
+    duration: z.number().min(0.05).max(2),
+    name: z.string().min(1).max(40),
+    params: z.record(z.string(), z.union([z.number(), z.boolean(), z.array(z.number()).min(2).max(4)])).optional(),
+  })
+  .strict();
+
 export const ThreeLayerSchema = z
   .object({
     ...LayerBaseShape,
@@ -354,9 +426,12 @@ export const ThreeLayerSchema = z
     objects: z.array(Object3DSchema).min(1).max(50),
     /** Tone-mapping exposure (ACES input scale). */
     exposure: z.number().positive().max(4).default(1),
+    /** Shader transitions at the cuts between the layer's shots (a camera path with cuts). */
+    transitions: z.array(Transition3DSchema).max(8).optional(),
   })
   .strict();
 
+export type Transition3D = z.output<typeof Transition3DSchema>;
 export type Light3D = z.output<typeof Light3DSchema>;
 export type Material = z.output<typeof MaterialSchema>;
 
