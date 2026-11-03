@@ -1,5 +1,5 @@
 // The page's side of a server-built export: start the job, poll its progress, fetch the finished MP4 as a blob (so the passcode header goes with it).
-import { PASSCODE_HEADER } from '@shared/api';
+import { credentialHeaders } from '../settings/access';
 
 export type ExportQuality = 'draft' | 'full';
 export type ExportJobStatus = 'rendering' | 'encoding' | 'done' | 'error' | 'cancelled';
@@ -21,12 +21,7 @@ export interface ExportJobView {
 export class RenderExportError extends Error {}
 
 function headers(): Record<string, string> {
-  try {
-    const p = localStorage.getItem('director.passcode');
-    return p ? { [PASSCODE_HEADER]: p } : {};
-  } catch {
-    return {};
-  }
+  return credentialHeaders();
 }
 
 async function fail(res: Response): Promise<never> {

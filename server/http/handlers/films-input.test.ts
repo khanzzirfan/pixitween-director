@@ -8,9 +8,9 @@ const opts = { maxBytes: 1024 };
 const fails = async (body: Record<string, unknown>) => (await parseCreateFilm(body, opts).catch((e) => e)) as InputError;
 
 describe('parseCreateFilm', () => {
-  it('accepts a photo with a text brief and defaults the aspect', async () => {
+  it('accepts a photo with a text brief and defaults to 9:16', async () => {
     const out = await parseCreateFilm({ product: file(png, 'p.png', 'image/png'), brief: '  a mug  ' }, opts);
-    expect(out).toMatchObject({ brief: 'a mug', aspect: '16:9' });
+    expect(out).toMatchObject({ brief: 'a mug', aspect: '9:16' });
     expect(out.photos.map((p) => p.mime)).toEqual(['image/png']);
   });
   it('takes no photo (the server invents one), several photos, and sniffs each real type', async () => {
@@ -36,6 +36,8 @@ describe('parseCreateFilm', () => {
     const product = file(png, 'p.png', 'image/png');
     expect((await fails({ product, brief: 'x'.repeat(2001) })).code).toBe('brief_too_long');
     expect((await fails({ product, brief: 'x', aspect: '4:3' })).code).toBe('bad_aspect');
+    expect((await fails({ product, brief: 'x', aspect: '16:9' })).code).toBe('bad_aspect');
+    expect((await fails({ product, brief: 'x', aspect: '1:1' })).code).toBe('bad_aspect');
     expect((await parseCreateFilm({ product, brief: 'x', aspect: '9:16' }, opts)).aspect).toBe('9:16');
   });
 });

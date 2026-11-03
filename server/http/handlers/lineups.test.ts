@@ -113,6 +113,15 @@ it('refuses a feed that is not a feed, and an unknown line-up is 404', async () 
   expect((await app.request('/api/lineups/lin_00000000')).status).toBe(404);
 });
 
+it('makes 9:16 reels only', async () => {
+  const form = new FormData();
+  form.set('demo', 'feed-6');
+  form.set('aspect', '16:9');
+  const { res } = await start(form);
+  expect(res.status).toBe(400);
+  expect(((await res.json()) as { error: string }).error).toBe('bad_aspect');
+});
+
 it('tells the crew the feed facts and the owner words', () => {
   const text = productBrief({ id: 'a', title: 'Forest Oud', price: 95, salePrice: 80, currency: 'USD', imageUrl: 'x.png', category: 'perfume', brand: 'Acme' }, 'moody');
   expect(text).toContain('Forest Oud');

@@ -4,6 +4,7 @@ import { Panel, PanelGroup, PanelResizeHandle, type ImperativePanelHandle } from
 import { Icon, type IconName } from './Icon';
 import { useTheme, useWide } from './hooks';
 import { goHome } from './nav';
+import { accessLabel, openSettings, useAccessMode, useVideoKeyStatus } from '../settings/access';
 import './shell.css';
 
 export interface ShellTab {
@@ -135,6 +136,10 @@ export function StudioShell(p: StudioShellProps) {
 
   const current = tabs.find((t) => t.id === active);
   const dark = theme === 'dark';
+  const keyMode = useAccessMode();
+  const videoKeys = useVideoKeyStatus();
+  const hasVideo = Boolean(videoKeys && (videoKeys.fal || videoKeys.higgsfield || videoKeys.revana));
+  const keyShown = keyMode === 'none' && hasVideo ? 'key' : keyMode;
 
   const rail = (
     <nav className="sh-rail" aria-label="Studio panels">
@@ -203,6 +208,12 @@ export function StudioShell(p: StudioShellProps) {
             {p.status}
           </span>
         )}
+        <button type="button" className={`sh-key is-${keyShown}`} onClick={() => openSettings()} title="Muse key, Director code, and video keys">
+          {accessLabel(keyMode, videoKeys)}
+        </button>
+        <button type="button" className="sh-icon-btn" aria-label="Settings" title="Muse key, Director code, and video keys" onClick={() => openSettings()}>
+          <Icon name="gear" />
+        </button>
         <button type="button" className="sh-icon-btn" aria-label="Keyboard shortcuts" title="Shortcuts (?)" onClick={() => setHelp((h) => !h)}>
           <b aria-hidden="true">?</b>
         </button>

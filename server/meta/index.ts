@@ -1,4 +1,5 @@
 import type { MetaClients } from '@shared/ports';
+import { activeMuseKey } from '../credentials';
 import type { Env } from '../env';
 import { createMetaHttp } from './http';
 import { createImageClient } from './image';
@@ -9,7 +10,7 @@ import { createTranscribeClient } from './transcribe';
 export function createMetaClients(env: Env): MetaClients {
   const http = createMetaHttp({
     baseUrl: env.META_BASE_URL,
-    apiKey: () => env.metaApiKey,
+    apiKey: () => activeMuseKey(env.metaApiKey),
     maxInflight: env.META_MAX_INFLIGHT,
     log: (line) => console.log(line),
     mode: env.DIRECTOR_REPLAY ? { replay: { dir: env.DIRECTOR_FIXTURES_DIR } } : env.DIRECTOR_RECORD ? { record: { dir: env.DIRECTOR_FIXTURES_DIR } } : undefined,

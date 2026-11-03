@@ -6,6 +6,7 @@ import { formatPrice, parseFeed, shownPrice, type Product } from '@shared/catalo
 import type { Aspect } from '@shared/composition';
 import { BRIEF_MAX, newLineupId, type LineupItem } from '@shared/lineup';
 import { resolvePhoto } from '../../lineup/photos';
+import { activeMuseKey, rememberUserKey } from '../../credentials';
 import { loadEnv } from '../../env';
 import { imageSize } from '../../media/image';
 import { getCrewSession } from '../../crew/run-crew';
@@ -17,7 +18,6 @@ import { readFileSync } from 'node:fs';
 const DEMO_FEED = 'fixtures/catalog/feed-6.csv';
 /** Every product is a full film with a paid crew, so a line-up is kept short. */
 const MAX_PRODUCTS = 12;
-const ASPECTS: readonly Aspect[] = ['9:16', '16:9', '1:1'];
 
 const isFile = (v: unknown): v is File => typeof File !== 'undefined' && v instanceof File;
 
@@ -47,12 +47,12 @@ export function registerLineupRoutes(app: Hono, deps: AppDeps): void {
     if (parsed.products.length > MAX_PRODUCTS) return c.json({ error: 'too_many_products', max: MAX_PRODUCTS }, 400);
     const wanted = form.get('aspect');
     const aspect = wanted === null || wanted === '' ? '9:16' : String(wanted);
-    if (!ASPECTS.includes(aspect as Aspect)) return c.json({ error: 'bad_aspect' }, 400);
+    if (aspect !== '9:16') return c.json({ error: 'bad_aspect', message: 'MuseReels makes 9:16 reels only.' }, 400);
     const rawBrief = form.get('brief');
     const brief = typeof rawBrief === 'string' ? rawBrief.trim() : '';
     if (brief.length > BRIEF_MAX) return c.json({ error: 'brief_too_long', max: BRIEF_MAX }, 400);
     const env = loadEnv();
-    if (!process.env.DIRECTOR_FAKE && !env.metaApiKey) return c.json({ error: 'meta_key_missing' }, 503);
+    if (!process.env.DIRECTOR_FAKE && !activeMuseKey(env.metaApiKey)) return c.json({ error: 'meta_key_missing' }, 503);
 
     const uploads = new Map<string, Buffer>();
     for (const photo of form.getAll('photos')) if (isFile(photo)) uploads.set(photo.name, Buffer.from(await photo.arrayBuffer()));
@@ -75,6 +75,7 @@ export function registerLineupRoutes(app: Hono, deps: AppDeps): void {
           ...(env.CREW_ENABLED ? { crew: true } : {}),
           assets: [asset],
         });
+        rememberUserKey(deps.dataDir ?? env.DATA_DIR, film.id);
         items.push({ product, filmId: film.id, state: 'waiting' });
       } catch (e) {
         items.push({ product, state: 'failed', error: e instanceof Error ? e.message.slice(0, 200) : 'could not start this film' });

@@ -45,7 +45,7 @@ Secrets are set on Fly and never written to a file in this repository. Run `fly 
 fly secrets set -a <app> META_API_KEY=<your key> DIRECTOR_PASSCODE=<your passcode>
 ```
 
-Without a passcode anyone can create films and catalog runs, and spend your Meta key.
+A matching Director code spends `META_API_KEY`. Anyone without that code can still make films by saving their own Muse key in Settings; that key is used instead, including on Fly. Without a code set, the server key is open to every visitor.
 
 ## Deploy
 

@@ -2,6 +2,7 @@
 import type { InboxItem } from '@shared/crew';
 import type { FilmEvent } from '@shared/events';
 import type { LlmBackend } from '@shared/ports';
+import { runWithFilmKey } from '../credentials';
 import { loadEnv } from '../env';
 import { pickBackend } from '../llm/router';
 import { resizeFit } from '../media/image';
@@ -246,14 +247,18 @@ export function bindCrew(deps: AppDeps, o?: CrewOptions): void {
 export const getCrewSession = (filmId: string): CrewSession | undefined => bound?.get(filmId);
 
 /** The session of a film, started if there is none (a chat message after the session went idle or the server restarted). */
+const crewDataDir = () => boundDeps?.dataDir ?? loadEnv().DATA_DIR;
+
 export async function ensureCrewSession(filmId: string): Promise<CrewSession> {
   if (!bound) throw new Error('crew not bound');
-  return bound.get(filmId) ?? bound.start(filmId, { resume: true });
+  const existing = bound.get(filmId);
+  if (existing) return existing;
+  return runWithFilmKey(crewDataDir(), filmId, () => bound!.start(filmId, { resume: true }));
 }
 
 export async function runCrew(filmId: string, limits?: FilmLimits): Promise<void> {
   if (!bound) throw new Error('crew not bound');
-  return bound.runCrew(filmId, limits);
+  return runWithFilmKey(crewDataDir(), filmId, () => bound!.runCrew(filmId, limits));
 }
 
 /** Sends a user message to a crew film's showrunner. `showrunner.heard` goes out first, so the UI shows it before any model call. */
