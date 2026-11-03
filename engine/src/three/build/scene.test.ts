@@ -230,3 +230,19 @@ describe('buildScene text3d', () => {
     for (const s of [...gs, ...ms]) expect(s).toHaveBeenCalled();
   });
 });
+
+describe('spot light cone', () => {
+  it('takes the cone and edge softness the layer writes, and defaults to a 30 degree, 0.4 soft cone', async () => {
+    const { ThreeLayerSchema } = await import('../../schema/layer3d');
+    const { buildScene } = await import('./scene');
+    const base = { id: 'w', type: 'three', width: 64, height: 64, objects: [{ id: 'o', geometry: { type: 'box', size: [1, 1, 1] } }] };
+    const rig = buildScene(ThreeLayerSchema.parse({ ...base, lights: [{ id: 's1', type: 'spot', intensity: 5, angle: 18, penumbra: 0.9 }, { id: 's2', type: 'spot', intensity: 5 }] }), { textures: new Map(), gltfs: new Map(), fonts: new Map(), errors: [] } as never);
+    const a = rig.lights.get('s1') as THREE.SpotLight;
+    const b = rig.lights.get('s2') as THREE.SpotLight;
+    expect(a.angle).toBeCloseTo((18 * Math.PI) / 180);
+    expect(a.penumbra).toBeCloseTo(0.9);
+    expect(b.angle).toBeCloseTo(Math.PI / 6);
+    expect(b.penumbra).toBeCloseTo(0.4);
+    rig.dispose();
+  });
+});

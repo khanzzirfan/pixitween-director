@@ -200,6 +200,8 @@ function buildLight(spec: Light3D): { light: THREE.Light; target: THREE.Object3D
       const light = new THREE.SpotLight(color, spec.intensity);
       light.position.set(spec.position[0], spec.position[1], spec.position[2]);
       light.castShadow = spec.castShadow;
+      light.angle = THREE.MathUtils.degToRad(spec.angle ?? 30);
+      light.penumbra = spec.penumbra ?? 0.4;
       light.target.position.set(spec.target[0], spec.target[1], spec.target[2]);
       return { light, target: light.target };
     }

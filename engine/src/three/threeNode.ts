@@ -196,6 +196,18 @@ function resolveLightTarget(light: THREE.Light, prop: string): TargetRef | null 
       return tryPathRef(light.position, 'y', 'number');
     case 'position.z':
       return tryPathRef(light.position, 'z', 'number');
+    case 'target.x':
+    case 'target.y':
+    case 'target.z':
+      return (light as THREE.SpotLight).isSpotLight ? tryPathRef((light as THREE.SpotLight).target.position, prop.slice(-1), 'number') : null;
+    case 'angle': {
+      if (!(light as THREE.SpotLight).isSpotLight) return null;
+      // the schema speaks degrees, the light radians
+      const spot = light as THREE.SpotLight;
+      const proxy = {} as { angle: number };
+      Object.defineProperty(proxy, 'angle', { get: () => THREE.MathUtils.radToDeg(spot.angle), set: (v: number) => { spot.angle = THREE.MathUtils.degToRad(v); } });
+      return { obj: proxy, key: 'angle', kind: 'number' };
+    }
     default:
       return null;
   }

@@ -2,11 +2,11 @@
 
 ## X post
 
-> Shelfreel turns a product CSV into a video ad for every product, checked before it plays. A price change re-cuts the ad in a second for $0. Built with Muse agents for the Meta hackathon. Try it: <!-- OWNER:live-url --> Demo: <!-- OWNER:video-url -->
+> MuseReels turns a product CSV into a video ad for every product, checked before it plays. A price change re-cuts the ad in a second for $0. Built with Muse agents for the Meta hackathon. Try it: <!-- OWNER:live-url --> Demo: <!-- OWNER:video-url -->
 
 ## Discord post
 
-Shelfreel: your whole catalog, as ads. A product CSV becomes one checked, editable video ad per product, built with Muse Wonder, Muse Spark, Muse Image, SAM 3.1 and Muse Voice Transcribe.
+MuseReels: your whole catalog, as ads. A product CSV becomes one checked, editable video ad per product, built with Muse Wonder, Muse Spark, Muse Image, SAM 3.1 and Muse Voice Transcribe.
 
 - Live: <!-- OWNER:live-url -->
 - Code: <!-- OWNER:repo-url -->

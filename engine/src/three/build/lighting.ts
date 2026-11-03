@@ -207,15 +207,49 @@ export function disposeLightingRig(rig: LightingRig): void {
   rig.ambient.dispose();
 }
 
-// One PMREM-filtered room environment per Three renderer, shared across every `three` layer so the
-// env-map build cost is paid once.
-const roomEnvironments = new WeakMap<THREE.WebGLRenderer, THREE.Texture>();
+// One PMREM-filtered environment per Three renderer and kind, shared across every `three` layer so the env-map build cost is paid once.
+const environments = new WeakMap<THREE.WebGLRenderer, Map<string, THREE.Texture>>();
 
-export function getRoomEnvironmentTexture(renderer: THREE.WebGLRenderer): THREE.Texture {
-  const cached = roomEnvironments.get(renderer);
+/** A glowing flat shape at `at`, facing the origin, brighter than white (`power`) so a chrome surface picks it up as a hot reflection. */
+function glow(shape: THREE.BufferGeometry, at: [number, number, number], color: number, power: number): THREE.Mesh {
+  const m = new THREE.Mesh(shape, new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(power), side: THREE.DoubleSide }));
+  m.position.set(...at);
+  m.lookAt(0, 0, 0);
+  return m;
+}
+
+/** The scene a studio environment is drawn from: a dark room with its lights, or a graded sky. Lights are in the same place whatever the shot. */
+export function buildStudio(kind: Exclude<LightingEnvironment, 'room' | 'none'>): THREE.Scene {
+  const scene = new THREE.Scene();
+  const dome = (colors: (y: number) => THREE.Color): void => {
+    const g = new THREE.SphereGeometry(30, 32, 16);
+    const pos = g.getAttribute('position');
+    const c = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) colors(pos.getY(i) / 30).toArray(c, i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+    scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
+  };
+  if (kind === 'softbox') {
+    dome(() => new THREE.Color(0x0d0d12));
+    scene.add(glow(new THREE.PlaneGeometry(1.4, 9), [-6, 1, 1], 0xffffff, 7), glow(new THREE.PlaneGeometry(1.4, 9), [6, 1, -1], 0xfff1e0, 5), glow(new THREE.PlaneGeometry(9, 3), [0, 8, 0], 0xffffff, 3));
+  } else if (kind === 'ring') {
+    dome(() => new THREE.Color(0x101014));
+    scene.add(glow(new THREE.RingGeometry(1.6, 2.1, 48), [0, 0.5, 8], 0xffffff, 9), glow(new THREE.PlaneGeometry(10, 10), [0, -8, 0], 0x303038, 1));
+  } else {
+    const low = new THREE.Color(0xff8a3d), high = new THREE.Color(0x1b2a55), ground = new THREE.Color(0x2a1a14);
+    dome((y) => (y < 0 ? ground.clone().lerp(low, Math.max(0, 1 + y * 4)) : low.clone().lerp(high, Math.min(1, y * 1.6))));
+    scene.add(glow(new THREE.CircleGeometry(1.8, 32), [14, 4, 6], 0xffd9a0, 14));
+  }
+  return scene;
+}
+
+export function getEnvironmentTexture(renderer: THREE.WebGLRenderer, kind: Exclude<LightingEnvironment, 'none'>): THREE.Texture {
+  let byKind = environments.get(renderer);
+  if (!byKind) environments.set(renderer, (byKind = new Map()));
+  const cached = byKind.get(kind);
   if (cached) return cached;
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const room = new RoomEnvironment();
+  const room = kind === 'room' ? new RoomEnvironment() : buildStudio(kind);
   const target = pmrem.fromScene(room, 0.04);
   room.traverse((child) => {
     const mesh = child as THREE.Mesh;
@@ -225,11 +259,13 @@ export function getRoomEnvironmentTexture(renderer: THREE.WebGLRenderer): THREE.
     for (const material of materials) material?.dispose();
   });
   pmrem.dispose();
-  roomEnvironments.set(renderer, target.texture);
+  byKind.set(kind, target.texture);
   return target.texture;
 }
 
+export const getRoomEnvironmentTexture = (renderer: THREE.WebGLRenderer): THREE.Texture => getEnvironmentTexture(renderer, 'room');
+
 export function applyEnvironment(scene: THREE.Scene, config: LightingConfig, renderer: THREE.WebGLRenderer): void {
-  scene.environment = config.environment === 'room' ? getRoomEnvironmentTexture(renderer) : null;
+  scene.environment = config.environment === 'none' ? null : getEnvironmentTexture(renderer, config.environment);
   scene.environmentIntensity = config.environmentIntensity;
 }

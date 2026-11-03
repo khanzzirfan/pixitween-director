@@ -310,6 +310,16 @@ describe('convertWorld lighting, focus and shadow', () => {
     expect((convertWorld(cine(), [], ctx).layer as any).timeWarp).toBeUndefined();
   });
 
+  it('turns spot lights into engine spots (cone in degrees), and tweens an animated one on its own light', () => {
+    const spots = [{ id: 'spot1', position: [-0.7, 0.4, 0.3], target: [0, 0.08, 0], intensity: [{ t: 0, v: 2 }, { t: 30, v: 6 }], angle: 18, penumbra: 0.8, color: '#88aaff' }];
+    const w = { ...cine(), lights: { ...(cine() as any).lights, spots } } as unknown as AepStage3DLayer;
+    const { layer, warnings } = convertWorld(w, [], ctx);
+    expect(warnings.join(' ')).not.toMatch(/spots/);
+    expect((layer as any).lights).toEqual([{ id: 'spot1', type: 'spot', position: [-0.7, 0.4, 0.3], target: [0, 0.08, 0], intensity: 2, castShadow: false, color: '#88aaff', angle: 18, penumbra: 0.8 }]);
+    expect(layer.tweens.some((t) => t.target === 'light:spot1' && 'intensity' in t.to)).toBe(true);
+    expect((convertWorld(cine(), [], ctx).layer as any).lights).toEqual([]);
+  });
+
   it('an animated camera target becomes lookAt tweens, with no warning', () => {
     const w = { ...cine(), camera: { position: [0, 0.4, 1], target: [{ t: 0, v: [0, 0.08, 0] }, { t: 10, v: [0.04, 0.12, 0] }], fov: 14 } } as unknown as AepStage3DLayer;
     const { layer, warnings } = convertWorld(w, [], ctx);

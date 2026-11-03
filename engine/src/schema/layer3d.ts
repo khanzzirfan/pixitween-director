@@ -27,7 +27,8 @@ export type LightingPreset = (typeof LIGHTING_PRESETS)[number];
 
 export const LightingPresetSchema = z.enum(LIGHTING_PRESETS);
 
-export const LIGHTING_ENVIRONMENTS = ['room', 'none'] as const;
+// What the shiny things reflect: the three.js room, or one of the engine's own studios (softbox strips, a ring light, a low sunset), or nothing.
+export const LIGHTING_ENVIRONMENTS = ['room', 'softbox', 'ring', 'sunset', 'none'] as const;
 
 export type LightingEnvironment = (typeof LIGHTING_ENVIRONMENTS)[number];
 
@@ -317,6 +318,9 @@ export const Light3DSchema = z
     position: Vec3Schema.default([3, 5, 4]),
     target: Vec3Schema.default([0, 0, 0]),
     castShadow: z.boolean().default(false),
+    /** Spot lights only: the cone's half-angle in degrees, and how soft its edge is (0 hard, 1 fully soft). */
+    angle: z.number().min(1).max(89).optional(),
+    penumbra: z.number().min(0).max(1).optional(),
   })
   .strict()
   .refine((light) => !isPresetLightId(light.id), {

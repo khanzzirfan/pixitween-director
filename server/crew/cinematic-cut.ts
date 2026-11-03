@@ -6,7 +6,7 @@ import type { ToolCtx } from '@shared/tools';
 import { cutout } from '../art/cutout';
 import { dominantAccent } from '../art/palette';
 import { planBoard, reviewBoard, type CinematicBoard } from '../authoring/beatsheet';
-import { renderKeyFrames, reviewEnabled, reviewFrames } from './frame-review';
+import { judgeFrames, keyTimes, renderKeyFrames, reviewEnabled, reviewFrames } from './frame-review';
 import { prepareRound } from '../authoring/catalog-clip';
 import { buildCinematicFilm, type CinematicInput } from '../authoring/cinematic-film';
 import { elementKey, makeElement, type IngredientAsset } from '../authoring/ingredients';
@@ -260,6 +260,8 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     ...(board.blur !== undefined ? { blur: board.blur } : {}),
     ...(board.grade ? { grade: board.grade } : {}),
     ...(board.bokeh !== undefined ? { bokeh: board.bokeh } : {}),
+    ...(board.reflect ? { reflect: board.reflect } : {}),
+    ...(board.spots?.length ? { spots: board.spots } : {}),
     ...(board.aperture !== undefined ? { aperture: board.aperture } : {}),
     ...(bed ? { music: { id: bed.id, src: bed.url } } : {}),
     title,
@@ -274,7 +276,25 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     const photoRef = film.assets.find((a) => a.role === 'product-photo');
     const photo = photoRef ? await ctx.assets.read(photoRef.id).catch(() => undefined) : undefined;
     const seen = await reviewFrames(ctx, { board, title, brief: film.brief.text, ...(photo ? { photo } : {}), flat, render: (times) => renderKeyFrames(comp, times), log });
-    if (seen.revised) comp = build(seen.board);
+    if (seen.revised) {
+      comp = build(seen.board);
+      // a revised film is looked at once more: the swap for the finished 2D film happens only if the cinematic cut is judged good
+      const times = keyTimes(seen.board);
+      const again = await renderKeyFrames(comp, times)
+        .then((frames) => judgeFrames(ctx, { board: seen.board, times, frames, ...(photo ? { photo } : {}), final: true }))
+        .catch((err: unknown) => {
+          log(`the revised film could not be looked at: ${err instanceof Error ? err.message : String(err)}`);
+          return undefined;
+        });
+      if (!again || !again.ship) {
+        log(`Kept the finished 2D film: the cinematic cut did not pass a second look${again ? ` (${again.problems.join('; ')})` : ''}`);
+        return false;
+      }
+      log('Muse looked at the revised film and it passed');
+    } else if (seen.judged && !seen.judged.ship) {
+      log(`Kept the finished 2D film: the cinematic cut could not be fixed (${seen.judged.problems.join('; ')})`);
+      return false;
+    }
   }
   const r = await ctx.films.commit(ctx.filmId, comp, 'director', 'cinematic cut: camera moves, element splashes, animated price card');
   return r.ok;

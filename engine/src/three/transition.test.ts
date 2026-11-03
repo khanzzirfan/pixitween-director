@@ -32,3 +32,21 @@ describe('shader transitions', () => {
     expect(ThreeLayerSchema.safeParse({ ...base, transitions: [{ at: 1, duration: 5, name: 'CrossZoom' }] }).success).toBe(false);
   });
 });
+
+describe('cinematic transitions', () => {
+  it('are found by name beside the collection, each a transition function over named uniforms with defaults', async () => {
+    const { CINEMATIC_TRANSITIONS } = await import('./cinematicTransitions');
+    const { loadGlTransitions } = await import('./transition');
+    const lib = await loadGlTransitions();
+    for (const t of CINEMATIC_TRANSITIONS) {
+      expect(lib.find(t.name)).toBe(t);
+      expect(t.glsl).toContain('vec4 transition(vec2 uv)');
+      expect(usable(t)).toBe(true);
+      for (const name of Object.keys(t.paramsTypes)) {
+        expect(t.glsl).toContain(`uniform ${t.paramsTypes[name]} ${name};`);
+        expect(t.defaultParams[name]).toBeDefined();
+      }
+    }
+    expect(CINEMATIC_TRANSITIONS.map((t) => t.name)).toEqual(['LensWhip', 'LightLeak', 'ZoomPunch']);
+  });
+});

@@ -2,7 +2,7 @@
 
 ## Project description
 
-Shelfreel turns a store's product catalog into video ads. You drop in a product CSV and the photos it names. SAM 3.1 cuts each product out once as a transparent layer. Muse Image paints one set per look, such as a tabletop, a pedestal or a room, and a vision read of each set finds the surface the product can stand on, so it never floats in front of the wall.
+MuseReels turns a store's product catalog into video ads. You drop in a product CSV and the photos it names. SAM 3.1 cuts each product out once as a transparent layer. Muse Image paints one set per look, such as a tabletop, a pedestal or a room, and a vision read of each set finds the surface the product can stand on, so it never floats in front of the wall.
 
 Every product then gets its own short retail clip built from layers: the product, its name, a price badge with the old price struck through on a sale, and the brand mark. The title and price come straight from the feed, so a model never invents a price. Before anything plays, a verifier bakes every frame from the clip's JSON and checks that the price stays inside its badge, the text sits above the product and the product stands on a surface. What it can fix, it fixes and rebuilds.
 

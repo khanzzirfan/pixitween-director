@@ -33,11 +33,19 @@ export const VOCAB = {
     cloud: 'a bloom of light across the cut',
     zoom: 'a zoom blur: the lens rushes through the cut',
     whip: 'a whip pan: a fast sideways smear into the next shot',
+    lenswhip: 'a whip with colour fringing, like a real lens at speed',
+    spin: 'the frame spins through a turn as it blurs',
+    punch: 'a push-in with a hot flash at the swap, an impact',
     ripple: 'a water drop ripple spreads across the cut',
     swirl: 'a swirl twists the old shot into the new',
     glitch: 'a digital glitch tears the picture across the cut',
     burn: 'a warm film burn washes through the cut',
+    leak: 'a warm band of light sweeps across and leaves the new shot behind it',
     streak: 'light streaks sweep across the cut',
+    iris: 'a camera aperture closes and opens on the next shot',
+    dream: 'a soft wavering dissolve',
+    defocus: 'the old shot goes out of focus and the new one racks sharp',
+    melt: 'the bright parts melt away into the next shot',
     flash: 'a hot flash of the key light that fades at once (inside the scene)',
     pass: 'the product passes the lens: the shot before plunges at it until it fills the frame and this shot pulls out of that crop (inside the scene)',
     match: 'a match cut on shape: this shot opens with the product as large and on the lens the last one ended on, the angle jumping (inside the scene)',
@@ -121,17 +129,41 @@ export const LIGHT = {
 } as const;
 
 /**
+ * The spot lights a board can add (at most `max`): a pool of light on the product from one side. A spot sits `distance` metres from the product
+ * and aims at its middle; `strength` is the number the board writes (0.2 to 3) times `power` in the engine's units; `cone` is the half-angle
+ * in degrees and `soft` how soft its edge is.
+ */
+export const SPOT = {
+  max: 2,
+  distance: 0.9,
+  height: 0.3,
+  power: 5,
+  cone: { min: 10, max: 60, default: 24 },
+  soft: 0.6,
+  /** where each side puts the light, as multiples of `distance` (x right, z toward the lens) and the height above the product's middle in metres */
+  sides: { left: [-0.8, 0.3, 0.35], right: [0.8, 0.3, 0.35], above: [0.05, 1.1, 0.1], behind: [0.15, 0.25, -1], front: [0, 0.2, 1] },
+} as const;
+
+/**
  * The shader transitions a cut can use: the word the board writes, the open gl-transitions shader behind it, and how long it plays (it starts on the
  * first frame of the shot it leads into). Each costs a second render of the world for its length, so a film uses at most `max` of them.
  */
 export const CUT_SHADERS = {
-  zoom: { shader: 'CrossZoom', seconds: 0.4 },
-  whip: { shader: 'WhipPan', seconds: 0.3 },
-  ripple: { shader: 'WaterDrop', seconds: 0.5 },
-  swirl: { shader: 'Swirl', seconds: 0.5 },
-  glitch: { shader: 'GlitchDisplace', seconds: 0.35 },
-  burn: { shader: 'FilmBurn', seconds: 0.6 },
-  streak: { shader: 'LightStreaks', seconds: 0.5 },
+  zoom: { shader: 'CrossZoom', seconds: 0.4, use: 'a zoom blur: the world rushes at the lens (a reveal, a launch, a burst of energy)' },
+  whip: { shader: 'WhipPan', seconds: 0.3, use: 'a fast sideways smear: the camera whips away to the next place' },
+  lenswhip: { shader: 'LensWhip', seconds: 0.35, use: 'a whip with colour fringing at the edges, like a real lens at speed (sport, street, travel, a quick change of place)' },
+  spin: { shader: 'WhipSpin', seconds: 0.45, use: 'the frame spins through a turn as it blurs (playful, dizzy, a big turn in the story)' },
+  punch: { shader: 'ZoomPunch', seconds: 0.35, use: 'a push-in with a hot flash at the swap: an impact, a hit on the beat' },
+  ripple: { shader: 'WaterDrop', seconds: 0.5, use: 'a water ripple spreading from the centre (water, cool drinks, calm, a memory)' },
+  swirl: { shader: 'Swirl', seconds: 0.5, use: 'a twist of the picture (a dream, magic, a stir)' },
+  glitch: { shader: 'GlitchDisplace', seconds: 0.35, use: 'a digital tear (tech, night, nerve, a jolt)' },
+  burn: { shader: 'FilmBurn', seconds: 0.6, use: 'a warm film burn (summer, nostalgia, golden light)' },
+  leak: { shader: 'LightLeak', seconds: 0.6, use: 'a warm band of light sweeps across and leaves the new shot behind it (romantic, golden hour, a soft glamorous change)' },
+  streak: { shader: 'LightStreaks', seconds: 0.5, use: 'streaks of light (night, festive, glamour)' },
+  iris: { shader: 'ApertureWipe', seconds: 0.5, use: 'a camera aperture closing and opening on the next shot (a reveal, a lens-craft film, premium)' },
+  dream: { shader: 'Dreamy', seconds: 0.6, use: 'a soft wavering dissolve (gentle, intimate, slow, memory)' },
+  defocus: { shader: 'DefocusBlur', seconds: 0.5, params: { blurSize: 0.04 }, use: 'the old shot goes out of focus and the new one racks sharp (calm, premium, a quiet change)' },
+  melt: { shader: 'LuminanceMelt', seconds: 0.7, use: 'the bright parts melt away into the next shot (heat, sun, rich glow)' },
   max: 3,
 } as const;
 
@@ -259,6 +291,7 @@ export function ruleSentences(): string[] {
     `A flat, wide product never fills more than ${pct(C.maxWidthShare)} of the frame's width, and a flat cut-out is built as a solid body, so it turns as far as the spin says.`,
     `A cut may play a shader transition (${Object.keys(CUT_SHADERS).filter((k) => k !== 'max').join(', ')}); at most ${CUT_SHADERS.max} cuts in a film are anything but a plain cut, and never the first shot's.`,
     `Three cuts happen inside the scene and cost no second render, so they are not counted in that limit: flash (a hot flash of the key light that fades in 0.14 s), pass (the shot before plunges at the product over its last ${pct(C.passTail)} until the product fills the frame, and this shot pulls out of that crop) and match (this shot starts as close and on the same lens as the one before ended, so the product keeps its size and place while the angle jumps).`,
+    `A board may add up to ${SPOT.max} spot lights, each ${SPOT.distance} m from the product on a side Muse names (left, right, above, behind, front), aimed at its middle: strength is 0.2 to 3 times ${SPOT.power} in engine units, the cone ${SPOT.cone.min} to ${SPOT.cone.max} degrees (${SPOT.cone.default} unless written) and the edge ${SPOT.soft} soft unless written. The board also picks what shiny things reflect: room, softbox, ring, sunset or none.`,
     `The finish is the screen grade over the world: glow (${FINISH.glow.soft.intensity} soft, ${FINISH.glow.strong.intensity} strong; it swells ${pct(FINISH.holdSwell - 1)} in the end hold), grain (${FINISH.grain.fine} fine, ${FINISH.grain.heavy} heavy), vignette (${FINISH.vignette.soft} soft, ${FINISH.vignette.strong} strong), an optional colour fringe of ${FINISH.fringe} and the floor's shine (a reflection of the product, ${FINISH.floor.matte.strength} matte, ${FINISH.floor.glossy.strength} glossy, ${FINISH.floor.mirror.strength} mirror, fading out ${FINISH.floor.matte.fade} to ${FINISH.floor.mirror.fade} m from it; only on a set) and wet (beads of condensation on the product, ${FINISH.wet.light} light, ${FINISH.wet.heavy} heavy, for a cold drink or a fresh, dewy product) and caustics (light rippling on the floor round the product the way a glass of liquid or a pool throws it, ${FINISH.caustics.soft} soft, ${FINISH.caustics.bright} bright, for drinks, water and anything fresh or aquatic; only on a set); the board picks the levels, and a board that picks none gets them from its key level.`,
     `The rendered film must move: a moving shot's picture changes at least ${(MOTION_RULES.minShot * 100).toFixed(2)}% a step (${MOTION_RULES.stepSec} s), the price hold at least ${(MOTION_RULES.minHold * 100).toFixed(2)}%, and at least ${pct(MOTION_RULES.minLive)} of the film is live.`,
   ];

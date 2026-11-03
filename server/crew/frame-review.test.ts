@@ -2,7 +2,8 @@ import { Buffer } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
 import { floorBoard, totalSeconds } from '../authoring/beatsheet';
-import { critiquePrompt, keyTimes, parseCritique, REVIEW_FRAMES, reviewFrames } from './frame-review';
+import sharp from 'sharp';
+import { critiquePrompt, isBurnt, judgeFrames, keyTimes, measureExposure, parseCritique, REVIEW_FRAMES, reviewFrames } from './frame-review';
 
 const board = floorBoard({ title: 'Citrus Soda', category: 'soda' });
 const jpg = Buffer.from('jpeg');
@@ -92,5 +93,50 @@ describe('reviewFrames', () => {
     const c = setup([{ fine: true }]);
     await reviewFrames(c.ctx, input());
     expect(c.add).toHaveBeenCalledWith('f', 'muse-spark-1.3-contributor', 'frame review', 0.006);
+  });
+});
+
+describe('the gate on a burnt or unfaithful film', () => {
+  const flat = (hex: string) => sharp({ create: { width: 40, height: 70, channels: 3, background: hex } }).jpeg().toBuffer();
+  const ctxWith = (reply: unknown) => {
+    const reviewImages = vi.fn(async () => reply);
+    return { ctx: { filmId: 'f', meta: { spark: { reviewImages } }, ledger: { add: vi.fn() } } as unknown as ToolCtx, reviewImages };
+  };
+
+  it('measures the mean brightness and the near-white share of the frames, and unreadable frames add nothing', async () => {
+    expect(await measureExposure([await flat('#202020'), Buffer.from('not a picture')])).toEqual({ mean: 0.13, hot: 0 });
+    expect(await measureExposure([await flat('#ffffff')])).toEqual({ mean: 1, hot: 1 });
+  });
+
+  it('calls only a truly burnt picture burnt: a bright scene with its detail is not', () => {
+    expect(isBurnt({ mean: 0.92, hot: 0.7 })).toBe(true);
+    expect(isBurnt({ mean: 0.79, hot: 0.4 })).toBe(false);
+    expect(isBurnt({ mean: 0.6, hot: 0.65 })).toBe(true);
+  });
+
+  it('does not ship burnt frames even when Muse says they are fine, and says why', async () => {
+    const { ctx } = ctxWith({ fine: true, problems: [] });
+    const j = await judgeFrames(ctx, { board, times: [1, 2], frames: [await flat('#ffffff'), await flat('#fefefe')] });
+    expect(j.ship).toBe(false);
+    expect(j.problems[0]).toMatch(/burnt out/);
+  });
+
+  it('ships frames Muse finds fine, and holds back ones it names problems with', async () => {
+    const frames = [await flat('#556677')];
+    expect((await judgeFrames(ctxWith({ fine: true, problems: [] }).ctx, { board, times: [1], frames })).ship).toBe(true);
+    const bad = await judgeFrames(ctxWith({ fine: false, problems: ['the towel is a puck'] }).ctx, { board, times: [1], frames });
+    expect(bad).toMatchObject({ ship: false, problems: ['the towel is a puck'] });
+  });
+
+  it('shows Muse the real photo first, with the measured brightness, and asks the final look to beat the plain film', async () => {
+    const { ctx, reviewImages } = ctxWith({ fine: true, problems: [] });
+    const photo = await flat('#aa8844');
+    await judgeFrames(ctx, { board, times: [1], frames: [await flat('#556677')], photo, final: true });
+    const [images, prompt] = reviewImages.mock.calls[0] as unknown as [Buffer[], string];
+    expect(images[0]).toBe(photo);
+    expect(images).toHaveLength(2);
+    expect(prompt).toContain('real photo of the product');
+    expect(prompt).toContain('Measured on the frames');
+    expect(prompt).toContain('better advertisement');
   });
 });

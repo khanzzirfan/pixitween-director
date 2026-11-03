@@ -88,13 +88,13 @@ Each item must be exposed as a Muse option, not a rule (rule 1).
 
 1. **Look at the new features on more films and fix what looks wrong.** Run 3-4 different products (a round can so a 360° spin is allowed, a perfume bottle, goggles, a bag). Look for: spin that reads as a stall in the middle (mid-key easing), tilt/roll on flat cut-outs, a light key that jumps in one frame between shots (the keys for shot n+1 start the frame after shot n ends), rim colour too weak or too strong.
 2. **Export a real MP4 with blur** through the UI (Export panel, exact mode and server mode) and check duration, size and speed. Consider lowering default samples or letting the exporter cap them (cost grows with `samples`).
-3. **Speed ramps.** Per-shot time remapping (slow motion then snap back) as a Muse option.
-4. **Camera paths.** Curves through several points per shot (today only `from` -> `to`), seeded handheld shake as a choice, focus pulls tied to real depth of field with bokeh.
-5. **Grade and lens.** Split toning, lens flare streaks, soft highlight glow, letterbox as Muse choices (today: glow, grain, vignette, fringe levels only). The converter already supports `post.grade` (brightness, contrast, saturation, hue) but the board cannot set it.
-6. **Environment reflections.** `environment` is only `room` or `none`. Add studio softbox strips, ring light, sunset reflection for chrome products (engine `lighting.ts` `getRoomEnvironmentTexture`).
-7. **Scene-internal transitions.** The product passing the lens as a wipe, a light flash, a match cut on shape (next to the gl-transitions shader cuts).
-8. **Muse reviews frames.** Render about 6 key frames, let Muse look, revise the board once. Keeps creativity with Muse and catches ugly results.
-9. **Spots.** The converter warns `lights.spots are not supported yet` and sets `lights: []`. Wiring spot lights (up to 2 in the schema) would allow more than key/fill/rim.
+3. ~~**Speed ramps.**~~ DONE (see 'Added 2026-11-03 (second agent)') — Per-shot time remapping (slow motion then snap back) as a Muse option.
+4. ~~**Camera paths.**~~ DONE (see 'Added 2026-11-03 (second agent)') — Curves through several points per shot (today only `from` -> `to`), seeded handheld shake as a choice, focus pulls tied to real depth of field with bokeh.
+5. ~~**Grade and lens.**~~ DONE (see 'Added 2026-11-03 (second agent)') — Split toning, lens flare streaks, soft highlight glow, letterbox as Muse choices (today: glow, grain, vignette, fringe levels only). The converter already supports `post.grade` (brightness, contrast, saturation, hue) but the board cannot set it.
+6. ~~**Environment reflections.**~~ DONE (board `reflect`: room, softbox, ring, sunset, none; `debug/reflect-strip.png`) —  `environment` is only `room` or `none`. Add studio softbox strips, ring light, sunset reflection for chrome products (engine `lighting.ts` `getRoomEnvironmentTexture`).
+7. ~~**Scene-internal transitions.**~~ DONE (see 'Added 2026-11-03 (second agent)') — The product passing the lens as a wipe, a light flash, a match cut on shape (next to the gl-transitions shader cuts).
+8. ~~**Muse reviews frames.**~~ DONE (see 'Added 2026-11-03 (second agent)') — Render about 6 key frames, let Muse look, revise the board once. Keeps creativity with Muse and catches ugly results.
+9. ~~**Spots.**~~ DONE (board `spots`, max 2: side, color, strength, cone, soft; `debug/spots-strip.png`) —  The converter warns `lights.spots are not supported yet` and sets `lights: []`. Wiring spot lights (up to 2 in the schema) would allow more than key/fill/rim.
 10. **Floor board.** `defaultBeatSheet` is still a fixed template, used only when Muse fails twice. Keep it as a safety net but check it still looks acceptable.
 11. **Cut-out leftovers.** Cache the successful noun per photo; consider a salient-crop fallback when every word fails; add a live test with the Meta key on a few more photos (bags, shoes, tubes).
 
@@ -122,4 +122,23 @@ All uncommitted, all Muse options (nothing forced). Rule book sentences are in `
 - **Limits raised for three layers**: tweens 64 -> 192 (`THREE_TWEENS_MAX`), effects 8 -> 12 (`THREE_EFFECTS_MAX`); `CAMERA.tweenBudget` is 190.
 - Verified by frames (in `debug/`): grade/streak/halation/bokeh (`grade-check-strip.png`), pass plunge (`pass-strip.png`). Not verified live: a full Muse run with the review loop, ramps/via on a real film.
 - Known failing tests not from this work: `plate-map` (missing asset file in `data/`), `director.test`, `films.test` (89 warnings count); `board-clip` times out only under load.
-- Reference worth porting next: `clippy-pixijs-nodejs/src/filters/customTransitions.ts` (shape wipes in the same gl-transitions format) and `shaders/animatedVfxShaders.ts` (light leak, VHS, glitch wave...).
+- clippy's `customTransitions.ts` (heart/shape wipes) was reviewed and not ported (off-brand); instead see 'Transition vocabulary' below.
+
+### Transition vocabulary (second agent, 2026-11-03)
+- `engine/src/three/cinematicTransitions.ts`: our own cut shaders (LensWhip, LightLeak, ZoomPunch), found by name beside gl-transitions (clippy's heart/shape wipes were judged off-brand for a commercial and not ported).
+- `CUT_SHADERS` (cinematic-rules.ts) now 15 words, each with a `use` line that the board prompt shows Muse (so it picks by story and mood); optional `params` pass through to `shotTransitions`. Limit of 3 non-hard cuts per film is unchanged.
+- Tests keep the words, CUTS, VOCAB.cuts and the engine in step (every shader exists and needs no second picture).
+- A shot may carry `dir` (left, right, up, down): sets which way a whip, lenswhip or leak cut travels (default: the cut's own).
+- Frames of all 15 shader cuts at mid-transition: `debug/cuts-strip-mid.png` (synthetic textures, not a film).
+
+### Next (second agent, after the transitions)
+1. Run a real film end to end (restart `npm run dev`) with 3 different products and look at: the review loop, ramps/via, and which cuts Muse picks. Check Muse does not repeat one cut and keeps to 3.
+2. Export an MP4 through the UI with blur and a shader cut (the mixer renders the world twice; check export time).
+3. Spots done: converter maps `lights.spots` to engine spot lights (angle and penumbra added to `Light3DSchema`; intensity, position, target, angle can be keyframed on `light:<id>`); the board writes only static spots. A moving spot sweep per shot would be the next step. (Reflections done: engine `buildStudio` in `engine/src/three/build/lighting.ts`; the board's `reflect` sets `world.lights.environment`.)
+4. Possible cut extras: timing option per cut (`seconds`), a second in-scene cut (product-fills-frame `iris` on the product's own shape).
+
+### The cinematic cut is now a gated swap (film_93e6eed7f3dc, 2026-11-03)
+- What happened: the 2D film (v65, good: pool, stripes, hero, $29 closer) was replaced by the cinematic cut (v66: the rolled towel extruded into a fat puck, yellows crushed, Muse's own words as captions) although frame review had flagged it burnt out and Muse's one revision was never looked at again. Frames: `debug/film93-v65.png` vs `debug/film93-v66.png`. (The "black wipes at half opacity" in that report are the caption plates behind each word, not wipes; wipes last 0.2 s.)
+- Fix, `server/crew/cinematic-cut.ts` + `server/crew/frame-review.ts`: the review is now the gate. Muse is shown the real product photo first plus the frames and the measured brightness (`measureExposure`); a picture past `BURNT` (mean 0.86 or 60% near white) never ships whatever Muse says; after a revision the film is drawn and judged again (`judgeFrames`, final = "is this better than the plain flat film?"). If either look fails, `cinematicCut` returns false and the finished 2D film + `applyFinish` stand. If the review cannot run at all (no web server), behaviour is as before (ships, unjudged).
+- Not verified: a live Muse run of the re-look on that film (costs a paid call). The server must be restarted for this to apply. Film `film_93e6eed7f3dc` is still at v66; restoring v65 is the owner's call.
+- Still open: a rolled/flat product extruded as a thick slab looks wrong even when it passes; the `body` option (depth, section) is the lever, and Muse should be shown the photo when it picks it.
