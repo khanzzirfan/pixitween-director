@@ -13,7 +13,7 @@ import { setKeyframes } from './transform';
 import { rampProgress, type RatePoint } from '@engine/core/speedRamp';
 import type { Aspect, Comp, Obj } from './types';
 import { inkOn, tint, words } from './variant-film';
-import { BEVEL_SHARE, DEPTH_SHARE } from '../product3d/presets';
+
 import type { PrimitiveShape } from '../product3d/types';
 
 // The cinematic film: one beat sheet played in one stage3d world (engine aep-32, schema 1.12.0). The camera cuts between shots and
@@ -40,6 +40,8 @@ export const FILL: Record<ShotSize, number> = { wide: 0.32, medium: 0.5, close: 
 export const APERTURE = 0.3;
 /** A backdrop brighter than this (relative luminance of its top third) takes dark type. */
 export const BRIGHT_SKY = 0.45;
+/** A flat cut-out is built into a solid; unless Muse says otherwise it is this deep (a share of its width) and this round (2 is an ellipse). */
+export const SOLID = { depth: 0.55, section: 2.6 } as const;
 /** Engine limits (STAGE3D_LIMITS in aep-32). */
 export const LIMITS = { props: 12, instances: 400, swarm: 200 } as const;
 
@@ -68,6 +70,8 @@ export interface CinematicInput {
   finish?: Finish;
   /** The end card's style, Muse's choice. Absent means a centred pill, a round disc and the product's own accent. */
   endCard?: EndCard;
+  /** The product's body when it is a flat cut-out: depth as a share of its width and the cross-section's exponent. Absent means SOLID. */
+  body?: { depth?: number; section?: number };
   /** The colours of the key and rim lights, Muse's choice. Absent means the key follows the tone and the rim is white. */
   light?: BoardLight;
   /** Motion blur for the film: the share of a frame the shutter stays open (a shot's own `blur` replaces it). Absent means none. */
@@ -1010,8 +1014,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     cam = { ...cam, position: cam.position.map((k) => (k.t >= beat.start && k.t <= beat.end ? { ...k, v: [r(k.v[0] + x), r(k.v[1] + y), k.v[2]] as V3 } : k)) };
   }
   if (flat) {
-    // a flat cut-out shows only its front: it may swing CAMERA.flatSwingMax degrees either way, never edge-on or from behind
-    yaw = yaw.map((k) => ({ ...k, v: [k.v[0], Math.max(-CAMERA.flatSwingMax, Math.min(CAMERA.flatSwingMax, k.v[1])), k.v[2]] as V3 }));
+    // the cut-out is a solid body with a back and sides, so it turns as far as Muse asks
     rise = rise.map((k) => ({ ...k, v: [k.v[0], r(k.v[1] + lift), k.v[2]] as V3 }));
   }
   const can: Obj = {
@@ -1023,7 +1026,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     inPoint: 0,
     outPoint: frames,
     source: flat
-      ? { type: 'extrude', contour: i.contour, depth: r2(i.texture.width * DEPTH_SHARE), bevel: r2(i.texture.width * BEVEL_SHARE) }
+      ? { type: 'extrude', contour: i.contour, depth: r2(i.texture.width * (i.body?.depth ?? SOLID.depth)), section: i.body?.section ?? SOLID.section }
       : { type: 'primitive', shape: i.shape, proportions: { width: 1, height: r2(aspect) } },
     textures: flat ? { front: i.texture.id, side: i.set ? tint(i.side, LIGHT.sideLift) : i.side } : { label: i.texture.id, side: i.side },
     size: r(fitSize),

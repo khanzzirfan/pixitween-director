@@ -99,6 +99,11 @@ export const ExtrudeGeometrySchema = z
     bevel: z.number().min(0).optional(),
     /** Colour of the extruded sides; the front and back caps take the material (and its map). */
     sideColor: ColorSchema.optional(),
+    /**
+     * Builds a solid body instead of a slab: every row of the outline is swept round into a cross-section (an ellipse at 2, boxier above, up to a near-rectangle),
+     * as deep as `depth` is to the widest row, so the product has a back and sides and can turn all the way round. The photo wraps the front and, read the right way, the back.
+     */
+    section: z.number().min(1).max(6).optional(),
   })
   .strict();
 

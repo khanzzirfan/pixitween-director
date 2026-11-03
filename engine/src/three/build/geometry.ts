@@ -34,7 +34,7 @@ export function buildGeometry(spec: PrimitiveGeometry): THREE.BufferGeometry {
     case 'plane':
       return new THREE.PlaneGeometry(spec.size[0], spec.size[1]);
     case 'extrude':
-      return buildExtrude(spec);
+      return spec.section !== undefined ? buildBody(spec) : buildExtrude(spec);
     case 'lathe':
       return buildLathe(spec);
   }
@@ -106,5 +106,104 @@ function buildExtrude(spec: Extract<PrimitiveGeometry, { type: 'extrude' }>): TH
   });
   geometry.translate(0, 0, -depth / 2);
   geometry.computeVertexNormals();
+  return geometry;
+}
+
+const BODY_ROWS = 72;
+const BODY_ARC = 28;
+
+/** The left and right edge of the outline across the row at height `y` (image pixels, y down), or undefined when the outline does not reach it. */
+function rowSpan(contour: ReadonlyArray<readonly [number, number]>, y: number): [number, number] | undefined {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (let i = 0; i < contour.length; i++) {
+    const [x0, y0] = contour[i]!;
+    const [x1, y1] = contour[(i + 1) % contour.length]!;
+    if ((y0 <= y && y1 > y) || (y1 <= y && y0 > y)) {
+      const x = x0 + ((y - y0) / (y1 - y0)) * (x1 - x0);
+      lo = Math.min(lo, x);
+      hi = Math.max(hi, x);
+    }
+  }
+  return lo <= hi ? [lo, hi] : undefined;
+}
+
+// A solid from the cut-out's outline: each row is swept round a centre line into a superellipse of the row's own width, as deep as `depth` is to the widest row.
+// The front half's UVs are the photo laid flat (u across, v up); the back half reads it the other way so its text is not mirrored. Centred on the origin in all three axes.
+function buildBody(spec: Extract<PrimitiveGeometry, { type: 'extrude' }>): THREE.BufferGeometry {
+  const contour = spec.contour;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [x, y] of contour) {
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+  }
+  const width = Math.max(maxX - minX, 1e-6);
+  const height = Math.max(maxY - minY, 1e-6);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const ratio = Math.max(spec.depth, 1e-6) / width;
+  const power = 2 / (spec.section ?? 2);
+
+  // one span per row, sampled at the middle of its band; a row the outline misses takes its neighbour's
+  const spans: Array<[number, number]> = [];
+  for (let j = 0; j <= BODY_ROWS; j++) {
+    const y = minY + (height * Math.min(Math.max(j, 0.01), BODY_ROWS - 0.01)) / BODY_ROWS;
+    const span = rowSpan(contour, y) ?? spans[j - 1];
+    spans.push(span ?? [cx, cx]);
+  }
+  for (let j = BODY_ROWS - 1; j >= 0; j--) if (spans[j]![0] === cx && spans[j]![1] === cx && spans[j + 1]![0] !== spans[j + 1]![1]) spans[j] = spans[j + 1]!;
+
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const index: number[] = [];
+  const per = BODY_ARC + 1;
+  for (const back of [false, true]) {
+    const base = positions.length / 3;
+    for (let j = 0; j <= BODY_ROWS; j++) {
+      const [lo, hi] = spans[j]!;
+      const mid = (lo + hi) / 2;
+      const half = (hi - lo) / 2;
+      const y = minY + (height * j) / BODY_ROWS;
+      for (let k = 0; k <= BODY_ARC; k++) {
+        const theta = Math.PI * (k / BODY_ARC) + (back ? Math.PI : 0);
+        const c = Math.cos(theta);
+        const s = Math.sin(theta);
+        // the end rows close the body: they shrink to the centre line
+        const close = j === 0 || j === BODY_ROWS ? 0 : 1;
+        const x = mid + close * half * Math.sign(c) * Math.abs(c) ** power;
+        const z = close * half * ratio * Math.sign(s) * Math.abs(s) ** power;
+        positions.push(x - cx, cy - y, z);
+        const u = (x - minX) / width;
+        uvs.push(back ? 1 - u : u, 1 - (y - minY) / height);
+      }
+    }
+    for (let j = 0; j < BODY_ROWS; j++) {
+      for (let k = 0; k < BODY_ARC; k++) {
+        const a = base + j * per + k;
+        const b = a + 1;
+        const c = a + per;
+        const d = c + 1;
+        index.push(a, b, c, b, d, c);
+      }
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(index);
+  geometry.computeVertexNormals();
+  // the two halves meet along the silhouette; their normals are averaged there so the shading has no crease
+  const normal = geometry.getAttribute('normal') as THREE.BufferAttribute;
+  const half = positions.length / 3 / 2;
+  const mix = new THREE.Vector3();
+  for (let j = 0; j <= BODY_ROWS; j++) {
+    for (const [f, b] of [[0, BODY_ARC], [BODY_ARC, 0]] as const) {
+      const fi = j * per + f;
+      const bi = half + j * per + b;
+      mix.set(normal.getX(fi) + normal.getX(bi), normal.getY(fi) + normal.getY(bi), normal.getZ(fi) + normal.getZ(bi)).normalize();
+      normal.setXYZ(fi, mix.x, mix.y, mix.z);
+      normal.setXYZ(bi, mix.x, mix.y, mix.z);
+    }
+  }
   return geometry;
 }

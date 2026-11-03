@@ -55,6 +55,14 @@ Muse looks at the product photo and writes a **board** (`server/authoring/beatsh
 - Tests: 2906 pass, 1 old failure (`server/agent/director.test.ts`, predates this work). Typecheck and lint clean.
 - Not verified: a full MP4 export with blur downloaded and played; spin of 360° on a round pack (the cooler is a flat cut-out); rim colour visually on a real film; the new cut-out on more than three photos.
 
+### 5. Solid product body (2026-11-03, after the owner saw the films as "2D flat")
+- Problem: every flat cut-out (perfume, cooler, goggles) was a slab only 6 % of its width deep with the photo on its front, held to a 30 degree swing. It read as a card moving in 3D space.
+- Fix: `ExtrudeGeometrySchema.section` (engine `layer3d.ts`, AEP `shared/aep/layer.ts`, `stage3d.ts` passes it). With `section` set, `buildBody` in `engine/src/three/build/geometry.ts` sweeps each row of the outline into a superellipse (2 round, higher boxier) as deep as `depth` is to the widest row. Front UVs lay the photo flat; the back reads it reversed so text is not mirrored; seam normals are averaged. `object.ts` sets `alphaTest 0.5` for it.
+- Builder: `SOLID = { depth: 0.55, section: 2.6 }` in `cinematic-film.ts` is the default; Muse overrides with board `body {depth 0.05-1.2, section 1-6}` (prompt section THE PRODUCT'S BODY, parsed in `beatsheet.ts`, passed by `cinematic-cut.ts`). The yaw clamp (`flatSwingMax`) on flat products is gone, so a Muse spin and the drop's spin-in play unclamped. Prompt and rule-book text that said a cut-out cannot turn were updated.
+- Checked by rendering patched compositions (perfume at yaw 0/75/160, cooler at 0/40/110): real volume, wrapped shading, a readable back. Known limits: side walls smear the photo's edge columns (streaks, worst on the cooler at 90-110 degrees); the back repeats the front picture; a gap in the outline (ornament arms, handles) shows as see-through when turned.
+- Not done: no new film was generated with the new code (needs a real run, a few cents); Muse's choice of `body` has not been seen on a real board.
+- Ideas to improve: blend the side walls toward the product's side colour, a gentle back-darkening, depth from a depth-estimation model for a real relief, or an image-to-3D model for true geometry.
+
 ## How to run and verify
 
 - Dev servers: `npm run dev` (API 8787, web 5173). Use your own ports for checks.

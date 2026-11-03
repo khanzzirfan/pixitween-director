@@ -256,6 +256,7 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     ...(board.finish ? { finish: board.finish } : {}),
     ...(board.endCard ? { endCard: board.endCard } : {}),
     ...(board.light ? { light: board.light } : {}),
+    ...(board.body ? { body: board.body } : {}),
     ...(board.blur !== undefined ? { blur: board.blur } : {}),
     ...(board.grade ? { grade: board.grade } : {}),
     ...(board.bokeh !== undefined ? { bokeh: board.bokeh } : {}),

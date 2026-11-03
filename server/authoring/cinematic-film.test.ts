@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
 import { checkBeatSheet, defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
-import { ELEVATION, rampKeysFor, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, finishPost, shaderCuts, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
+import { ELEVATION, rampKeysFor, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, SOLID, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, finishPost, shaderCuts, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
 import { CAMERA, LIGHT, MATERIALS } from './cinematic-rules';
 import { SPACE_EM } from './text-width';
 import { FLOOR, floorElements, glassAsset, liquidAsset, vapourAsset, type IngredientAsset } from './ingredients';
@@ -545,10 +545,19 @@ describe('a flat product (a cut-out that is not a round pack)', () => {
     const v = lightValidate(buildCinematicFilm(flat()));
     expect(v.ok, v.ok ? '' : JSON.stringify(v.issues)).toBe(true);
   });
-  it('never shows its back or its edge: the turn stays within 30 degrees', () => {
+  it('is a solid body, so it is not held to a swing: a drop spins in from behind', () => {
     const p = product(buildCinematicFilm(flat()));
+    expect((p.source as Obj).section).toBe(SOLID.section);
+    expect((p.source as Obj).depth).toBeCloseTo(100 * SOLID.depth, 5);
     const yaws = (p.rotation as Array<{ v: number[] }>).map((k) => k.v[1]!);
-    expect(Math.max(...yaws.map(Math.abs))).toBeLessThanOrEqual(30);
+    expect(Math.max(...yaws.map(Math.abs))).toBeGreaterThan(30);
+  });
+  it("takes Muse's depth and section for its body", () => {
+    const p = product(buildCinematicFilm(flat({ body: { depth: 0.9, section: 2 } })));
+    expect(p.source as Obj).toMatchObject({ depth: 90, section: 2 });
+    const q = product(buildCinematicFilm(flat({ body: { section: 4 } })));
+    expect((q.source as Obj).depth).toBeCloseTo(100 * SOLID.depth, 5);
+    expect((q.source as Obj).section).toBe(4);
   });
   it('swings to the other side on every turn, so no turn leaves it standing still', () => {
     const turns = defaultBeatSheet(floorElements('Stone Mug', 'home')).beats.map((b, i) => (i > 0 && i < 6 && b.size !== 'macro' ? { ...b, product: 'turn' as const } : b));
@@ -556,7 +565,6 @@ describe('a flat product (a cut-out that is not a round pack)', () => {
     const keys = (p.rotation as Array<{ t: number; v: number[] }>).map((k) => k.v[1]!);
     const moves = keys.slice(1).filter((y, n) => Math.abs(y - keys[n]!) > 1).length;
     expect(moves).toBeGreaterThanOrEqual(3);
-    expect(Math.max(...keys.map(Math.abs))).toBeLessThanOrEqual(30);
   });
   it('a wide product is sized by its width and lifted so its centre stays where the camera looks', () => {
     const towel = product(buildCinematicFilm(flat({ productAspect: 0.5, texture: { ...pic('ast_front', 400, 200), kind: 'front' } })));
