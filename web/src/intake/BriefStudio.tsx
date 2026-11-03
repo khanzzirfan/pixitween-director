@@ -163,7 +163,11 @@ export function BriefStudio() {
   } else if (mode === 'film') {
     const n = photos.length;
     const have = n === 0 ? 'No photo yet: I will make one from your description.' : n === 1 ? 'Got your photo.' : `Got ${n} photos: one film that cuts between them.`;
-    crewSays = text.trim() || voice ? `${have} Ready when you are.` : `${have} Now tell me the mood, the audience, anything it must show, or press 🎙 and say it.`;
+    crewSays = voice
+      ? `${have} Got your voice brief. Nothing starts until you press Make film.`
+      : text.trim()
+        ? `${have} Ready when you are: press Make film to start.`
+        : `${have} Now tell me the mood, the audience, anything it must show, or press 🎙 and say it.`;
   }
 
   const chat = (
@@ -195,6 +199,12 @@ export function BriefStudio() {
             {ready && missing.length > 0 && (
               <div className="quick">
                 <button type="button" onClick={() => picker.current?.click()}>Choose photos</button>
+              </div>
+            )}
+            {canMake && (
+              <div className="quick">
+                <button type="button" className="quick-make" onClick={() => void make()}>Send now</button>
+                {voice && <button type="button" onClick={recorder.reset}>Record again</button>}
               </div>
             )}
           </div>
@@ -256,7 +266,7 @@ export function BriefStudio() {
           {ASPECTS.map((a) => (
             <button key={a} type="button" className={`chip${aspect === a ? ' is-on' : ''}`} aria-pressed={aspect === a} onClick={() => setAspect(a)}>{a}</button>
           ))}
-          <button type="button" className="brief-make" disabled={!canMake} onClick={() => void make()}>Make film</button>
+          <button type="button" className={`brief-make${canMake ? ' is-ready' : ''}`} disabled={!canMake} onClick={() => void make()}>Make film</button>
         </div>
         </div>
         {!busy && attached.length === 0 && (

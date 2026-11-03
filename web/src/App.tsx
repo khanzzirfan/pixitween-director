@@ -24,7 +24,7 @@ import { openFilm } from './shell/nav';
 import type { Lineup } from '@shared/lineup';
 import type { LineupView } from './crew/CrewStudio';
 
-function Director({ filmId, lineup }: { filmId: string | null; lineup?: Lineup | null }) {
+function Director({ filmId, lineup, onLineupStopped }: { filmId: string | null; lineup?: Lineup | null; onLineupStopped?: () => void }) {
   const { film, events } = useFilm(filmId);
   const playerRef = useRef<PlayerHandle>(null);
   const [selected, setSelected] = useState<string>();
@@ -45,7 +45,7 @@ function Director({ filmId, lineup }: { filmId: string | null; lineup?: Lineup |
   if (film?.crew) {
     const item = lineup?.items.find((i) => i.filmId === film.id);
     const view: LineupView | undefined = lineup
-      ? { tabs: <LineupTabs lineup={lineup} filmId={film.id} />, note: <LineupNote lineup={lineup} filmId={film.id} />, ...(item?.state === 'waiting' ? { hold: 'Waiting for the product before it to finish…' } : {}) }
+      ? { tabs: <LineupTabs lineup={lineup} filmId={film.id} />, note: <LineupNote lineup={lineup} filmId={film.id} onStopped={onLineupStopped} />, ...(item?.state === 'waiting' ? { hold: 'Waiting for the product before it to finish…' } : {}) }
       : undefined;
     return <CrewStudio film={film} events={events} playerRef={playerRef} panels={panels} lineup={view} />;
   }
@@ -110,7 +110,7 @@ export function App() {
   }, []);
   const params = new URLSearchParams(search);
   const lineupParam = params.get('lineup');
-  const { lineup } = useLineup(lineupParam);
+  const { lineup, reload } = useLineup(lineupParam);
   // the studio follows the crew from one product to the next, unless the owner opened another product's tab
   const followed = followedFilm(lineup);
   const following = useRef<string | undefined>(undefined);
@@ -123,5 +123,5 @@ export function App() {
   const filmParam = params.get('film');
   if (params.get('replay') === '1' && filmParam) return <ReplayPage key={filmParam} filmId={filmParam} />;
   // keyed, so going home (or opening another film) starts the shell fresh on the right tab
-  return <Director key={filmParam ?? 'new'} filmId={filmParam} lineup={lineupParam ? lineup : null} />;
+  return <Director key={filmParam ?? 'new'} filmId={filmParam} lineup={lineupParam ? lineup : null} onLineupStopped={reload} />;
 }

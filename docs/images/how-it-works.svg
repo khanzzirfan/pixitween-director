@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 760" width="1280" height="760" font-family="Inter, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b84b8"/></marker>
+    <marker id="ap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b69cff"/></marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f2a65a"/></marker>
+    <style>
+      .t{fill:#f3f1fa;font-size:17px;font-weight:650}
+      .s{fill:#a9a4c4;font-size:13px}
+      .m{fill:#c9b8ff;font-size:12px;font-weight:600;letter-spacing:.04em}
+      .h{fill:#8b84b8;font-size:12px;font-weight:700;letter-spacing:.14em}
+      .box{fill:#1c1a26;stroke:#363249;stroke-width:1.5}
+      .lead{fill:#251f3d;stroke:#8b6cff;stroke-width:2}
+      .ok{fill:#16261f;stroke:#2f7a55;stroke-width:1.5}
+      .chk{fill:#2a1f17;stroke:#a8693a;stroke-width:1.5}
+      .ln{stroke:#8b84b8;stroke-width:1.8;fill:none}
+      .lp{stroke:#b69cff;stroke-width:1.8;fill:none;stroke-dasharray:6 5}
+      .lo{stroke:#f2a65a;stroke-width:1.8;fill:none;stroke-dasharray:6 5}
+    </style>
+  </defs>
+  <rect width="1280" height="760" rx="20" fill="#121019"/>
+
+  <text x="40" y="52" fill="#f3f1fa" font-size="26" font-weight="750">How MuseReels makes an ad</text>
+  <text x="40" y="78" class="s" font-size="15">One showrunner plans, four builders work in parallel, independent checkers send fixes back. The film is data, so every edit is versioned and undoable.</text>
+
+  <!-- column headers -->
+  <text x="40" y="112" class="h">1 · YOU</text>
+  <text x="300" y="112" class="h">2 · PLAN</text>
+  <text x="560" y="112" class="h">3 · BUILD IN PARALLEL</text>
+  <text x="900" y="112" class="h">4 · CHECK · 5 · WATCH &amp; EXPORT</text>
+
+  <!-- YOU -->
+  <rect class="box" x="40" y="140" width="210" height="96" rx="14"/>
+  <text x="58" y="170" class="t">📷  Product photos</text>
+  <text x="58" y="194" class="s">0–6 photos · none? Muse</text>
+  <text x="58" y="212" class="s">Image makes one</text>
+
+  <rect class="box" x="40" y="252" width="210" height="96" rx="14"/>
+  <text x="58" y="282" class="t">🎙  Brief</text>
+  <text x="58" y="306" class="s">typed, or spoken and</text>
+  <text x="58" y="324" class="m">VOICE TRANSCRIBE</text>
+
+  <rect class="box" x="40" y="364" width="210" height="96" rx="14"/>
+  <text x="58" y="394" class="t">🧾  Catalog CSV</text>
+  <text x="58" y="418" class="s">one film per product,</text>
+  <text x="58" y="436" class="s">title + price from the feed</text>
+
+  <!-- PLAN: showrunner -->
+  <rect class="lead" x="300" y="180" width="220" height="230" rx="16"/>
+  <text x="320" y="214" class="t" font-size="19">🎬  Showrunner</text>
+  <text x="320" y="236" class="m">MUSE WONDER</text>
+  <text x="320" y="268" class="s">• writes the storyboard</text>
+  <text x="320" y="290" class="s">  (scenes, copy, camera, timing)</text>
+  <text x="320" y="312" class="s">• sets the style bible</text>
+  <text x="320" y="334" class="s">• posts one job per scene</text>
+  <text x="320" y="356" class="s">• reads your messages and</text>
+  <text x="320" y="378" class="s">  re-plans only what they touch</text>
+
+  <path class="ln" d="M250,188 C275,188 275,260 298,260" marker-end="url(#a)"/>
+  <path class="ln" d="M250,300 L298,300" marker-end="url(#a)"/>
+  <path class="ln" d="M250,412 C275,412 275,340 298,340" marker-end="url(#a)"/>
+
+  <!-- job board -->
+  <rect class="box" x="560" y="140" width="300" height="44" rx="10"/>
+  <text x="580" y="168" class="t" font-size="15">📋  Job board</text>
+  <text x="712" y="168" class="s">build · fix · edit</text>
+  <path class="ln" d="M520,240 C545,240 540,162 558,162" marker-end="url(#a)"/>
+
+  <!-- builders -->
+  <g>
+    <rect class="box" x="560" y="200" width="142" height="68" rx="12"/>
+    <text x="576" y="229" class="t" font-size="15">Builder 1</text>
+    <text x="576" y="250" class="m">MUSE SPARK</text>
+    <rect class="box" x="718" y="200" width="142" height="68" rx="12"/>
+    <text x="734" y="229" class="t" font-size="15">Builder 2</text>
+    <text x="734" y="250" class="m">MUSE SPARK</text>
+    <rect class="box" x="560" y="280" width="142" height="68" rx="12"/>
+    <text x="576" y="309" class="t" font-size="15">Builder 3</text>
+    <text x="576" y="330" class="m">MUSE SPARK</text>
+    <rect class="box" x="718" y="280" width="142" height="68" rx="12"/>
+    <text x="734" y="309" class="t" font-size="15">Builder 4</text>
+    <text x="734" y="330" class="m">MUSE SPARK</text>
+  </g>
+
+  <!-- tools -->
+  <rect class="box" x="560" y="372" width="300" height="104" rx="12" fill="#17151f"/>
+  <text x="578" y="398" class="h">TOOLS THE BUILDERS CALL</text>
+  <text x="578" y="424" class="s">🖼  paint a set ........ <tspan class="m">MUSE IMAGE</tspan></text>
+  <text x="578" y="446" class="s">✂️  cut out product .... <tspan class="m">SAM 3.1</tspan></text>
+  <text x="578" y="468" class="s">🔤  place text · animate · 3D shot</text>
+  <path class="ln" d="M710,350 L710,370" marker-end="url(#a)"/>
+
+  <!-- film -->
+  <rect class="ok" x="560" y="500" width="300" height="78" rx="14"/>
+  <text x="578" y="530" class="t">🎞  Film = layers as JSON</text>
+  <text x="578" y="554" class="s">validated · versioned · undoable</text>
+  <path class="ln" d="M710,478 L710,498" marker-end="url(#a)"/>
+
+  <!-- checkers -->
+  <rect class="chk" x="900" y="140" width="340" height="96" rx="14"/>
+  <text x="918" y="170" class="t">👁  Blind critic</text>
+  <text x="1066" y="170" class="m">MUSE SPARK</text>
+  <text x="918" y="194" class="s">sees captured frames only, never the</text>
+  <text x="918" y="212" class="s">storyboard: "headline cut off at 0.6 s"</text>
+
+  <rect class="chk" x="900" y="252" width="340" height="96" rx="14"/>
+  <text x="918" y="282" class="t">📏  Measured rules</text>
+  <text x="918" y="306" class="s">contrast · safe area · text over product</text>
+  <text x="918" y="324" class="s">· continuity between scenes · in-frame</text>
+
+  <!-- film fans out on a bus between the columns -->
+  <path class="ln" d="M862,530 L880,530 L880,188"/>
+  <path class="ln" d="M880,188 L898,188" marker-end="url(#a)"/>
+  <path class="ln" d="M880,300 L898,300" marker-end="url(#a)"/>
+  <path class="ln" d="M880,428 L898,428" marker-end="url(#a)"/>
+  <path class="ln" d="M862,555 L898,555" marker-end="url(#a)"/>
+  <!-- fix loop -->
+  <path class="lo" d="M1060,138 L1060,132 L872,132 L872,150 L864,158" marker-end="url(#ao)"/>
+  <text x="1072" y="136" fill="#f2a65a" font-size="13" font-weight="650">findings become fix jobs</text>
+
+  <!-- output -->
+  <rect class="box" x="900" y="380" width="340" height="96" rx="14"/>
+  <text x="918" y="410" class="t">▶  Browser player</text>
+  <text x="918" y="434" class="s">GSAP + Three.js timeline plays the JSON;</text>
+  <text x="918" y="452" class="s">frame-exact capture → <tspan fill="#f3f1fa" font-weight="650">MP4</tspan></text>
+
+  <rect class="box" x="900" y="492" width="340" height="86" rx="14"/>
+  <text x="918" y="522" class="t">⏪  Watch it being made</text>
+  <text x="918" y="546" class="s">replays the event log at 1–8×, $0</text>
+
+  <!-- talk back -->
+  <path class="lp" d="M38,300 C12,300 12,600 120,600 L330,600 C410,600 410,480 410,414" marker-end="url(#ap)"/>
+  <text x="170" y="628" fill="#b69cff" font-size="13" font-weight="650">talk or type while it builds → only those scenes change</text>
+
+  <!-- footer strip -->
+  <rect x="40" y="660" width="1200" height="64" rx="12" fill="#1a1724" stroke="#2b273a"/>
+  <text x="62" y="690" class="t" font-size="14">💰  Every Meta call is a cost event · budget per film (default $1.50) · crew stops taking jobs when it's spent</text>
+  <text x="62" y="711" class="s">Server: Hono API + SQLite event log, live to the studio over SSE · Keys stay server-side · Offline fake crew for $0 testing</text>
+</svg>

@@ -32,6 +32,7 @@ it('shows a tab per product and opens that product’s film, keeping the line-up
 it('the chat note says which product the crew is on, and lets you jump to it', () => {
   render(<LineupNote lineup={lineup} filmId="film_a" />);
   expect(screen.getByText(/Making product 2 of 4: Forest Oud/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Watch it' }));
   expect(window.location.search).toContain('film=film_b');
 });

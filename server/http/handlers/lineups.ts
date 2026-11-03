@@ -8,7 +8,8 @@ import { BRIEF_MAX, newLineupId, type LineupItem } from '@shared/lineup';
 import { resolvePhoto } from '../../lineup/photos';
 import { loadEnv } from '../../env';
 import { imageSize } from '../../media/image';
-import { runLineup } from '../../lineup/runner';
+import { getCrewSession } from '../../crew/run-crew';
+import { cancelLineup, runLineup } from '../../lineup/runner';
 import { createLineupStore, type LineupStore } from '../../lineup/store';
 import type { AppDeps } from '../deps';
 import { readFileSync } from 'node:fs';
@@ -85,6 +86,24 @@ export function registerLineupRoutes(app: Hono, deps: AppDeps): void {
     void runLineup(deps, lineup.id, lineups()).catch((e) => console.error(`lineup ${lineup.id} failed:`, e));
 
     return c.json({ lineupId: lineup.id, filmIds: lineup.items.flatMap((i) => (i.filmId ? [i.filmId] : [])) }, 202);
+  });
+
+  app.post('/api/lineups/:id/stop', async (c) => {
+    const id = c.req.param('id');
+    const l = await lineups().get(id);
+    if (!l) return c.json({ error: 'not_found' }, 404);
+    const open = l.items.filter((i) => i.state === 'waiting' || i.state === 'making');
+    if (!open.length) return c.json({ ok: true, stopped: false });
+    cancelLineup(id);
+    for (const item of open) {
+      if (item.filmId) getCrewSession(item.filmId)?.stop();
+      await lineups().setItem(id, item.product.id, { state: 'stopped', error: 'Stopped.' });
+      if (item.state === 'making' && item.filmId) {
+        await deps.films.update(item.filmId, { status: 'failed' });
+        deps.makeToolCtx(item.filmId).emit({ type: 'film.status', status: 'failed' });
+      }
+    }
+    return c.json({ ok: true, stopped: true });
   });
 
   app.get('/api/lineups/:id', async (c) => {

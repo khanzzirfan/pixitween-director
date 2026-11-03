@@ -9,8 +9,8 @@ export const BRIEF_MAX = 600;
 export const LINEUP_ID_RE = /^lin_[a-z0-9]{8,32}$/;
 export const newLineupId = (): string => `lin_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
 
-/** Where a product is in the line-up. `waiting` films exist already but have not started. */
-export const ITEM_STATES = ['waiting', 'making', 'done', 'failed'] as const;
+/** Where a product is in the line-up. `waiting` films exist already but have not started. `stopped` means the owner ended the catalogue. */
+export const ITEM_STATES = ['waiting', 'making', 'done', 'failed', 'stopped'] as const;
 export type ItemState = (typeof ITEM_STATES)[number];
 
 export const lineupItemSchema = z.object({

@@ -9,7 +9,7 @@ flowchart LR
   subgraph Browser["Browser · Vite + React"]
     direction TB
     Studio["Studio shell<br/>plan · crew · chat · review · export"]
-    Player["Player<br/>reacthub-pixitweenjs"]
+    Player["Player<br/>Motion engine (engine/)"]
     Capture["Frame capture"]
     Export["MP4 export"]
     Studio --> Player

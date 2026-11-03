@@ -11,7 +11,7 @@ const runCrew = vi.fn(async (id: string) => {
   await new Promise((r) => setTimeout(r, 10));
   inFlight--;
 });
-vi.mock('../../crew/run-crew', () => ({ runCrew: (id: string) => runCrew(id), bindCrew: () => undefined }));
+vi.mock('../../crew/run-crew', () => ({ runCrew: (id: string) => runCrew(id), bindCrew: () => undefined, getCrewSession: () => undefined }));
 vi.mock('../../agent/director', () => ({ runDirector: vi.fn(), bindDirector: () => undefined }));
 
 const { createApp } = await import('../app');
@@ -41,7 +41,7 @@ async function start(form: FormData) {
 const settled = async (app: ReturnType<typeof createApp>, id: string): Promise<Lineup> => {
   for (let i = 0; i < 200; i++) {
     const l = (await (await app.request(`/api/lineups/${id}`)).json()) as Lineup;
-    if (l.items.every((x) => x.state === 'done' || x.state === 'failed')) return l;
+    if (l.items.every((x) => x.state === 'done' || x.state === 'failed' || x.state === 'stopped')) return l;
     await new Promise((r) => setTimeout(r, 20));
   }
   throw new Error('line-up did not finish');
@@ -77,6 +77,32 @@ it('a failed film does not stop the next one', async () => {
   expect(lineup.items[0]!.state).toBe('failed');
   expect(lineup.items[1]!.state).toBe('done');
   expect(order).toEqual(filmIds.slice(1)); // the failing film threw before it was recorded; every other one still ran
+});
+
+it('stop ends the films in progress and leaves the rest unstarted', async () => {
+  // LINEUP_CONCURRENCY defaults to 2: hold both slots' films until after the stop
+  const releases: Array<() => void> = [];
+  const hold = (id: string) => {
+    order.push(id);
+    return new Promise<void>((r) => {
+      releases.push(() => r());
+    });
+  };
+  runCrew.mockImplementationOnce(hold).mockImplementationOnce(hold);
+  const form = new FormData();
+  form.set('demo', 'feed-6');
+  const { app, res } = await start(form);
+  const { lineupId, filmIds } = (await res.json()) as { lineupId: string; filmIds: string[] };
+  for (let i = 0; i < 50 && order.length < 2; i++) await new Promise((r) => setTimeout(r, 20));
+  const stop = await app.request(`/api/lineups/${lineupId}/stop`, { method: 'POST' });
+  expect(stop.status).toBe(200);
+  expect(await stop.json()).toMatchObject({ ok: true, stopped: true });
+  for (const release of releases) release();
+  const lineup = await settled(app, lineupId);
+  expect(order).toEqual(filmIds.slice(0, 2));
+  expect(lineup.items.every((i) => i.state === 'stopped')).toBe(true);
+  expect((await app.request(`/api/lineups/${lineupId}/stop`)).status).toBe(404);
+  expect((await app.request(`/api/lineups/${lineupId}/stop`, { method: 'POST' })).status).toBe(200);
 });
 
 it('refuses a feed that is not a feed, and an unknown line-up is 404', async () => {
