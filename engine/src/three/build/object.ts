@@ -144,7 +144,10 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
       material = makeUnlitMaterial(spec.material, ctx.textures);
     } else {
       material = makeMaterial(spec.material, ctx.textures);
-      if (spec.geometry.type === 'extrude' && spec.geometry.sideColor) {
+      if (spec.geometry.type === 'extrude' && spec.geometry.section !== undefined) {
+        // A solid body wears the photo all round; where the outline has a gap (a strap, a handle) the picture is clear, so those pixels are cut away.
+        material.alphaTest = 0.5;
+      } else if (spec.geometry.type === 'extrude' && spec.geometry.sideColor) {
         // Caps carry the map, the sides a plain colour.
         material = [material, makeMaterial({ ...spec.material, map: undefined, color: spec.geometry.sideColor }, ctx.textures)];
       }

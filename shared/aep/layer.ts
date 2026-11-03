@@ -349,6 +349,8 @@ const aepModel3DExtrudeSourceSchema = z
       .max(2000),
     depth: aepAnimatableOf(z.number().min(0)),
     bevel: z.number().min(0).optional(),
+    /** A solid body rather than a slab: the cross-section's exponent (2 round, higher boxier). `depth` then sets how deep it is. */
+    section: z.number().min(1).max(6).optional(),
   })
   .strict();
 

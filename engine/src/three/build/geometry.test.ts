@@ -9,6 +9,11 @@ function boundingSize(geometry: THREE.BufferGeometry): THREE.Vector3 {
   return size;
 }
 
+function geometryBox(geometry: THREE.BufferGeometry): THREE.Box3 {
+  geometry.computeBoundingBox();
+  return geometry.boundingBox!;
+}
+
 describe('buildGeometry', () => {
   it('box size [1, 2, 3] gives a 1 x 2 x 3 bounding box', () => {
     const size = boundingSize(buildGeometry({ type: 'box', size: [1, 2, 3] }));
@@ -99,5 +104,68 @@ describe('buildGeometry', () => {
   it('extrude: two material groups, caps then sides', () => {
     const geometry = buildGeometry({ type: 'extrude', contour: [[0, 0], [1, 0], [1, 1]], depth: 1, bevel: 0.1 });
     expect(geometry.groups.map((g) => g.materialIndex)).toEqual([0, 1]);
+  });
+
+  describe('extrude with a section: a solid body', () => {
+    // a bottle: a narrow neck on a wide body, 40 wide at most and 100 tall (y down)
+    const bottle: Array<[number, number]> = [[15, 0], [25, 0], [25, 30], [40, 40], [40, 100], [0, 100], [0, 40], [15, 30]];
+    const body = () => buildGeometry({ type: 'extrude', contour: bottle, depth: 40, section: 2 });
+
+    it('is centred, as wide as the outline and as deep as depth says of its widest row', () => {
+      const size = boundingSize(body());
+      expect(size.x).toBeCloseTo(40, 0);
+      expect(size.y).toBeCloseTo(100, 0);
+      expect(size.z).toBeCloseTo(40, 0);
+      const box = geometryBox(body());
+      expect((box.min.x + box.max.x) / 2).toBeCloseTo(0, 1);
+      expect((box.min.z + box.max.z) / 2).toBeCloseTo(0, 1);
+    });
+    it('narrows with the outline: the neck is thinner both ways than the body', () => {
+      const g = body();
+      const pos = g.getAttribute('position');
+      const reach = (y0: number, y1: number, axis: 'x' | 'z') => {
+        let m = 0;
+        for (let i = 0; i < pos.count; i++) if (pos.getY(i) >= y0 && pos.getY(i) <= y1) m = Math.max(m, Math.abs(axis === 'x' ? pos.getX(i) : pos.getZ(i)));
+        return m;
+      };
+      // image y 0-30 is the neck (top, y up from 20 to 50), image y 50-100 the body
+      expect(reach(25, 45, 'x')).toBeLessThan(reach(-50, -20, 'x'));
+      expect(reach(25, 45, 'z')).toBeLessThan(reach(-50, -20, 'z'));
+    });
+    it('lays the photo flat on the front (u rises to the right) and reads it the other way on the back', () => {
+      const g = body();
+      const pos = g.getAttribute('position');
+      const uv = g.getAttribute('uv');
+      let front = 0;
+      let back = 0;
+      for (let i = 0; i < pos.count; i++) {
+        if (Math.abs(pos.getY(i) + 20) > 3) continue;
+        if (pos.getZ(i) > 15 && pos.getX(i) > 5) front = Math.max(front, uv.getX(i));
+        if (pos.getZ(i) < -15 && pos.getX(i) > 5) back = Math.max(back, uv.getX(i));
+      }
+      expect(front).toBeGreaterThan(0.5);
+      expect(back).toBeLessThan(0.5);
+    });
+    it('faces its normals outward, and none is zero', () => {
+      const g = body();
+      const pos = g.getAttribute('position');
+      const normal = g.getAttribute('normal');
+      for (let i = 0; i < pos.count; i += 7) {
+        const n = new THREE.Vector3().fromBufferAttribute(normal, i);
+        expect(n.length()).toBeGreaterThan(0.99);
+        const p = new THREE.Vector3().fromBufferAttribute(pos, i);
+        if (Math.abs(p.z) > 10 && Math.abs(p.y) < 45) expect(Math.sign(n.z)).toBe(Math.sign(p.z));
+      }
+    });
+    it('a higher exponent is boxier: more of the body lies near its corners', () => {
+      const corner = (section: number) => {
+        const g = buildGeometry({ type: 'extrude', contour: [[0, 0], [100, 0], [100, 100], [0, 100]], depth: 100, section });
+        const pos = g.getAttribute('position');
+        let best = 0;
+        for (let i = 0; i < pos.count; i++) best = Math.max(best, Math.hypot(pos.getX(i), pos.getZ(i)));
+        return best;
+      };
+      expect(corner(5)).toBeGreaterThan(corner(2));
+    });
   });
 });

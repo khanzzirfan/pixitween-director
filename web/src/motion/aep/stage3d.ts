@@ -188,7 +188,7 @@ export function convertProp(
   } else if (source.type === 'extrude') {
     // The depth is read once, at the prop's in-point.
     const depth = sampleAt(source.depth, prop.inPoint, 100);
-    geometry = { type: 'extrude', contour: source.contour, depth: Math.max(depth, 1e-6), bevel: source.bevel, sideColor: side };
+    geometry = { type: 'extrude', contour: source.contour, depth: Math.max(depth, 1e-6), bevel: source.bevel, sideColor: side, ...(source.section !== undefined ? { section: source.section } : {}) };
     if (prop.textures?.front) map = sanitizeId(prop.textures.front);
   } else if (source.shape === 'box') {
     const w = source.proportions?.width ?? 1;
