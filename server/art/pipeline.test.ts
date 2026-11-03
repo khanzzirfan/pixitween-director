@@ -5,7 +5,7 @@ import { addLayer, addScene, newFilmComposition, registerAsset } from '../author
 import { makeTestFilm } from '../test-utils/film';
 import { imageSize } from '../media/image';
 import { runTool } from '../tools/registry';
-import { cutout, ownAlpha, plainKey, selectObject, studioKey } from './cutout';
+import { cutout, coverage, COVER_MIN, KEY_SEMI_MAX, ownAlpha, plainKey, selectObject, semiShare, studioKey } from './cutout';
 import { lintPrompt, extractBrandTerms } from './lint';
 import { coverCrop } from './stills';
 import type { SamObject } from '@shared/ports';
@@ -77,6 +77,53 @@ it('keeps a light product on a white sweep whole: only backdrop joined to the ed
   const inside = keyed!.alpha[(18 + 10) * 100 + 50]!;
   expect(inside).toBe(255);
   expect(keyed!.alpha[5 * 100 + 5]).toBe(0);
+});
+
+it('measures how much of a mask is part see-through', () => {
+  expect(semiShare(Uint8Array.from([0, 0, 255, 255, 255, 255]))).toBe(0);
+  expect(semiShare(Uint8Array.from([0, 100, 255, 120]))).toBeCloseTo(2 / 3);
+  expect(semiShare(new Uint8Array(4))).toBe(1);
+});
+
+it('does not trust a ghost key (a cream product on a pale sweep, half see-through): SAM is asked instead', async () => {
+  const t = await makeTestFilm();
+  // the body is a little off the backdrop (keyed half see-through); only the dark band keys solid
+  const band = await sharp({ create: { width: 30, height: 12, channels: 3, background: '#3b2113' } }).png().toBuffer();
+  const product = await sharp({ create: { width: 30, height: 60, channels: 3, background: '#fff0c8' } }).composite([{ input: band, left: 0, top: 30 }]).png().toBuffer();
+  const source = await sharp({ create: { width: 100, height: 100, channels: 3, background: '#e2e2e2' } }).composite([{ input: product, left: 35, top: 20 }]).png().toBuffer();
+  const keyed = await studioKey(source);
+  expect(keyed).toBeDefined();
+  expect(semiShare(keyed!.alpha)).toBeGreaterThan(KEY_SEMI_MAX);
+  let asked = 0;
+  (t.ctx.meta.sam as { segmentImage: unknown }).segmentImage = async () => {
+    asked++;
+    return [{ objectId: 'sam-can', confidence: 0.9, bounds: { left: 35, top: 20, right: 65, bottom: 80 }, alpha: Buffer.from(Uint8Array.from({ length: 100 * 100 }, (_, i) => (i % 100 >= 35 && i % 100 < 65 && i >= 2000 && i < 8000 ? 255 : 0))) }];
+  };
+  const cut = await cutout(t.ctx, { source, noun: 'can', sceneId: 's1' });
+  expect(asked).toBe(1);
+  expect(cut.objectId).toBe('sam-can');
+});
+
+it('measures how much of the product a mask covers', () => {
+  expect(coverage(Uint8Array.from([255, 255, 0, 0]), Uint8Array.from([255, 255, 0, 0]))).toBe(1);
+  expect(coverage(Uint8Array.from([255, 0, 0, 0]), Uint8Array.from([255, 255, 255, 255]))).toBe(0.25);
+  expect(coverage(Uint8Array.from([0, 0]), Uint8Array.from([0, 0]))).toBe(1);
+  expect(COVER_MIN).toBeGreaterThan(0.5);
+});
+
+it('refuses a SAM answer that is only a part of the product (the berry on the pot) and asks the next word', async () => {
+  const t = await makeTestFilm();
+  const product = await sharp({ create: { width: 30, height: 60, channels: 3, background: '#2a6f3c' } }).png().toBuffer();
+  const source = await sharp({ create: { width: 100, height: 100, channels: 3, background: '#b09070' } }).composite([{ input: product, left: 35, top: 20 }]).png().toBuffer();
+  const mask = (rows: [number, number]) => Buffer.from(Uint8Array.from({ length: 100 * 100 }, (_, i) => (i % 100 >= 35 && i % 100 < 65 && i >= rows[0] * 100 && i < rows[1] * 100 ? 255 : 0)));
+  const words: string[] = [];
+  (t.ctx.meta.sam as { segmentImage: unknown }).segmentImage = async (_: Buffer, word: string) => {
+    words.push(word);
+    return word === 'berry' ? [{ objectId: 'part', confidence: 0.9, bounds: { left: 35, top: 20, right: 65, bottom: 35 }, alpha: mask([20, 35]) }] : [{ objectId: 'whole', confidence: 0.9, bounds: { left: 35, top: 20, right: 65, bottom: 80 }, alpha: mask([20, 80]) }];
+  };
+  const cut = await cutout(t.ctx, { source, noun: 'berry', alsoTry: ['pot'], sceneId: 's1' });
+  expect(cut.objectId).toBe('whole');
+  expect(words).toEqual(['berry', 'pot']);
 });
 
 it('keys a product on a plain coloured backdrop once SAM has found nothing, and refuses a busy border', async () => {

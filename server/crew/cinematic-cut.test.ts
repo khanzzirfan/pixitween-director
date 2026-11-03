@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { boardPrompt } from '../authoring/beatsheet';
 import sharp from 'sharp';
-import { isProductTitle, isStraightCylinder, otherNouns, pricesIn, productNoun, topLuma } from './cinematic-cut';
+import { isProductTitle, isReadName, isStraightCylinder, otherNouns, pricesIn, productNoun, topLuma } from './cinematic-cut';
 
 describe('pricesIn', () => {
   it('shows the lowest price and keeps the highest as the one it was', () => {
@@ -73,5 +73,19 @@ describe('isProductTitle', () => {
     expect(isProductTitle('', brief)).toBe(false);
     expect(isProductTitle(undefined, brief)).toBe(false);
     expect(isProductTitle('Cold Brew', 'Cold brew for energy')).toBe(true);
+  });
+  it('takes a product name the brief opens with, up to five words, and not a clause of it', () => {
+    const brief = 'Clear Water Swim Goggles. swim summer by Saltline. price $14.00 (was $18.00). Summer sale for swim goggles.';
+    expect(isProductTitle('Clear Water Swim Goggles', brief)).toBe(true);
+    expect(isProductTitle('Clear Water Swim Goggles. swim summer by Saltline', brief)).toBe(false);
+    expect(isProductTitle('Cold brew for energy, excitment', 'Cold brew for energy, excitment, refreshment')).toBe(false);
+  });
+});
+
+describe('isReadName', () => {
+  it('takes a name and refuses a reading that says it found none', () => {
+    expect(isReadName('Esky Cooler')).toBe(true);
+    expect(isReadName('Lattafa Habik')).toBe(true);
+    for (const no of ['NOT VISIBLE', 'Not readable', 'Unknown', 'N/A', 'No name on the pack', 'None', '---', 'Unable to read']) expect(isReadName(no)).toBe(false);
   });
 });

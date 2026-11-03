@@ -1,8 +1,9 @@
 import { Buffer } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
-import { defaultFinish, boardPrompt, checkBeatSheet, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
+import { choosesFlat, defaultFinish, boardPrompt, checkBeatSheet, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, isFailureText, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
 import { TEXT_RULES } from './cinematic-rules';
+import { FORM_VERDICTS, verdictLines } from './form-verdicts';
 import { floorElements } from './ingredients';
 import { EXAMPLES, filmLines, nearestFilms, pickExamples, referenceDeck } from './reference-deck';
 import type { FilmSnapshot } from '../corpus/films';
@@ -115,6 +116,62 @@ describe('parseBoard', () => {
     expect(r.ok && r.board.elements).toHaveLength(3);
     expect(r.ok && r.dropped.join('|')).toMatch(/cola: brand-name "coke"/);
     expect(r.ok && r.dropped.join('|')).toMatch(/element 5/);
+  });
+  it('keeps the form and traits Muse wrote, and drops a bad value', () => {
+    const r = parseBoard({ ...lemonBoard(), form: '2d', traits: { rigid: false, sits: 'lying', edge: 'fuzzy', sells: 'softness' } });
+    expect(r.ok && r.board.form).toBe('2d');
+    expect(r.ok && r.board.traits).toEqual({ rigid: false, sits: 'lying', edge: 'fuzzy', sells: 'softness' });
+    const bad = parseBoard({ ...lemonBoard(), form: 'hologram', traits: { sits: 'floating' } });
+    expect(bad.ok && bad.board.form).toBeUndefined();
+    expect(bad.ok && bad.board.traits).toBeUndefined();
+    const none = parseBoard(lemonBoard());
+    expect(none.ok && none.board.form).toBeUndefined();
+  });
+
+  it("keeps the body's axis Muse wrote, and drops a bad one", () => {
+    const r = parseBoard({ ...lemonBoard(), body: { depth: 0.8, section: 2, axis: 'across' } });
+    expect(r.ok && r.board.body).toEqual({ depth: 0.8, section: 2, axis: 'across' });
+    const bad = parseBoard({ ...lemonBoard(), body: { depth: 0.8, axis: 'sideways' } });
+    expect(bad.ok && bad.board.body?.axis).toBeUndefined();
+    expect(boardPrompt({ title: 'Loaf', seconds: 8 }).system).toMatch(/"axis" is how it is built/);
+  });
+  it("keeps the surface Muse wrote and drops one it does not know", () => {
+    expect((parseBoard({ ...lemonBoard(), surface: 'matte' }) as { board: { surface?: string } }).board.surface).toBe('matte');
+    const bad = parseBoard({ ...lemonBoard(), surface: 'velvet' });
+    expect(bad.ok && bad.board.surface).toBeUndefined();
+    expect(boardPrompt({ title: 'Cold brew', seconds: 8 }).system).toMatch(/THE PRODUCT'S SURFACE/);
+  });
+  it('trusts a 2d choice only when its own traits give the reason', () => {
+    expect(choosesFlat({ form: '2d', traits: { rigid: false, sits: 'lying', edge: 'fuzzy' } })).toBe(true);
+    expect(choosesFlat({ form: '2d', traits: { rigid: true, sits: 'upright', edge: 'fuzzy' } })).toBe(true);
+    expect(choosesFlat({ form: '2d', traits: { rigid: true, sits: 'upright', edge: 'crisp' } })).toBe(false);
+    expect(choosesFlat({ form: '2d' })).toBe(false);
+    expect(choosesFlat({ form: '3d', traits: { rigid: false } })).toBe(false);
+    expect(choosesFlat({})).toBe(false);
+  });
+
+  it('teaches the choice of form in the prompt, with the owner\'s verdicts as examples', () => {
+    const p = boardPrompt({ title: 'Cold brew', seconds: 10 }).system;
+    expect(p).toMatch(/3D OR 2D/);
+    for (const line of verdictLines()) expect(p).toContain(line);
+    expect(FORM_VERDICTS.some((v) => v.form === '2d')).toBe(true);
+    expect(FORM_VERDICTS.some((v) => v.form === '3d')).toBe(true);
+  });
+
+  it('drops words that say the model could not see the product, from a shot and from the tagline', () => {
+    const b = lemonBoard() as { beats: Array<Record<string, unknown>>; tagline?: string };
+    b.beats[1]!.text = 'No pack visible';
+    b.beats[0]!.text = 'Sun pool repeat';
+    b.tagline = 'Label not readable';
+    const r = parseBoard(b);
+    expect(r.ok && r.board.sheet.beats[1]!.text).toBeUndefined();
+    expect(r.ok && r.board.sheet.beats[0]!.text).toBe('Sun pool repeat');
+    expect(r.ok && r.board.tagline).toBeUndefined();
+    expect(r.ok && r.notes.join('|')).toMatch(/No pack visible/);
+  });
+  it('tells a failure to see from copy', () => {
+    for (const bad of ['NO PACK VISIBLE', 'not visible', 'Product not found', 'Unknown', 'N/A', 'label is not readable', 'Unable to read', "can't see the can"]) expect(isFailureText(bad), bad).toBe(true);
+    for (const good of ['Carry the sunshine', 'No ice, no compromise', 'Nothing beats cold', 'Not just coffee', 'Seen on every beach', 'Find your shade']) expect(isFailureText(good), good).toBe(false);
   });
   it('makes a solid one piece, clamps sizes and gives glass no picture', () => {
     const b = lemonBoard();

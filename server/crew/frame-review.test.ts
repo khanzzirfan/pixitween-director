@@ -2,7 +2,8 @@ import { Buffer } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
 import { floorBoard, totalSeconds } from '../authoring/beatsheet';
-import { critiquePrompt, keyTimes, parseCritique, REVIEW_FRAMES, reviewFrames } from './frame-review';
+import sharp from 'sharp';
+import { burntShare, critiquePrompt, measureFrames, middleSaturation, surroundGap, keyTimes, parseCritique, REVIEW_FRAMES, reviewFrames } from './frame-review';
 
 const board = floorBoard({ title: 'Citrus Soda', category: 'soda' });
 const jpg = Buffer.from('jpeg');
@@ -92,5 +93,40 @@ describe('reviewFrames', () => {
     const c = setup([{ fine: true }]);
     await reviewFrames(c.ctx, input());
     expect(c.add).toHaveBeenCalledWith('f', 'muse-spark-1.3-contributor', 'frame review', 0.006);
+  });
+});
+
+describe('the burnt-out check', () => {
+  const field = (bg: string, mid: string) => sharp({ create: { width: 96, height: 96, channels: 3, background: bg } }).composite([{ input: { create: { width: 40, height: 48, channels: 3 as const, background: mid } }, left: 28, top: 24 }]).png().toBuffer();
+  const solid = (c: string) => sharp({ create: { width: 64, height: 64, channels: 3, background: c } }).png().toBuffer();
+  it('measures the share of pure white', async () => {
+    expect(await burntShare(await solid('#ffffff'))).toBe(1);
+    expect(await burntShare(await solid('#202020'))).toBe(0);
+    expect(await burntShare(await solid('#f0f0f0'))).toBe(0);
+  });
+  it('flags a film with two or more burnt frames, and not one with a single bright frame', async () => {
+    const white = await field('#ffffff', '#ffffff');
+    const dark = await field('#202020', '#808080');
+    expect((await measureFrames([dark, white, white, dark]))[0]).toMatch(/burnt out: frame 2 is 100% pure white, frame 3/);
+    expect(await measureFrames([dark, white, dark])).toEqual([]);
+    expect(await measureFrames([jpg, jpg])).toEqual([]);
+  });
+  it('measures the gap between the middle of the picture and its surround, and flags a product lost in its set', async () => {
+    const cream = '#e8e2d6';
+    const lost = await field(cream, '#efe9de');
+    const clear = await field('#10202e', '#e8e2d6');
+    expect(await surroundGap(lost)).toBeLessThan(0.05);
+    expect(await surroundGap(clear)).toBeGreaterThan(0.4);
+    expect((await measureFrames([lost, lost, clear, clear]))[0]).toMatch(/no contrast: in frames 1, 2/);
+    expect(await measureFrames([lost, clear, clear, clear])).toEqual([]);
+  });
+  it('flags a film whose product is pushed to full saturation, and says what its photo was', async () => {
+    const loud = await field('#10202e', '#ff0040');
+    const plain = await field('#10202e', '#b06070');
+    expect(await middleSaturation(loud)).toBeGreaterThan(0.85);
+    expect(await middleSaturation(plain)).toBeLessThan(0.6);
+    const r = await measureFrames([loud, loud, plain, plain], plain);
+    expect(r.join('|')).toMatch(/over-saturated: the middle of frames 1, 2 is at 100% colour saturation \(its photo is 45%\)/);
+    expect(await measureFrames([loud, plain, plain, plain], plain)).toEqual([]);
   });
 });

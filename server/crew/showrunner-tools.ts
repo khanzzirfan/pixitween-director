@@ -210,7 +210,10 @@ export async function finishFilm(crew: CrewCtx, ctx: ToolCtx, summary: string, o
   if (!gate.pass && o.force && !gate.block.some((b) => b.startsWith('nothing is built'))) gate = { pass: true, block: [], accepted: [...gate.accepted, ...gate.block.map((b) => `${b} (out of time)`)] };
   if (!gate.pass) return fail(gate.block.join(', '));
   // a round product gets the cinematic cut (real camera, ingredient splashes, animated price card); anything else keeps the 2D finish
-  const cinematic = process.env.CINEMATIC_CUT === '0' ? false : await cinematicCut(ctx, (line) => crew.emit({ type: 'showrunner.say', kind: 'note', text: line })).catch(() => false);
+  const cinematic = process.env.CINEMATIC_CUT === '0' ? false : await cinematicCut(ctx, (line) => crew.emit({ type: 'showrunner.say', kind: 'note', text: line })).catch((err: unknown) => {
+        crew.emit({ type: 'showrunner.say', kind: 'note', text: `cinematic cut failed: ${err instanceof Error ? err.message : String(err)}` });
+        return false;
+      });
   if (!cinematic) await applyFinish(crew.films, crew.filmId, ctx.assets);
   await crew.films.update(crew.filmId, { status: 'ready' });
   crew.emit({ type: 'film.status', status: 'ready' });

@@ -2,10 +2,13 @@ import { readFile } from 'node:fs/promises';
 import { isFakeDirector } from '../agent/fake-director';
 import sharp from 'sharp';
 import { ASPECT_SIZES } from '@shared/composition';
+import type { AepCompositionJson } from '@shared/aep';
 import type { ToolCtx } from '@shared/tools';
 import { cutout } from '../art/cutout';
 import { dominantAccent } from '../art/palette';
-import { planBoard, reviewBoard, type CinematicBoard } from '../authoring/beatsheet';
+import { choosesFlat, isFailureText, planBoard, reviewBoard, type CinematicBoard } from '../authoring/beatsheet';
+import { finishedComposition } from './finish-film';
+import { commitCuts, keeps3d, pickForm } from './form-pick';
 import { renderKeyFrames, reviewEnabled, reviewFrames } from './frame-review';
 import { prepareRound } from '../authoring/catalog-clip';
 import { buildCinematicFilm, type CinematicInput } from '../authoring/cinematic-film';
@@ -27,12 +30,17 @@ export function pricesIn(text: string): { price: number; was?: number } | undefi
   return was > price ? { price, was } : { price };
 }
 
-/** True when a film's stored title is a real name: short, and not the brief itself (a film with no title is named after its brief). */
+/** True when a film's stored title is a real name: short, and not the brief itself (a film with no title is named after its brief). A brief may open with the product's name; a title that is a clause of the brief (a comma, or six words or more) is the brief. */
 export function isProductTitle(title: string | undefined, brief: string): boolean {
   const t = title?.trim();
   if (!t || t.split(/\s+/).length > 6 || /[$€£¥₹\d]/.test(t)) return false;
   const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  return !norm(brief).startsWith(norm(t)) || norm(t).split(' ').length <= 3;
+  return !norm(brief).startsWith(norm(t)) || (norm(t).split(' ').length <= 5 && !t.includes(','));
+}
+
+/** True when a reading of the pack is a name, not Muse saying it could not read one ("Not visible", "Unknown", "N/A"). */
+export function isReadName(name: string): boolean {
+  return /[a-z]/i.test(name) && !isFailureText(name) && !/^(no|none|null|nothing|undefined|na)\b|\bno (name|text|label)\b/i.test(name.trim());
 }
 
 /** A short name for the end card: the one Muse reads off the pack, else the brief's first words (a brief is a sentence, not a name). */
@@ -41,7 +49,7 @@ async function productName(ctx: ToolCtx, photo: Buffer, brief: string): Promise<
     const reply = (await ctx.meta.spark.reviewImages([photo], 'Read the product name printed on this pack. Reply as JSON {"name": "<brand and product, at most 4 words, title case>"}.')) as { name?: unknown };
     ctx.ledger.add(ctx.filmId, 'muse-spark-1.3-contributor', '1 call', 0.005);
     const name = typeof reply?.name === 'string' ? reply.name.trim() : '';
-    if (name && name.length <= 32) return name;
+    if (name && name.length <= 32 && isReadName(name)) return name;
   } catch {
     /* fall through to the brief */
   }
@@ -237,6 +245,12 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
   const parts = (pending ? await pending : undefined) ?? (await prepareParts(ctx, log));
   if (!parts) return false;
   const { prep, board, set, bed, title } = parts;
+  if (board.form === '2d' && !choosesFlat(board)) log(`Muse wrote 2D but its own traits (${JSON.stringify(board.traits ?? {})}) give no reason for it; the 3D film is built`);
+  if (choosesFlat(board)) {
+    // Muse read the photo as a soft or lying product the solid 3D body would spoil, so the 2D film stays
+    log(`2D film kept: Muse chose it (${board.traits ? JSON.stringify(board.traits) : 'no traits'}); ${board.concept}`.slice(0, 400));
+    return false;
+  }
   const flat = prep.shape === 'other';
 
   const t = prep.texture;
@@ -257,6 +271,7 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     ...(board.endCard ? { endCard: board.endCard } : {}),
     ...(board.light ? { light: board.light } : {}),
     ...(board.body ? { body: board.body } : {}),
+    ...(board.surface ? { surface: board.surface } : {}),
     ...(board.blur !== undefined ? { blur: board.blur } : {}),
     ...(board.grade ? { grade: board.grade } : {}),
     ...(board.bokeh !== undefined ? { bokeh: board.bokeh } : {}),
@@ -269,13 +284,35 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     ingredients: parts.ingredients,
   });
   let comp = build(board);
+  let flatCut: AepCompositionJson | undefined;
+  let keep: '2d' | '3d' = '3d';
   if (reviewEnabled()) {
     // Muse looks at six frames of what it wrote and may revise the board once; the pictures it needs are already made
     const photoRef = film.assets.find((a) => a.role === 'product-photo');
     const photo = photoRef ? await ctx.assets.read(photoRef.id).catch(() => undefined) : undefined;
     const seen = await reviewFrames(ctx, { board, title, brief: film.brief.text, ...(photo ? { photo } : {}), flat, render: (times) => renderKeyFrames(comp, times), log });
     if (seen.revised) comp = build(seen.board);
+    // a last look: Muse sees both cuts, and the film goes back to its 2D cut only when that cut clearly wins (the 3D one broke the product)
+    flatCut = (await finishedComposition(ctx.films, ctx.filmId, ctx.assets).catch(() => undefined)) as AepCompositionJson | undefined;
+    if (flatCut) {
+      const twoD = flatCut;
+      const at = (c: { durationInFrames: number; fps: number }, shares: readonly number[]) => shares.map((x) => Math.round(((x * c.durationInFrames) / c.fps) * 100) / 100);
+      const pick = await pickForm(ctx, {
+        filmId: ctx.filmId,
+        title,
+        brief: film.brief.text,
+        ...(photo ? { photo } : {}),
+        render2d: (shares) => renderKeyFrames(twoD, at(twoD, shares), undefined, 2000),
+        render3d: (shares) => renderKeyFrames(comp, at(comp as { durationInFrames: number; fps: number }, shares)),
+        log,
+      });
+      log(`2D or 3D: Muse found ${pick.better === 'tie' ? 'a tie' : `the ${pick.better.toUpperCase()} cut better${pick.clear ? ' by a clear margin' : ', but only slightly'}`}${pick.why ? `: ${pick.why}` : ''}`);
+      if (!keeps3d(pick)) {
+        log('the 2D film stays: its cut clearly beat the 3D one (the 3D cut is kept one version back)');
+        keep = '2d';
+      }
+    }
   }
-  const r = await ctx.films.commit(ctx.filmId, comp, 'director', 'cinematic cut: camera moves, element splashes, animated price card');
-  return r.ok;
+  // both cuts are saved, the one not chosen one step back in the film's history
+  return commitCuts(ctx.films, ctx.filmId, { ...(flatCut ? { flat: flatCut } : {}), solid: comp as AepCompositionJson, keep, log });
 }

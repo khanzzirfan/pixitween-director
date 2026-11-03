@@ -167,6 +167,20 @@ export const MATERIALS = {
   drop: { color: '#eaf7ff', roughness: 0.04, metalness: 0, opacity: 0.8, clearcoat: 1 },
 } as const;
 
+/**
+ * The product's surface, chosen by Muse from the photo. The photo carries the colour; the surface only says how light sits on it. Metal mirrors the
+ * set and tints a printed pack the set's colour (a cream can turned gold), so it is for bare metal seen in the photo; satin, the default, keeps the
+ * photo's own colours.
+ */
+export const SURFACES = {
+  matte: { roughness: 0.8, metalness: 0, clearcoat: 0 },
+  satin: { roughness: 0.5, metalness: 0.05, clearcoat: 0.25 },
+  gloss: { roughness: 0.22, metalness: 0, clearcoat: 0.9 },
+  metal: { roughness: 0.3, metalness: 0.6, clearcoat: 0.8 },
+} as const;
+export type Surface = keyof typeof SURFACES;
+export const SURFACE_NAMES = Object.keys(SURFACES) as Surface[];
+
 export const CAMERA = {
   /** a push starts this many times further than it arrives: the hook comes in hard (the references push 40-90 %), later pushes ease in */
   pushFromHook: 1.7,

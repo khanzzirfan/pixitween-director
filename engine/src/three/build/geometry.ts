@@ -111,6 +111,8 @@ function buildExtrude(spec: Extract<PrimitiveGeometry, { type: 'extrude' }>): TH
 
 const BODY_ROWS = 72;
 const BODY_ARC = 28;
+/** How far inside the outline, as a share of the width, the side wall reads the photo. */
+const BODY_EDGE_INSET = 0.012;
 
 /** The left and right edge of the outline across the row at height `y` (image pixels, y down), or undefined when the outline does not reach it. */
 function rowSpan(contour: ReadonlyArray<readonly [number, number]>, y: number): [number, number] | undefined {
@@ -128,30 +130,32 @@ function rowSpan(contour: ReadonlyArray<readonly [number, number]>, y: number): 
   return lo <= hi ? [lo, hi] : undefined;
 }
 
-// A solid from the cut-out's outline: each row is swept round a centre line into a superellipse of the row's own width, as deep as `depth` is to the widest row.
-// The front half's UVs are the photo laid flat (u across, v up); the back half reads it the other way so its text is not mirrored. Centred on the origin in all three axes.
+// A solid from the cut-out's outline: each row (or, for a body lying across, each column) is swept round a centre line into a superellipse of its own width, as deep as `depth` is to the widest row.
+// The front half's UVs are the photo laid flat; the back half reads it the other way so its text is not mirrored. Centred on the origin in all three axes.
+// Written in (a, b): a runs across a slice and b along the body, so an upright body has (a, b) = (x, y) and a body lying across has (a, b) = (y, x).
 function buildBody(spec: Extract<PrimitiveGeometry, { type: 'extrude' }>): THREE.BufferGeometry {
-  const contour = spec.contour;
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const [x, y] of contour) {
-    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+  const across = spec.axis === 'across';
+  const contour = across ? spec.contour.map(([x, y]) => [y, x] as const) : spec.contour;
+  let minA = Infinity, maxA = -Infinity, minB = Infinity, maxB = -Infinity;
+  for (const [a, b] of contour) {
+    minA = Math.min(minA, a); maxA = Math.max(maxA, a);
+    minB = Math.min(minB, b); maxB = Math.max(maxB, b);
   }
-  const width = Math.max(maxX - minX, 1e-6);
-  const height = Math.max(maxY - minY, 1e-6);
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
+  const width = Math.max(maxA - minA, 1e-6);
+  const height = Math.max(maxB - minB, 1e-6);
+  const cA = (minA + maxA) / 2;
+  const cB = (minB + maxB) / 2;
   const ratio = Math.max(spec.depth, 1e-6) / width;
   const power = 2 / (spec.section ?? 2);
 
-  // one span per row, sampled at the middle of its band; a row the outline misses takes its neighbour's
+  // one span per slice, sampled at the middle of its band; a slice the outline misses takes its neighbour's
   const spans: Array<[number, number]> = [];
   for (let j = 0; j <= BODY_ROWS; j++) {
-    const y = minY + (height * Math.min(Math.max(j, 0.01), BODY_ROWS - 0.01)) / BODY_ROWS;
-    const span = rowSpan(contour, y) ?? spans[j - 1];
-    spans.push(span ?? [cx, cx]);
+    const t = minB + (height * Math.min(Math.max(j, 0.01), BODY_ROWS - 0.01)) / BODY_ROWS;
+    const span = rowSpan(contour, t) ?? spans[j - 1];
+    spans.push(span ?? [cA, cA]);
   }
-  for (let j = BODY_ROWS - 1; j >= 0; j--) if (spans[j]![0] === cx && spans[j]![1] === cx && spans[j + 1]![0] !== spans[j + 1]![1]) spans[j] = spans[j + 1]!;
+  for (let j = BODY_ROWS - 1; j >= 0; j--) if (spans[j]![0] === cA && spans[j]![1] === cA && spans[j + 1]![0] !== spans[j + 1]![1]) spans[j] = spans[j + 1]!;
 
   const positions: number[] = [];
   const uvs: number[] = [];
@@ -163,27 +167,44 @@ function buildBody(spec: Extract<PrimitiveGeometry, { type: 'extrude' }>): THREE
       const [lo, hi] = spans[j]!;
       const mid = (lo + hi) / 2;
       const half = (hi - lo) / 2;
-      const y = minY + (height * j) / BODY_ROWS;
+      const b = minB + (height * j) / BODY_ROWS;
       for (let k = 0; k <= BODY_ARC; k++) {
         const theta = Math.PI * (k / BODY_ARC) + (back ? Math.PI : 0);
         const c = Math.cos(theta);
         const s = Math.sin(theta);
-        // the end rows close the body: they shrink to the centre line
+        // the end slices close the body: they shrink to the centre line
         const close = j === 0 || j === BODY_ROWS ? 0 : 1;
-        const x = mid + close * half * Math.sign(c) * Math.abs(c) ** power;
+        const a = mid + close * half * Math.sign(c) * Math.abs(c) ** power;
         const z = close * half * ratio * Math.sign(s) * Math.abs(s) ** power;
-        positions.push(x - cx, cy - y, z);
-        const u = (x - minX) / width;
-        uvs.push(back ? 1 - u : u, 1 - (y - minY) / height);
+        if (across) positions.push(b - cB, cA - a, z);
+        else positions.push(a - cA, cB - b, z);
+        // the side wall would stretch the photo's last pixels across its whole depth into stripes: as the surface turns side-on its picture is eased to the edge (a little inside, clear of the cut-out's clear border)
+        const edge = (mid + Math.sign(c) * half - minA) / width - Math.sign(c) * BODY_EDGE_INSET;
+        const side = Math.min(1, Math.max(0, (Math.abs(c) - 0.75) / 0.22));
+        const ease = side * side * (3 - 2 * side);
+        const aFlat = (a - minA) / width;
+        const along = (b - minB) / height;
+        if (across) {
+          // the photo's x runs along the body (the back reads it the other way round); its y runs across it and is the one eased on the side wall
+          const v = 1 - aFlat;
+          const vEdge = 1 - edge;
+          uvs.push(back ? 1 - along : along, v + (vEdge - v) * ease);
+        } else {
+          // the back reads the picture the other way round, but both halves end on the same edge column so the side wall has no seam
+          const flat = back ? 1 - aFlat : aFlat;
+          uvs.push(flat + (edge - flat) * ease, 1 - along);
+        }
       }
     }
     for (let j = 0; j < BODY_ROWS; j++) {
       for (let k = 0; k < BODY_ARC; k++) {
-        const a = base + j * per + k;
-        const b = a + 1;
-        const c = a + per;
-        const d = c + 1;
-        index.push(a, b, c, b, d, c);
+        const p = base + j * per + k;
+        const q = p + 1;
+        const r = p + per;
+        const t = r + 1;
+        // sweeping columns instead of rows mirrors the body, so its triangles are wound the other way to keep the faces outward
+        if (across) index.push(p, r, q, q, r, t);
+        else index.push(p, q, r, q, t, r);
       }
     }
   }

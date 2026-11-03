@@ -104,6 +104,11 @@ export const ExtrudeGeometrySchema = z
      * as deep as `depth` is to the widest row, so the product has a back and sides and can turn all the way round. The photo wraps the front and, read the right way, the back.
      */
     section: z.number().min(1).max(6).optional(),
+    /**
+     * Which way the body's cross-sections are cut. 'up' (the default) sweeps every row of the outline, for a product that stands upright; 'across' sweeps every column,
+     * for a product lying on its side (a roll, a board, a loaf), so its round cross-section is at its ends and `depth` is how deep it is at its tallest column.
+     */
+    axis: z.enum(['up', 'across']).optional(),
   })
   .strict();
 

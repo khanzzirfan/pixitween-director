@@ -34,22 +34,27 @@ export async function settleContrast(c: Comp, assets: Pick<ToolCtx['assets'], 'r
   return { comp: fixed.length ? out : c, fixed };
 }
 
+/** The 2D film as the finish would make it (shadow, grade, type, music), without committing it. Nothing when the film has no composition. */
+export async function finishedComposition(films: FilmStore, filmId: string, assets: ToolCtx['assets']): Promise<Comp | undefined> {
+  const film = await films.get(filmId);
+  if (!film.composition) return undefined;
+  let comp = film.composition as Comp;
+  const held = (comp.layers as Obj[]).find((l) => l.id === 'finish:music')?.assetId as string | undefined;
+  let musicAssetId = held && comp.assets[held] ? held : undefined;
+  if (!musicAssetId) {
+    const ref = await assets.put(await readFile(new URL('./media/bed.wav', import.meta.url)), 'audio/wav', { role: 'audio' });
+    comp = registerAsset(comp, { id: ref.id, kind: 'audio', src: ref.url, duration: comp.durationInFrames });
+    musicAssetId = ref.id;
+  }
+  const finished = finishComposition(comp, { musicAssetId, brief: film.brief.text, ...(film.styleBible?.palette[0] ? { accent: film.styleBible.palette[0] } : {}) });
+  return (await settleContrast(finished, assets).catch(() => ({ comp: finished, fixed: [] as string[] }))).comp;
+}
+
 /** The last step of a crew film: shadow, grade, type and the music bed, committed as one version. Never throws: a film without the polish still ships. */
 export async function finishFilm(films: FilmStore, filmId: string, assets: ToolCtx['assets']): Promise<void> {
   try {
-    const film = await films.get(filmId);
-    if (!film.composition) return;
-    let comp = film.composition as Comp;
-    const held = (comp.layers as Obj[]).find((l) => l.id === 'finish:music')?.assetId as string | undefined;
-    let musicAssetId = held && comp.assets[held] ? held : undefined;
-    if (!musicAssetId) {
-      const ref = await assets.put(await readFile(new URL('./media/bed.wav', import.meta.url)), 'audio/wav', { role: 'audio' });
-      comp = registerAsset(comp, { id: ref.id, kind: 'audio', src: ref.url, duration: comp.durationInFrames });
-      musicAssetId = ref.id;
-    }
-    const finished = finishComposition(comp, { musicAssetId, brief: film.brief.text, ...(film.styleBible?.palette[0] ? { accent: film.styleBible.palette[0] } : {}) });
-    const settled = await settleContrast(finished, assets).catch(() => ({ comp: finished, fixed: [] as string[] }));
-    await films.commit(filmId, settled.comp, 'director', 'finish: shadow, grade, type, music');
+    const comp = await finishedComposition(films, filmId, assets);
+    if (comp) await films.commit(filmId, comp, 'director', 'finish: shadow, grade, type, music');
   } catch {
     /* the film is already built; the polish is optional */
   }

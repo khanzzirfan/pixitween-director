@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
 import { checkBeatSheet, defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
 import { ELEVATION, rampKeysFor, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, SOLID, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, finishPost, shaderCuts, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
-import { CAMERA, LIGHT, MATERIALS } from './cinematic-rules';
+import { CAMERA, LIGHT, MATERIALS, SURFACES } from './cinematic-rules';
 import { SPACE_EM } from './text-width';
 import { FLOOR, floorElements, glassAsset, liquidAsset, vapourAsset, type IngredientAsset } from './ingredients';
 import type { Obj } from './types';
@@ -158,6 +158,13 @@ describe('buildCinematicFilm', () => {
     expect(w.set).toEqual({ ground: 'none', wall: false });
     expect(w.style.shading).toBe('pbr');
     expect(w.camera.position.length).toBeGreaterThan(sheet.beats.length);
+  });
+  it('the product is satin unless Muse names its surface, so a printed can keeps its own colours', () => {
+    const material = (o: Partial<CinematicInput>) => (props(buildCinematicFilm(input(o)) as any).find((p: any) => p.role === 'product') as any).material;
+    expect(material({})).toMatchObject(SURFACES.satin);
+    expect(material({}).metalness).toBeLessThan(0.1);
+    expect(material({ surface: 'metal' })).toMatchObject(SURFACES.metal);
+    expect(material({ surface: 'matte' })).toMatchObject(SURFACES.matte);
   });
   it('the product is a prop3d can wearing the label, tumbling in and facing the camera in the macro', () => {
     const c = buildCinematicFilm(input()) as any;
@@ -326,7 +333,7 @@ describe('buildCinematicFilm', () => {
     expect(product('heavy').material.condensation).toBe(0.9);
     expect(product('light').material.condensation).toBe(0.4);
     expect(product('none').material.condensation).toBeUndefined();
-    expect(product('heavy').material.clearcoat).toBe(0.8);
+    expect(product('heavy').material.clearcoat).toBe(SURFACES.satin.clearcoat);
     expect(lightValidate(buildCinematicFilm(input({ finish: { ...base, wet: 'heavy' } }))).ok).toBe(true);
   });
   it('a board with no finish gets one from its key level, and a finish of none adds no post at all', () => {
@@ -552,12 +559,24 @@ describe('a flat product (a cut-out that is not a round pack)', () => {
     const yaws = (p.rotation as Array<{ v: number[] }>).map((k) => k.v[1]!);
     expect(Math.max(...yaws.map(Math.abs))).toBeGreaterThan(30);
   });
+  it('is as deep as a share of its shorter side: a long, low roll is not a puck', () => {
+    const wide: Array<[number, number]> = [[0, 0], [300, 0], [300, 100], [0, 100]];
+    const p = product(buildCinematicFilm(flat({ contour: wide, texture: { ...pic('ast_front', 300, 100), kind: 'front' }, productAspect: 1 / 3 })));
+    expect((p.source as Obj).depth).toBeCloseTo(100 * SOLID.depth, 5);
+  });
   it("takes Muse's depth and section for its body", () => {
     const p = product(buildCinematicFilm(flat({ body: { depth: 0.9, section: 2 } })));
     expect(p.source as Obj).toMatchObject({ depth: 90, section: 2 });
     const q = product(buildCinematicFilm(flat({ body: { section: 4 } })));
     expect((q.source as Obj).depth).toBeCloseTo(100 * SOLID.depth, 5);
     expect((q.source as Obj).section).toBe(4);
+  });
+  it("builds a body lying on its side when Muse says axis across, and an upright one otherwise", () => {
+    const lying = product(buildCinematicFilm(flat({ body: { axis: 'across' } })));
+    expect((lying.source as Obj).axis).toBe('across');
+    const upright = product(buildCinematicFilm(flat({ body: { axis: 'up' } })));
+    expect((upright.source as Obj).axis).toBeUndefined();
+    expect((product(buildCinematicFilm(flat({}))).source as Obj).axis).toBeUndefined();
   });
   it('swings to the other side on every turn, so no turn leaves it standing still', () => {
     const turns = defaultBeatSheet(floorElements('Stone Mug', 'home')).beats.map((b, i) => (i > 0 && i < 6 && b.size !== 'macro' ? { ...b, product: 'turn' as const } : b));

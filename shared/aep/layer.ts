@@ -351,6 +351,8 @@ const aepModel3DExtrudeSourceSchema = z
     bevel: z.number().min(0).optional(),
     /** A solid body rather than a slab: the cross-section's exponent (2 round, higher boxier). `depth` then sets how deep it is. */
     section: z.number().min(1).max(6).optional(),
+    /** Which way the body's cross-sections are cut: 'up' (upright, the default) or 'across' (lying on its side). */
+    axis: z.enum(['up', 'across']).optional(),
   })
   .strict();
 

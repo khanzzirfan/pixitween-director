@@ -59,8 +59,10 @@ Muse looks at the product photo and writes a **board** (`server/authoring/beatsh
 - Problem: every flat cut-out (perfume, cooler, goggles) was a slab only 6 % of its width deep with the photo on its front, held to a 30 degree swing. It read as a card moving in 3D space.
 - Fix: `ExtrudeGeometrySchema.section` (engine `layer3d.ts`, AEP `shared/aep/layer.ts`, `stage3d.ts` passes it). With `section` set, `buildBody` in `engine/src/three/build/geometry.ts` sweeps each row of the outline into a superellipse (2 round, higher boxier) as deep as `depth` is to the widest row. Front UVs lay the photo flat; the back reads it reversed so text is not mirrored; seam normals are averaged. `object.ts` sets `alphaTest 0.5` for it.
 - Builder: `SOLID = { depth: 0.55, section: 2.6 }` in `cinematic-film.ts` is the default; Muse overrides with board `body {depth 0.05-1.2, section 1-6}` (prompt section THE PRODUCT'S BODY, parsed in `beatsheet.ts`, passed by `cinematic-cut.ts`). The yaw clamp (`flatSwingMax`) on flat products is gone, so a Muse spin and the drop's spin-in play unclamped. Prompt and rule-book text that said a cut-out cannot turn were updated.
-- Checked by rendering patched compositions (perfume at yaw 0/75/160, cooler at 0/40/110): real volume, wrapped shading, a readable back. Known limits: side walls smear the photo's edge columns (streaks, worst on the cooler at 90-110 degrees); the back repeats the front picture; a gap in the outline (ornament arms, handles) shows as see-through when turned.
-- Not done: no new film was generated with the new code (needs a real run, a few cents); Muse's choice of `body` has not been seen on a real board.
+- Checked by rendering patched compositions (perfume at yaw 0/75/160, cooler at 0/40/110): real volume, wrapped shading, a readable back. Known limits: the back repeats the front picture; a gap in the outline (ornament arms, handles) shows as see-through when turned.
+- Real runs after the change: cooler `film_a8124611a94a`/`film_6bdf361e5c28`, perfume `film_008949f9b6c3`, goggles `film_e6757ef47715`/`film_3c92017e59c4`. Muse chose `section` 4 for the cooler and perfume, 2 for the goggles.
+- Side walls: as the surface turns side-on its UV eases to the photo's edge column (`BODY_EDGE_INSET`), and both halves end on that same column, so the sides are smooth bands, not stripes or a seam.
+- End-card name bug: `isProductTitle` (`server/crew/cinematic-cut.ts`) refused a feed title the brief opens with, so the name was read off the photo and Muse answered "NOT VISIBLE". It now takes a title of up to five words with no comma, and `isReadName` refuses "not visible", "unknown", "n/a" and the like.
 - Ideas to improve: blend the side walls toward the product's side colour, a gentle back-darkening, depth from a depth-estimation model for a real relief, or an image-to-3D model for true geometry.
 
 ## How to run and verify
@@ -123,3 +125,16 @@ All uncommitted, all Muse options (nothing forced). Rule book sentences are in `
 - Verified by frames (in `debug/`): grade/streak/halation/bokeh (`grade-check-strip.png`), pass plunge (`pass-strip.png`). Not verified live: a full Muse run with the review loop, ramps/via on a real film.
 - Known failing tests not from this work: `plate-map` (missing asset file in `data/`), `director.test`, `films.test` (89 warnings count); `board-clip` times out only under load.
 - Reference worth porting next: `clippy-pixijs-nodejs/src/filters/customTransitions.ts` (shape wipes in the same gl-transitions format) and `shaders/animatedVfxShaders.ts` (light leak, VHS, glitch wave...).
+
+## 6. Guards against bad cinematic output (2026-11-03)
+
+Added after a towel film came out as a burnt puck with "NO PACK VISIBLE" captions.
+
+- **Ghost keys** (`server/art/cutout.ts`): a colour key (studio or plain) is accepted only if its see-through share is under `KEY_SEMI_MAX` (0.2). A clean key is about 1%; a ghost can key was 49%. A rejected key falls through to SAM.
+- **Depth** (`cinematic-film.ts`): depth is a share of the product's shorter side, so a wide roll stays a roll.
+- **Failure text** (`beatsheet.ts`, `cinematic-cut.ts`): `isFailureText` drops taglines and shot text such as "not visible" or "no pack visible"; `isReadName` rejects them as a product name.
+- **Logging**: a cinematic cut that falls back to 2D now logs why (`cinematic cut refused by the film check`) and `finishFilm` emits a showrunner note.
+- **Blur** now applies in the server export (`BLUR_FRAME` in `server/export/render.ts`).
+
+Verified live (own server, 8797): cold brew can is a solid can (not a pole); towel is a roll with no failure captions.
+Not verified: the can brief asked for one full 360 spin, but Muse wrote a 222 degree swing into place (-250 to -28); look at whether the prompt should make Muse honour a spin named in the brief. A full MP4 export with blur played back is also unchecked.

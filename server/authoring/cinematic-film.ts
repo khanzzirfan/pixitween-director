@@ -7,7 +7,7 @@ import { defaultFinish, type Grade, type FocusTarget, type Handheld, type ShotFo
 import type { IngredientAsset } from './ingredients';
 import { shade, type ClipAsset, type Rect } from './retail-clip';
 import { addScene } from './scenes';
-import { CAMERA, CUT_SHADERS, FINISH, LIGHT, MATERIALS } from './cinematic-rules';
+import { CAMERA, CUT_SHADERS, FINISH, LIGHT, MATERIALS, SURFACES, type Surface } from './cinematic-rules';
 import { WALL, type SetAir, type SetLook } from './set-art';
 import { setKeyframes } from './transform';
 import { rampProgress, type RatePoint } from '@engine/core/speedRamp';
@@ -40,8 +40,12 @@ export const FILL: Record<ShotSize, number> = { wide: 0.32, medium: 0.5, close: 
 export const APERTURE = 0.3;
 /** A backdrop brighter than this (relative luminance of its top third) takes dark type. */
 export const BRIGHT_SKY = 0.45;
-/** A flat cut-out is built into a solid; unless Muse says otherwise it is this deep (a share of its width) and this round (2 is an ellipse). */
+/**
+ * A flat cut-out is built into a solid; unless Muse says otherwise it is this deep and this round (2 is an ellipse). The depth is a share of the
+ * product's shorter side, so a tall bottle is as deep as part of its width and a long, low roll as part of its height, never a thick puck.
+ */
 export const SOLID = { depth: 0.55, section: 2.6 } as const;
+
 /** Engine limits (STAGE3D_LIMITS in aep-32). */
 export const LIMITS = { props: 12, instances: 400, swarm: 200 } as const;
 
@@ -70,8 +74,10 @@ export interface CinematicInput {
   finish?: Finish;
   /** The end card's style, Muse's choice. Absent means a centred pill, a round disc and the product's own accent. */
   endCard?: EndCard;
-  /** The product's body when it is a flat cut-out: depth as a share of its width and the cross-section's exponent. Absent means SOLID. */
-  body?: { depth?: number; section?: number };
+  /** The product's body when it is a flat cut-out: depth as a share of its shorter side and the cross-section's exponent. Absent means SOLID. */
+  body?: { depth?: number; section?: number; axis?: 'up' | 'across' };
+  /** How light sits on the product (matte, satin, gloss, metal). Absent means satin. */
+  surface?: Surface;
   /** The colours of the key and rim lights, Muse's choice. Absent means the key follows the tone and the rim is white. */
   light?: BoardLight;
   /** Motion blur for the film: the share of a frame the shutter stays open (a shot's own `blur` replaces it). Absent means none. */
@@ -1026,11 +1032,11 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     inPoint: 0,
     outPoint: frames,
     source: flat
-      ? { type: 'extrude', contour: i.contour, depth: r2(i.texture.width * (i.body?.depth ?? SOLID.depth)), section: i.body?.section ?? SOLID.section }
+      ? { type: 'extrude', contour: i.contour, depth: r2(Math.min(i.texture.width, i.texture.height) * (i.body?.depth ?? SOLID.depth)), section: i.body?.section ?? SOLID.section, ...(i.body?.axis === 'across' ? { axis: 'across' as const } : {}) }
       : { type: 'primitive', shape: i.shape, proportions: { width: 1, height: r2(aspect) } },
     textures: flat ? { front: i.texture.id, side: i.set ? tint(i.side, LIGHT.sideLift) : i.side } : { label: i.texture.id, side: i.side },
     size: r(fitSize),
-    material: { ...(flat ? { roughness: 0.5, metalness: 0.05, clearcoat: 0.25 } : { roughness: 0.3, metalness: 0.6, clearcoat: 0.8 }), ...wetLook(i.finish ?? defaultFinish(keyLevel)) },
+    material: { ...SURFACES[i.surface ?? 'satin'], ...wetLook(i.finish ?? defaultFinish(keyLevel)) },
     position: rise,
     rotation: yaw,
   };
