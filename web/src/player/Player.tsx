@@ -12,6 +12,8 @@ export interface PlayerHandle {
   getTime(): number;
   /** Front-most layer id at a doc-space pixel (y down), or null. */
   pick?(x: number, y: number): string | null;
+  /** The motion blur at `sec` for an exact export: the shutter (share of a frame, 0 to 1) and the pictures to average; null when sharp. */
+  blurAt?(sec: number): { shutter: number; samples: number } | null;
   /** Resolves true when every 3D layer has drawn (at once when there are none), false on a layer error or after `timeoutSec`. */
   whenReady(timeoutSec: number): Promise<boolean>;
 }
@@ -86,6 +88,7 @@ function MotionLoadedPlayer({ composition, assetMap, onError, onLayerError, hand
     () => ({
       getCanvas: () => stageRef.current?.getCanvas() ?? null,
       pick: (x: number, y: number) => stageRef.current?.pick(x, y) ?? null,
+      blurAt: (sec: number) => stageRef.current?.blurAt(sec) ?? null,
       play: () => stageRef.current?.play(),
       pause: () => stageRef.current?.pause(),
       seek: (sec: number) => stageRef.current?.seek(clampSeek(sec, duration)),

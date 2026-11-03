@@ -288,6 +288,14 @@ describe('convertWorld lighting, focus and shadow', () => {
     expect(warnings.join(' ')).not.toMatch(/overrides|focus/);
   });
 
+  it('keeps the rim light colour and turns the blur shots into spans in seconds', () => {
+    const w = { ...cine(), lights: { ...(cine() as any).lights, rim: { color: '#22ccdd', intensity: 1 } }, post: { motionBlur: { samples: 8, shots: [{ startFrame: 30, durationFrames: 15, shutter: 0.7 }] } } } as unknown as AepStage3DLayer;
+    const { layer } = convertWorld(w, [], ctx);
+    expect(layer.lighting).toMatchObject({ rimColor: '#22ccdd' });
+    expect((layer as any).motionBlur).toEqual({ samples: 8, spans: [{ from: 1, to: 1.5, shutter: 0.7 }] });
+    expect((convertWorld(cine(), [], ctx).layer as any).motionBlur).toBeUndefined();
+  });
+
   it('an animated camera target becomes lookAt tweens, with no warning', () => {
     const w = { ...cine(), camera: { position: [0, 0.4, 1], target: [{ t: 0, v: [0, 0.08, 0] }, { t: 10, v: [0.04, 0.12, 0] }], fov: 14 } } as unknown as AepStage3DLayer;
     const { layer, warnings } = convertWorld(w, [], ctx);

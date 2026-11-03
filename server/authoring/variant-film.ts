@@ -93,16 +93,16 @@ export function shape(c: Comp, sceneId: string, box: Rect, fill: string, z: numb
  * Words laid out on one line, centred on cx, each its own text layer so they can arrive one after another. Returns the ids in
  * reading order. Widths come from the font's real advance widths (text-width.ts), and the gap is one space, so the line reads as one line of text.
  */
-export function words(c: Comp, sceneId: string, text: string, o: { cx: number; cy: number; maxW: number; size: number; color: string; boldLast?: boolean; z: number }): { c: Comp; ids: string[] } {
+export function words(c: Comp, sceneId: string, text: string, o: { cx: number; cy: number; maxW: number; size: number; color: string; boldLast?: boolean; z: number; /** the weight of the plain words (default 500) */ weight?: number; /** the line starts here instead of being centred on cx */ left?: number }): { c: Comp; ids: string[] } {
   const ws = text.split(/\s+/).filter(Boolean);
   const total = (s: number) => ws.reduce((a, w, n) => a + textEm(w, !!o.boldLast && n === ws.length - 1) * s, 0) + (ws.length - 1) * SPACE_EM * s;
   const size = Math.max(12, Math.min(o.size, Math.floor((o.size * o.maxW) / Math.max(1, total(o.size)))));
-  let x = o.cx - total(size) / 2;
+  let x = o.left ?? o.cx - total(size) / 2;
   const ids: string[] = [];
   ws.forEach((w, n) => {
     const bold = !!o.boldLast && n === ws.length - 1;
     const width = textEm(w, bold) * size;
-    const t = add(c, sceneId, { role: 'caption', kind: 'text', text: w, z: o.z, style: { size, weight: bold ? 800 : 500, color: o.color, align: 'center' }, box: { x, y: o.cy - size * 0.6, w: width, h: size * 1.2 } });
+    const t = add(c, sceneId, { role: 'caption', kind: 'text', text: w, z: o.z, style: { size, weight: bold ? 800 : (o.weight ?? 500), color: o.color, align: 'center' }, box: { x, y: o.cy - size * 0.6, w: width, h: size * 1.2 } });
     c = t.c;
     ids.push(t.id);
     x += width + SPACE_EM * size;

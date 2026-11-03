@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
 import { checkBeatSheet, defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
-import { ELEVATION, PLATE, FILL, FOV_BASE, FOV_WIDE, LIMITS, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, finishPost, shaderCuts, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
+import { ELEVATION, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, finishPost, shaderCuts, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
 import { CAMERA, LIGHT, MATERIALS } from './cinematic-rules';
 import { SPACE_EM } from './text-width';
 import { FLOOR, floorElements, glassAsset, liquidAsset, vapourAsset, type IngredientAsset } from './ingredients';
@@ -933,5 +933,117 @@ describe('a wide product stays inside the frame', () => {
     const tall = buildCinematicFilm(input({ sheet: closeShot, shape: 'other', contour: [[0, 0], [100, 0], [100, 400], [0, 400]], texture: { ...pic('ast_f', 100, 400), kind: 'front' }, productAspect: 4 })) as any;
     const dist = (c: any) => Math.hypot(...((world(c) as any).camera.position[1].v as number[]));
     expect(dist(wide)).toBeGreaterThan(dist(tall) * 1.3);
+  });
+});
+
+describe("the end card as Muse styles it", () => {
+  const W = 1080;
+  const wordsOf = (c: any) => layers(c).filter((l) => l.kind === 'text');
+  const plates = (c: any) => layers(c).filter((l) => l.kind === 'shape' && (l.path as any)?.kind === 'rect' && ['#0b0b12', '#ffffff'].includes(String(l.fill)) && (l.path as any).size[1] < 400);
+  const base = () => buildCinematicFilm(input({ tagline: 'Cold goes anywhere' }));
+  const pos = (l: any) => {
+    const p = l.transform.position;
+    return (Array.isArray(p) && typeof p[0] === 'object' ? p[0].v : p) as [number, number];
+  };
+  const word = (c: any, text: string) => wordsOf(c).find((l) => String(l.source) === text) as any;
+  it('with no choices it is as before: a pill plate, a round disc, the product accent', () => {
+    const c = base();
+    expect(plates(c).length).toBeGreaterThan(0);
+    expect(plates(c).every((l) => (l.path as any).roundness > 0)).toBe(true);
+    expect(layers(c).some((l) => l.kind === 'shape' && l.fill === '#c27a3a' && (l.path as any).kind === 'ellipse')).toBe(true);
+  });
+  it('plate none draws no plate, and bar runs the full width with square ends', () => {
+    expect(plates(buildCinematicFilm(input({ tagline: 'x y', endCard: { plate: 'none' } }))).length).toBe(0);
+    const bar = plates(buildCinematicFilm(input({ tagline: 'x y', endCard: { plate: 'bar' } })));
+    expect(bar.length).toBeGreaterThan(0);
+    for (const b of bar) {
+      expect((b.path as any).roundness ?? 0).toBe(0);
+      expect((b.path as any).size[0]).toBeGreaterThanOrEqual(W - 2);
+    }
+  });
+  it('price tag is a rounded rectangle, plain has no shape, and the accent colours it', () => {
+    const tag = buildCinematicFilm(input({ endCard: { price: 'tag', accent: '#2b9d8f' } }));
+    const t = layers(tag).find((l) => l.kind === 'shape' && l.fill === '#2b9d8f') as any;
+    expect(t.path.kind).toBe('rect');
+    expect(t.path.size[0]).toBeGreaterThan(t.path.size[1]);
+    const plain = buildCinematicFilm(input({ endCard: { price: 'plain', accent: '#2b9d8f' } }));
+    expect(layers(plain).some((l) => l.kind === 'shape' && l.fill === '#2b9d8f')).toBe(false);
+    expect(wordsOf(plain).some((l) => /\$/.test(String(l.source)))).toBe(true);
+  });
+  it('capitals, weight and alignment change the words', () => {
+    const up = buildCinematicFilm(input({ tagline: 'Cold goes anywhere', endCard: { text: 'upper' } }));
+    expect(word(up, 'BREW')).toBeTruthy();
+    expect(word(up, 'ANYWHERE')).toBeTruthy();
+    expect(word(buildCinematicFilm(input({ endCard: { weight: 'light' } })), 'Cold').style.weight).toBe(300);
+    expect(word(buildCinematicFilm(input({ endCard: { weight: 'bold' } })), 'Cold').style.weight).toBe(700);
+    const centred = pos(word(base(), 'Cold'));
+    const left = pos(word(buildCinematicFilm(input({ tagline: 'Cold goes anywhere', endCard: { align: 'left' } })), 'Cold'));
+    expect(left[0]).toBeLessThan(centred[0]);
+    expect(left[0]).toBeLessThan(W * 0.3);
+  });
+  it('pulse false keeps the price from beating with the music', () => {
+    const keys = (c: any) => (layers(c).find((l) => l.kind === 'shape' && l.fill === '#c27a3a' && (l.path as any).kind === 'ellipse') as any).transform.scale.length;
+    expect(keys(buildCinematicFilm(input({ endCard: { pulse: false } })))).toBeLessThan(keys(base()));
+  });
+  it('the film still passes the light validator with any style', () => {
+    for (const endCard of [{ plate: 'bar', price: 'tag', align: 'left', text: 'upper', weight: 'bold' }, { plate: 'none', price: 'plain', pulse: false }] as const) {
+      expect(lightValidate(buildCinematicFilm(input({ tagline: 'Cold goes anywhere', endCard }))).ok).toBe(true);
+    }
+  });
+});
+
+describe('Muse directs the product, the light and the shutter', () => {
+  const beat = (extra: object = {}): any => ({ size: 'medium', move: 'push', seconds: 2, product: 'still', ...extra });
+  const mk = (...beats: any[]): BeatSheet => ({ beats: [...beats, beat({ move: 'hold', seconds: 2 })] });
+  const rot = (sh: BeatSheet) => props(buildCinematicFilm(input({ sheet: sh })))[0]!.rotation as Array<{ t: number; v: number[] }>;
+  const lift = (sh: BeatSheet) => props(buildCinematicFilm(input({ sheet: sh })))[0]!.position as Array<{ t: number; v: number[] }>;
+  it('a spin of 360 degrees turns the product right round over its shot, and a negative one turns it back', () => {
+    const k = rot(mk(beat({ spin: { degrees: 360 } })));
+    expect(k.at(-2)!.v[1]! - k[0]!.v[1]!).toBeCloseTo(360, 0);
+    const back = rot(mk(beat({ spin: { degrees: -180 } })));
+    expect(back.at(-2)!.v[1]! - back[0]!.v[1]!).toBeCloseTo(-180, 0);
+  });
+  it('tilt and roll peak at the middle of the shot, and a lift raises the product there and brings it back', () => {
+    const sh = mk(beat({ spin: { degrees: 90, tilt: 20, roll: 12, lift: 1.5 } }));
+    const k = rot(sh);
+    const mid = k.find((x) => x.v[2] === 12)!;
+    expect(mid.v[0]).toBeCloseTo(24, 1);
+    const up = lift(sh);
+    expect(Math.max(...up.map((x) => x.v[1]!))).toBeCloseTo(1.5 * PRODUCT_H, 3);
+    expect(up.at(-1)!.v[1]).toBe(0);
+  });
+  it('a shot with no spin turns as its product word says, and two spins give two different films', () => {
+    const plain = rot(mk(beat({ product: 'turn' })));
+    expect(plain.at(-2)!.v[1]! - plain[0]!.v[1]!).toBeCloseTo(45 + 28 - 28 + 28 - 28, 0);
+    expect(JSON.stringify(rot(mk(beat({ spin: { degrees: 360 } }))))).not.toEqual(JSON.stringify(rot(mk(beat({ spin: { degrees: 90 } })))));
+  });
+  it('a light that slides across a shot is keyed from where it starts to where it ends, and only what a shot names is keyed', () => {
+    const sh = mk(beat({ light: { from: -80, to: 70, rim: 2 } }));
+    const cam = planCamera(sh, 30);
+    const lp = lightKeys(sh, cam, { azimuth: -70, elevation: 55, key: 3, rim: 0.6 })!;
+    expect(lp.azimuth!.map((k) => k.v)).toEqual([-80, 70]);
+    expect(lp.rim!.map((k) => k.v)).toEqual([1.2]);
+    expect(lp.key).toBeUndefined();
+    expect(lp.elevation).toBeUndefined();
+    const w = world(buildCinematicFilm(input({ sheet: sh }))) as any;
+    expect(w.lights.key.azimuth.at(-1).v).toBe(70);
+    expect(lightKeys(mk(beat()), planCamera(mk(beat()), 30), { azimuth: -70, elevation: 55, key: 3, rim: 0.6 })).toBeUndefined();
+  });
+  it('the film keeps the colours Muse chose for the key and the rim light', () => {
+    const w = world(buildCinematicFilm(input({ light: { key: '#ffd7a3', rim: '#22ccdd' } }))) as any;
+    expect(w.lights.key.color).toBe('#ffd7a3');
+    expect(w.lights.rim.color).toBe('#22ccdd');
+    expect((world(buildCinematicFilm(input())) as any).lights.rim.color).toBeUndefined();
+  });
+  it('the shutter is open in the shots that name it, else as long as the film says, and not at all by default', () => {
+    const sh = mk(beat({ blur: 0.9 }), beat());
+    const cam = planCamera(sh, 30);
+    expect(motionBlur(sh, cam, undefined)!.shots).toHaveLength(1);
+    expect(motionBlur(sh, cam, 0.4)!.shots.map((s: { shutter: number }) => s.shutter)).toEqual([0.9, 0.4, 0.4]);
+    expect(motionBlur(mk(beat()), planCamera(mk(beat()), 30), undefined)).toBeUndefined();
+    const even = mk(beat(), beat());
+    expect(motionBlur(even, planCamera(even, 30), 1)!.samples).toBeGreaterThan(motionBlur(even, planCamera(even, 30), 0.1)!.samples);
+    const post = (world(buildCinematicFilm(input({ sheet: sh, blur: 0.5 }))) as any).post;
+    expect(post.motionBlur.shots[0]).toMatchObject({ startFrame: 0, shutter: 0.9 });
   });
 });

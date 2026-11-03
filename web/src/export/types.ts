@@ -17,9 +17,11 @@ export interface ExportDriver {
   pause(): void;
   seek(sec: number): void;
   getTime(): number;
+  /** The motion blur at `sec`, when the film has any: an exact export draws the frame `samples` times across the shutter and averages them. */
+  blurAt?(sec: number): { shutter: number; samples: number } | null;
 }
 
-export type ExportPlayerHandle = Pick<PlayerHandle, 'getCanvas' | 'play' | 'pause' | 'seek' | 'getTime'> & Partial<Pick<PlayerHandle, 'whenReady'>>;
+export type ExportPlayerHandle = Pick<PlayerHandle, 'getCanvas' | 'play' | 'pause' | 'seek' | 'getTime'> & Partial<Pick<PlayerHandle, 'whenReady' | 'blurAt'>>;
 
 /** How long an export waits for the 3D product to draw before it gives up, in seconds. */
 export const EXPORT_READY_WAIT_SEC = 20;

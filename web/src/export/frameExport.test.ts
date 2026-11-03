@@ -33,6 +33,23 @@ describe('captureFrames', () => {
     expect(times).toEqual([...times].sort((a, b) => a - b));
   });
 
+  it('draws a blurred frame across the shutter and averages the pictures, and copies a sharp one', async () => {
+    const d = { ...fakeDriver(), blurAt: (t: number) => (t >= 0.5 ? { shutter: 0.5, samples: 4 } : null) };
+    const draws: number[] = [];
+    const ctx = { clearRect: vi.fn(), drawImage: vi.fn(), globalAlpha: 1 };
+    const alphas: number[] = [];
+    ctx.drawImage.mockImplementation(() => void (alphas.push(ctx.globalAlpha), draws.push(d.seek.mock.calls.length)));
+    const out = { width: 4, height: 4, getContext: () => ctx } as unknown as HTMLCanvasElement;
+    await captureFrames({ driver: d, durationSec: 1, fps: 4, canvas: {} as HTMLCanvasElement, out, onFrame: async () => undefined }, { settle: async () => undefined });
+    // two sharp frames (one picture each) and two blurred (four each)
+    expect(d.seek).toHaveBeenCalledTimes(2 + 8);
+    expect(alphas.slice(2, 6)).toEqual([1, 0.5, 1 / 3, 0.25]);
+    const blurred = d.seek.mock.calls.map((c) => c[0]).slice(2, 6);
+    expect(Math.min(...blurred)).toBeLessThan(0.5);
+    expect(Math.max(...blurred)).toBeGreaterThan(0.5);
+    expect(Math.max(...blurred) - Math.min(...blurred)).toBeLessThan(0.5 / 4);
+  });
+
   it('stops with an aborted error when the signal fires', async () => {
     const ctl = new AbortController();
     const onFrame = vi.fn(async (i: number) => void (i === 5 && ctl.abort()));

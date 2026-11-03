@@ -176,6 +176,28 @@ export class MotionRuntime {
     return this.getCanvas();
   }
 
+  /**
+   * The motion blur at `sec`: how much of a frame the shutter stays open (0 to 1) and how many pictures an exporter draws across it, or null
+   * when the film is sharp there. Read from the three layers' `motionBlur` spans, on each layer's own clock.
+   */
+  blurAt(sec: number): { shutter: number; samples: number } | null {
+    const walk = (layers: Layer[], parentStart: number): { shutter: number; samples: number } | null => {
+      for (const layer of layers) {
+        const start = parentStart + layer.start;
+        if (layer.type === 'group') {
+          const inner = walk(layer.children, start);
+          if (inner) return inner;
+        } else if (layer.type === 'three' && layer.motionBlur) {
+          const local = sec - start;
+          const span = layer.motionBlur.spans.find((s) => local >= s.from && local < s.to);
+          if (span && span.shutter > 0.02) return { shutter: span.shutter, samples: layer.motionBlur.samples };
+        }
+      }
+      return null;
+    };
+    return this.doc ? walk(this.doc.layers, 0) : null;
+  }
+
   getFps(): number {
     return this.doc?.fps ?? 30;
   }

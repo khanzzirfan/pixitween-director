@@ -66,6 +66,23 @@ export function productNoun(title: string): string {
   return w[w.length - 1] ?? 'product';
 }
 
+/** The words of a name from its end back, the likeliest nouns first, without the first and without repeats ("Clear Water Swim Goggles" -> swim, water). */
+export function otherNouns(title: string, first: string): string[] {
+  const w = title.toLowerCase().replace(/[^a-z\s-]/g, ' ').trim().split(/\s+/).filter((x) => x.length > 2 && x !== first);
+  return [...new Set(w.reverse())].slice(0, 3);
+}
+
+/** What the thing in the photo is called, in a word or two each, most specific first: asked of Muse when the words of the name find nothing. */
+async function nounsFromPhoto(ctx: ToolCtx, photo: Buffer): Promise<string[]> {
+  try {
+    const reply = (await ctx.meta.spark.reviewImages([photo], 'What is the main product in this photo? Reply as JSON {"nouns": ["<what it is, one or two lowercase words, as a shopper would say it>", "<a more general word for it>", "<its shape or container, for example bottle, box, can>"]}.')) as { nouns?: unknown };
+    ctx.ledger.add(ctx.filmId, 'muse-spark-1.3-contributor', '1 call', 0.005);
+    return Array.isArray(reply?.nouns) ? reply.nouns.filter((n): n is string => typeof n === 'string' && n.trim().length > 0 && n.length <= 30).map((n) => n.trim().toLowerCase()).slice(0, 4) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** The narrowest row of the top part of a pack, over its body's typical width, below which it has a neck, shoulders or a cap. */
 export const STRAIGHT_SHARE = 0.85;
 
@@ -100,8 +117,15 @@ export async function isStraightCylinder(png: Buffer): Promise<boolean> {
  * The product in 3D: a tall straight cylinder (a can) wears its unwrapped label; anything else, a bottle with a neck or a cap included, is a
  * thick cut-out of its photo, extruded from its own outline.
  */
-async function prepareProduct(ctx: ToolCtx, photo: Buffer, noun: string): Promise<{ cutId: string; prep: Prepared3D } | undefined> {
-  const cut = await cutout(ctx, { source: photo, noun, sceneId: 'cinematic' }).catch(() => (noun === 'product' ? undefined : cutout(ctx, { source: photo, noun: 'product', sceneId: 'cinematic' })));
+async function prepareProduct(ctx: ToolCtx, photo: Buffer, title: string): Promise<{ cutId: string; prep: Prepared3D } | undefined> {
+  const noun = productNoun(title);
+  const tried = [noun, ...otherNouns(title, noun)];
+  // the words of the name first; when SAM finds nothing for them, Muse says what is in the photo and those words are tried, a little less strictly
+  const cut = await cutout(ctx, { source: photo, noun, alsoTry: tried.slice(1), sceneId: 'cinematic' }).catch(async () => {
+    const seen = new Set(tried);
+    const named = (await nounsFromPhoto(ctx, photo)).filter((n) => !seen.has(n));
+    return named.length ? cutout(ctx, { source: photo, noun: named[0]!, alsoTry: named.slice(1), minConfidence: 0.35, sceneId: 'cinematic' }).catch(() => undefined) : undefined;
+  });
   if (!cut) return undefined;
   const c = { id: cut.cutout.id, width: cut.cutout.width ?? 0, height: cut.cutout.height ?? 0 };
   const straight = await isStraightCylinder(await ctx.assets.read(c.id)).catch(() => false);
@@ -131,7 +155,7 @@ async function prepareParts(ctx: ToolCtx, log: (line: string) => void): Promise<
   if (!photoRef) return undefined;
   const photo = await ctx.assets.read(photoRef.id);
   const title = isProductTitle(film.title, film.brief.text) ? film.title!.trim() : await productName(ctx, photo, film.brief.text);
-  const made = await prepareProduct(ctx, photo, productNoun(title));
+  const made = await prepareProduct(ctx, photo, title);
   if (!made) return undefined;
   const { prep } = made;
   const flat = prep.shape === 'other';
@@ -163,7 +187,7 @@ async function prepareParts(ctx: ToolCtx, log: (line: string) => void): Promise<
   if (board.set) {
     try {
       const size = ASPECT_SIZES[film.aspect];
-      const art = await renderBackdrop({ look: board.set.look, ratio: size.width / size.height, ...(board.tone ? { tone: board.tone } : {}), ...(board.key ? { key: board.key } : {}) });
+      const art = await renderBackdrop({ look: board.set.look, ratio: size.width / size.height, ...(board.tone ? { tone: board.tone } : {}), ...(board.key ? { key: board.key } : {}), ...(board.set.palette ? { palette: board.set.palette } : {}) });
       const bd = await ctx.assets.put(art.png, 'image/png', { role: 'plate', width: art.width, height: art.height });
       const backdrop = { id: bd.id, src: ctx.assets.url(bd.id), width: art.width, height: art.height };
       let dot: { id: string; src: string; width: number; height: number } | undefined;
@@ -172,7 +196,7 @@ async function prepareParts(ctx: ToolCtx, log: (line: string) => void): Promise<
         const da = await ctx.assets.put(d.png, 'image/png', { role: 'cutout', width: d.width, height: d.height });
         dot = { id: da.id, src: ctx.assets.url(da.id), width: d.width, height: d.height };
       }
-      set = { look: board.set.look, air: board.set.air, backdrop, ground: groundColor(board.set.look, board.tone, board.key), ...(dot ? { dot } : {}), skyLuma: await topLuma(art.png) };
+      set = { look: board.set.look, air: board.set.air, backdrop, ground: groundColor(board.set.look, board.tone, board.key, board.set.palette), ...(dot ? { dot } : {}), skyLuma: await topLuma(art.png) };
     } catch (err) {
       log(`set not drawn: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -229,6 +253,9 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     ...(board.tagline ? { tagline: board.tagline } : {}),
     ...(board.handheld !== undefined ? { handheld: board.handheld } : {}),
     ...(board.finish ? { finish: board.finish } : {}),
+    ...(board.endCard ? { endCard: board.endCard } : {}),
+    ...(board.light ? { light: board.light } : {}),
+    ...(board.blur !== undefined ? { blur: board.blur } : {}),
     ...(bed ? { music: { id: bed.id, src: bed.url } } : {}),
     title,
     ...(prices ? { price: prices.price, ...(prices.was !== undefined ? { wasPrice: prices.was } : {}) } : {}),

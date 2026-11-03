@@ -15,6 +15,7 @@ export interface LightingConfig {
   keyColor: string;
   fillIntensity: number;
   rimIntensity: number;
+  rimColor: string;
   ambientIntensity: number;
   environmentIntensity: number;
   environment: LightingEnvironment;
@@ -29,6 +30,7 @@ export const LIGHTING_PRESETS: Record<LightingPreset, LightingConfig> = {
     keyColor: '#fff7ec',
     fillIntensity: 1.1,
     rimIntensity: 1.6,
+    rimColor: '#ffffff',
     ambientIntensity: 0.22,
     environmentIntensity: 0.75,
     environment: 'room',
@@ -41,6 +43,7 @@ export const LIGHTING_PRESETS: Record<LightingPreset, LightingConfig> = {
     keyColor: '#eef4ff',
     fillIntensity: 1.5,
     rimIntensity: 0.6,
+    rimColor: '#ffffff',
     ambientIntensity: 0.35,
     environmentIntensity: 0.85,
     environment: 'room',
@@ -53,6 +56,7 @@ export const LIGHTING_PRESETS: Record<LightingPreset, LightingConfig> = {
     keyColor: '#ffd29a',
     fillIntensity: 0.8,
     rimIntensity: 1.2,
+    rimColor: '#ffffff',
     ambientIntensity: 0.18,
     environmentIntensity: 0.55,
     environment: 'room',
@@ -65,6 +69,7 @@ export const LIGHTING_PRESETS: Record<LightingPreset, LightingConfig> = {
     keyColor: '#6f8cff',
     fillIntensity: 0.3,
     rimIntensity: 0.9,
+    rimColor: '#ffffff',
     ambientIntensity: 0.05,
     environmentIntensity: 0.2,
     environment: 'none',
@@ -77,6 +82,7 @@ export const LIGHTING_PRESETS: Record<LightingPreset, LightingConfig> = {
     keyColor: '#ff2fd0',
     fillIntensity: 1.8,
     rimIntensity: 2.2,
+    rimColor: '#ffffff',
     ambientIntensity: 0.15,
     environmentIntensity: 0.3,
     environment: 'none',
@@ -90,6 +96,7 @@ export const LIGHTING_PRESETS: Record<LightingPreset, LightingConfig> = {
     keyColor: '#ffffff',
     fillIntensity: 0,
     rimIntensity: 0,
+    rimColor: '#ffffff',
     ambientIntensity: 0,
     environmentIntensity: 0,
     environment: 'none',
@@ -105,6 +112,7 @@ export interface LightingOverrides {
   keyColor?: string;
   fillIntensity?: number;
   rimIntensity?: number;
+  rimColor?: string;
 }
 
 export function resolveLightingConfig(
@@ -121,6 +129,7 @@ export function resolveLightingConfig(
     keyColor: overrides.keyColor ?? base.keyColor,
     fillIntensity: overrides.fillIntensity ?? base.fillIntensity,
     rimIntensity: overrides.rimIntensity ?? base.rimIntensity,
+    rimColor: overrides.rimColor ?? base.rimColor,
     environment: environment ?? base.environment,
   };
 }
@@ -155,7 +164,7 @@ export function createLightingRig(config: LightingConfig): LightingRig {
   key.shadow.bias = -0.0005;
 
   const fill = new THREE.DirectionalLight(0xffffff, config.fillIntensity);
-  const rim = new THREE.DirectionalLight(0xffffff, config.rimIntensity);
+  const rim = new THREE.DirectionalLight(new THREE.Color(config.rimColor), config.rimIntensity);
 
   const group = new THREE.Group();
   // `none` keeps the rig empty so the scene holds only the layer's extra lights.
@@ -175,6 +184,7 @@ export function applyLightingRig(rig: LightingRig, config: LightingConfig): void
   rig.fill.intensity = config.fillIntensity;
   rig.rim.intensity = config.rimIntensity;
   rig.key.color.set(config.keyColor);
+  rig.rim.color.set(config.rimColor);
   setDirectionalPosition(rig.key, config.keyAzimuth, config.keyElevation);
 
   // Fill sits opposite the key, lower; rim is behind the product.

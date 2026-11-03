@@ -61,6 +61,7 @@ export async function exportMp4ViaServer(
   const pending = new Set<Promise<void>>();
   let failure: unknown;
   let uploaded = 0;
+  const out = o.driver.blurAt && typeof document !== 'undefined' ? Object.assign(document.createElement('canvas'), { width: o.canvas.width, height: o.canvas.height }) : undefined;
   await captureFrames(
     {
       driver: o.driver,
@@ -68,9 +69,10 @@ export async function exportMp4ViaServer(
       fps,
       signal: o.signal,
       onProgress: undefined,
+      ...(out ? { canvas: o.canvas, out } : {}),
       onFrame: async (i) => {
         if (failure) throw failure;
-        const body = await jpeg(o.canvas); // read now: the next seek overwrites the canvas
+        const body = await jpeg(out ?? o.canvas); // read now: the next seek overwrites the canvas
         const p: Promise<void> = doFetch(`/api/exports/${id}/frames/${i}`, { method: 'PUT', headers: { ...headers, 'content-type': 'image/jpeg' }, body })
           .then(async (res) => {
             if (!res.ok) await failFrom(res);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { boardPrompt } from '../authoring/beatsheet';
 import sharp from 'sharp';
-import { isProductTitle, isStraightCylinder, pricesIn, productNoun, topLuma } from './cinematic-cut';
+import { isProductTitle, isStraightCylinder, otherNouns, pricesIn, productNoun, topLuma } from './cinematic-cut';
 
 describe('pricesIn', () => {
   it('shows the lowest price and keeps the highest as the one it was', () => {
@@ -23,6 +23,14 @@ describe('boardPrompt', () => {
   });
   it('asks without a brief line when there is none', () => {
     expect(boardPrompt({ title: 'Cold Brew', seconds: 8 }).user).not.toContain("client's brief");
+  });
+});
+
+describe('otherNouns', () => {
+  it('gives the rest of the name from its end back, never the first word or a repeat', () => {
+    expect(otherNouns('Clear Water Swim Goggles', 'goggles')).toEqual(['swim', 'water', 'clear']);
+    expect(otherNouns('Cooler Cooler Box', 'box')).toEqual(['cooler']);
+    expect(otherNouns('X1', 'product')).toEqual([]);
   });
 });
 
