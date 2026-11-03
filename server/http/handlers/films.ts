@@ -3,6 +3,7 @@ import { getAdmission } from '../../admission';
 import { bindDirector, runDirector } from '../../agent/director';
 import { BriefTooLongError, EmptyBriefError, transcribeBrief } from '../../listener';
 import { bindCrew, runCrew } from '../../crew/run-crew';
+import { rememberUserKey } from '../../credentials';
 import { loadEnv } from '../../env';
 import { inventProductPhoto } from '../../art/invent-photo';
 import { PRICE } from '../../art/prices';
@@ -62,6 +63,7 @@ export function registerFilmsRoutes(app: Hono, deps: AppDeps): void {
       ...(crewOn ? { crew: true } : {}),
       assets: photos,
     });
+    rememberUserKey(deps.dataDir ?? env.DATA_DIR, film.id);
     if (invented) deps.ledger.add(film.id, 'muse-image-1.0', '1 image', PRICE.museImageUsd);
     const ctx = deps.makeToolCtx(film.id);
     if (input.audio) ctx.emit({ type: 'listener.transcript', text });

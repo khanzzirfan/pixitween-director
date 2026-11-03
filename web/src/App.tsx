@@ -12,6 +12,7 @@ import { recallIntake } from './crew/intakeHandoff';
 import { PendingStudio } from './crew/PendingStudio';
 import { ReplayPage } from './crew/replay/ReplayPage';
 import { BriefStudio } from './intake/BriefStudio';
+import { SettingsHost } from './settings/SettingsDialog';
 import { Filmstrip, sceneStarts } from './shell/Filmstrip';
 import { Slot } from './shell/Slot';
 import { EmptyPane, railTabs } from './shell/rail';
@@ -119,9 +120,9 @@ export function App() {
     if (lineupParam && followed && followed !== following.current && (following.current ? following.current === here : !here)) openFilm(followed, lineupParam);
     following.current = followed;
   }, [followed, lineupParam]);
-  if (params.get('fixture') === '1') return <FixturePage />;
+  if (params.get('fixture') === '1') return <><FixturePage /><SettingsHost /></>;
   const filmParam = params.get('film');
-  if (params.get('replay') === '1' && filmParam) return <ReplayPage key={filmParam} filmId={filmParam} />;
+  if (params.get('replay') === '1' && filmParam) return <><ReplayPage key={filmParam} filmId={filmParam} /><SettingsHost /></>;
   // keyed, so going home (or opening another film) starts the shell fresh on the right tab
-  return <Director key={filmParam ?? 'new'} filmId={filmParam} lineup={lineupParam ? lineup : null} onLineupStopped={reload} />;
+  return <><Director key={filmParam ?? 'new'} filmId={filmParam} lineup={lineupParam ? lineup : null} onLineupStopped={reload} /><SettingsHost /></>;
 }

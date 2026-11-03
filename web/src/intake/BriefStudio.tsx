@@ -11,14 +11,15 @@ import { railTabs } from '../shell/rail';
 import { Slot } from '../shell/Slot';
 import { StudioBoard } from '../shell/StudioBoard';
 import { StudioShell } from '../shell/StudioShell';
+import { openSettings } from '../settings/access';
 import { useRecorder } from '../panels/useRecorder';
 import { STEPS } from '../shell/steps';
 import { matchPhotos, needingPhoto, parseFeed, readText, sortDropped, type FeedPreview } from './feed';
 import '../crew/crew.css';
 import './intake.css';
 
-type Aspect = '9:16' | '16:9' | '1:1';
-const ASPECTS: readonly Aspect[] = ['9:16', '16:9', '1:1'];
+/** MuseReels makes vertical reels only. */
+const ASPECT = '9:16';
 const DEMO_FEED = 'feed-6';
 
 const OPENER = 'What are we making? Tell me about the film. Add product photos if you have them, or a CSV feed for a catalog. No photo is fine: I will make one.';
@@ -46,13 +47,10 @@ export function BriefStudio() {
   const [photos, setPhotos] = useState<File[]>([]);
   const [feed, setFeed] = useState<FeedPreview>();
   const [text, setText] = useState('');
-  const [aspect, setAspect] = useState<Aspect>('9:16');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [drag, setDrag] = useState(false);
   const [sent, setSent] = useState('');
-  const [passcode, setPasscode] = useState('');
-  const [needPasscode, setNeedPasscode] = useState(false);
   const recorder = useRecorder();
   const picker = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -105,13 +103,6 @@ export function BriefStudio() {
     setBusy(true);
     setError('');
     setSent(demo ? 'Try the example feed' : voice ? '🎙 Voice brief' : text.trim());
-    if (needPasscode) {
-      try {
-        localStorage.setItem('director.passcode', passcode);
-      } catch {
-        /* storage may be unavailable */
-      }
-    }
     try {
       if (demo || mode === 'feed') {
         const form = new FormData();
@@ -120,7 +111,7 @@ export function BriefStudio() {
           form.set('csv', csv!);
           for (const p of photos) form.append('photos', p, p.name);
         }
-        form.set('aspect', aspect);
+        form.set('aspect', ASPECT);
         if (text.trim()) form.set('brief', text.trim());
         const made = await createLineup(form);
         // the first product's film opens at once; the studio follows the crew to the next one as each finishes
@@ -134,7 +125,7 @@ export function BriefStudio() {
         // the first photo is the hero, the others are cut between; with none the server makes a photo from the brief
         const form = new FormData();
         for (const p of photos) form.append('photos', p, p.name);
-        form.set('aspect', aspect);
+        form.set('aspect', ASPECT);
         if (voice) form.set('audio', new File([recorder.blob!], 'brief.webm', { type: recorder.blob!.type || 'audio/webm' }));
         else form.set('brief', text.trim());
         const result = await api.createFilm(form);
@@ -143,8 +134,10 @@ export function BriefStudio() {
       }
     } catch (err) {
       setSent('');
-      if (err instanceof ApiRequestError && err.status === 401) setNeedPasscode(true);
-      setError(reasonOf(err));
+      if (err instanceof ApiRequestError && err.status === 401) {
+        openSettings();
+        setError('Add a Director code or your Muse API key in Settings, then try again.');
+      } else setError(reasonOf(err));
       setBusy(false);
     }
   }
@@ -213,12 +206,6 @@ export function BriefStudio() {
         {(error || recorder.error) && <div className="bubble crew"><p role="alert" className="crew-error">{error || recorder.error}</p></div>}
       </div>
       <div className="composer brief-composer">
-        {needPasscode && (
-          <label className="passcode">
-            Passcode
-            <input aria-label="Passcode" type="password" value={passcode} onChange={(e) => setPasscode(e.target.value)} />
-          </label>
-        )}
         <button type="button" className="brief-dropzone" onClick={() => picker.current?.click()}>
           <span aria-hidden="true">+</span>
           <span>
@@ -263,9 +250,6 @@ export function BriefStudio() {
             ) : (
               <button type="button" className="tool" aria-label="Record a voice brief" disabled={busy || !!recorder.blob} onClick={() => void recorder.start()}>🎙</button>
             ))}
-          {ASPECTS.map((a) => (
-            <button key={a} type="button" className={`chip${aspect === a ? ' is-on' : ''}`} aria-pressed={aspect === a} onClick={() => setAspect(a)}>{a}</button>
-          ))}
           <button type="button" className={`brief-make${canMake ? ' is-ready' : ''}`} disabled={!canMake} onClick={() => void make()}>Make film</button>
         </div>
         </div>

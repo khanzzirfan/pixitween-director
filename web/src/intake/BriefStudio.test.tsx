@@ -21,11 +21,11 @@ it('shows what a dropped CSV holds, asks only for the missing photo, then starts
   expect(screen.getByRole('button', { name: 'Make film' })).toBeDisabled();
   drop([new File(['x'], 'orchid.png', { type: 'image/png' }), new File(['x'], 'oud.png', { type: 'image/png' })]);
   await waitFor(() => expect(screen.getByRole('button', { name: 'Make film' })).toBeEnabled());
-  fireEvent.click(screen.getByRole('button', { name: '16:9' }));
+  expect(screen.queryByRole('button', { name: '16:9' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Make film' }));
   await waitFor(() => expect(run).toHaveBeenCalled());
   const form = run.mock.calls[0][0] as FormData;
-  expect(form.get('aspect')).toBe('16:9');
+  expect(form.get('aspect')).toBe('9:16');
   expect(form.getAll('photos')).toHaveLength(2);
   await waitFor(() => { expect(window.location.search).toContain('lineup=lin_1'); expect(window.location.search).toContain('film=film_1'); });
 });

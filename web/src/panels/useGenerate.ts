@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import type { AepCompositionJson } from '@shared/aep';
 import type { AssetRef } from '@shared/composition';
 import type { FilmEvent } from '@shared/events';
-import { PASSCODE_HEADER } from '@shared/api';
+import { credentialHeaders } from '../settings/access';
 import type { ModeResponse, Proposal } from './generate-types';
 
 export type Phase = 'motion' | 'idle' | 'proposed' | 'running' | 'placing' | 'checking' | 'done' | 'failed' | 'needs_retry';
@@ -56,18 +56,8 @@ export class GenerateApiError extends Error {
   }
 }
 
-function passcode(): string | null {
-  try {
-    return localStorage.getItem('director.passcode');
-  } catch {
-    return null;
-  }
-}
-
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  const pass = passcode();
-  if (pass) headers[PASSCODE_HEADER] = pass;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...credentialHeaders() };
   const res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) });
   const json = (await res.json().catch(() => ({}))) as T & { error?: string };
   if (!res.ok) throw new GenerateApiError(res.status, json as never);

@@ -1,12 +1,16 @@
 import type { LlmBackend } from '@shared/ports';
+import { runWithFilmKey } from '../credentials';
+import { loadEnv } from '../env';
 import type { AppDeps } from '../http/deps';
 import { StoryboardError } from './storyboard';
 
 export const STUB_OWNER = 'S3b' as const;
 let bound: ReturnType<typeof createDirector> | undefined;
+let dataDir = () => loadEnv().DATA_DIR;
 
 export function bindDirector(deps: AppDeps): void {
   bound = createDirector(deps);
+  if (deps.dataDir) dataDir = () => deps.dataDir!;
 }
 
 export function createDirector(deps: AppDeps, o: { backend?: LlmBackend; model?: string; delayMs?: number } = {}) {
@@ -44,5 +48,5 @@ export function createDirector(deps: AppDeps, o: { backend?: LlmBackend; model?:
 
 export async function runDirector(filmId: string): Promise<void> {
   if (!bound) throw new Error('director not bound');
-  return bound.runDirector(filmId);
+  return runWithFilmKey(dataDir(), filmId, () => bound!.runDirector(filmId));
 }

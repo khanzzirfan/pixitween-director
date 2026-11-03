@@ -49,8 +49,9 @@ export async function parseCreateFilm(body: Record<string, unknown>, o: { maxByt
   const audioFile = isFile(body.audio) && body.audio.size > 0 ? body.audio : undefined;
   if (!!brief === !!audioFile) throw new InputError(400, 'brief_or_audio', 'Provide either a text brief or a voice brief.');
   if (brief.length > 2000) throw new InputError(400, 'brief_too_long', 'The brief must be 2000 characters or fewer.');
-  const aspect = body.aspect === undefined || body.aspect === '' ? '16:9' : body.aspect;
-  if (!['16:9', '9:16', '1:1'].includes(String(aspect))) throw new InputError(400, 'bad_aspect', 'Aspect must be 16:9, 9:16 or 1:1.');
+  // MuseReels makes vertical reels only
+  const aspect = body.aspect === undefined || body.aspect === '' ? '9:16' : body.aspect;
+  if (aspect !== '9:16') throw new InputError(400, 'bad_aspect', 'MuseReels makes 9:16 reels only.');
   const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 80) : undefined;
   if (audioFile) {
     const audioMime = audioFile.type.toLowerCase();

@@ -63,7 +63,7 @@ Read it aloud with a timer. At 140 words a minute it fills 2:50.
 Use this when rehearsing. Browser at 100% zoom, 1920×1080, Chrome.
 
 1. **Open** http://localhost:5173. Left rail: Gallery. Studio tabs: Brief → Plan → Build → Review → Export.
-2. **Brief (0:15).** Drop one round-product photo, press 🎙, say the brief, press ■, press **Send now**. Say something like: *"A ten-second vertical ad for this can. Bold, clean, end on the price, twenty-nine dollars."* Pick 9:16 first.
+2. **Brief (0:15).** Drop one round-product photo, press 🎙, say the brief, press ■, press **Send now**. Say something like: *"A ten-second vertical ad for this can. Bold, clean, end on the price, twenty-nine dollars."*
 3. **Plan (0:30).** Open the **Plan** tab: each scene with copy, camera move and duration.
 4. **Crew (0:35).** Open **Crew**, **Lanes**. Point at the four builders and the job costs in cents.
 5. **Interrupt (0:45).** In **Talk to the showrunner**, type or hold Space and say: *"Add a sunset scene after the second one."* Show that only one new job appears.

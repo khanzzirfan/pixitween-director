@@ -9,7 +9,7 @@ import type {
   UndoRedoResponse,
   VersionsResponse,
 } from '@shared/api';
-import { PASSCODE_HEADER } from '@shared/api';
+import { credentialHeaders } from '../settings/access';
 import type { FilmState } from '@shared/composition';
 
 export interface FramesResponse {
@@ -30,19 +30,10 @@ export class ApiRequestError extends Error {
   }
 }
 
-function passcode(): string | null {
-  try {
-    return localStorage.getItem('director.passcode');
-  } catch {
-    return null;
-  }
-}
-
 export async function request<T>(method: string, path: string, body?: BodyInit | null, json = false): Promise<T> {
   const headers: Record<string, string> = {};
   if (json) headers['Content-Type'] = 'application/json';
-  const pass = method === 'GET' ? null : passcode();
-  if (pass) headers[PASSCODE_HEADER] = pass;
+  if (method !== 'GET') Object.assign(headers, credentialHeaders());
   const res = await fetch(path, { method, headers, body });
   const text = await res.text();
   let parsed: unknown = text;
