@@ -248,3 +248,15 @@
 .sheet-thumb img { height: 72px; border-radius: 6px; display: block; }
 .sheet-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); display: grid; place-items: center; z-index: 50; }
 .sheet-overlay img { max-width: 94vw; max-height: 94vh; border-radius: 8px; }
+
+/* the 3D film's live step list in the plan pane */
+.build-progress { display: grid; gap: 14px; padding: 18px 8px; }
+.build-now { display: flex; gap: 10px; align-items: center; margin: 0; font-weight: 600; }
+.build-secs { color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+.build-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; color: var(--muted); }
+.build-steps li { display: flex; gap: 10px; align-items: center; }
+.build-steps li.is-now { color: inherit; font-weight: 600; }
+.build-steps li.is-done { opacity: 0.7; }
+.build-dot { width: 20px; height: 20px; border-radius: 50%; border: 1px solid currentColor; display: inline-grid; place-items: center; font-size: 11px; flex: none; }
+.build-steps li.is-now .build-dot { background: var(--accent, #8b7cf6); border-color: transparent; color: #fff; }
+.build-last { margin: 0; font-size: 12px; color: var(--muted); }

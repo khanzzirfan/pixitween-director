@@ -6,6 +6,16 @@ export const LANES = ['showrunner', 'builder', 'critic', 'continuity', 'producer
 export const laneSchema = z.enum(LANES);
 export type Lane = z.infer<typeof laneSchema>;
 
+/** The steps of a 3D film, in order. The showrunner's crew.agent note is one of these labels, so the plan pane can show where the film is. */
+export const SHEET_STEPS = [
+  { id: 'parts', label: 'Cutting out the product and planning the board' },
+  { id: 'sheets', label: 'Drawing the product, element and set sheets' },
+  { id: 'check', label: 'Muse is checking the sheets' },
+  { id: 'look', label: 'Drawing the film sheet and looking at it' },
+  { id: 'commit', label: 'Committing the film' },
+] as const;
+export type SheetStepId = (typeof SHEET_STEPS)[number]['id'];
+
 export const JOB_KINDS = ['build-scene', 'rebuild-scene', 'restyle-scene', 'edit', 'fix', 'take', 'critique', 'continuity', 'revert'] as const;
 export const jobKindSchema = z.enum(JOB_KINDS);
 export type JobKind = z.infer<typeof jobKindSchema>;

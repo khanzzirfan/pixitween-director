@@ -1,5 +1,6 @@
 // Owned by S12d. The storyboard as cards that change as the crew works. The user edits them in place; every edit is one op.
-import { useRef, useState, Fragment } from 'react';
+import { useEffect, useRef, useState, Fragment } from 'react';
+import { SHEET_STEPS } from '@shared/crew';
 import type { StoryboardOp } from '@shared/crew';
 import type { Scene } from '@shared/storyboard';
 import type { CrewState } from './crewReducer';
@@ -38,6 +39,36 @@ function AddSlot({ onAdd }: { onAdd(intent: string): void }) {
       <input autoFocus aria-label="New scene intent" placeholder="What happens in this scene?" value={text} maxLength={300} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)} />
       <button type="submit" className="primary" disabled={!text.trim()}>Add</button>
     </form>
+  );
+}
+
+/** What the 3D film is doing right now, from the showrunner's own crew events: the step, how long it has run, and the steps before it. */
+function BuildProgress({ crew }: { crew: CrewState }) {
+  const [tick, setTick] = useState(() => Date.now());
+  const lane = crew.lanes.showrunner;
+  const step = SHEET_STEPS.findIndex((s) => s.label === lane?.note);
+  const active = !!lane && lane.state !== 'idle' && step >= 0;
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+  if (!active) return <div className="empty-state"><span className="pulse-dot" aria-hidden="true" />The showrunner is sketching the plan…</div>;
+  const secs = Math.max(0, Math.round((tick - Date.parse(lane.since)) / 1000));
+  const last = crew.notes.at(-1);
+  return (
+    <div className="build-progress" role="status" aria-live="polite">
+      <p className="build-now"><span className="pulse-dot" aria-hidden="true" />{SHEET_STEPS[step]!.label}… <span className="build-secs">{secs} s</span></p>
+      <ol className="build-steps" aria-label="Film steps">
+        {SHEET_STEPS.map((s, i) => (
+          <li key={s.id} className={i < step ? 'is-done' : i === step ? 'is-now' : ''} aria-current={i === step ? 'step' : undefined}>
+            <span className="build-dot" aria-hidden="true">{i < step ? '✓' : i + 1}</span>
+            {s.label}
+          </li>
+        ))}
+      </ol>
+      {last && <p className="build-last">{last.text}</p>}
+    </div>
   );
 }
 
@@ -97,7 +128,7 @@ export function LiveStoryboard({ crew, now = Date.now(), onOps, onRebuild, filmS
       </header>
       {error && <p role="alert" className="crew-error">{error}</p>}
       {scenes.length === 0 ? (
-        <div className="empty-state"><span className="pulse-dot" aria-hidden="true" />The showrunner is sketching the plan…</div>
+        <BuildProgress crew={crew} />
       ) : (
         <div className="cards">
           {onOps && <AddSlot onAdd={(t) => addAfter(null, t)} />}

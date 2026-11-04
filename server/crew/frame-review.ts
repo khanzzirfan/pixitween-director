@@ -261,7 +261,7 @@ export async function reviewFrames(ctx: ToolCtx, o: ReviewInput): Promise<Review
     }
     log(`Muse saw: ${first.problems.join('; ')}`);
     const asks = [...first.problems.map((p) => `seen in the film's own frames: ${p}`), 'keep the elements and the set exactly as they are; change only the shots, camera, light, grade and finish'];
-    const planned = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(10, Math.max(4, totalSeconds(o.board.sheet))), flat: o.flat, prior: { board: o.board, violations: asks } });
+    const planned = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(30, Math.max(4, totalSeconds(o.board.sheet))), flat: o.flat, prior: { board: o.board, violations: asks } });
     if (planned.source !== 'muse') return { ...keep, problems: first.problems };
     const merged = reviewBoard({ ...planned.board, elements: o.board.elements, ...(o.board.set ? { set: o.board.set } : {}) });
     if (merged.hard.length) return { ...keep, problems: first.problems };
@@ -273,7 +273,7 @@ export async function reviewFrames(ctx: ToolCtx, o: ReviewInput): Promise<Review
     if (left.length) {
       log(`Muse saw after its revision: ${left.join('; ')}`);
       const asks2 = [...left.map((p) => `still seen in the film's frames after your revision: ${p}`), 'keep the elements and the set exactly as they are; change only the shots, camera, light, grade and finish'];
-      const second = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(10, Math.max(4, totalSeconds(board.sheet))), flat: o.flat, prior: { board, violations: asks2 } });
+      const second = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(30, Math.max(4, totalSeconds(board.sheet))), flat: o.flat, prior: { board, violations: asks2 } });
       const again2 = second.source === 'muse' ? reviewBoard({ ...second.board, elements: o.board.elements, ...(o.board.set ? { set: o.board.set } : {}) }) : undefined;
       if (again2 && !again2.hard.length) {
         board = again2.board;

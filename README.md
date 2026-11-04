@@ -1,20 +1,42 @@
 # MuseReels
 
-> **Your whole catalog, as ads.** Drop in a product CSV, or one photo and a spoken brief, and a crew of Muse agents makes a checked, editable vertical video ad. A showrunner plans it, four builders work on different scenes at the same time, and a blind critic reviews every frame.
+> **Your whole catalog, as 3D ads.** Drop in a product CSV, or one photo and a brief, and Muse directs a real 3D film of your product: a board, a camera, light and a set. Before the film is assembled, the parts are drawn on **sheets** and Muse checks them against your photo, so a wrong colour, a missing label or a cropped product is caught on a cheap picture, not in the finished ad.
 >
 > Built for the Meta Global AI Developer Hackathon (27 Oct – 4 Nov 2026) · Track: Startups · Theme: Build for Your World
 
 <!-- OWNER:gif -->
 
 <p align="center">
+  <img src="docs/images/sheet-film.jpg" alt="A film sheet: one labelled frame per shot of a real 3D film of a cold brew can, from the wide push to the price end card, each with its time, size, move and cut" width="100%">
+</p>
+
+<p align="center"><em>A <b>film sheet</b> from a real run: one frame per shot, labelled with time, size, camera move and cut. Muse looks at this sheet once and fixes the board before the film is committed. (The can's label did not reach this render. That is the kind of fault the sheets exist to show; see <a href="#limitations">Limitations</a>.)</em></p>
+
+<p align="center">
   <img src="docs/images/showrunner-map.gif" alt="Crew map during a real run: the Showrunner node at the centre sends jobs as coloured packets to Builders 1 to 4, the Critic and Continuity, while the film on the right fills in scene by scene" width="100%">
 </p>
 
-<p align="center"><em>The crew map, replayed from a real run at 4× speed. The <b>Muse Wonder showrunner</b> sits at the centre with you, the director, on its left. Each packet is a job: builds and fixes go out to the four <b>Muse Spark builders</b>, and frames go to the <b>critic</b> and <b>continuity</b> checks, whose findings come back as fixes. On the right, the film fills in as each scene lands.</em></p>
+<p align="center"><em>The older 2D crew, replayed from a real run at 4× speed (still available with <code>FILM_PATH=crew</code>). The crew map, replayed from a real run at 4× speed. The <b>Muse Wonder showrunner</b> sits at the centre with you, the director, on its left. Each packet is a job: builds and fixes go out to the four <b>Muse Spark builders</b>, and frames go to the <b>critic</b> and <b>continuity</b> checks, whose findings come back as fixes. On the right, the film fills in as each scene lands.</em></p>
 
 **Live:** <!-- OWNER:live-url --> · **Demo video (3 min):** <!-- OWNER:video-url --> · **Code:** <!-- OWNER:repo-url --> · **Team:** <!-- OWNER:team -->
 
-## How it all works, in one picture
+## The 3D film, in one picture
+
+```mermaid
+flowchart LR
+  In["Photo + brief<br/>or a product CSV"] --> Parts["Parts<br/>SAM cut-out, Muse board,<br/>element pictures, set"]
+  Parts --> Sheets["Sheets<br/>product · elements · set<br/>drawn by our own engine"]
+  Sheets --> Check["Muse checks the sheets<br/>against the photo"]
+  Check --> Build["Film built from JSON<br/>code rules, no render"]
+  Build --> Look["Film sheet<br/>one Muse look, one revision"]
+  Look --> Commit["Committed 3D film<br/>player + MP4"]
+```
+
+Every sheet is a render of the real 3D parts by our own engine, not an AI picture, so a sheet costs nothing but render time and shows exactly what the film will show.
+
+### The older 2D crew, in one picture
+
+The first version of the app (and `FILM_PATH=crew`) made a 2D film with a crew of agents. The picture below is that crew.
 
 <p align="center">
   <img src="docs/images/how-it-works.png" alt="Diagram: you give photos, a typed or spoken brief, or a catalog CSV. The Muse Wonder showrunner writes the storyboard and posts one job per scene to a job board. Four Muse Spark builders take jobs in parallel and call tools: Muse Image paints sets, SAM 3.1 cuts out the product, and text, animation and 3D shots are placed. The film is layers as JSON, validated, versioned and undoable. A blind Muse Spark critic and measured rules check it and send findings back as fix jobs. The browser player plays the JSON and exports MP4, and the replay shows how it was made. You can talk to the showrunner while it builds." width="100%">
@@ -27,12 +49,21 @@
 | Step | What you do | Time |
 |------|-------------|------|
 | 1 | [Run it locally](#1-run-it-locally): you only need a Muse API key | 3 min |
-| 2 | [Make a film from one photo and your voice](#2-make-a-film-from-a-photo-and-your-voice) | 4 min, mostly waiting |
-| 3 | [Talk to the showrunner while it works](#3-talk-to-the-showrunner-while-it-works) | 1 min |
+| 2 | [Make a film from one photo and a brief](#2-make-a-film-from-a-photo-and-your-voice) | 4 min, mostly waiting |
+| 3 | [Watch the steps, then read the sheets](#3-watch-the-steps-then-read-the-sheets) | 1 min |
 | 4 | [Turn a whole catalog into ads](#4-turn-a-whole-catalog-into-ads) | 1 min to start |
 | 5 | [Watch it being made, then export an MP4](#5-watch-it-being-made-then-export-an-mp4) | 1 min |
 
-No key, or don't want to spend? [Free offline mode](#no-key-free-offline-mode) runs the whole crew with scripted agents.
+No key, or don't want to spend? [Free offline mode](#no-key-free-offline-mode) runs the app with scripted agents.
+
+**What is new since the first version** (all in this repository, with the PRDs that made it in [`ralph/`](ralph/README.md)):
+
+- **Every film is 3D by default** (`FILM_PATH=3d`, PRD S23): one sequential pipeline that makes a film in about 2.5 to 5 minutes for about $0.04 to $0.07, where the 2D crew took over 11 minutes and about $1.
+- **Sheets**: the product, its elements, the set and the finished film each drawn on one labelled sheet and checked by Muse before anything ships. Design: [`docs/architecture/sheet-film-3d.md`](docs/architecture/sheet-film-3d.md).
+- **Lock lines**: the board names 2 to 4 things that must stay true in every shot (for example "the tub is white with a pink label") and the sheets are checked against them.
+- **Live steps in the UI**: the Plan tab and crew map show which of the five steps is running and for how long, so a long Muse call is never silence.
+- **Catalogs on the 3D path**: a CSV makes one 3D film per product; the demo feed makes all six. A cut-out that wrongly rejected a mug on a coaster is fixed.
+- **Muse names the form, code writes the numbers**: a round tub no longer turns into a card; Muse reads the shape from the photo and code sets the depth.
 
 ---
 
@@ -51,7 +82,7 @@ Every frame below is from a real run of the app on the demo feed in [`fixtures/c
   </tr>
 </table>
 
-Each film is a composition of layers, not a rendered video: a set painted by Muse Image, the product cut out by SAM 3.1, and the title and price set from the feed. The browser plays it on a GSAP timeline. Because it is data, an edit changes only what it touches, every version can be undone, and the title and price are always exactly the feed's.
+Each film is a composition written as JSON, not a rendered video: the product is a real 3D shape wearing your photo, in a set drawn for the board, with a camera, light, and the title and price set from the feed. The browser plays it on a GSAP and Three.js timeline. Because it is data, every version can be undone, the title and price are always exactly the feed's, and code rules can check the film before anything is rendered. The frames above are from the earlier 2D run; the sheet at the top is from the 3D path.
 
 ## Demo
 
@@ -63,25 +94,47 @@ Each film is a composition of layers, not a rendered video: a set painted by Mus
 
 ## How it works, step by step
 
-1. **You brief it.** Give it 0–6 product photos and a brief, typed or spoken. With no photo, Muse Image makes one from the brief.
-2. **The showrunner plans.** Muse Wonder writes a storyboard (scenes, durations, camera moves, on-screen copy) and a style bible, then posts one job per scene.
-3. **Builders work in parallel.** Four Muse Spark builders each take a scene. They call tools to paint the set, cut out the product with SAM, place text and animate. Every edit is validated and versioned.
-4. **Nobody marks their own work.** A critic that never sees the storyboard reviews captured frames, and measured rules check contrast, safe areas, text over the product, and what leaves the frame. Their findings come back as fix jobs.
-5. **You can step in at any time.** A message, typed or spoken, goes to the showrunner, which changes only the scenes it touches. A per-film budget (default $1.50) stops new jobs once it is spent.
+A new film runs five steps, one after the other. The Plan tab shows the current step with a running clock.
+
+| # | Step | What happens | Typical time |
+|---|------|--------------|--------------|
+| 1 | **Parts** | SAM 3.1 cuts the product out. Muse Spark writes the **board**: a concept, 2 to 4 lock lines, the elements, a set and 5 to 10 shots from a fixed vocabulary of camera moves and cuts. Muse looks once at the photo to name the product's form (round, boxy, slab). Muse Image draws element pictures. | 50 to 95 s |
+| 2 | **Sheets** | Our engine renders a product sheet (the photo and the 3D product from four sides), an element sheet and a set sheet. | 9 to 10 s |
+| 3 | **Check** | One Muse look at the sheets beside the photo and the board: fine, or a list of problems and elements to drop. | 30 to 60 s |
+| 4 | **Film sheet** | The film is built from JSON and checked by code rules (length, layout, title boxes). It is drawn as a film sheet, one frame per shot, and Muse looks once. At most one board revision follows, and it also mends whatever the part sheets showed. | 80 to 200 s |
+| 5 | **Commit** | The 3D film is saved, and the storyboard for the Plan tab is written from the board. | 0 s |
+
+Nobody edits a film by hand: to make films more cinematic we add words to the vocabulary and teach the assembler to draw them ([`docs/architecture/cinematic-assembly.md`](docs/architecture/cinematic-assembly.md)). A product the 3D path cannot make, for example a photo the product cannot be cut out of, ends as failed with a plain reason.
+
+**Measured on the demo feed (4 Nov 2026):** coffee films 2.5 to 4 minutes and $0.035 to $0.048 each; mug films 2.5 to 5 minutes and $0.058 to $0.065 each. The earlier 2D crew on one film took 11 min 18 s and $1.02.
 
 <p align="center">
-  <img src="docs/images/07-crew-live.jpg" alt="Crew view mid-run: Showrunner (Muse Wonder) at the top, four Muse Spark builders working on fix and build jobs, the critic and continuity checks below, and the showrunner's messages on the right" width="100%">
+  <img src="docs/images/sheet-product.jpg" alt="A product sheet: the product photo, then the 3D product at the front, three-quarter, side and back, a label close-up and colour swatches" width="80%">
 </p>
-<p align="center"><em>The Crew view mid-run: each lane shows its jobs, timings and cost in cents. On the right the showrunner explains what it is doing: "Fixing contrast and the off-screen headline…"</em></p>
+<p align="center"><em>A product sheet. Muse compares the photo (top left) with the 3D product turned four ways, and the colour swatches. Here the check should, and did, flag the missing label.</em></p>
+
+### The older 2D crew (`FILM_PATH=crew`)
+
+1. **The showrunner plans.** Muse Wonder writes a storyboard and a style bible, then posts one job per scene.
+2. **Builders work in parallel.** Four Muse Spark builders each take a scene, paint the set, cut out the product with SAM, place text and animate.
+3. **Nobody marks their own work.** A critic that never sees the storyboard reviews captured frames, and measured rules check contrast, safe areas and what leaves the frame. Findings come back as fix jobs.
+4. **You can step in at any time.** A message goes to the showrunner, which changes only the scenes it touches. A per-film budget (default $1.50) stops new jobs once it is spent.
+
+We moved away from it because the 3D film needed about 4 minutes while the crew around it took over 11, and because judging 2D against 3D at the end spent time and money for little. It stays until a later PRD deletes it. In the 3D path there is no showrunner loop and no builders; the crew map shows only the Showrunner and Critic lighting up as the steps run.
+
+<p align="center">
+  <img src="docs/images/07-crew-live.jpg" alt="Crew view mid-run of the older 2D crew: Showrunner (Muse Wonder) at the top, four Muse Spark builders working on fix and build jobs, the critic and continuity checks below, and the showrunner's messages on the right" width="100%">
+</p>
+<p align="center"><em>The older 2D crew mid-run: each lane shows its jobs, timings and cost in cents.</em></p>
 
 ## Meta models used
 
 | Model | Id | What it does here | Call site |
 |-------|----|-------------------|-----------|
-| Muse Wonder | `muse-wonder-1.0` | the showrunner: plans, sets the style bible, dispatches jobs, answers you | [`server/llm/wonder-backend.ts`](server/llm/wonder-backend.ts) |
-| Muse Spark 1.3 | `muse-spark-1.3-contributor` | the storyboard (strict JSON schema), the builders' parallel tool calls, frame review, chat edits | [`server/meta/spark.ts`](server/meta/spark.ts) |
-| Muse Image | `muse-image-1.0` | scene sets ("plates") and product shots | [`server/meta/image.ts`](server/meta/image.ts) |
-| SAM 3.1 | `sam-3.1` | product cut-outs: one transparent layer per photo | [`server/meta/sam.ts`](server/meta/sam.ts) |
+| Muse Wonder | `muse-wonder-1.0` | the showrunner of the older 2D crew (`FILM_PATH=crew`); not used in the 3D path | [`server/llm/wonder-backend.ts`](server/llm/wonder-backend.ts) |
+| Muse Spark 1.3 | `muse-spark-1.3-contributor` | the board (strict JSON schema, lock lines), the form of the product from the photo, the sheet check, the film sheet look, board revisions; in the 2D crew also the builders and critic | [`server/meta/spark.ts`](server/meta/spark.ts) |
+| Muse Image | `muse-image-1.0` | element pictures (berries, ice, steam) for the film; in the 2D crew also scene sets | [`server/meta/image.ts`](server/meta/image.ts) |
+| SAM 3.1 | `sam-3.1` | the product cut-out: the shape and the pixels the 3D body wears | [`server/meta/sam.ts`](server/meta/sam.ts) |
 | Muse Voice Transcribe | `muse-voice-transcribe-1.0` | the spoken brief, and push-to-talk to the showrunner | [`server/meta/transcribe.ts`](server/meta/transcribe.ts) |
 
 ---
@@ -139,39 +192,36 @@ You should see `"metaConfigured":true` and `"ffmpeg":true`.
 
 Prefer typing? Write the brief in the box and press Enter.
 
-The studio moves through **Brief → Plan → Build → Review → Export**. Within about a minute the **Plan** tab shows the storyboard: each scene with its copy, camera move and duration, and its status (building, reviewing, done). The player fills in as the shots land.
+The studio moves through **Brief → Plan → Build → Review → Export**. While the film builds, the **Plan** tab lists the five steps with the current one marked and its clock running, and the **Crew** tab lights up the Showrunner and Critic. When the film commits, the Plan tab shows the sheets as thumbnails (click one to open it large) and the storyboard: each shot with its camera move and duration. The player then shows the finished 3D film.
 
 <p align="center">
   <img src="docs/images/02-plan.jpg" alt="Plan tab of a finished film: four storyboard scenes (opener, detail, hero-glide, closer) all marked done, the film in the player, and the showrunner's messages ending with Your film is ready" width="100%">
 </p>
 
-A film takes a few minutes and usually costs between $0.15 and $1.00 in Meta calls. Every call is logged; see [Cost per film](#cost-per-film).
+A 3D film takes about 2.5 to 5 minutes and, on the demo feed, cost $0.035 to $0.065 in Meta calls. Every call is logged; see [Cost per film](#cost-per-film).
 
 ---
 
-## 3. Talk to the showrunner while it works
+## 3. Watch the steps, then read the sheets
 
-While the crew is building, use the box under **Talk to the showrunner**:
+While the film builds, open **Plan**: the current step, how long it has run, the steps already done and the latest note from the pipeline. Open **Crew** and the Showrunner and Critic light up with the step they are on.
 
-- Type, for example *"make the price bigger on the last scene"*, and press Enter.
-- Or **hold to talk**: hold the button, or hold Space, speak, and let go.
-
-The showrunner reads your message and changes only the scenes it touches. Builders on other scenes keep going.
-
-Open **Review** to see what the critic and the rules found, each finding tied to a scene and a time:
+When it is done, the sheets sit above the storyboard. They are the evidence of what Muse checked: the product sheet, the element sheet, the set sheet and the film sheet. Open **Review** to see what the rules found, each finding tied to a scene and a time:
 
 <p align="center">
   <img src="docs/images/04-review.jpg" alt="Review tab listing findings per scene: rule checks such as outside-safe-area, low-contrast and text-over-product with measured numbers, and Spark critic notes such as cut-off and text-hard-to-read" width="100%">
 </p>
 
+Chat edits of a finished 3D film are not built yet (PRD S23 leaves them out). The box under **Talk to the showrunner** still works for the older 2D crew.
+
 ---
 
 ## 4. Turn a whole catalog into ads
 
-The catalog flow makes one film per product, two at a time by default (`LINEUP_CONCURRENCY`, 1–4), in feed order.
+The catalog flow makes one 3D film per product, two at a time by default (`LINEUP_CONCURRENCY`, 1–4), in feed order. A failed film never stops the others, and a restart resumes unfinished products from `director.db`.
 
 1. Press **New film**.
-2. Drop the demo feed [`fixtures/catalog/feed-summer-surf.csv`](fixtures/catalog/feed-summer-surf.csv) into the chat. Its photos are in the repository, so nothing else is needed. You can also press **Try an example** for a smaller feed.
+2. Drop a demo feed into the chat: [`fixtures/catalog/feed-6.csv`](fixtures/catalog/feed-6.csv) (three cold-brew cans and three mugs; **Try an example** uses it) or [`fixtures/catalog/feed-summer-surf.csv`](fixtures/catalog/feed-summer-surf.csv). Their photos are in the repository, so nothing else is needed.
 3. Press **Make film**. A tab appears for each product, and the studio follows the crew as each film finishes. **Stop** halts the films in progress and starts no more.
 
 Your own feed needs these columns:
@@ -182,12 +232,7 @@ id,title,price,sale_price,currency,image_link,category,link,brand
 
 Add the photos it names. The board lists any product still missing a photo.
 
-How a catalog clip is made:
-
-- **SAM 3.1** cuts each distinct photo out once.
-- **Muse Image** paints one set per look and product class.
-- The title, price badge (with the struck-through old price on a sale) and brand mark come straight from the feed.
-- A **verifier** checks every frame from the clip's JSON before anything is rendered. It checks that the price stays inside its badge, that text sits above the product, that the product stands on a surface, and that nothing leaves the frame.
+**Tested on 4 Nov 2026:** all six products of `feed-6.csv` made a film. The first run lost the three mugs because the cut-out check rejected a mug standing on a wooden coaster (SAM found the mug at 0.96 confidence, but it covered only 45% of the non-background area); the fix uses a confident named answer when the check would otherwise fail the film. The re-run made all three mugs for $0.058, $0.063 and $0.065. A feed takes minutes per product, so a six-product feed takes about 10 to 15 minutes at the default concurrency. The design is in [`docs/architecture/catalog-lineup.md`](docs/architecture/catalog-lineup.md).
 
 ---
 
@@ -199,7 +244,7 @@ Open **Gallery** in the left rail. Every finished film has **Watch it being made
   <img src="docs/images/05-gallery.jpg" alt="Gallery with finished films, each with a Watch it being made button" width="560">
 </p>
 
-To get a video file, open a film, go to **Export**, choose **MP4** and press **Export video**. Chrome encodes in the page. Other browsers upload the frames to the server's ffmpeg. See [docs/architecture/mp4-export.md](docs/architecture/mp4-export.md).
+Replays are recorded from the older crew's event log. To get a video file, open a film, go to **Export**, choose **MP4** and press **Export video**. Chrome encodes in the page. Other browsers upload the frames to the server's ffmpeg. See [docs/architecture/mp4-export.md](docs/architecture/mp4-export.md).
 
 ---
 
@@ -231,7 +276,8 @@ npx tsx scripts/demo-film.ts load data-fake
 | You recorded, but nothing happens | A recording is not sent on its own: press **Send now** or **Make film**. |
 | Asked for a passcode | Open Settings (the gear) and enter the Director code, or your own Muse key. |
 | Port 8787 or 5173 already in use | Stop the other process, or set `PORT` in `.env`. |
-| A film stops early with "Out of time" or a budget message | The crew finishes with what is built once the per-film budget is spent. Raise `CREW_FILM_BUDGET_USD` in `.env` (default 1.50). |
+| A film ends as failed with "the product in it could not be cut out" | The photo needs the product on a plain or clean backdrop; SAM found nothing for the product's name. Try a clearer photo. Open `/api/films/<id>/events` to see which step failed. |
+| A film stops early with "Out of time" or a budget message (older 2D crew only) | The crew finishes with what is built once the per-film budget is spent. Raise `CREW_FILM_BUDGET_USD` in `.env` (default 1.50). |
 
 ---
 
@@ -254,7 +300,7 @@ npx tsx scripts/demo-film.ts load data-fake
 | `npm run r8:fixtures` | regenerate the engine's R8 test fixtures (`fixtures/r8`) |
 | `npm run live -- <name> [--yes]` | live checks that spend money; a dry run unless `--yes` is passed |
 
-Optional settings in `.env`: `PRODUCT_3D=true` turns on 3D product shots, `CREW_FILM_BUDGET_USD` sets the budget per film, and `DIRECTOR_PASSCODE` is the code that spends the server Muse key. Visitors without that code use their own key from Settings. The Export panel's "Make AI movie" button sends a finished film's scenes to Fal's MiniMax H3 as reference frames and gets one clip back; its price is on the button, and `FAL_API_KEY=<your key> npm run live -- s22-ai-video --film=<id>` runs the same path from the terminal. A Fal key saved in Settings is spent only for that browser session and only from the IP that saved it. The Fal key is optional and always the visitor's own: the server has none to spend.
+Optional settings in `.env`: `FILM_PATH` is `3d` (the default: every new film is the sheet film) or `crew` (the older 2D crew), `PRODUCT_3D=true` turns on 3D product scenes for the 2D crew, `CREW_FILM_BUDGET_USD` sets the budget per film for the 2D crew, and `DIRECTOR_PASSCODE` is the code that spends the server Muse key. Visitors without that code use their own key from Settings. The Export panel's "Make AI movie" button sends a finished film's scenes to Fal's MiniMax H3 as reference frames and gets one clip back; its price is on the button, and `FAL_API_KEY=<your key> npm run live -- s22-ai-video --film=<id>` runs the same path from the terminal. A Fal key saved in Settings is spent only for that browser session and only from the IP that saved it. The Fal key is optional and always the visitor's own: the server has none to spend.
 
 ---
 
@@ -262,17 +308,18 @@ Optional settings in `.env`: `PRODUCT_3D=true` turns on 3D product shots, `CREW_
 
 ```mermaid
 flowchart LR
-  Browser["Browser<br/>React studio, GSAP player<br/>frame capture, MP4 export"] -- "REST + SSE" --> API["Server<br/>Hono"]
-  API --> Crew["Crew<br/>showrunner + job board"]
-  Crew --> Workers["Builders · critic · continuity"]
-  Workers --> Tools["Tools<br/>authoring · art · 3D · review · edit"]
+  Browser["Browser<br/>React studio, GSAP + Three.js player<br/>frame capture, MP4 export"] -- "REST + SSE" --> API["Server<br/>Hono"]
+  API --> Film["Sheet film<br/>parts · sheets · check · film sheet"]
+  API -. "FILM_PATH=crew" .-> Crew["Older 2D crew<br/>showrunner + builders + critic"]
+  Film --> Tools["Tools<br/>authoring · art · 3D · review"]
+  Crew --> Tools
   Tools --> Store[("SQLite: films, versions,<br/>event logs · asset files")]
   Tools --> Meta["Meta models"]
 ```
 
 | Folder | What it holds |
 |--------|---------------|
-| `server/` | the Hono API, the crew, the agents and their tools, the Meta clients, catalog line-ups, the stores |
+| `server/` | the Hono API, the sheet film (`server/crew/sheet-film/`), the older crew, the authoring and 3D product code, the Meta clients, catalog line-ups, the stores |
 | `engine/` | the Motion engine: our own GSAP + Three.js player for one composition JSON, with its CLI and browser tests |
 | `web/` | the React studio, the player, frame capture, export and replay |
 | `shared/` | contracts used by both sides: film state, storyboard, events, crew, tools |
@@ -280,7 +327,7 @@ flowchart LR
 | `fixtures/` | demo feeds and photos, recorded real-shape responses, hand-made compositions |
 | `e2e/` | Playwright flows, with the fake director and the fake crew |
 | `deploy/` | the container and the Fly.io setup |
-| `docs/` | how it works: [crew](docs/crew.md), [architecture](docs/architecture.md), [3D](docs/3d.md), [local mode](docs/local-mode.md) |
+| `docs/` | how it works: [sheet film](docs/architecture/sheet-film-3d.md), [turnaround design](docs/architecture/turnaround-3d.md), [crew](docs/crew.md), [architecture](docs/architecture.md), [3D](docs/3d.md), [local mode](docs/local-mode.md) |
 
 ---
 
@@ -297,7 +344,7 @@ Planning prices, from the vendor pages on 27 Oct 2026:
 - SAM 3.1: $2.50 per 1,000 images
 - Muse Voice Transcribe: $0.18 per hour
 
-Replays and 3D scenes cost nothing.
+Replays cost nothing, and so do the sheets: the engine renders them. A 3D film's cost is its Muse Spark calls (about $0.005 each), a few Muse Image element pictures ($0.01 each) and SAM ($0.0025 per call).
 
 ## Limitations
 
@@ -305,12 +352,15 @@ Replays and 3D scenes cost nothing.
 - **Muse Spark's video review is coarse.** It sees sampled stills and hears no audio, so review uses frames as images plus measured rules, and catalog clips are checked from their JSON before anything is rendered.
 - **Voice Transcribe repeats some words** ("our our") and gives turn-level timestamps only. The text goes to the showrunner as it is.
 - **Muse Image returns 1920x1280 when asked for 1536x1024, and has no transparent output**, so every transparent layer comes from SAM.
-- **3D product shots show the front of the product** as photographed, and turn at most 35° either side. Soft packaging should stay in 2D motion.
-- **A film is not always clean.** Some finished films still show issues the critic flagged (for example, text cropped at the edge) when the time or budget ran out before the fix landed. The Review tab lists them.
+- **The 3D product wears one photo.** Its front is the photo; the back is a side colour. A round product is unwrapped; other shapes are swept from the outline with a depth Muse names from the photo. A drawn back and a measured depth (the turnaround, PRD S24) are designed in [`docs/architecture/turnaround-3d.md`](docs/architecture/turnaround-3d.md) but **not built**.
+- **Sheets can show a fault the film still has.** In the demo-feed run the cold-brew can's product sheet, and the film sheet, rendered the can without its label; Muse flagged it and revised the board, but a board revision cannot fix a texture that did not load. This is the first thing to look at next.
+- **A finished 3D film cannot be edited in chat yet**, and the Plan tab shows storyboard cards only after the film commits.
+- **Each Muse call takes 10 to 90 s**, so a film is minutes, not seconds, and a CSV of six is 10 to 15 minutes.
+- **A film is not always clean.** The 3D path revises the board once and accepts what the code rules still flag (it logs them as "accepted problems"). The Review tab lists findings.
 
 ## Built during the hackathon
 
-Everything here was written during the event; the git history starts on 28 Oct 2026. It was built with AI coding agents (Ralph TUI and Claude Code) from PRDs kept in `ralph/`: 14 PRDs for the first build, then 10 more for the crew, the replay, the 3D product shots and the studio shell. What is new and what existed before the event: [`docs/new-vs-existing.md`](docs/new-vs-existing.md).
+Everything here was written during the event; the git history starts on 28 Oct 2026. It was built with AI coding agents (Ralph TUI and Claude Code) from PRDs kept in `ralph/` (54 of them): 14 PRDs for the first build, then more for the crew, the replay, the 3D product shots, the studio shell, the catalog and, on the last days, **S23 (the sheet film, every product film in 3D)**. S23's 14 stories are implemented, with its modules listed under "Built" in [`docs/architecture/sheet-film-3d.md`](docs/architecture/sheet-film-3d.md). S24 (the turnaround) is designed and not built. What is new and what existed before the event: [`docs/new-vs-existing.md`](docs/new-vs-existing.md).
 
 That includes the player. The **Motion engine** in [`engine/`](engine/README.md) is our own GSAP + Three.js player for the composition JSON the agents write, built during the hackathon, with its own CLI (`npm run engine:cli`) and browser tests (`npm run engine:e2e`).
 

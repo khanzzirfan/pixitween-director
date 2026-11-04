@@ -101,7 +101,7 @@ LENGTH_SLACK, the washed-out gap, the Regenerate button, `ringFor(jobs, id, film
 
 Every module is under `server/crew/sheet-film/` unless a path is given.
 
-- `server/crew/sheet-film/plan.ts`: `secondsIn`, `askedSeconds` (the length the brief asks for, at most 10 s, 8 s by default), `storyboardFromBoard` (scenes of 2 to 8 s for the Plan panel).
+- `server/crew/sheet-film/plan.ts`: `secondsIn`, `askedSeconds` (the length the brief asks for, 4 to 30 s, 10 s by default), `storyboardFromBoard` (scenes of 2 to 8 s for the Plan panel).
 - `server/crew/sheet-film/sheets.ts`: `productSheetComp`, `elementSheetComp`, `setSheetComp`, `sheetLabels`; small compositions made from the built film's JSON.
 - `server/crew/sheet-film/compose.ts`: `composeSheet`, `swatchesOf`, `labelCrop`; one labelled landscape JPEG per sheet.
 - `server/crew/sheet-film/render.ts`: `drawSheets`; draws the three part sheets and saves each as a film asset with role `sheet` (an `art.asset` event follows).

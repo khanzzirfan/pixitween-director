@@ -73,7 +73,7 @@ export const VOCAB = {
 export const SHEET = {
   /** Only what the render needs: Muse decides the rest (how many shots, what order, which moves, where the peak sits). */
   minTotal: 4,
-  maxTotal: 20,
+  maxTotal: 30,
   minBeats: 3,
   maxBeats: 14,
   /** every shot but the last */

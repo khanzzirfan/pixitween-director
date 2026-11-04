@@ -1,5 +1,6 @@
 import type { Buffer } from 'node:buffer';
 import type { AepCompositionJson } from '@shared/aep';
+import { SHEET_STEPS, type SheetStepId } from '@shared/crew';
 import type { ToolCtx } from '@shared/tools';
 import { choosesFlat, reviewBoard, type CinematicBoard } from '../../authoring/beatsheet';
 import type { Comp } from '../../authoring/types';
@@ -27,6 +28,18 @@ export async function makeSheetFilm(
   const render = o.render ?? ((comp: Comp, times: number[]) => renderKeyFrames(comp, times));
   const seconds: Record<string, number> = { parts: 0, sheets: 0, check: 0, look: 0, commit: 0 };
   let t0 = now();
+  // who is busy on which step, as crew events: the plan pane and the crew map read these, so a long Muse call is not silence
+  const crewOn = (step: SheetStepId) => {
+    const label = SHEET_STEPS.find((s) => s.id === step)?.label ?? step;
+    const watching = step === 'check' || step === 'look';
+    ctx.emit({ type: 'crew.agent', lane: 'showrunner', worker: 'showrunner', state: watching ? 'waiting' : 'working', note: label });
+    ctx.emit({ type: 'crew.agent', lane: 'critic', worker: 'critic', state: watching ? 'thinking' : 'idle', ...(watching ? { note: label } : {}) });
+  };
+  const crewOff = () => {
+    ctx.emit({ type: 'crew.agent', lane: 'showrunner', worker: 'showrunner', state: 'idle' });
+    ctx.emit({ type: 'crew.agent', lane: 'critic', worker: 'critic', state: 'idle' });
+  };
+  crewOn('parts');
   const lap = (step: string) => {
     seconds[step] = Math.round((now() - t0) / 100) / 10;
     log(`${step}: ${seconds[step]} s`);
@@ -45,6 +58,7 @@ export async function makeSheetFilm(
       return { ok: false, reason: 'the film needs a product photo, and the product in it could not be cut out' };
     }
     lap('parts');
+    crewOn('sheets');
     let board: CinematicBoard = parts.board;
     // a flat cut-out product is told so on every board Muse writes, revisions included
     const flat = parts.prep.shape === 'other';
@@ -60,6 +74,7 @@ export async function makeSheetFilm(
       log(`sheets skipped: ${err instanceof Error ? err.message : String(err)}`);
     }
     lap('sheets');
+    crewOn('check');
 
     // one Muse look at the sheets: an element it says is wrong leaves the film now, and what else it names is mended in the one revision
     // after the film sheet (a revision here as well cost a 50 s board call and rarely changed the board)
@@ -83,6 +98,8 @@ export async function makeSheetFilm(
     }
     lap('check');
 
+    crewOn('look');
+
     // the film sheet and one Muse look at it, with at most one revision, which also mends what the part sheets showed
     let comp: Comp = build(board);
     const rules = (c: Comp) => jsonRules(c, { askedSeconds: asked, aspect: film.aspect });
@@ -94,6 +111,7 @@ export async function makeSheetFilm(
       log(`film sheet look skipped: ${err instanceof Error ? err.message : String(err)}`);
     }
     lap('look');
+    crewOn('commit');
     const left = rules(comp);
     if (left.length) log(`accepted problems: ${left.join('; ')}`);
 
@@ -112,5 +130,7 @@ export async function makeSheetFilm(
     return { ok: true, seconds };
   } catch (err) {
     return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  } finally {
+    crewOff();
   }
 }

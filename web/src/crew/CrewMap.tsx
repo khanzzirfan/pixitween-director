@@ -34,7 +34,7 @@ export function layout(crew: CrewState): NodeSpec[] {
     return j && lane(key)?.state !== 'idle' ? `${j.kind.replace('-scene', '')}${j.sceneId ? ` ${j.sceneId}` : ''}` : undefined;
   };
   const fixed = (id: string, x: number, y: number, title: string, laneName: Parameters<typeof modelLabel>[1]): NodeSpec => ({
-    id, x, y, title, model: modelLabel(lane(id)?.model, laneName), state: lane(id)?.state ?? 'idle', job: jobOf(id),
+    id, x, y, title, model: modelLabel(lane(id)?.model, laneName), state: lane(id)?.state ?? 'idle', job: jobOf(id) ?? (lane(id)?.state !== 'idle' ? lane(id)?.note : undefined),
   });
   const builders = Object.entries(crew.lanes).filter(([, l]) => l.lane === 'builder').map(([w]) => w).sort();
   const n = builders.length;
