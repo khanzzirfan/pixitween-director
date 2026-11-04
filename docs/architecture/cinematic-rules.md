@@ -6,7 +6,7 @@ The board prompt offers Muse the options in this book, the checker only catches 
 
 ## The rules
 
-- A film is 3 to 14 shots and 4 to 20 s in all.
+- A film is 3 to 14 shots and 4 to 30 s in all.
 - The floor is 16 by 30 m so it fills the bottom of the frame when the hook's camera starts far back, and the product drops in from 30 cm, so the very first picture has the product in it.
 - The camera stays at least 3 cm above the floor, even at a low angle, so the floor is never seen from below.
 - Every shot but the last lasts 0.25 to 6 s.

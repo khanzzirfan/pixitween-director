@@ -11,6 +11,7 @@ import { buildMirror } from './mirror';
 import { buildRunners, roundProfile } from './runners';
 import { buildSmoke } from './smoke';
 import { buildSwarm } from './swarm';
+import { wearViews } from './views';
 import { buildText3D, type Text3DResult } from '../text/build';
 import { recordText3DStats } from '../text/debug';
 import type { Font } from 'three/examples/jsm/loaders/FontLoader.js';
@@ -138,8 +139,13 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
     root.add(rig.mesh);
     swarmTime = rig.setTime;
   } else {
-    const geometry = buildGeometry(spec.geometry);
+    const spec3 = spec.geometry;
+    const body = spec3.type === 'extrude' && spec3.section !== undefined && !spec.material.unlit;
+    // a body with drawn views wears them blended by where the camera is; a body lying across keeps its single picture
+    const viewed = body && spec3.type === 'extrude' && spec3.axis !== 'across' && !!(spec.material.backMap || spec.material.profileMap) && !!spec.material.map;
+    const geometry = buildGeometry(viewed && spec3.type === 'extrude' ? { ...spec3, views: true } : spec3);
     let material: THREE.Material | THREE.Material[];
+    let viewUpdate: ReturnType<typeof wearViews> | undefined;
     if (spec.material.unlit) {
       material = makeUnlitMaterial(spec.material, ctx.textures);
     } else {
@@ -147,6 +153,10 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
       if (spec.geometry.type === 'extrude' && spec.geometry.section !== undefined) {
         // A solid body wears the photo all round; where the outline has a gap (a strap, a handle) the picture is clear, so those pixels are cut away.
         material.alphaTest = 0.5;
+        if (viewed) {
+          const at = (id: string | undefined) => (id ? ctx.textures?.get(id) : undefined);
+          viewUpdate = wearViews(material as THREE.MeshStandardMaterial, { back: at(spec.material.backMap), side: at(spec.material.profileMap) });
+        }
       } else if (spec.geometry.type === 'extrude' && spec.geometry.sideColor) {
         // Caps carry the map, the sides a plain colour.
         material = [material, makeMaterial({ ...spec.material, map: undefined, color: spec.geometry.sideColor }, ctx.textures)];
@@ -160,6 +170,10 @@ export function buildObject(spec: Object3DSpec, ctx: ObjectBuildContext = {}): B
     }
     flipMaterial = (Array.isArray(material) ? material[0] : material) as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial;
     const mesh = new THREE.Mesh(geometry, material);
+    if (viewUpdate) {
+      const update = viewUpdate;
+      mesh.onBeforeRender = (_r, _s, camera) => update(mesh, camera);
+    }
     // Cards draw after the opaque objects so they blend over them.
     if (spec.material.unlit) mesh.renderOrder = 1;
     if (spec.fit !== undefined) fitToSize(mesh, spec.fit);

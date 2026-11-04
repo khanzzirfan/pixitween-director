@@ -289,6 +289,12 @@ function applyCrossFieldRules(doc: ParsedDoc, ctx: z.RefinementCtx): void {
         if (object.material.map !== undefined) {
           checkAsset(assets, object.material.map, 'image', [...path, 'objects', index, 'material', 'map'], ctx);
         }
+        if (object.material.backMap !== undefined) {
+          checkAsset(assets, object.material.backMap, 'image', [...path, 'objects', index, 'material', 'backMap'], ctx);
+        }
+        if (object.material.profileMap !== undefined) {
+          checkAsset(assets, object.material.profileMap, 'image', [...path, 'objects', index, 'material', 'profileMap'], ctx);
+        }
       });
 
       // A shot frames objects of this layer, so the subject must name one (engine/docs/09-camera.md).

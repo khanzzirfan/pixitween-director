@@ -2,16 +2,17 @@ import type { Aspect } from '@shared/composition';
 import { storyboardSchema, type Scene, type Storyboard } from '@shared/storyboard';
 import type { Beat, CinematicBoard } from '../../authoring/beatsheet';
 
-/** The first '<n>s', '<n> s', '<n> sec' or '<n> seconds' in the text, 4 to 20 inclusive. */
+/** The first '<n>s', '<n> s', '<n> sec' or '<n> seconds' in the text, 4 to 30 inclusive. */
 export function secondsIn(text: string): number | undefined {
   const m = /(\d+(?:\.\d+)?)\s*(?:seconds?|secs?|s)\b/i.exec(text);
   if (!m) return undefined;
   const n = Number(m[1]);
-  return n >= 4 && n <= 20 ? n : undefined;
+  return n >= 4 && n <= 30 ? n : undefined;
 }
 
-/** The length of the film the brief asks for, at most 10 s (the 3D film's limit), 8 s when it names none. */
-export const askedSeconds = (text: string): number => Math.min(10, secondsIn(text) ?? 8);
+/** The length of the film the brief asks for, up to 30 s; 10 s when it names none. */
+export const DEFAULT_SECONDS = 10;
+export const askedSeconds = (text: string): number => secondsIn(text) ?? DEFAULT_SECONDS;
 
 const SHOT_TYPE: Record<NonNullable<Beat['phase']>, Scene['shotType']> = { hook: 'hero', build: 'detail', peak: 'lifestyle', reveal: 'reveal', close: 'closer' };
 const CAMERA: Record<Beat['move'], Scene['camera']> = { push: 'dolly-in', pull: 'dolly-in', 'dolly-zoom': 'dolly-in', orbit: 'orbit', truck: 'pan', crane: 'parallax', hold: 'static', whip: 'static', rack: 'static' };

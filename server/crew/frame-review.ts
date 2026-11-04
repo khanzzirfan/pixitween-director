@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import sharp from 'sharp';
 import type { ToolCtx } from '@shared/tools';
+import type { Idea } from '../authoring/pitch';
 import { planBoard, reviewBoard, totalSeconds, type CinematicBoard } from '../authoring/beatsheet';
 
 // Muse looks at its own film. The film is built from the board, a few key frames are drawn, Muse is shown them in order and says what looks wrong
@@ -236,6 +237,8 @@ export interface ReviewInput {
   brief?: string;
   photo?: Buffer;
   flat: boolean;
+  /** The film Muse chose at the idea step: revisions are written from it too. */
+  idea?: Idea;
   /** Draws the film as it is now at these seconds, one picture each (JPEG or PNG). */
   render: (times: number[], board?: CinematicBoard) => Promise<Buffer[]>;
   log?: (line: string) => void;
@@ -261,7 +264,7 @@ export async function reviewFrames(ctx: ToolCtx, o: ReviewInput): Promise<Review
     }
     log(`Muse saw: ${first.problems.join('; ')}`);
     const asks = [...first.problems.map((p) => `seen in the film's own frames: ${p}`), 'keep the elements and the set exactly as they are; change only the shots, camera, light, grade and finish'];
-    const planned = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(10, Math.max(4, totalSeconds(o.board.sheet))), flat: o.flat, prior: { board: o.board, violations: asks } });
+    const planned = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(30, Math.max(4, totalSeconds(o.board.sheet))), flat: o.flat, ...(o.idea ? { idea: o.idea } : {}), prior: { board: o.board, violations: asks } });
     if (planned.source !== 'muse') return { ...keep, problems: first.problems };
     const merged = reviewBoard({ ...planned.board, elements: o.board.elements, ...(o.board.set ? { set: o.board.set } : {}) });
     if (merged.hard.length) return { ...keep, problems: first.problems };
@@ -273,7 +276,7 @@ export async function reviewFrames(ctx: ToolCtx, o: ReviewInput): Promise<Review
     if (left.length) {
       log(`Muse saw after its revision: ${left.join('; ')}`);
       const asks2 = [...left.map((p) => `still seen in the film's frames after your revision: ${p}`), 'keep the elements and the set exactly as they are; change only the shots, camera, light, grade and finish'];
-      const second = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(10, Math.max(4, totalSeconds(board.sheet))), flat: o.flat, prior: { board, violations: asks2 } });
+      const second = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(30, Math.max(4, totalSeconds(board.sheet))), flat: o.flat, ...(o.idea ? { idea: o.idea } : {}), prior: { board, violations: asks2 } });
       const again2 = second.source === 'muse' ? reviewBoard({ ...second.board, elements: o.board.elements, ...(o.board.set ? { set: o.board.set } : {}) }) : undefined;
       if (again2 && !again2.hard.length) {
         board = again2.board;
@@ -296,12 +299,12 @@ export const REVIEW_TIMEOUT_MS = 120_000;
 export const reviewEnabled = (): boolean => process.env.FRAME_REVIEW !== '0' && process.env.NODE_ENV !== 'test';
 
 /** Draws the composition at `times` (seconds) in headless Chromium on the app's own stage page, at half size, as JPEGs. The web server must be reachable at `base`. */
-export async function renderKeyFrames(composition: unknown, times: number[], base = process.env.EXPORT_RENDER_BASE ?? `http://localhost:${process.env.DIRECTOR_WEB_PORT ?? 5173}`, /** how long each frame is given to draw after a seek (a 2D film's pictures load as it plays) */ settleMs = 900): Promise<Buffer[]> {
+export async function renderKeyFrames(composition: unknown, times: number[], base = process.env.EXPORT_RENDER_BASE ?? `http://localhost:${process.env.DIRECTOR_WEB_PORT ?? 5173}`, /** how long each frame is given to draw after a seek (a 2D film's pictures load as it plays) */ settleMs = 900, /** JPEG quality of each frame */ quality = 72, /** device pixel ratio of the page: 2 draws each frame at twice the size */ scale = 1): Promise<Buffer[]> {
   const pw = await import('playwright');
   const browser = await pw.chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const timer = setTimeout(() => void browser.close().catch(() => undefined), REVIEW_TIMEOUT_MS);
   try {
-    const page = await (await browser.newContext({ viewport: { width: 700, height: 1300 } })).newPage();
+    const page = await (await browser.newContext({ viewport: { width: 700, height: 1300 }, deviceScaleFactor: scale })).newPage();
     await page.route('**/__review-film.json', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify(composition) }));
     await page.goto(`${base}/stage-check.html?film=live&file=${encodeURIComponent('/__review-film.json')}`);
     await page.waitForFunction(() => Boolean((window as unknown as { __stage?: unknown }).__stage), undefined, { timeout: STAGE_WAIT_MS });
@@ -317,7 +320,7 @@ export async function renderKeyFrames(composition: unknown, times: number[], bas
     for (const t of times) {
       await page.evaluate((s) => (window as unknown as { __stage: Stage }).__stage.seek(s), t);
       await page.waitForTimeout(settleMs);
-      out.push(await page.locator('canvas').first().screenshot({ type: 'jpeg', quality: 72 }));
+      out.push(await page.locator('canvas').first().screenshot({ type: 'jpeg', quality }));
     }
     return out;
   } finally {

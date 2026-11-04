@@ -75,3 +75,49 @@ it("outlines a flacon asked as a bottle, so the ornate cap is not replaced by a 
   expect(r.shape).toBe('other');
   expect(r.fallback).toBe('extrude');
 });
+
+const solid = (colour: string, w = 200, h = 400) => sharp({ create: { width: w, height: h, channels: 4, background: colour } }).png().toBuffer();
+
+it('gives a body a back texture the size of its front, and leaves the front texture as it was', async () => {
+  const t = await setup(triangle());
+  const plain = await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'other' }, newPrepareCache());
+  const turned = await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'other', back: await solid('#3366cc') }, newPrepareCache());
+  expect(plain.back).toBeUndefined();
+  expect(turned.textureKind).toBe('front');
+  expect(await t.assets.read(turned.texture.id)).toEqual(await t.assets.read(plain.texture.id));
+  const m = await sharp(await t.assets.read(turned.back!.id)).metadata();
+  expect([m.width, m.height]).toEqual([turned.texture.width, turned.texture.height]);
+});
+
+it('wraps a can all the way round with a back, and keeps the 2048 x 1024 strip', async () => {
+  const t = await setup(stripedCan().img);
+  const plain = await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'can' }, newPrepareCache());
+  const turned = await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'can', back: await solid('#3366cc') }, newPrepareCache());
+  expect(turned.shape).toBe('can');
+  const m = await sharp(await t.assets.read(turned.texture.id)).metadata();
+  expect([m.width, m.height]).toEqual([2048, 1024]);
+  const raw = async (id: string) => (await sharp(await t.assets.read(id)).removeAlpha().raw().toBuffer());
+  // the front column is the same, the column at 180 degrees is the drawn back's blue
+  const [a, b] = [await raw(plain.texture.id), await raw(turned.texture.id)];
+  const at = (buf: Buffer, u: number) => [buf[(512 * 2048 + u) * 3]!, buf[(512 * 2048 + u) * 3 + 1]!, buf[(512 * 2048 + u) * 3 + 2]!];
+  expect(at(b, 1024)).toEqual(at(a, 1024));
+  expect(at(b, 0)[2]).toBeGreaterThan(at(b, 0)[0]!);
+});
+
+it('keeps a back view out of the cache key of the plain product', async () => {
+  const t = await setup(triangle());
+  const cache = newPrepareCache();
+  const plain = await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'other' }, cache);
+  const turned = await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'other', back: await solid('#3366cc') }, cache);
+  expect(turned).not.toBe(plain);
+  expect(await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'other' }, cache)).toBe(plain);
+});
+
+it('gives a body its side picture, as tall as the front texture, and no profile without a side', async () => {
+  const t = await setup(triangle());
+  const turned = await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'other', back: await solid('#3366cc'), side: await solid('#33cc66', 120, 400) }, newPrepareCache());
+  expect(turned.profile).toBeDefined();
+  const m = await sharp(await t.assets.read(turned.profile!.id)).metadata();
+  expect(m.height).toBe(turned.texture.height);
+  expect((await prepareProduct3D(t.assets, { cutoutAssetId: t.cut.id, shape: 'other', back: await solid('#3366cc') }, newPrepareCache())).profile).toBeUndefined();
+});

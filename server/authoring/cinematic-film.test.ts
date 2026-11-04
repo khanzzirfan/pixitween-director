@@ -639,6 +639,20 @@ describe('a flat product (a cut-out that is not a round pack)', () => {
     const v = lightValidate(buildCinematicFilm(flat()));
     expect(v.ok, v.ok ? '' : JSON.stringify(v.issues)).toBe(true);
   });
+  it('wears a drawn back on the back half when it has one, and the same front', () => {
+    const c = buildCinematicFilm(flat({ backTexture: pic('ast_back', 100, 400) }));
+    const p = product(c);
+    expect((p.textures as Obj).front).toBe('ast_front');
+    expect((p.textures as Obj).back).toBe('ast_back');
+    expect(Object.keys((c as any).assets)).toContain('ast_back');
+    const v = lightValidate(c);
+    expect(v.ok, v.ok ? '' : JSON.stringify(v.issues)).toBe(true);
+    expect((product(buildCinematicFilm(flat())).textures as Obj).back).toBeUndefined();
+    const sided = buildCinematicFilm(flat({ backTexture: pic('ast_back', 100, 400), profileTexture: pic('ast_side', 90, 400) }));
+    expect((product(sided).textures as Obj).profile).toBe('ast_side');
+    expect(Object.keys((sided as any).assets)).toContain('ast_side');
+    expect(lightValidate(sided).ok).toBe(true);
+  });
   it('is a solid body, so it is not held to a swing: a drop spins in from behind', () => {
     const p = product(buildCinematicFilm(flat()));
     expect((p.source as Obj).section).toBe(SOLID.section);

@@ -2,7 +2,7 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { setProductNoun } from '../authoring/meta';
 import { towelFilm } from '../authoring/test-helpers';
-import { aiFilmContext, aspectOf, chatNotes, buildAiFilmPrompt, buildH3Request, captureFrames, H3_ENDPOINT, H3_LIMITS, planAiFilm, quoteAiFilm } from './ai-film';
+import { aiFilmContext, aspectOf, cameraWords3d, chatNotes, museConcept, buildAiFilmPrompt, buildH3Request, captureFrames, H3_ENDPOINT, H3_LIMITS, planAiFilm, quoteAiFilm, shotSpans, withoutTitles } from './ai-film';
 
 describe('planAiFilm', () => {
   it('sends one frame for about each 3 s of the clip, in timeline order, each from the scene playing then', () => {
@@ -143,5 +143,96 @@ describe('captureFrames', () => {
       expect(meta.format).toBe('jpeg');
       expect([meta.width, meta.height]).toEqual([720, 1280]);
     }
+  });
+});
+
+/** A 3D film as the sheet film writes it: one scene, a shape backdrop, a stage3d world whose camera holds at the end of each shot, a product, elements and titles. */
+export const film3d = (): any => {
+  const kf = (t: number, v: number[], hold = false) => ({ t, v, ...(hold ? { hold: true } : {}) });
+  return {
+    version: 1, id: 'f3d', name: 'film', width: 1080, height: 1920, fps: 30, durationInFrames: 300, bgColor: '#000', assets: {},
+    layers: [{ id: 'cine', kind: 'precomp' }],
+    precomps: {
+      cine: {
+        layers: [
+          { id: 'cine:bg', kind: 'shape' },
+          { id: 'cine:world', kind: 'stage3d', camera: { target: [0, 0.08, 0], position: [kf(0, [-0.18, 0.17, 0.87]), kf(59, [0, 0.15, 0.68], true), kf(60, [0, 0.13, 0.55]), kf(107, [0, 0.13, 0.55], true), kf(108, [-0.2, 0.15, 0.63]), kf(161, [0.2, 0.15, 0.63], true), kf(162, [0, 0.17, 0.77]), kf(300, [0, 0.17, 0.77])] } },
+          { id: 'cine:product', kind: 'prop3d' },
+          { id: 'cine:ing0-brew-swirl', kind: 'prop3d' },
+          { id: 'cine:ing1-cream', kind: 'prop3d' },
+          { id: 'cine:air-bokeh0', kind: 'prop3d' },
+          { id: 'cine:air-bokeh1', kind: 'prop3d' },
+          { id: 'cine:titles', kind: 'stage3d' },
+          { id: 'cine:title-words-1', kind: 'prop3d' },
+          { id: 'cine:title-price-slab-2', kind: 'prop3d' },
+        ],
+      },
+    },
+    meta: { director: { productNoun: 'can', scenes: { cine: { precompId: 'cine', startFrame: 0, durationFrames: 300, mode: 'motion', intent: 'Cinematic 3D film: medium push, close hold, wide orbit, medium hold' } }, layers: {} } },
+  };
+};
+
+describe('a 3D film', () => {
+  const storyboard = [{ durationSec: 4, intent: 'Can large and centred, slow push in, espresso ribbon behind' }, { durationSec: 6, intent: 'Label close, cream loops behind' }];
+
+  it('is cut into one shot for each hold of its camera, each drawn by the stage at the middle of the shot', () => {
+    const plan = planAiFilm(film3d(), { storyboard });
+    expect(plan.stage3d).toBe(true);
+    expect(plan.durationSec).toBe(10);
+    expect(plan.shots).toHaveLength(3);
+    expect(plan.shots.every((sh) => Math.abs(sh.sec - 10 / 3) < 1e-9)).toBe(true);
+    const at = plan.shots.map((s) => s.atSec!);
+    expect(at).toEqual([...at].sort((a, b) => a - b));
+    expect(plan.shots[0]!.atSec!).toBeCloseTo(1.67, 1);
+    expect(plan.shots.reduce((n, s) => n + s.sec, 0)).toBeCloseTo(10, 6);
+    expect(plan.elements).toBe('brew swirl, cream, bokeh');
+  });
+
+  it('reads each shot\'s camera move from where the camera stands at its start and end', () => {
+    const layer = film3d().precomps.cine.layers[1];
+    const spans = shotSpans(layer, 300, 30);
+    expect(spans).toEqual([[0, 59], [60, 107], [108, 161], [162, 300]]);
+    expect(cameraWords3d(layer, spans[0]!)).toBe('slow push-in with a slight arc');
+    expect(cameraWords3d(layer, spans[2]!)).toBe('slow orbit around the product');
+    expect(cameraWords3d(layer, spans[3]!)).toBe('locked-off camera');
+  });
+
+  it('takes the film\'s titles out of the frames, and nothing else', () => {
+    const ids = withoutTitles(film3d()).precomps!.cine!.layers.map((l: { id: string }) => l.id);
+    expect(ids).toEqual(['cine:bg', 'cine:world', 'cine:product', 'cine:ing0-brew-swirl', 'cine:ing1-cream', 'cine:air-bokeh0', 'cine:air-bokeh1']);
+  });
+
+  it('draws its frames with the stage, titles out, and says so in the prompt at one frame for each 3 s', async () => {
+    const plan = planAiFilm(film3d(), { storyboard, title: 'Cold Brew', concept: 'A cream can summons a spiral of dark brew out of the night.' });
+    const photo = await sharp({ create: { width: 360, height: 640, channels: 3, background: '#553' } }).png().toBuffer();
+    let seen: { ids: string[]; times: number[] } | undefined;
+    const frames = await captureFrames({ assets: {} as never }, film3d(), plan, async (comp, times) => {
+      seen = { ids: comp.precomps!.cine!.layers.map((l: { id: string }) => l.id), times };
+      return times.map(() => photo);
+    });
+    expect(frames).toHaveLength(3);
+    expect(seen!.ids).not.toContain('cine:titles');
+    expect(seen!.times).toEqual(plan.shots.map((s) => s.atSec));
+    await expect(captureFrames({ assets: {} as never }, film3d(), plan)).rejects.toThrow(/stage/);
+
+    const prompt = buildAiFilmPrompt(plan);
+    expect(prompt).toContain('3 reference images in time order, one per 3.3 seconds');
+    expect(prompt).toContain('Subject: Cold Brew, a can.');
+    expect(prompt).toContain('Story: A cream can summons a spiral of dark brew out of the night.');
+    expect(prompt).toContain('How it unfolds: 1) Can large and centred, slow push in, espresso ribbon behind; 2) Label close, cream loops behind.');
+    expect(prompt).toContain('Make that same film again, richer: the same story in the same order');
+    expect(prompt).toContain('Also in the set: brew swirl, cream, bokeh');
+    expect(prompt).toContain('Image 1: Medium shot. Can large and centred');
+    expect(prompt).toContain('Camera: slow push-in with a slight arc.');
+    expect(prompt).toContain('Shot 3 (6.7s-10.0s), Image 3:');
+  });
+});
+
+describe('museConcept', () => {
+  it('is the concept of the board Muse wrote, or of the last one it revised, without the body note', () => {
+    const say = (text: string) => ({ type: 'showrunner.say', text });
+    expect(museConcept([say('parts: 3 s'), say('board by muse: A can rises (a body from its outline: round)')])).toBe('A can rises');
+    expect(museConcept([say('board by muse: A can rises'), say('Muse revised the board after the sheets: A can rises from the night.'), say('Muse revised the board after the film sheet in 58 s: A can spins from the night.')])).toBe('A can spins from the night.');
+    expect(museConcept([say('nothing here')])).toBe('');
   });
 });

@@ -1,6 +1,6 @@
 # Turnaround: the real front, a Muse-drawn back, the true depth
 
-Status: design for `ralph/src/prd-s24-turnaround-3d.json`. Rewritten 2026-11-04 after a live spike. Needs `prd-s23-sheet-film-3d` merged first.
+Status: built on 2026-11-04 (all 15 stories of `ralph/src/prd-s24-turnaround-3d.json`, done directly in the main checkout on `feat/sqlite-upgrade`, not through ralph). Off by default (`TURNAROUND=1`); MG-1 and MG-2 are the owner's. Designed after a live spike.
 
 ## The rule
 
@@ -91,3 +91,45 @@ cost is lower than the sum.
 ## Non-goals
 
 An image-to-3D mesh service, photogrammetry, characters, boxes, an approval gate on the drawn sheet.
+
+## Built
+
+Every module is under `server/product3d/` unless a path is given. Tests sit beside each file.
+
+- `turnaround.ts`: `referenceCanvas` (the real cut-out in the left third of a white 1536 x 1024 canvas, floor line at 95 %), `turnaroundPrompt` (layout and fidelity rules, brand terms linted out), `drawTurnaround` (one `image.edit`, refs: canvas then photo, $0.04, problems of the last drawing appended on a redraw), `splitTurnaround` (SAM asked for the product's noun, which keeps a white product's white parts; the white key only when SAM does not find exactly 3 views), `frontDifference` (the drawn front against the real cut-out, both trimmed into one small box: colour difference where both are opaque, 1 where only one is, so the backdrop's tint and a small shift do not count).
+- `agree.ts`: `viewsAgree`, the code gate before any vision call: front kept (frontDifference <= 0.12, a guess until live runs measure it), back = the front's outline flipped (IoU >= 0.85), back colour within Lab 25 of the front's, depth share 0.15-1.25, no view over 60 % empty; returns `depthShare` = side aspect over front aspect.
+- `turnaround-check.ts`: `checkTurnaround`, one Muse look at the photo and the sheet, both sent at most 1024 px (the full-size look took 52-56 s), $0.005; an unreadable reply counts as ok.
+- `back.ts`: `backTexture`, the back view trimmed, resized to the front texture's box, matched channel by channel to the front's mean and spread, and given the front's outline mirrored (where the drawing falls short its row's edge pixel is carried out, so the body has no holes at its sides); `sideTexture`, the side view as tall as the front, colour-matched and filled edge to edge. Calibration only.
+- `wrap360.ts`: `wrapStrip`, the label strip of a round product: the front's unwrap for -85..+85 degrees unchanged, the back view's unwrap for the other side, a 10 degree seam.
+- `turnaround-flow.ts`: `turnaroundFor` (draw, split, agree, check, redraw once with the problems, or `undefined` with one log line), cached per photo hash; `suppliedBack` (one Muse look: is another photo of the film the back of this product? it wins over drawing).
+- `codec.ts`: `decode`/`encode`/`trim`/`trimPng`, moved out of `prepare.ts`.
+- `prepare.ts`: `prepareProduct3D` takes `back`; a body returns a `back` asset (the front texture is untouched), a can's label becomes `wrapStrip`. `prepareRound` passes it on.
+- Engine: `material.backMap` and `material.profileMap` (`engine/src/schema/layer3d.ts`). An upright body with either wears them blended by view (`engine/src/three/build/views.ts`): the geometry carries `views` coordinates (the photo's u straight through the body, the side picture's u across the depth), and each frame the camera's direction in the body's own space weights the photo, the back and the side (cosine to the 4th power, adding up to 1). Square on, the body is exactly today's; at 90 and 270 degrees it is the drawn side (mirrored on the left), at 180 the drawn back. A first try cut the surface into quarters (4 Nov) and showed the drawn side as bands at the edges of the 0 degree view, against the rule. `textures.back` and `textures.profile` in `shared/aep/layer.ts`, checked by `light-validator.ts`, converted by `web/src/motion/aep/stage3d.ts`. Old films are as before.
+- `server/crew/cinematic-cut.ts`: `prepareParts` runs the turnaround beside the board and the form look (`Promise.all`), then re-makes the product with the back; `buildCinematic` passes `backTexture` and the measured depth (a share of the width, converted to the film's share of the shorter side; it wins over any board depth, except for a body lying across).
+- `server/crew/sheet-film/render.ts`: the turnaround sheet is saved first (first thumbnail); the product sheet gets a row of the drawn views; `check.ts` tells Muse the 3D back is the drawn back.
+- `server/env.ts`, `.env.example`: `TURNAROUND` (off). `server/art/prices.ts`: `turnaroundUsd` 0.04.
+- `scripts/live/s24-turnaround.ts`: MG-1.
+
+### Run MG-1
+
+Start the review web server (`DIRECTOR_WEB_PORT=5199 DIRECTOR_API_URL=http://localhost:8797 npx vite --config web/vite.config.ts`), then:
+
+```
+npm run live -- s24-turnaround          # dry run: description and the $0.10 estimate
+npm run live -- s24-turnaround --yes    # the perfume and the yoghurt tub; or give photo paths
+```
+
+Every drawing is saved with its scores (`sheet-N.png`, `views-N.jpg`, `attempts.json`), pass or fail. Open `debug/turnaround/<stamp>/<name>/compare.jpg` (today's body on top, the turnaround body below) and judge at 90, 135, 180 and 270 degrees whether the turnaround body wins while 0 degrees is unchanged. `views.jpg` shows the three views the body is made from.
+
+For MG-2 set `TURNAROUND=1` and make a perfume film in the app: the Plan panel shows the turnaround sheet first, the product sheet shows the drawn views above the 3D turns.
+
+| Product | Time added | Cost | Verdict |
+|---|---|---|---|
+| perfume (4 Nov, before the view blend) | 85 s (drawing 23 s, look 56 s) | $0.05 | drawn back right at 180; sides at 90-270 holed and striped |
+| yoghurt tub (4 Nov, before the view blend) | 97 s, one redraw | $0.09 | round at 90 where today's is a slab; seam at 90 and 270; the back copies the front's art |
+| both, with the view blend | to fill | to fill | to fill |
+
+## Next
+
+- Turn `TURNAROUND` on by default once MG-1 and MG-2 pass.
+- An image-to-3D mesh option; boxes.

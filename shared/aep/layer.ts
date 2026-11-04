@@ -388,6 +388,10 @@ export const aepModel3DTexturesSchema = z
   .object({
     label: assetIdField.optional(),
     front: assetIdField.optional(),
+    /** A solid body's back half wears this picture (a drawn back, seen from behind) instead of the front read the other way. */
+    back: assetIdField.optional(),
+    /** A solid body's sides wear this picture (the product seen from its side) across the depth. */
+    profile: assetIdField.optional(),
     side: aepColorSchema.optional(),
   })
   .strict();

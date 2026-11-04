@@ -50,3 +50,10 @@ it('shows a waiting bubble and holds typing while the film is still starting', (
   expect(screen.getByLabelText('Message')).toBeDisabled();
   expect(screen.getByText('hi')).toBeInTheDocument();
 });
+
+it('shows what was heard for a voice brief, and only the label until the words are known', () => {
+  const { rerender } = render(<ChatThread crew={foldCrew([])} aspect="16:9" onPlay={() => {}} onSend={() => {}} onVoice={() => {}} brief={{ text: '', voice: true }} />);
+  expect(screen.getByTestId('brief-text')).toHaveTextContent('🎙 Voice brief');
+  rerender(<ChatThread crew={foldCrew([])} aspect="16:9" onPlay={() => {}} onSend={() => {}} onVoice={() => {}} brief={{ text: 'a fifteen second towel ad', voice: true }} />);
+  expect(screen.getByTestId('brief-text')).toHaveTextContent('🎙 “a fifteen second towel ad”');
+});

@@ -8,13 +8,20 @@ Deadline for the hackathon submission: **Wed 4 Nov 2026, 21:00 EST.**
 
 | Date | Entry | What it covers |
 |------|-------|----------------|
+| 4 Nov 2026 | [Sheet-film UX and the CSV run](2026-11-04-sheet-film-ux-and-csv-run.md) | Live step progress in the plan pane and crew map, why 3D has no builders, CSV demo feed run, the mug cut-out bug and fix |
 | 31 Oct 2026 | [Next steps](2026-10-31-next-steps.md) | **Priority list to the deadline**: submission documents first, then demo path, catalogue crew, 3D hero improvements |
 | 31 Oct 2026 | [The 3D hero clip](2026-10-31-3d-hero-clip.md) | Tumble, turn, light sweep, real dolly zoom, price disc; how it is built, run and limited |
 | 31 Oct 2026 | [Engine changes (0.3.5)](2026-10-31-engine-fov-and-shadow.md) | Animatable camera fov, soft shadow edge, and the release mistake (0.3.4 shipped without the fixes) |
 | 31 Oct 2026 | [The 3D hero in the catalogue](2026-10-31-catalogue-hero-3d.md) | `pickLook`, `prepareRound`, `buildCatalogClip`, the live run on the sample feed |
 | 31 Oct 2026 | [Player and viewer fixes](2026-10-31-player-and-viewer-fixes.md) | Play button stuck on Pause, compact check page, viewer setup |
 
-## Where we are (31 Oct 2026)
+## Where we are (4 Nov 2026)
+
+- 3D is the only path: a film is one sequential pipeline of about 2.5 to 5 minutes. The plan pane and crew map now show the live step.
+- CSV catalogs work on the 3D path: all six demo-feed products make a film after the cut-out fix.
+- Open: a test for the cut-out fix, and looking at the mug films.
+
+## Earlier (31 Oct 2026)
 
 - The 3D hero clip is built, tested, run live on the six-product sample feed and viewed in the browser. It needs `reacthub-pixitweenjs` 0.3.5.
 - Tests: 10 failures, all from before this work: nine submission-document checks (the documents are not written yet) and one engine schema-version check.

@@ -191,6 +191,8 @@ export function semiShare(alpha: Uint8Array): number {
  * the pot, which would be built into a red blob. Of the pixels the colour key marks as the product, at least this share must lie inside the mask.
  */
 export const COVER_MIN = 0.6;
+/** A named answer this sure is cut from even when it covers less of the plain-backdrop reference than COVER_MIN (the reference may include a prop the product stands on). */
+export const SURE_CONFIDENCE = 0.9;
 
 /** Of the pixels `reference` marks as product (alpha above 16), the share that `mask` keeps (alpha above 127). 1 when the reference is empty. */
 export function coverage(mask: Uint8Array, reference: Uint8Array): number {
@@ -221,6 +223,9 @@ export async function cutout(
     const bar = o.minConfidence ?? 0.5;
     let object = keyed;
     let loose: SamObject | undefined;
+    // a named object SAM is sure of (a mug on its coaster: the mug is found at 0.96, the coaster is not part of it) that the coverage check
+    // refused; used only when nothing else was found, so the film is cut from it instead of failing
+    let sure: SamObject | undefined;
     // what the photo shows against its backdrop, when the backdrop is one colour: an answer that misses most of it found a part, not the product
     const reference = keyed ? undefined : (await plainKey(o.source))?.alpha;
     const whole = (c: SamObject | undefined): SamObject | undefined => (c && (!reference || coverage(c.alpha, reference) >= COVER_MIN) ? c : undefined);
@@ -231,6 +236,8 @@ export async function cutout(
         object = whole(selectObject(found, bar));
         if (object) break;
         loose ??= whole(selectObject(found, Math.min(bar, FALLBACK_CONFIDENCE)));
+        const top = selectObject(found, SURE_CONFIDENCE);
+        if (top && (top.confidence ?? 0) > (sure?.confidence ?? 0)) sure = top;
       }
       object ??= loose;
     }
@@ -243,6 +250,7 @@ export async function cutout(
     }
     // no word found it: a product on a plain backdrop can still be keyed by colour, for nothing
     if (!object && !keyed) object = solidKey(await plainKey(o.source));
+    if (!object && !keyed) object = sure;
     if (!object) throw new ArtError('no-object', `no ${o.noun} found in the photo`);
     if (object.alpha.length !== width * height)
       throw new ArtError('alpha-size-mismatch', `SAM alpha length ${object.alpha.length} does not match ${width}x${height}`);

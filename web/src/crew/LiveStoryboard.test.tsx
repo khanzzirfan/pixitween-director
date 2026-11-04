@@ -86,6 +86,14 @@ it('shows a hint before any storyboard exists', () => {
   expect(screen.getByText(/sketching the plan/)).toBeInTheDocument();
 });
 
+it('shows the 3D film step that is running, with the steps before it done', () => {
+  const ev = { filmId: 'film_aaaaaaaaaaaa', at: '2026-10-30T14:00:00.000Z', type: 'crew.agent', lane: 'showrunner', worker: 'showrunner', state: 'waiting', note: 'Muse is checking the sheets' } as FilmEvent;
+  render(<LiveStoryboard crew={foldCrew([ev])} />);
+  expect(screen.getByRole('status')).toHaveTextContent('Muse is checking the sheets');
+  expect(screen.getByRole('list', { name: 'Film steps' }).querySelector('[aria-current="step"]')).toHaveTextContent('Muse is checking the sheets');
+  expect(screen.queryByText(/sketching the plan/)).toBeNull();
+});
+
 it("shows the tag '3D' on the card of a 3d scene (S13b)", () => {
   const crew = foldCrew(FIXTURE);
   const sb = structuredClone(crew.storyboard!);
