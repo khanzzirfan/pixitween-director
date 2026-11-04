@@ -133,7 +133,21 @@ describe('parseBoard', () => {
     expect(r.ok && r.board.body).toEqual({ depth: 0.8, section: 2, axis: 'across' });
     const bad = parseBoard({ ...lemonBoard(), body: { depth: 0.8, axis: 'sideways' } });
     expect(bad.ok && bad.board.body?.axis).toBeUndefined();
-    expect(boardPrompt({ title: 'Loaf', seconds: 8 }).system).toMatch(/"axis" is how it is built/);
+  });
+  it('builds the body from the form Muse names, and asks for it every time', () => {
+    const round = parseBoard({ ...lemonBoard(), body: { form: 'round' } });
+    expect(round.ok && round.board.body).toEqual({ form: 'round', depth: 0.95, section: 2 });
+    // a form decides the section; a depth outside the form is pulled back into it
+    const thin = parseBoard({ ...lemonBoard(), body: { form: 'round', depth: 0.3, section: 5 } });
+    expect(thin.ok && thin.board.body).toEqual({ form: 'round', depth: 0.75, section: 2 });
+    const lying = parseBoard({ ...lemonBoard(), body: { form: 'lying' } });
+    expect(lying.ok && lying.board.body?.axis).toBe('across');
+    const unknown = parseBoard({ ...lemonBoard(), body: { form: 'blob', depth: 0.4 } });
+    expect(unknown.ok && unknown.board.body).toEqual({ depth: 0.4 });
+    const p = boardPrompt({ title: 'Tub', seconds: 8 }).system;
+    expect(p).toMatch(/always write "body"/);
+    expect(p).toMatch(/"form":"round\|boxy\|slab\|lying"/);
+    expect(p).toMatch(/"form":"round\|thin\|chunk \(solid\)"/);
   });
   it("keeps the surface Muse wrote and drops one it does not know", () => {
     expect((parseBoard({ ...lemonBoard(), surface: 'matte' }) as { board: { surface?: string } }).board.surface).toBe('matte');
@@ -222,6 +236,23 @@ describe('parseBoard tagline', () => {
     const fits = parseBoard({ ...raw, tagline: 'Ride   every wave' });
     expect(fits.ok && fits.board.tagline).toBe('Ride every wave');
     expect(TEXT_RULES.taglineWords).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('parseBoard locks', () => {
+  it('reads lock lines, keeps the first 4 and drops a line of 300 characters', () => {
+    const one = parseBoard({ ...lemonBoard(), locks: ['the tub is white with a pink label'] });
+    expect(one.ok && one.board.locks).toEqual(['the tub is white with a pink label']);
+    const six = parseBoard({ ...lemonBoard(), locks: Array.from({ length: 6 }, (_, i) => `lock line number ${i}`) });
+    expect(six.ok && six.board.locks).toHaveLength(4);
+    const long = parseBoard({ ...lemonBoard(), locks: ['x'.repeat(300), 'the label faces the lens'] });
+    expect(long.ok).toBe(true);
+    expect(long.ok && long.board.locks).toEqual(['the label faces the lens']);
+  });
+  it('keeps locks through reviewBoard and tells Muse about them in the prompt', () => {
+    const r = parseBoard({ ...lemonBoard(), locks: ['the tub is white with a pink label'] });
+    expect(r.ok && reviewBoard(r.board).board.locks).toEqual(['the tub is white with a pink label']);
+    expect(boardPrompt({ title: 'X', seconds: 8 }).system).toContain('LOCKS');
   });
 });
 

@@ -61,6 +61,8 @@ const schema = z.object({
   FILMS_QUEUE_MAX: int(4, 0, 20),
   FILMS_STARTS_PER_WINDOW: int(3, 1, 50),
   FILMS_WINDOW_SEC: int(300, 30, 3600),
+  // How a new product film is made: '3d' is the sheet film (one 3D film checked on sheets, no 2D crew); 'crew' keeps the 2D crew and its 3D cut.
+  FILM_PATH: z.enum(['3d', 'crew']).default('3d'),
   CREW_ENABLED: boolOn,
   PRODUCT_3D: boolOff,
   SHOWRUNNER_MODEL: z.string().default('muse-wonder-1.0'),

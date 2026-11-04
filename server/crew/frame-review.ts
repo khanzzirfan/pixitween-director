@@ -308,7 +308,11 @@ export async function renderKeyFrames(composition: unknown, times: number[], bas
     await page.waitForTimeout(3000);
     type Stage = { seek(s: number): Promise<void>; whenReady(s: number): Promise<boolean> };
     const ready = await page.evaluate((s) => (window as unknown as { __stage: Stage }).__stage.whenReady(s), READY_WAIT_SEC);
-    if (!ready) throw new Error('the 3D product did not finish drawing');
+    if (!ready) {
+      // the stage page prints why (an invalid composition, a layer error); say it, not just that it failed
+      const why = await page.locator('[data-testid="errors"], body').first().innerText().then((t) => t.split('\n').find((l) => /invalid|error/i.test(l) && !/schema: ok/.test(l)), () => undefined);
+      throw new Error(`the 3D product did not finish drawing${why ? `: ${why.slice(0, 300)}` : ''}`);
+    }
     const out: Buffer[] = [];
     for (const t of times) {
       await page.evaluate((s) => (window as unknown as { __stage: Stage }).__stage.seek(s), t);

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { boardPrompt } from '../authoring/beatsheet';
+import { boardPrompt, floorBoard } from '../authoring/beatsheet';
 import sharp from 'sharp';
-import { isProductTitle, isReadName, quotedName, isStraightCylinder, otherNouns, pricesIn, productNoun, topLuma } from './cinematic-cut';
+import { buildCinematic, formFromPhoto, isProductTitle, isReadName, quotedName, isStraightCylinder, otherNouns, pricesIn, productNoun, topLuma } from './cinematic-cut';
+import type { ToolCtx } from '@shared/tools';
 
 describe('pricesIn', () => {
   it('shows the lowest price and keeps the highest as the one it was', () => {
@@ -96,5 +97,47 @@ describe('isReadName', () => {
     expect(isReadName('Esky Cooler')).toBe(true);
     expect(isReadName('Lattafa Habik')).toBe(true);
     for (const no of ['NOT VISIBLE', 'Not readable', 'Unknown', 'N/A', 'No name on the pack', 'None', '---', 'Unable to read']) expect(isReadName(no)).toBe(false);
+  });
+});
+
+describe('formFromPhoto', () => {
+  const ctxWith = (reply: unknown) => {
+    const lines: number[] = [];
+    const ctx = { filmId: 'f1', meta: { spark: { reviewImages: async () => { if (reply instanceof Error) throw reply; return reply; } } }, ledger: { add: (_f: string, _m: string, _u: string, usd: number) => lines.push(usd) } } as unknown as ToolCtx;
+    return { ctx, lines };
+  };
+  it("takes Muse's form for the product and charges one look", async () => {
+    const { ctx, lines } = ctxWith({ form: 'round' });
+    expect(await formFromPhoto(ctx, Buffer.from('x'), 'Pure Spoonful')).toBe('round');
+    expect(lines).toEqual([0.005]);
+  });
+  it('is undefined for a form it does not know, or when the look fails', async () => {
+    expect(await formFromPhoto(ctxWith({ form: 'blob' }).ctx, Buffer.from('x'), 'X')).toBeUndefined();
+    expect(await formFromPhoto(ctxWith(new Error('down')).ctx, Buffer.from('x'), 'X')).toBeUndefined();
+  });
+});
+
+describe('buildCinematic body', () => {
+  const ctx = { assets: { url: (id: string) => `/api/assets/${id}` } } as unknown as ToolCtx;
+  const parts = (body?: { form: 'round'; depth: number; section: number }) => ({
+    title: 'Pure Spoonful',
+    aspect: '9:16' as const,
+    accent: '#cc6688',
+    prep: { shape: 'other' as const, texture: { id: 'ast_t', width: 800, height: 1000 }, textureKind: 'front' as const, side: '#eeeeee', aspect: 1.25, contour: [[0, 0], [800, 0], [760, 1000], [40, 1000]] as Array<[number, number]> },
+    board: floorBoard({ title: 'Pure Spoonful' }),
+    ingredients: {},
+    set: undefined,
+    ...(body ? { body } : {}),
+  });
+  const productOf = (comp: unknown) => ((comp as { precomps: { cine: { layers: Array<{ id: string; source: { depth: number; section?: number } }> } } }).precomps.cine.layers.find((l) => l.id === 'cine:product')!.source);
+  it("builds the product round from the form found with the photo when the board names none, and a later board's form wins", () => {
+    const p = parts({ form: 'round', depth: 0.95, section: 2 });
+    const asked = productOf(buildCinematic(ctx, p as never, p.board));
+    expect(asked.section).toBe(2);
+    expect(asked.depth).toBe(760);
+    const boxy = productOf(buildCinematic(ctx, p as never, { ...p.board, body: { form: 'boxy', depth: 0.6, section: 4.5 } }));
+    expect(boxy.section).toBe(4.5);
+    const none = productOf(buildCinematic(ctx, parts() as never, parts().board));
+    expect(none.section).toBe(2.6);
   });
 });

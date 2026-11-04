@@ -94,3 +94,54 @@ showrunner, whose 2D tools do not edit the stage world).
 
 The branch must include the uncommitted work of 4 Nov 2026 (3D titles, backdrop fill, product-covered rule, quotedName,
 LENGTH_SLACK, the washed-out gap, the Regenerate button, `ringFor(jobs, id, filmStatus)`). The owner commits it before the run.
+
+## Built
+
+Every module is under `server/crew/sheet-film/` unless a path is given.
+
+- `server/crew/sheet-film/plan.ts`: `secondsIn`, `askedSeconds` (the length the brief asks for, at most 10 s, 8 s by default), `storyboardFromBoard` (scenes of 2 to 8 s for the Plan panel).
+- `server/crew/sheet-film/sheets.ts`: `productSheetComp`, `elementSheetComp`, `setSheetComp`, `sheetLabels`; small compositions made from the built film's JSON.
+- `server/crew/sheet-film/compose.ts`: `composeSheet`, `swatchesOf`, `labelCrop`; one labelled landscape JPEG per sheet.
+- `server/crew/sheet-film/render.ts`: `drawSheets`; draws the three part sheets and saves each as a film asset with role `sheet` (an `art.asset` event follows).
+- `server/crew/sheet-film/check.ts`: `sheetCheckPrompt`, `parseSheetCheck`, `checkSheets`; one Muse look at the sheets beside the photo ($0.005).
+- `server/crew/sheet-film/json-rules.ts`: `jsonRules`, `titleBoxes`, `layoutProblems`; code rules on the built JSON, shared with `scripts/titles-harness.ts`.
+- `server/crew/sheet-film/film-sheet.ts`: `filmSheetTimes`, `filmSheetLabels`, `lookAtFilm`; the film sheet, one Muse look, at most one revision.
+- `server/crew/sheet-film/index.ts`: `makeSheetFilm`; the whole run from brief to committed 3D film, returning the seconds of each step.
+- `server/authoring/beatsheet.ts`: the board's `locks` (2 to 4 lines, at most 120 characters each).
+- `server/crew/cinematic-cut.ts`: `prepareCinematicParts` and `buildCinematic` (additive; `cinematicCut` is unchanged).
+- `server/crew/run-crew.ts`: a new film takes the sheet film path; `FILM_PATH=crew` keeps the 2D crew. `FILM_PATH` is declared in `server/env.ts` and listed in `.env.example`.
+- `web/src/crew/SheetStrip.tsx`: the sheets as thumbnails above the storyboard in the Plan panel; a click opens one large.
+- `scripts/live/s23-sheet-film.ts`: the live gate.
+
+Sheets are saved as film assets with role `sheet` (`shared/composition.ts`, `shared/events.ts`) and shown in the Plan panel.
+
+### Shape: Muse names the form, code writes the numbers
+
+A product that is not a straight can is a body swept from its outline. Muse names its form on the board (`body.form`: `round` for a
+bottle, can, tub, jar or fruit; `boxy`; `slab` for a folded towel, pouch or book; `lying` for a rolled towel or loaf), and
+`server/authoring/forms.ts` turns the word into depth and cross-section (round: 0.95 deep, section 2). If the board names no form,
+`formFromPhoto` asks Muse once with the photo ($0.005); the answer is kept on the parts so a revised board cannot lose it. Solid elements
+carry a form too (`round` berry, `thin` leaf, `chunk` slice). Before this, every body was 0.55 deep with a boxy section, so a round
+tub turned into a card at 90 degrees and berries were coins.
+
+The element sheet shows one piece of each element (not its swarm, which is empty in a still), and the set sheet keeps the film's air
+(bokeh, dust, smoke) with every keyframe held at its first value.
+
+### Run MG-1
+
+Start the API (`PORT=8797 DATA_DIR=data-s-review npm run dev:server:nowatch`) and the web server
+(`DIRECTOR_WEB_PORT=5199 DIRECTOR_API_URL=http://localhost:8797 npx vite --config web/vite.config.ts`); the script checks both before it
+spends anything. Then:
+
+```
+npm run live -- s23-sheet-film          # dry run: description and the $0.10 estimate
+npm run live -- s23-sheet-film --yes    # makes the film
+```
+
+It prints the seconds of every step and the cost, and writes the sheets, `film.json` and `timings.json` to `debug/sheet-film/<stamp>/`.
+
+## Next
+
+- Delete the 2D crew (`server/crew/workers`, the showrunner tools that only serve 2D) once MG-1 and MG-2 pass.
+- An optional approval gate at the film sheet.
+- Chat edits of a 3D film.

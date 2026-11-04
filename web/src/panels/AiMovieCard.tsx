@@ -167,11 +167,14 @@ export default function AiMovieCard({ filmId, title, hasContent, deps = {} }: { 
       {run.kind === 'done' && run.job.videoUrl && (
         <div className="ai-done">
           <video className="ai-video" src={run.job.videoUrl} controls playsInline preload="metadata" aria-label="Your AI movie" />
-          <div className="ai-done-row">
-            <a className="ai-download" href={run.job.videoUrl} download={exportFileName(`${title ?? 'film'} ai`, 'mp4', now())}>Download MP4</a>
-            <button type="button" onClick={() => setRun({ kind: 'idle' })}>Make another</button>
+          <div className="ai-done-side">
+            <p className="ai-done-title">Your AI movie is ready</p>
+            <p className="ai-fine">{run.job.durationSec} s · {usd(run.job.costUsd)} billed by Fal.</p>
+            <div className="ai-done-row">
+              <a className="ai-download" href={run.job.videoUrl} download={exportFileName(`${title ?? 'film'} ai`, 'mp4', now())}>Download MP4</a>
+              <button type="button" onClick={() => setRun({ kind: 'idle' })}>Make another</button>
+            </div>
           </div>
-          <p className="ai-fine">{run.job.durationSec} s · {usd(run.job.costUsd)} billed by Fal.</p>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import type { AepCompositionJson } from '@shared/aep';
 import type { EditSelection } from './useSelection';
+const ROLE_ICON: Record<string, string> = { bg: '▦', product: '◆', product3d: '◆', subject: '☻', headline: 'T', caption: 't', price: '$', clip: '▶', audio: '♪', text: 'T', image: '▣' };
 type Scene = { id: string; startFrame: number; durationFrames: number; mode: string };
 export function LayerList({
   comp,
@@ -16,26 +17,41 @@ export function LayerList({
     .map(([id, m]: [string, any]) => ({ ...(m as Scene), id }))
     .sort((a, b) => a.startFrame - b.startFrame);
   return (
-    <div>
+    <div className="layer-list">
       {scenes.map((scene) => (
-        <section key={scene.id}>
+        <section key={scene.id} className="layer-scene">
           <button
             type="button"
+            className="layer-scene-btn"
+            data-mode={scene.mode ?? 'motion'}
             aria-pressed={selection?.sceneId === scene.id && !selection.layerId}
+            aria-label={`${scene.id} · ${(scene.durationFrames / comp.fps).toFixed(1)}s · ${(scene.mode ?? 'motion').toUpperCase()}`}
             onClick={() => onSelect({ sceneId: scene.id })}
           >
-            {scene.id} · {(scene.durationFrames / comp.fps).toFixed(1)}s · {(scene.mode ?? 'motion').toUpperCase()}
+            <span className="layer-scene-name">{scene.id}</span>
+            <span className="layer-scene-mode">{scene.mode ?? 'motion'}</span>
+            <span className="layer-scene-dur">{(scene.durationFrames / comp.fps).toFixed(1)}s</span>
           </button>
-          {((comp.precomps?.[scene.id] as any)?.layers ?? []).map((layer: any) => (
-            <button
-              key={layer.id}
-              type="button"
-              aria-pressed={selection?.layerId === layer.id}
-              onClick={() => onSelect({ sceneId: scene.id, layerId: layer.id })}
-            >
-              {layer.id} · {d.layers?.[layer.id]?.role ?? layer.kind}
-            </button>
-          ))}
+          <div className="layer-chips">
+            {((comp.precomps?.[scene.id] as any)?.layers ?? []).map((layer: any) => {
+              const role = d.layers?.[layer.id]?.role ?? layer.kind;
+              return (
+                <button
+                  key={layer.id}
+                  type="button"
+                  className="layer-chip"
+                  data-role={role}
+                  title={`${layer.id} · ${role}`}
+                  aria-label={`${layer.id} · ${role}`}
+                  aria-pressed={selection?.layerId === layer.id}
+                  onClick={() => onSelect({ sceneId: scene.id, layerId: layer.id })}
+                >
+                  <span className="layer-chip-icon" aria-hidden="true">{ROLE_ICON[role] ?? '●'}</span>
+                  {role}
+                </button>
+              );
+            })}
+          </div>
         </section>
       ))}
     </div>
