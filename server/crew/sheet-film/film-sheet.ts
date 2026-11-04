@@ -67,7 +67,20 @@ export function filmLookPrompt(o: { board: CinematicBoard; title: string; measur
  */
 export async function lookAtFilm(
   ctx: ToolCtx,
-  o: { board: CinematicBoard; title: string; brief?: string; photo?: Buffer; askedSeconds: number; flat?: boolean; build: (b: CinematicBoard) => Comp; render: Render; jsonProblems: (c: Comp) => string[]; log: (line: string) => void },
+  o: {
+    board: CinematicBoard;
+    title: string;
+    brief?: string;
+    photo?: Buffer;
+    askedSeconds: number;
+    flat?: boolean;
+    build: (b: CinematicBoard) => Comp;
+    render: Render;
+    jsonProblems: (c: Comp) => string[];
+    log: (line: string) => void;
+    /** what Muse saw on the part sheets: mended in this one revision, so the film costs one board call, not two */
+    fromSheets?: string[];
+  },
 ): Promise<FilmLook> {
   const clock = () => Date.now();
   const draw = async (board: CinematicBoard, film: Comp) => {
@@ -96,14 +109,15 @@ export async function lookAtFilm(
     o.log(`film sheet look skipped: ${err instanceof Error ? err.message : String(err)}`);
   }
 
+  const sheets = o.fromSheets ?? [];
   const problems = [...muse, ...measured].slice(0, 8);
   let sheet = first.sheet;
   let revised = false;
   let left = problems;
-  if (problems.length) {
+  if (problems.length || sheets.length) {
     const t0 = clock();
     try {
-      const asks = [...problems.map((p) => `seen in the film sheet: ${p}`), 'keep the elements and the set exactly as they are; change only the shots, camera, light, grade and finish'];
+      const asks = [...sheets.map((p) => `seen on the part sheets: ${p}`), ...problems.map((p) => `seen in the film sheet: ${p}`), 'keep the elements and the set exactly as they are; change only the shots, camera, light, grade and finish'];
       const planned = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: o.askedSeconds, ...(o.flat !== undefined ? { flat: o.flat } : {}), prior: { board, violations: asks } });
       if (planned.source === 'muse') {
         const merged = reviewBoard({ ...planned.board, elements: board.elements, ...(board.set ? { set: board.set } : {}) });

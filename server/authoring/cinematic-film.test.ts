@@ -1414,20 +1414,23 @@ describe('the light budget', () => {
     expect(two.key).toBeGreaterThanOrEqual(0.55);
     expect(lightBudget([{ side: 'left', strength: 3 }, { side: 'right', strength: 3 }], '#3b2416').key).toBe(0.55);
   });
-  it('a white tub takes less key, rim and spot, and its glow starts higher (the burned lid of 4 Nov)', () => {
+  it('a white tub takes less rim and spot, and its glow starts higher (the burned lid of 4 Nov); its key stays', () => {
     const pale = lightBudget([{ side: 'left', strength: 0.8 }], '#f6f6f6');
-    expect(pale.key).toBeLessThan(lightBudget([{ side: 'left', strength: 0.8 }], '#3b2416').key);
+    const dark = lightBudget([{ side: 'left', strength: 0.8 }], '#3b2416');
+    expect(pale.key).toBe(dark.key);
+    expect(pale.rim).toBeLessThan(dark.rim);
     expect(pale.spot).toBeLessThan(1);
     expect(pale.bloom).toBe(LIGHT.pale.bloom);
   });
-  it('the built world carries it: the white tub\'s spots, key and glow are turned down', () => {
+  it('the built world carries it: the white tub\'s spots, rim and glow are turned down', () => {
     const spots = [{ side: 'left' as const, strength: 0.8 }, { side: 'right' as const, strength: 0.6 }];
     const set = { look: 'studio' as const, air: 'none' as const, backdrop: pic('ast_back', 2000, 1000), ground: '#d8d4ce' };
     const w = (side: string) => world(buildCinematicFilm(input({ key: 'low', set, spots, side, finish: { glow: 'soft', grain: 'none', vignette: 'none', floor: 'none', wet: 'none', caustics: 'none' } as any }))) as any;
     const white = w('#f6f6f6');
     const dark = w('#3b2416');
-    expect(white.lights.key.intensity).toBeLessThan(dark.lights.key.intensity);
+    expect(white.lights.key.intensity).toBe(dark.lights.key.intensity);
     expect(dark.lights.key.intensity).toBeLessThan(LIGHT.low.key);
+    expect(white.lights.rim.intensity[0].v).toBeLessThan(dark.lights.rim.intensity[0].v);
     expect(white.lights.spots[0].intensity).toBeLessThan(dark.lights.spots[0].intensity);
     expect(white.post.bloom.threshold).toBe(LIGHT.pale.bloom);
     expect(dark.post.bloom.threshold).toBeLessThan(LIGHT.pale.bloom);

@@ -50,10 +50,13 @@ function assetsFor(film: Comp, layers: Obj[]): Obj {
   return Object.fromEntries(Object.entries(all ?? {}).filter(([id]) => text.includes(`"${id}"`)));
 }
 
-function sheetComp(film: Comp, o: { name: string; width: number; height: number; fps: number; frames: number; layers: Obj[] }): Comp {
+function sheetComp(film: Comp, o: { name: string; width: number; height: number; fps: number; frames: number; layers: Obj[]; panels?: number[] }): Comp {
   const unit = (film as Obj).meta?.rotationUnit ?? 'deg';
-  return { version: (film as Obj).version, id: 'sheet', name: o.name, width: o.width, height: o.height, fps: o.fps, durationInFrames: o.frames, assets: assetsFor(film, o.layers), layers: o.layers, meta: { rotationUnit: unit } } as unknown as Comp;
+  return { version: (film as Obj).version, id: 'sheet', name: o.name, width: o.width, height: o.height, fps: o.fps, durationInFrames: o.frames, assets: assetsFor(film, o.layers), layers: o.layers, meta: { rotationUnit: unit, ...(o.panels ? { panels: o.panels } : {}) } } as unknown as Comp;
 }
+
+/** The seconds at which a sheet's panels are drawn: its own (`meta.panels`), else one per frame. */
+export const panelTimes = (comp: Comp): number[] => ((comp as Obj).meta?.panels as number[] | undefined) ?? Array.from({ length: comp.durationInFrames as number }, (_, i) => i / (comp.fps as number));
 
 const field = (w: number, h: number, frames: number): Obj => ({ kind: 'shape', id: 'sheet:bg', name: 'bg', inPoint: 0, outPoint: frames, path: { kind: 'rect', size: [w, h] }, fill: NEUTRAL, transform: { position: [w / 2, h / 2], anchor: [w / 2, h / 2], scale: [1, 1], rotation: 0, opacity: 1 } });
 
@@ -75,13 +78,13 @@ function studioWorld(frames: number, camera: Obj): Obj {
   };
 }
 
-/** A camera that looks at the centre of a thing `height` m tall from the front, framing it at SHEET_FILL; one pose per frame. */
-const frontCamera = (heights: number[]): Obj => {
+/** A camera that looks at the centre of a thing `height` m tall from the front, framing it at SHEET_FILL; one pose every `step` frames. */
+const frontCamera = (heights: number[], step = 1): Obj => {
   const poses = heights.map((h) => ({ target: [0, h / 2, 0] as V3, position: [0, h / 2, framingDistance(SHEET_FILL, FOV_BASE, h)] as V3 }));
   const one = poses.length === 1;
   return {
-    position: one ? poses[0]!.position : poses.map((p, i) => hold(i, p.position)),
-    target: one ? poses[0]!.target : poses.map((p, i) => hold(i, p.target)),
+    position: one ? poses[0]!.position : poses.map((p, i) => hold(i * step, p.position)),
+    target: one ? poses[0]!.target : poses.map((p, i) => hold(i * step, p.target)),
     fov: FOV_BASE,
   };
 };
@@ -104,19 +107,22 @@ export function productSheetComp(film: Comp): Comp | undefined {
   return sheetComp(film, { name: 'product sheet', width: SIDE, height: SIDE, fps: 1, frames, layers: [field(SIDE, SIDE, frames), world, prop] });
 }
 
-/** Each element of the film alone, centred on the neutral studio world, one frame each; undefined when the film has no elements. */
+/**
+ * Each element of the film alone, centred on the neutral studio world; undefined when the film has no elements. Each element lives two frames
+ * at 2 fps and is drawn between them: a liquid or vapour is timed by its prop's life, so drawn at its first instant a splash is a flat disc.
+ */
 export function elementSheetComp(film: Comp): Comp | undefined {
   const els = elementsOf(film);
   if (!els.length) return undefined;
-  const frames = els.length;
+  const frames = els.length * 2;
   const heights = els.map((e) => Math.max(typeof e.size === 'number' ? e.size : PRODUCT_H / 4, 0.02));
   // one piece, not the swarm: a swarm's pieces start high and fall or grow over time, so a still frame of it is empty
   const props = els.map((e, i): Obj => {
     const { position: _position, rotation: _rotation, scale: _scale, swarm: _swarm, ...rest } = structuredClone(e);
-    return { ...rest, stage: WORLD, inPoint: i, outPoint: i + 1, position: [0, 0, 0], rotation: [0, 20, 0] };
+    return { ...rest, stage: WORLD, inPoint: i * 2, outPoint: i * 2 + 2, position: [0, 0, 0], rotation: [0, 20, 0] };
   });
-  const world = studioWorld(frames, frontCamera(heights));
-  return sheetComp(film, { name: 'element sheet', width: SIDE, height: SIDE, fps: 1, frames, layers: [field(SIDE, SIDE, frames), world, ...props] });
+  const world = studioWorld(frames, frontCamera(heights, 2));
+  return sheetComp(film, { name: 'element sheet', width: SIDE, height: SIDE, fps: 2, frames, layers: [field(SIDE, SIDE, frames), world, ...props], panels: els.map((_, i) => i + 0.5) });
 }
 
 /** The empty set under the film's own light and grade, no prop in it: frame 0 a wide view from the front, frame 1 from the reverse. */

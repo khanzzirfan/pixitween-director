@@ -64,16 +64,20 @@ describe('makeSheetFilm', () => {
     if (!r.ok) expect(r.reason).toMatch(/photo|cut out/);
     expect(commitCuts).not.toHaveBeenCalled();
   });
-  it('sends sheet problems back to Muse exactly once', async () => {
+  it('makes no board call of its own for sheet problems: it hands them to the one revision after the film sheet', async () => {
     vi.mocked(checkSheets).mockResolvedValue({ fine: false, problems: ['the tub is brown'], dropElements: [] });
-    vi.mocked(planBoard).mockResolvedValue({ board: { ...board, concept: 'a truer white tub' }, source: 'muse', violations: [], dropped: [] });
     const r = await makeSheetFilm(setup().ctx, { log: vi.fn(), render: vi.fn() });
     expect(r.ok).toBe(true);
-    expect(planBoard).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(lookAtFilm).mock.calls[0]![1].board.concept).toBe('a truer white tub');
-    // a flat cut-out product is told so on both revisions
-    expect(vi.mocked(planBoard).mock.calls[0]![1].flat).toBe(true);
+    expect(planBoard).not.toHaveBeenCalled();
+    expect(vi.mocked(lookAtFilm).mock.calls[0]![1].fromSheets).toEqual(['the tub is brown']);
+    // a flat cut-out product is told so on the revision
     expect(vi.mocked(lookAtFilm).mock.calls[0]![1].flat).toBe(true);
+  });
+  it('still drops an element Muse names on the sheets before the film is built', async () => {
+    vi.mocked(checkSheets).mockResolvedValue({ fine: false, problems: [], dropElements: [elements[0]!.id] });
+    await makeSheetFilm(setup().ctx, { log: vi.fn(), render: vi.fn() });
+    const ids = vi.mocked(lookAtFilm).mock.calls[0]![1].board.elements.map((e) => e.id);
+    if (elements.length > 1) expect(ids).not.toContain(elements[0]!.id);
   });
   it('fails when the film check refuses the film', async () => {
     vi.mocked(commitCuts).mockResolvedValueOnce(false);

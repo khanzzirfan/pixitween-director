@@ -6,7 +6,7 @@ import { aepCompositionSchema } from '@shared/aep/composition';
 import { lightValidate } from '../../engine/light-validator';
 import type { Obj } from '../../authoring/types';
 import { aepToMotion } from '../../../web/src/motion/aep';
-import { elementSheetComp, productSheetComp, setSheetComp, sheetLabels } from './sheets';
+import { elementSheetComp, panelTimes, productSheetComp, setSheetComp, sheetLabels } from './sheets';
 
 const pic = (id: string, w = 128, h = 64) => ({ id, src: `/api/assets/${id}`, width: w, height: h });
 const base: CinematicInput = { aspect: '9:16', sheet: defaultBeatSheet(floorElements('Coffee Co. Cold Brew', 'drinks')), texture: { ...pic('ast_label', 2048, 1024), kind: 'label' }, shape: 'can', side: '#e8e0ce', productAspect: 3, title: 'Coffee Co. Cold Brew', accent: '#c27a3a' };
@@ -48,12 +48,15 @@ describe('productSheetComp', () => {
 
 describe('elementSheetComp and setSheetComp', () => {
   const film = buildCinematicFilm(withElements());
-  it('gives one frame per element, each frame holding exactly one element', () => {
+  it('gives one panel per element, drawn halfway through its two frames, each holding exactly one element', () => {
     const sheet = elementSheetComp(film)!;
-    expect(sheet.durationInFrames).toBe(2);
+    expect(sheet.durationInFrames).toBe(4);
     const ps = props(sheet);
     expect(ps).toHaveLength(2);
-    expect(ps.map((p) => [p.inPoint, p.outPoint])).toEqual([[0, 1], [1, 2]]);
+    expect(ps.map((p) => [p.inPoint, p.outPoint])).toEqual([[0, 2], [2, 4]]);
+    // a splash is timed by its prop's life: drawn at its first instant it is a flat disc (the cream of 4 Nov)
+    expect(panelTimes(sheet)).toEqual([0.5, 1.5]);
+    expect(panelTimes(setSheetComp(film))).toEqual([0, 1]);
     expect(lightValidate(sheet).ok).toBe(true);
     expect(sheetLabels(film).elements).toEqual(['raspberry: fall', 'honey: drift']);
   });
@@ -112,7 +115,7 @@ describe('an element used in two shots', () => {
   it('is one panel', () => {
     const i = withElements();
     const film = buildCinematicFilm({ ...i, sheet: { beats: [...i.sheet.beats.slice(0, 3), beat({ ingredient: { kind: 'raspberry', action: 'burst', scale: 1 } }), ...i.sheet.beats.slice(3)] } });
-    expect(elementSheetComp(film)!.durationInFrames).toBe(2);
+    expect(elementSheetComp(film)!.durationInFrames).toBe(4);
     expect(sheetLabels(film).elements).toEqual(['raspberry: fall', 'honey: drift']);
   });
 });

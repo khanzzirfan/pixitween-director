@@ -37,10 +37,12 @@ brief + photo
      set backdrop, music. The board now also carries lock lines and the asked length is enforced.
   2. sheets (new): product sheet, element sheet, set sheet  -> saved as film assets (role 'sheet'), shown in the Plan panel
   3. sheet check (new, one Muse call): the sheets beside the photo and the board -> fine, or problems + elements to drop
-     -> at most one board revision (planBoard with the problems as violations)
+     -> an element to drop leaves the board now; the problems wait for the one revision in step 5
   4. build (exists: buildCinematicFilm) -> JSON rules (new, code only, no render)
   5. film sheet (new): one frame per shot in reading order, labelled "[0.0-1.2s] wide push, hard cut"
-     -> measured checks (exists: measureFrames) + one Muse look -> at most one board revision, rebuilt, film sheet drawn again
+     -> measured checks (exists: measureFrames) + one Muse look -> at most one board revision, which also mends the sheet
+     problems of step 3, rebuilt, film sheet drawn again. (Until 4 Nov the sheet problems had a revision of their own: about 50 s
+     each run, and the concept never changed.)
   6. commit the 3D film (exists: commitCuts with no flat cut), write the storyboard from the board, status ready.
 ```
 
@@ -79,7 +81,7 @@ inside the frame (3 % margin); at most 12 props per stage world. The title check
 |---|---|---|
 | parts (board, product name, element pictures) | 1 board + 1 name read + 1 picture per element | as today, about 80 s, about $0.05 |
 | sheet check | 1 vision call with 4 images | about 15-25 s, $0.005 |
-| board revision (only if needed) | 1 | about 40 s, $0.005 |
+| board revision (only if needed, once, after the film sheet) | 1 | about 40-60 s, $0.005 |
 | film sheet look | 1 vision call with the photo and the sheet | about 15-25 s, $0.005 |
 | renders | sheets + film sheet, one headless page each | about 30-60 s |
 | total | | about 2-4 minutes, about $0.06-0.10 |
@@ -129,7 +131,7 @@ tub turned into a card at 90 degrees and berries were coins.
 
 Muse's spots add to the key, and on 4 Nov a white tub under a 3.4 key, two spots (4 and 3), a 1.8 rim and a 0.72 glow threshold burned its
 lid to flat white. `lightBudget` (cinematic-film.ts) now takes a share of the key and rim per unit of spot strength (never below 0.55), and a
-pale product (side colour luma over 0.6) takes less key, rim and spot and glows only above 0.88. The numbers are `LIGHT.pale` and
+pale product (side colour luma over 0.6) takes less rim and spot and glows only above 0.88; its key stays (a cut key lost a low-key tub in black). The element sheet draws each element halfway through its own two frames, so a splash shows risen, not as the flat disc of its first instant. The numbers are `LIGHT.pale` and
 `SPOT.share`/`SPOT.floor` in cinematic-rules.ts.
 
 The element sheet shows one piece of each element (not its swarm, which is empty in a still), and the set sheet keeps the film's air
