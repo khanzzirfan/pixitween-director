@@ -1,7 +1,7 @@
 import type { Buffer } from 'node:buffer';
 import type { AepCompositionJson } from '@shared/aep';
 import type { ToolCtx } from '@shared/tools';
-import { choosesFlat, planBoard, reviewBoard, type CinematicBoard } from '../../authoring/beatsheet';
+import { choosesFlat, reviewBoard, type CinematicBoard } from '../../authoring/beatsheet';
 import type { Comp } from '../../authoring/types';
 import { buildCinematic, pricesIn, prepareCinematicParts } from '../cinematic-cut';
 import { commitCuts } from '../form-pick';
@@ -13,7 +13,7 @@ import { askedSeconds, storyboardFromBoard } from './plan';
 import { drawSheets, type PartSheets } from './render';
 
 // Every new product film as one 3D film: the parts, the product, element and set sheets checked once by Muse, the film built from JSON,
-// checked by code rules, drawn as a film sheet and looked at once, then committed. No 2D crew and no 2D-versus-3D judging.
+// checked by code rules, drawn as a film sheet and looked at once, at most one board revision for both looks, then committed. No 2D crew and no 2D-versus-3D judging.
 
 export type SheetFilmResult = { ok: true; seconds: Record<string, number> } | { ok: false; reason: string };
 
@@ -25,7 +25,7 @@ export async function makeSheetFilm(
   const { log } = o;
   const now = o.now ?? Date.now;
   const render = o.render ?? ((comp: Comp, times: number[]) => renderKeyFrames(comp, times));
-  const seconds: Record<string, number> = { parts: 0, sheets: 0, check: 0, revise: 0, look: 0, commit: 0 };
+  const seconds: Record<string, number> = { parts: 0, sheets: 0, check: 0, look: 0, commit: 0 };
   let t0 = now();
   const lap = (step: string) => {
     seconds[step] = Math.round((now() - t0) / 100) / 10;
@@ -50,10 +50,6 @@ export async function makeSheetFilm(
     const flat = parts.prep.shape === 'other';
     if (choosesFlat(board)) log(`Muse chose a flat 2D film (${board.traits ? JSON.stringify(board.traits) : 'no traits'}); it is built in 3D anyway`.slice(0, 300));
     const build = (b: CinematicBoard): Comp => buildCinematic(ctx, parts, b, prices);
-    const keepFixed = (next: CinematicBoard, from: CinematicBoard): CinematicBoard | undefined => {
-      const merged = reviewBoard({ ...next, elements: from.elements, ...(from.set ? { set: from.set } : {}) });
-      return merged.hard.length ? undefined : merged.board;
-    };
 
     // the product, element and set sheets, drawn from the built film
     let sheets: PartSheets | undefined;
@@ -65,7 +61,8 @@ export async function makeSheetFilm(
     }
     lap('sheets');
 
-    // one Muse look at the sheets; what it names goes back once to the board, and an element it says is wrong leaves the film
+    // one Muse look at the sheets: an element it says is wrong leaves the film now, and what else it names is mended in the one revision
+    // after the film sheet (a revision here as well cost a 50 s board call and rarely changed the board)
     let problems: string[] = [];
     if (sheets) {
       try {
@@ -86,26 +83,11 @@ export async function makeSheetFilm(
     }
     lap('check');
 
-    if (problems.length) {
-      try {
-        const asks = [...problems.map((p) => `seen on the sheets: ${p}`), 'keep the elements and the set exactly as they are; change only the shots, camera, light, grade and finish'];
-        const planned = await planBoard(ctx, { title: parts.title, brief: film.brief.text, photo, seconds: asked, flat, prior: { board, violations: asks } });
-        const next = planned.source === 'muse' ? keepFixed(planned.board, board) : undefined;
-        if (next) {
-          board = next;
-          log(`Muse revised the board after the sheets: ${board.concept}`);
-        }
-      } catch (err) {
-        log(`revision after the sheets skipped: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    }
-    lap('revise');
-
-    // the film sheet and one Muse look at it, with at most one revision
+    // the film sheet and one Muse look at it, with at most one revision, which also mends what the part sheets showed
     let comp: Comp = build(board);
     const rules = (c: Comp) => jsonRules(c, { askedSeconds: asked, aspect: film.aspect });
     try {
-      const seen = await lookAtFilm(ctx, { board, title: parts.title, brief: film.brief.text, photo, askedSeconds: asked, flat, build, render, jsonProblems: rules, log });
+      const seen = await lookAtFilm(ctx, { board, title: parts.title, brief: film.brief.text, photo, askedSeconds: asked, flat, build, render, jsonProblems: rules, log, fromSheets: problems });
       board = seen.board;
       comp = seen.film;
     } catch (err) {

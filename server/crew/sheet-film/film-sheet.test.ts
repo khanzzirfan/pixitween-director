@@ -63,6 +63,14 @@ describe('lookAtFilm', () => {
     expect(s.put).toHaveBeenCalledTimes(1);
     expect(s.reviewImages).toHaveBeenCalledTimes(1);
   });
+  it('mends what the part sheets showed in the same one revision, even when the film sheet looks clean', async () => {
+    const s = setup({ fine: true, problems: [] });
+    vi.mocked(planBoard).mockResolvedValue({ board: { ...board, concept: 'mended' }, source: 'muse', violations: [], dropped: [] });
+    const r = await lookAtFilm(s.ctx, { ...s.input, fromSheets: ['the cream is a flat disc'] });
+    expect(planBoard).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(planBoard).mock.calls[0]![1].prior!.violations[0]).toBe('seen on the part sheets: the cream is a flat disc');
+    expect(r.revised).toBe(true);
+  });
   it('keeps the first board when the revision comes from the floor', async () => {
     const s = setup({ fine: false, problems: ['too dark'] });
     vi.mocked(planBoard).mockResolvedValue({ board: { ...board, concept: 'floor' }, source: 'floor', violations: [], dropped: [] });
