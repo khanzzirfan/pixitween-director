@@ -75,15 +75,25 @@ export async function burntShare(frame: Buffer): Promise<number> {
 
 /** A pixel at or above this brightness (0 to 255) is near white. */
 export const WASHED_LEVEL = 215;
-/** A frame is washed out when more than this share of it is near white; the film is when at least half of its frames are. */
+/** A frame is washed out when more than this share of the picture round the product is near white; the film is when at least half of its frames are. */
 export const WASHED_SHARE = 0.2;
 
-/** The share of a picture that is near white (brightness at or above WASHED_LEVEL), measured on a small copy. */
+/**
+ * The share of the picture round the product (everything outside its middle half across and middle half down) that is near white, on a small copy.
+ * Only the surround is counted, so a white product on a dark set is not a wash: a bright set, sand or sky filling the frame is.
+ */
 export async function washedShare(frame: Buffer): Promise<number> {
-  const { data } = await sharp(frame).removeAlpha().greyscale().resize(96, 96, { fit: 'inside' }).raw().toBuffer({ resolveWithObject: true });
-  let n = 0;
-  for (const v of data) if (v >= WASHED_LEVEL) n++;
-  return n / data.length;
+  const size = 96;
+  const { data } = await sharp(frame).removeAlpha().greyscale().resize(size, size, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
+  let white = 0;
+  let total = 0;
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      if (x >= size * 0.3 && x < size * 0.7 && y >= size * 0.25 && y < size * 0.75) continue;
+      total++;
+      if (data[y * size + x]! >= WASHED_LEVEL) white++;
+    }
+  return white / total;
 }
 
 /** The middle of the picture, where the product sits, must differ from the rest of the picture by at least this much in colour (0 to 1). */
@@ -146,7 +156,7 @@ export async function measureFrames(frames: Buffer[], photo?: Buffer): Promise<s
   }
   const washed = (await Promise.all(frames.map((f) => washedShare(f).catch(() => 0)))).map((v, i) => ({ v, i })).filter((x) => x.v > WASHED_SHARE);
   if (burnt.length < 2) {
-    if (washed.length * 2 >= frames.length && washed.length >= 2) problems.push(`washed out: ${washed.map((x) => `frame ${x.i + 1} is ${Math.round(x.v * 100)}% near white`).join(', ')}; the product loses its edges and colour in the bright wash (lower the grade's brightness, the glow and the key light, or set the product against a darker world)`);
+    if (washed.length * 2 >= frames.length && washed.length >= 2) problems.push(`washed out: in ${washed.map((x) => `frame ${x.i + 1} ${Math.round(x.v * 100)}% of the picture round the product is near white`).join(', ')}; the bright wash takes the product's edges and colour (lower the grade's brightness, the glow and the key light, or set the product against a darker world)`);
   }
   return problems;
 }

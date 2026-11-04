@@ -51,6 +51,14 @@ it('reviewImages sends data URLs with sniffed mimes and parses the verdict', asy
   expect(body2.response_format).toMatchObject({ type: 'json_schema', json_schema: { name: 'review', strict: true } });
 });
 
+it('reviewImages sends a temperature only when one is given', async () => {
+  srv = await startTestServer((_r, res) => sendJson(res, 200, readSeedJson('spark-vision-image-response.json')));
+  await client().reviewImages([readSeedBuffer('cafe-with-mug.jpg')], 'check');
+  expect(JSON.parse(srv.seen[0]!.body)).not.toHaveProperty('temperature');
+  await client().reviewImages([readSeedBuffer('cafe-with-mug.jpg')], 'check', undefined, { temperature: 0.9 });
+  expect(JSON.parse(srv.seen[1]!.body).temperature).toBe(0.9);
+});
+
 it('reviewImages throws on non-JSON content', async () => {
   srv = await startTestServer((_r, res) => sendJson(res, 200, { choices: [{ message: { content: 'not json' } }] }));
   await expect(client().reviewImages([readSeedBuffer('mug-product.png')], 'x')).rejects.toBeInstanceOf(SparkProtocolError);

@@ -26,6 +26,9 @@ A running list of what we decided about the cinematic films and what is left, so
 | 2026-11-03 | Baseline wins: after the frame review, Muse sees the photo plus 5 frames of the 2D cut and 5 of the 3D cut (order fixed per film, about half 3D first) and the 3D cut replaces the 2D film only on a clear 3D win (`server/crew/form-pick.ts`). If frames cannot be drawn, the 3D cut is kept as before | the towel film: a worse 3D cut replaced a good 2D film |
 | 2026-11-03 | The product's surface is Muse's (`surface`: matte, satin, gloss, metal); satin is the default for every product. Round products were hard-coded metal | the cream matte can rendered silver-gold and lost to its 2D cut |
 | 2026-11-03 | The pick was flipped: the 3D film stays unless the 2D cut wins clearly, and Muse is told the owner loves the 3D world and that looking like the photo is no reason for 2D | owner's verdict: the 3D goggles in water look cute and the cylindrical can should be 3D; the 2D cut always wins on likeness because it is the photo |
+| 2026-11-03 | Frame review also measures a washed-out set: more than 20% of the picture round the product (outside its middle half) at brightness 215 or more, in at least half the frames. Only the surround counts, so a white product on a dark set is not a wash | the goggles' yellow beach wash measured 27-49% against at most 6% on good films; the cream yoghurt set 75-95% |
+| 2026-11-03 | A film whose revised frames still measure wrong gets one more Muse revision, asked in the measure's words (at most two revisions in all) | one revision did not always fix a measured wash |
+| 2026-11-03 | The 2D-or-3D pick looks twice, once with each cut shown first, and the film goes back to 2D only when both looks say 2D clearly; any other mix keeps 3D | on the same frames the two orders gave opposite verdicts for the goggles (3D clearly, 2D clearly): the small vision model is noisy and position-biased, and the owner prefers 3D |
 | 2026-11-03 | The prompt tells Muse that pale products clip and vanish on a pale set | yoghurt film: burnt out first, then lost on a cream set after Muse's fix |
 | 2026-11-03 | Muse chooses `form: 3d \| 2d` from the product's traits (rigid, sits, edge, sells); 2d keeps the 2D film | the 3D body suits rigid, upright, crisp-edged products; it spoils soft or lying ones (towel) |
 
@@ -46,7 +49,7 @@ A running list of what we decided about the cinematic films and what is left, so
 - [x] Baseline-wins pick: build 2D and 3D, Muse compares frames, 3D replaces 2D only if it clearly wins.
 - [x] 3D material: the cream matte can renders metallic silver-gold (Muse's reason for keeping the 2D can).
 - [x] Keep the losing cut as a non-head version so the owner can see both (`commitCuts`: the cut not chosen is committed first, so it sits one version back; undo shows it, redo returns).
-- [ ] 3D quality varies run to run: the latest goggles and cooler 3D cuts lost to 2D (cooler lid blown out and blurred; goggles washed in yellow with an odd teal splash shape). Look at making the first 3D cut safer (exposure, glow, streak) so more 3D films survive the pick.
+- [x] (done: washed measure, second revision, two-look pick; see decisions) 3D quality varies run to run: the latest goggles and cooler 3D cuts lost to 2D (cooler lid blown out and blurred; goggles washed in yellow with an odd teal splash shape). Look at making the first 3D cut safer (exposure, glow, streak) so more 3D films survive the pick.
 - [ ] `cinematicCut` can run twice on one film (the cooler's history shows the pair of cuts committed twice); find who calls finishFilm twice.
 - [ ] Front-view likeness check: the 3D product's front must match the photo.
 - [ ] Soft edge on cut-outs for fabric; stop dark props covering the hero.
@@ -91,3 +94,27 @@ After the surface fix and the flipped pick:
 | Goggles | film_c853a44d3d8e | 2D: this 3D cut was murky, burnt out and cut off (Muse's frame review saw it too, and its revision did not save it). Earlier 3D goggles runs were good, so this varies run to run. |
 
 Both cuts saved (goggles film_41bf5e912828, cooler film_b059474636bf): the 3D cut sits at the version before the head (goggles v111 -> head v112; cooler v79 -> head v80). Seen by eye: the cooler's 3D cut has a blown-out, soft-focus lid; the goggles' 3D cut is washed yellow with an odd teal splash. Muse's 2D picks were fair. Note the cooler history shows the pair committed twice (v77/78 and v79/80).
+
+Safer 3D cut run (goggles film_e39cbfd33178, cooler film_4ff1cdb63e03): both ended 3D and look good by eye (cooler: solid blue body, white lid, readable end card; goggles: orange lenses true to the photo, water splash). The goggles' pick was a tie between the two looks (one said 3D clearly, the other 2D clearly), so 3D stayed; the cooler won 3D clearly. A third film in that batch (perfume film_aefcfdcd8e99) failed inside the crew's own 2D build ("too late for this change: the film is being wrapped up", the showrunner's time budget; three films ran at once). It never reached the cinematic cut; not caused by these changes.
+
+Owner's note (2026-11-03): text on a background plate looks good, mostly with the glossy styles.
+
+### Corpus feed fix (2026-11-04)
+
+Why films looked alike: Muse saw 3 corpus films picked by shared words. Products with no shared word got unrelated films (goggles got a horse-snack pouch and a T-shirt stack), the seven AI ads closest to ours (10 s, food and drink) showed only "1.4s push-in" lines because they were reviewed by beats and the deck read only shot labels, and Muse never saw the corpus pace. Changes, all in `reference-deck.ts`: films are matched by kind of product as well as words (`PRODUCT_KINDS`, retrieval only), "yoghurt" meets "yogurt", beat-reviewed films are written beat by beat with their shots, films with no notes are left out, and a measured pace line (ads of 6-16 s: 7-14 shots, median shot 0.8 s, 63% under a second) is shown as an observation. Also fixed: an element the safety pass dropped in a fresh reply made its shots hard breaks, so the board fell to the floor board; those shots now play without it (`parseBoard` returns `gone`).
+
+12 boards (6 products x 2, 8 s), before -> after: median shot 1.2 -> 0.9 s; shots under a second 21% -> 57%; shots per film 5-7 -> mostly 7-9; truck 5 -> 10, crane 3 -> 7, whip 0 -> 5. Perfume stayed slow (5 shots) by choice. Still open: 7 of 12 concepts are "one calm object while chaos rages around it", the CRAFT deck's own first example.
+
+### Kinds of idea (2026-11-04)
+
+The CRAFT deck's first line offered only contrasts, ending on "a calm object in a violent storm", the fast worked board's concept was "a calm object in a storm of fizz", and the task line asked for "a contrast or a device". Now the first line lists kinds of idea taken from the corpus ads (journey, eruption, sensory dive, montage, ritual, transformation, contrast), the worked concept is "the can drops into its own cold eruption", and the task asks for an idea chosen for this product. 12 boards: "calm object while chaos rages" concepts 7 -> 2 (both cooler boards); new concepts include berries falling into yoghurt, a wave the goggles punch through, a tide pulling back to leave the board on wet sand. Pace unchanged (median shot 0.9 s), floor boards 2 -> 0. Two boards for the same product and brief still share one idea (perfume both "a jewel wakes in smoke").
+
+### Three films after the feed and idea fixes (2026-11-04)
+
+| Product | Film | Muse's idea | Pick | Seen by eye |
+|---|---|---|---|---|
+| Yoghurt | film_d6385fe5bb37 | dawn rains wild berries into thick cream round the cup | 2D, clear | 3D: the berry rain barely shows (a few specks), the cup washes out white on a pale pink set and turns its label away. 2D: clean, but the first 3.6 s are a title on sand with no product. |
+| Goggles | film_22f0921ed56e | a wave bursts and the goggles punch through the spray | 3D (looks tied) | Best of the three: a water crown splash, a ripple, motion blur, readable end card. The idea is on screen. |
+| Cold brew can | film_dd4c88c7eb87 | a cream can wakes in a cold night as ice bursts and brew swirls | 2D, clear | 3D: dark night, ice beads, a thin brew ring, but the spin ends with the label turned away for the whole end card. 2D: clean, label front-on. |
+
+Ideas now differ per product. What stops them showing in 3D: elements too sparse or small to carry the idea (berry rain), and spins that end on the product's back (can, yoghurt). Both are tool and safety gaps, not Muse's choices.

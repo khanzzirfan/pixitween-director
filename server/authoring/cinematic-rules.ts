@@ -237,6 +237,8 @@ export const CAMERA = {
   shakeKeysMax: 3,
   /** A shot with a speed ramp is sampled along its curve at this many keys between its ends (each costs a tween). */
   rampKeys: 5,
+  /** how far from facing the lens (degrees) the product may end the film: past this its side or back shows under the price */
+  endFaceMax: 40,
   /** a layer may hold 64 tweens; the tremor must leave room for everything else */
   tweenBudget: 190,
   /** How far behind the product the lens focuses when it pulls to the far set, in metres (the wall's distance). */

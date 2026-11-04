@@ -6,7 +6,7 @@ import { readSnapshots, type FilmSnapshot } from '../corpus/films';
 
 /** What the references do, one line each: observations to choose from, not rules to follow. Muse decides which of them its idea wants. */
 export const CRAFT = [
-  'The best ads rest on one idea, often a contrast: one warm accent in a cold world, one bright object in black, a tiny product in a huge world, a calm object in a violent storm. Pick yours and let every choice serve it.',
+  'The best ads rest on one idea, and ideas come in many kinds. A journey: follow one drop, crumb or ray from where the product comes from to where it lands (a lens skimming a lemon field to the can, a droplet that slides down the pack into the next scene). An eruption: the product opens and what is inside takes the frame (a cap pops and a spice column fills the screen, then becomes the cut). A sensory dive: the lens goes inside the texture, the liquid, the foam. A montage: one gesture repeated across moments or places, cut on the beat. A ritual: the moment of use, step by step. A transformation: raw things become the product, or the product changes the world around it. A contrast: one warm accent in a cold world, one bright object in black, a tiny product in a huge world. Find the kind THIS product suggests; the first idea that comes to mind is usually the one every film has. Then let every choice serve it.',
   'Ads differ in shape. Some are fast: ten shots, whips, glitches, hard cuts. Some are slow: three shots, a long lens, a camera that floats. Some are one long move that changes lens as it goes. Choose the shape the idea needs, not the shape of the last film.',
   'A camera can push in to build desire, pull out to pay off, truck so the set streams past, crane to show the world, orbit to show form, whip into a cut, rack focus from near lights to the product, or change lens mid-move (the dolly-zoom). Use the ones the idea wants, as many or as few as it wants; repeating one is fine when the idea is repetition.',
   'A lens is a mood: a long lens (14-20 degrees) flattens and compresses, calm and expensive; 30 is natural; a wide lens (60-85) stretches and exaggerates, energetic and close to the action. A move can end on a different lens than it started.',
@@ -27,7 +27,7 @@ export const EXAMPLES = [
   {
     product: 'Canned energy drink, silver can, neon label (a fast, loud ad)',
     board: {
-      concept: 'Detonation: the can is a calm object in a storm of fizz, and the film never lets the picture rest.',
+      concept: 'Detonation: the can drops into its own cold eruption, and the film never lets the picture rest.',
       mood: 'loud, neon, cold', tone: 'cool', key: 'low',
       set: { look: 'night', air: 'spray' },
       finish: { glow: 'strong', grain: 'heavy', vignette: 'strong', fringe: true, floor: 'mirror', wet: 'heavy', caustics: 'none' },
@@ -123,14 +123,50 @@ export function pickExamples(text: string, n = 2): typeof EXAMPLES {
 }
 
 /** Lower-case words of four letters or more, with a plural s dropped, so "bottles" meets "bottle". */
-const stems = (s: string) => new Set([...words(s)].map((w) => (w.length > 4 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)));
+/** Spellings of one word, so "yoghurt" meets "yogurt". */
+const SPELLINGS: Record<string, string> = { yoghurt: 'yogurt', colour: 'color', flavour: 'flavor', moisturiser: 'moisturizer' };
+const stems = (s: string) =>
+  new Set([...words(s)].map((w) => (w.length > 4 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)).map((w) => SPELLINGS[w] ?? w));
+
+/**
+ * Kinds of product, each with words that name it. Only for finding reference films: a goggles film meets beach and sport ads and a
+ * yoghurt meets food ads even when they share no word ("yoghurt" and "yogurt", "goggles" and "sunscreen"). Not a creative choice.
+ */
+export const PRODUCT_KINDS: Record<string, readonly string[]> = {
+  drink: ['drink', 'beverage', 'coffee', 'latte', 'espresso', 'brew', 'soda', 'cola', 'juice', 'smoothie', 'tea', 'beer', 'wine', 'lemonade', 'kombucha'],
+  fragrance: ['perfume', 'parfum', 'fragrance', 'cologne', 'toilette', 'oud', 'scent'],
+  skincare: ['serum', 'cream', 'skincare', 'lotion', 'sunscreen', 'spf', 'ampoule', 'moisturiser', 'moisturizer', 'cleanser', 'beauty', 'dropper', 'makeup', 'lipstick'],
+  food: ['food', 'snack', 'yoghurt', 'yogurt', 'dairy', 'chocolate', 'seasoning', 'spice', 'sauce', 'cereal', 'granola', 'biscuit', 'cookie', 'treat', 'honey', 'candy', 'protein'],
+  apparel: ['shirt', 'tshirt', 'hoodie', 'sweatshirt', 'fleece', 'jacket', 'dress', 'sock', 'sneaker', 'shoe', 'trainer', 'apparel', 'clothing', 'fashion', 'cap', 'bag'],
+  tech: ['earbud', 'headphone', 'speaker', 'audio', 'bluetooth', 'wireless', 'gadget', 'phone', 'charger', 'tech', 'watch', 'camera'],
+  home: ['vase', 'dinnerware', 'plate', 'bowl', 'mug', 'rug', 'towel', 'home', 'decor', 'candle', 'kitchen', 'lamp'],
+  outdoor: ['beach', 'surf', 'surfboard', 'swim', 'goggle', 'cooler', 'camping', 'outdoor', 'sport', 'fitness', 'summer', 'hiking', 'bike'],
+};
+
+/** The kinds a text names: words of three letters or more, with a plural s dropped. */
+export function kindsOf(text: string): Set<string> {
+  const ws = new Set(
+    text
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 3)
+      .map((w) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)),
+  );
+  return new Set(Object.entries(PRODUCT_KINDS).filter(([, names]) => names.some((n) => ws.has(n))).map(([k]) => k));
+}
+
+/** A film's text as reviewed: what it is of. */
+const filmText = (f: FilmSnapshot) => `${f.review?.subject ?? ''} ${f.review?.summary ?? ''}`;
+
+/** Whether the review says what happens in the film: shot notes, or notes on its beats. A film with neither teaches only "push-in". */
+const described = (f: FilmSnapshot) => (f.review?.shot_labels ?? []).some((l) => l.note) || (f.review?.beats ?? []).some((b) => b.note);
 
 let snapshots: FilmSnapshot[] | undefined;
-/** The measured product ads in the corpus (docs/direction/corpus/films), read once. Films without a review or with under three shots are left out. */
+/** The measured product ads in the corpus (docs/direction/corpus/films), read once. Films without a review, with under three shots, or with no notes on what happens are left out. */
 function corpusAds(): FilmSnapshot[] {
   if (!snapshots) {
     try {
-      snapshots = readSnapshots().filter((f) => f.review && f.review.kind === 'product-ad' && f.shots.length >= 3);
+      snapshots = readSnapshots().filter((f) => f.review && f.review.kind === 'product-ad' && f.shots.length >= 3 && described(f));
     } catch {
       snapshots = [];
     }
@@ -138,41 +174,101 @@ function corpusAds(): FilmSnapshot[] {
   return snapshots;
 }
 
-/** How many kinds of camera move a film uses: the tie-break, so a product the corpus has never seen is shown the most varied films. */
-const moveKinds = (f: FilmSnapshot) => new Set(f.shots.map((s) => s.move.replace(/\s*\(.*?\)/g, '').replace(/^slow /, ''))).size;
+/** The films whose pace is shown to Muse: ads of about our length (a 57 s walkthrough is paced for a different job). */
+const PACE_RANGE_S = [6, 16] as const;
+
+/**
+ * How fast real ads of about our length are cut, measured from the corpus: the middle half of shot counts, the median shot, the share of shots
+ * under a second and the share of hard cuts. Empty when fewer than five such films exist. An observation for Muse, not a rule.
+ */
+export function corpusPace(films: readonly FilmSnapshot[] = corpusAds()): string {
+  const pool = films.filter((f) => f.duration_s >= PACE_RANGE_S[0] && f.duration_s <= PACE_RANGE_S[1]);
+  if (pool.length < 5) return '';
+  const q = (xs: number[], p: number) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return s[Math.min(s.length - 1, Math.floor(p * s.length))]!;
+  };
+  const counts = pool.map((f) => f.shots.length);
+  const durs = pool.flatMap((f) => f.shots.map((s) => s.dur_s));
+  const entered = pool.flatMap((f) => f.shots.filter((s) => s.idx > 1));
+  const pct = (n: number, d: number) => Math.round((100 * n) / Math.max(1, d));
+  return (
+    `PACE OF REAL ADS OF ABOUT OUR LENGTH (${pool.length} films of ${PACE_RANGE_S[0]}-${PACE_RANGE_S[1]} s, measured): the middle half have ${q(counts, 0.25)}-${q(counts, 0.75)} shots; ` +
+    `the median shot lasts ${q(durs, 0.5).toFixed(1)} s and ${pct(durs.filter((d) => d < 1).length, durs.length)}% of shots are under a second; ` +
+    `${pct(entered.filter((s) => s.enters_via === 'hard').length, entered.length)}% of cuts are hard. A board of a few long shots is far slower than these. Pace is still yours: slow is a choice when the idea is stillness.`
+  );
+}
+
+/** The length of film we make, in seconds: a film nearer it teaches more than a 57 s walkthrough. */
+const OUR_LENGTH_S = 10;
+
+/** A number from the product's words and a film's name, so films tied on every other count are shown to different products in different order. */
+const spun = (text: string, slug: string): number => {
+  let h = [...`${text}|${slug}`].reduce((a, c) => (Math.imul(a, 31) + c.charCodeAt(0)) >>> 0, 7);
+  // a final mix, so films whose names differ only at the end do not keep one order for every product
+  h = Math.imul(h ^ (h >>> 15), 2246822507);
+  h = Math.imul(h ^ (h >>> 13), 3266489909);
+  return (h ^ (h >>> 16)) >>> 0;
+};
 
 /**
  * The real films in the corpus nearest the product: the most words shared between the product's words (category, title, brief) and
- * what each film is of (its reviewed subject and summary). Stable for the same words. `films` defaults to the corpus.
+ * what each film is of (its reviewed subject and summary). Films that share nothing are ordered by how near their length is to the film we make
+ * (a long walkthrough teaches less than a ten-second ad) and then by a hash of the product's words, so different products meet different films and
+ * none is shown to all. Stable for the same words. `films` defaults to the corpus.
  */
 export function nearestFilms(text: string, n = 3, films: readonly FilmSnapshot[] = corpusAds()): FilmSnapshot[] {
-  const score = (f: FilmSnapshot) => filmMatch(text, f);
   return films
-    .map((f) => ({ f, s: score(f), k: moveKinds(f) }))
-    .sort((a, b) => b.s - a.s || b.k - a.k || a.f.slug.localeCompare(b.f.slug))
+    .map((f) => ({ f, s: filmMatch(text, f), d: Math.round(Math.abs(f.duration_s - OUR_LENGTH_S)), h: spun(text, f.slug) }))
+    .sort((a, b) => b.s - a.s || a.d - b.d || a.h - b.h || a.f.slug.localeCompare(b.f.slug))
     .slice(0, n)
     .map((x) => x.f);
 }
 
-/** How many of the product's words the film is about (its reviewed subject and summary); 0 when the corpus has nothing like it. */
+/**
+ * How near the film is to the product: the product's words the film is about (its reviewed subject and summary), plus three for each kind of
+ * product they share (a kind outweighs a stray shared word such as "clear"). 0 when the corpus has nothing like it.
+ */
 export function filmMatch(text: string, f: FilmSnapshot): number {
-  const theirs = stems(`${f.review?.subject ?? ''} ${f.review?.summary ?? ''}`);
-  return [...stems(text)].filter((w) => theirs.has(w)).length;
+  const theirs = stems(filmText(f));
+  const shared = [...stems(text)].filter((w) => theirs.has(w)).length;
+  const kinds = kindsOf(filmText(f));
+  return shared + 3 * [...kindsOf(text)].filter((k) => kinds.has(k)).length;
 }
 
-/** A real film as prompt text: what it is, then each measured shot (length, size, camera move, what it does), then what it teaches. */
+/** A beat's time range ("1.4-3.4") as its start, in seconds; NaN when unreadable. */
+const beatStart = (t: string) => Number.parseFloat(t.split('-')[0] ?? '');
+
+/**
+ * A real film as prompt text: what it is, then each measured shot (length, size, camera move, what it does), then what it teaches. A film
+ * reviewed by beats rather than by shots is written beat by beat, each with its shots' lengths and moves, so its notes still reach Muse.
+ */
 export function filmLines(f: FilmSnapshot, maxShots = 12): string {
   const r = f.review!;
+  // the AI ads' subjects end in file facts ("10.03s, 24fps source, 9:16"), which teach nothing
+  const subject = r.subject.replace(/\.?\s*\d+(\.\d+)?s,.*$/, '').trim();
+  const move = (m: string) => m.replace(/\s*\(.*?\)/g, '');
   const label = new Map(r.shot_labels.map((l) => [l.shot, l]));
-  const shots = f.shots.slice(0, maxShots).map((s) => {
-    const l = label.get(s.idx);
-    const move = s.move.replace(/\s*\(.*?\)/g, '');
-    return `${s.dur_s.toFixed(1)}s ${l?.scale ?? ''} ${move}${l?.beat ? ` [${l.beat}]` : ''}${l?.note ? `: ${l.note}` : ''}`.replace(/\s+/g, ' ').trim();
-  });
+  const beats = r.beats.filter((b) => b.note && Number.isFinite(beatStart(b.t)));
+  let body: string[];
+  if (!label.size && beats.length) {
+    // each shot belongs to the last beat that starts at or before it (small overlaps in the review times are fine)
+    const of = (s: FilmSnapshot['shots'][number]) => beats.reduce((at, b, i) => (beatStart(b.t) <= s.start_s + 0.05 ? i : at), 0);
+    body = beats.map((b, i) => {
+      const mine = f.shots.filter((s) => of(s) === i);
+      const shots = mine.length ? ` (${mine.length} shot${mine.length > 1 ? 's' : ''}: ${mine.map((s) => `${s.dur_s.toFixed(1)}s ${move(s.move)}`).join(', ')})` : '';
+      return `${b.t} s ${b.beat}${shots}: ${b.note}`.replace(/\s+/g, ' ').trim();
+    });
+  } else {
+    body = f.shots.slice(0, maxShots).map((s) => {
+      const l = label.get(s.idx);
+      return `${s.dur_s.toFixed(1)}s ${l?.scale ?? ''} ${move(s.move)}${l?.beat ? ` [${l.beat}]` : ''}${l?.note ? `: ${l.note}` : ''}`.replace(/\s+/g, ' ').trim();
+    });
+    if (f.shots.length > maxShots) body.push(`(${f.shots.length - maxShots} more shots)`);
+  }
   return [
-    `Real film: ${r.subject} (${f.duration_s.toFixed(1)} s, ${f.shots.length} shots).${r.summary.startsWith(r.subject) ? '' : ` ${r.summary.slice(0, 320)}`}`,
-    ...shots.map((x) => `  - ${x}`),
-    ...(f.shots.length > maxShots ? [`  - (${f.shots.length - maxShots} more shots)`] : []),
+    `Real film: ${subject} (${f.duration_s.toFixed(1)} s, ${f.shots.length} shots).${r.summary.startsWith(r.subject) || r.summary.startsWith(subject) ? '' : ` ${r.summary.slice(0, 320)}`}`,
+    ...body.map((x) => `  - ${x}`),
     ...r.learn.slice(0, 2).map((x) => `  Lesson: ${x}`),
   ].join('\n');
 }
@@ -183,9 +279,11 @@ export function filmLines(f: FilmSnapshot, maxShots = 12): string {
  */
 export function referenceDeck(text = '', films?: readonly FilmSnapshot[]): string {
   const near = nearestFilms(text, 3, films);
+  const pace = corpusPace(films);
   return [
     'WHAT THE BEST ADS DO (measured on real 9:16 product ads; these are options and observations, not rules: take what your idea needs):',
     `- ${CRAFT}`,
+    ...(pace ? [pace] : []),
     ...(near.length
       ? [
           `${near.some((f) => filmMatch(text, f) > 0) ? 'REAL FILMS NEAREST THIS PRODUCT' : 'REAL FILMS (the corpus has none of this kind of product; these move the most)'}, measured shot by shot from the corpus (shot length, size, camera move, what happens). Study how they move and pace, then translate it into our shot vocabulary; do not copy their things or their order:`,

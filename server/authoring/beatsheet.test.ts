@@ -1,11 +1,11 @@
 import { Buffer } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
-import { choosesFlat, defaultFinish, boardPrompt, checkBeatSheet, CUTS, IN_SCENE_CUTS, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, isFailureText, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
+import { BOARD_TEMPERATURE, choosesFlat, defaultFinish, boardPrompt, checkBeatSheet, CUTS, IN_SCENE_CUTS, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, isFailureText, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
 import { TEXT_RULES } from './cinematic-rules';
 import { FORM_VERDICTS, verdictLines } from './form-verdicts';
 import { floorElements } from './ingredients';
-import { EXAMPLES, filmLines, nearestFilms, pickExamples, referenceDeck } from './reference-deck';
+import { EXAMPLES, corpusPace, filmLines, filmMatch, kindsOf, nearestFilms, pickExamples, referenceDeck } from './reference-deck';
 import type { FilmSnapshot } from '../corpus/films';
 
 const els = floorElements('Coffee Co. Cold Brew', 'drinks');
@@ -274,9 +274,14 @@ describe('nearestFilms', () => {
     expect(nearestFilms('running sneakers', 1, films)[0]!.slug).toBe('b');
     expect(nearestFilms('cold brew coffee', 1, films)[0]!.slug).toBe('c');
   });
-  it('shows the most varied films when nothing matches, and is stable', () => {
-    expect(nearestFilms('camping stove', 1, films)[0]!.slug).toBe('b');
-    expect(nearestFilms('camping stove', 3, films)).toEqual(nearestFilms('camping stove', 3, films));
+  it('shows films of about our length when nothing matches, differently for different products, and is stable', () => {
+    const long = { ...film('long', 'Bluetooth speaker walkthrough', ['push-in', 'pan left', 'pull-out', 'tilt up']), duration_s: 57 };
+    const more = ['d', 'e', 'f', 'g', 'h', 'i'].map((x) => film(x, `Unrelated ${x} gadget`, ['push-in', 'pull-out', 'static']));
+    const set = [...[...films, ...more].map((f) => ({ ...f, duration_s: 10 })), long];
+    expect(nearestFilms('camping stove', 3, set).map((f) => f.slug)).not.toContain('long');
+    expect(nearestFilms('camping stove', 3, set)).toEqual(nearestFilms('camping stove', 3, set));
+    const firsts = new Set(['camping stove', 'garden hose', 'yoga mat', 'desk lamp', 'tennis racket', 'wool socks', 'baby monitor', 'ink pen'].map((t) => nearestFilms(t, 1, set)[0]!.slug));
+    expect(firsts.size).toBeGreaterThan(1);
   });
   it('writes each film as its measured shots and lessons, and says when none match', () => {
     const lines = filmLines(films[1]!);
@@ -285,6 +290,32 @@ describe('nearestFilms', () => {
     expect(lines).toContain('Lesson: one idea per film');
     expect(referenceDeck('perfume bottle', films)).toContain('REAL FILMS NEAREST THIS PRODUCT');
     expect(referenceDeck('camping stove', films)).toContain('the corpus has none of this kind of product');
+  });
+  it('matches a kind of product when no word is shared, and spellings of one word', () => {
+    const set = [...films, film('y', "AI product ad, 'Veloura Yogurt' three flavours", ['push-in', 'push-in', 'static']), film('s', 'Sunscreen spray bottle on beach sand', ['push-in', 'static', 'pull-out'])];
+    expect(kindsOf('Clear Water Swim Goggles')).toEqual(new Set(['outdoor']));
+    expect(nearestFilms('dairy Wild Berry Greek Yoghurt', 1, set)[0]!.slug).toBe('y');
+    expect(nearestFilms('swim summer Swim Goggles', 1, set)[0]!.slug).toBe('s');
+    expect(filmMatch('latte', set[2]!)).toBeGreaterThan(0); // both are drinks
+  });
+  it('writes a film reviewed by beats beat by beat, with the shots under each beat', () => {
+    const f = film('n', "AI/CG product ad, 'Nescafe Ice Roast' sachet. 10.03s, 24fps source, 9:16 (468x832).", ['push-in', 'pull-out', 'push-in']);
+    const byBeats = { ...f, review: { ...f.review!, shot_labels: [], beats: [{ t: '0.0-1.5', beat: 'hook', note: 'sachet on ice, push into the logo' }, { t: '1.5-3.0', beat: 'immersion', note: 'lens inside the coffee' }] } };
+    const lines = filmLines(byBeats);
+    expect(lines).toContain("Real film: AI/CG product ad, 'Nescafe Ice Roast' sachet (3.0 s, 3 shots).");
+    expect(lines).toContain('0.0-1.5 s hook (2 shots: 1.0s push-in, 1.0s pull-out): sachet on ice, push into the logo');
+    expect(lines).toContain('1.5-3.0 s immersion (1 shot: 1.0s push-in): lens inside the coffee');
+  });
+  it('measures the pace of ads of about our length, and says nothing with too few', () => {
+    const quick = ['a', 'b', 'c', 'd', 'e'].map((x) => ({ ...film(x, 'ad', ['push-in', 'static', 'pull-out', 'push-in']), duration_s: 8 }));
+    const fast = quick.map((f) => ({ ...f, shots: f.shots.map((s, i) => ({ ...s, dur_s: 0.5, enters_via: i === 1 ? 'soft' : 'hard' })) }));
+    const pace = corpusPace(fast);
+    expect(pace).toContain('5 films of 6-16 s');
+    expect(pace).toContain('the middle half have 4-4 shots');
+    expect(pace).toContain('the median shot lasts 0.5 s and 100% of shots are under a second');
+    expect(pace).toContain('67% of cuts are hard');
+    expect(corpusPace(fast.slice(0, 4))).toBe('');
+    expect(referenceDeck('perfume', fast)).toContain('PACE OF REAL ADS');
   });
 });
 
@@ -343,6 +374,12 @@ describe('planBoard', () => {
     expect(c.reviewImages).toHaveBeenCalledTimes(1);
     expect(c.chat).not.toHaveBeenCalled();
     expect(c.add).toHaveBeenCalledWith('f', 'muse-spark-1.3-contributor', '1 call', 0.005);
+  });
+  it('samples the board freely on the photo path too, not at the provider default', async () => {
+    const c = ctx([lemonBoard()]);
+    await planBoard(c.ctx, { title: 'Citrus Soda', category: 'soda', photo });
+    const call = c.reviewImages.mock.calls[0] as unknown as [Buffer[], string, undefined, { temperature: number }];
+    expect(call[3]).toEqual({ temperature: BOARD_TEMPERATURE });
   });
   it('asks with words alone when there is no photo', async () => {
     const c = ctx([JSON.stringify(lemonBoard())]);
@@ -432,6 +469,19 @@ describe('reviewBoard and the mending retry', () => {
     expect(r.hard).toEqual([]);
     expect(r.board.sheet.beats.some((x) => x.ingredient?.kind === 'ice')).toBe(false);
     expect(r.board.sheet.beats.some((x) => x.ingredient?.kind === 'lemon-slice')).toBe(true);
+  });
+
+  it('a fresh reply whose element the safety pass drops is kept on the first ask, its shots playing without it', async () => {
+    const reply = lemonBoard();
+    reply.elements[1] = { ...reply.elements[1]!, name: 'Nike ice', look: 'a Nike logo ice cube, clear' };
+    const reviewImages = vi.fn(async () => JSON.stringify(reply));
+    const ctx = { filmId: 'f', meta: { spark: { reviewImages } }, ledger: { add: vi.fn() } } as unknown as ToolCtx;
+    const r = await planBoard(ctx, { title: 'Citrus Soda', photo: Buffer.from('x') });
+    expect(r.source).toBe('muse');
+    expect(reviewImages).toHaveBeenCalledTimes(1);
+    expect(r.dropped.join(' ')).toContain('ice');
+    expect(r.board.sheet.beats.some((x) => x.ingredient?.kind === 'ice')).toBe(false);
+    expect(r.board.sheet.beats.some((x) => x.ingredient?.kind === 'fizz')).toBe(true);
   });
 
   it('passes a good board and names what a hand edit broke', () => {

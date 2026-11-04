@@ -178,13 +178,13 @@ describe('the gate on a burnt or unfaithful film', () => {
 
 describe('the washed-out check and the second revision', () => {
   const field = (bg: string, mid: string) => sharp({ create: { width: 96, height: 96, channels: 3, background: bg } }).composite([{ input: { create: { width: 40, height: 48, channels: 3 as const, background: mid } }, left: 28, top: 24 }]).png().toBuffer();
-  it('measures the near-white share, and flags a film washed in a bright set while leaving a lit product on a dark one alone', async () => {
+  it('measures the near-white share round the product, and flags a film washed in a bright set while leaving a bright product on a dark set alone', async () => {
     const wash = await field('#f2e6a0', '#f6efb0');
-    const dark = await field('#101820', '#e8e2d6');
+    const dark = await field('#101820', '#f6f6f6');
     expect(await washedShare(wash)).toBeGreaterThan(0.9);
-    expect(await washedShare(dark)).toBeLessThan(0.2 + 0.01);
+    expect(await washedShare(dark)).toBeLessThan(0.05);
     const r = await measureFrames([wash, wash, wash, dark]);
-    expect(r.join('|')).toMatch(/washed out: frame 1 is \d+% near white, frame 2/);
+    expect(r.join('|')).toMatch(/washed out: in frame 1 100% of the picture round the product is near white, frame 2/);
     expect(await measureFrames([wash, dark, dark, dark])).toEqual([]);
     expect(await measureFrames([dark, dark, dark])).toEqual([]);
   });
@@ -206,7 +206,7 @@ describe('the washed-out check and the second revision', () => {
     const washed = await run(wash);
     expect(washed.chat).toHaveBeenCalledTimes(2);
     expect(washed.r.board.concept).toBe('second take');
-    expect(washed.log).toHaveBeenCalledWith(expect.stringContaining('after its revision: washed out'));
+    expect(washed.log).toHaveBeenCalledWith(expect.stringMatching(/after its revision: .*washed out/));
     const clean = await run(dark);
     expect(clean.chat).toHaveBeenCalledTimes(1);
     expect(clean.r.board.concept).toBe('first take');
