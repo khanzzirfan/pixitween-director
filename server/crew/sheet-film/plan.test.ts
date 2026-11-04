@@ -17,8 +17,10 @@ describe('secondsIn and askedSeconds', () => {
     expect(secondsIn('a 2s blink')).toBeUndefined();
   });
   it('defaults to 8 and caps at 10', () => {
-    expect(askedSeconds('no length given')).toBe(8);
-    expect(askedSeconds('a 15s film')).toBe(10);
+    expect(askedSeconds('no length given')).toBe(10);
+    expect(askedSeconds('a 15s film')).toBe(15);
+    expect(askedSeconds('a 30 second film')).toBe(30);
+    expect(askedSeconds('a 45s film')).toBe(10);
   });
 });
 

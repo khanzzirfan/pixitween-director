@@ -6,6 +6,7 @@ import type { AepCompositionJson } from '@shared/aep';
 import type { ToolCtx } from '@shared/tools';
 import { cutout } from '../art/cutout';
 import { dominantAccent } from '../art/palette';
+import { pitchIdeas } from '../authoring/pitch';
 import { choosesFlat, isFailureText, planBoard, reviewBoard, type BoardBody, type CinematicBoard } from '../authoring/beatsheet';
 import { PRODUCT_FORMS, productBody, type ProductForm } from '../authoring/forms';
 import { finishedComposition } from './finish-film';
@@ -225,7 +226,14 @@ async function prepareParts(ctx: ToolCtx, log: (line: string) => void, o: { seco
   // the form is one focused look at the photo, and the turnaround (off by default) one drawing of its side and back; both are asked while the board is written, so they cost little time
   const others = film.assets.filter((a) => a.role === 'product-photo' && a.id !== photoRef.id);
   const [planned, form, turn] = await Promise.all([
-    planBoard(ctx, { title, brief: film.brief.text, photo, seconds: o.seconds ?? Math.min(10, film.storyboard?.durationSec ?? 8), flat }),
+    (async () => {
+      // the idea step: Muse pitches three different films for this product and picks one; the board is written from it
+      const seconds = o.seconds ?? Math.min(30, film.storyboard?.durationSec ?? 10);
+      const pitch = await pitchIdeas(ctx, { title, brief: film.brief.text, photo, seconds });
+      if (pitch) log(`Muse pitched ${pitch.ideas.map((i) => `"${i.name}"`).join(', ')} and chose "${pitch.chosen.name}"${pitch.why ? `: ${pitch.why}` : ''}`.slice(0, 500));
+      else log('no ideas pitched; the board is written without one');
+      return planBoard(ctx, { title, brief: film.brief.text, photo, seconds, flat, ...(pitch ? { idea: pitch.chosen } : {}) });
+    })(),
     flat ? formFromPhoto(ctx, photo, title) : Promise.resolve(undefined),
     loadEnv().TURNAROUND
       ? (async () => turnaroundFor(ctx, { photo, cut: await ctx.assets.read(cut.c.id), what: `a ${cut.noun}`, noun: cut.noun, others: await Promise.all(others.map((a) => ctx.assets.read(a.id))), log }))().catch(() => undefined)

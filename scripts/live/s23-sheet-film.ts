@@ -4,7 +4,7 @@
 // debug/sheet-film/<stamp>/. The renderer needs the review web server on 5199 AND the API server on 8797 with DATA_DIR data-s-review: the pages
 // load the film's pictures from /api/assets, which 5199 proxies to 8797. Both are checked before anything is paid for.
 // Paid (Muse calls, about $0.06-0.10), so it prints an estimate and exits unless --yes is passed.
-// Usage: npm run live -- s23-sheet-film [photo.png] [--yes]
+// Usage: npm run live -- s23-sheet-film [photo.png] [--seconds N] [--yes]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildDeps } from '../../server/main';
@@ -33,11 +33,15 @@ export const estimateUsd: LiveScript['estimateUsd'] = () => 0.1;
 export const run: LiveScript['run'] = async ({ env, log, args }) => {
   if (!env.metaApiKey) throw new Error('META_API_KEY is required for s23-sheet-film');
   const photoPath = args?.find((a) => a.endsWith('.png')) ?? PHOTO;
+  // --seconds N asks for another length (the brief names it, as a client would)
+  const at = args?.indexOf('--seconds') ?? -1;
+  const seconds = at >= 0 ? Number(args![at + 1]) : undefined;
+  const brief = seconds ? BRIEF.replace('10s', `${seconds}s`) : BRIEF;
   process.env.DATA_DIR = DATA_DIR;
   const deps = await buildDeps({ ...env, DATA_DIR });
   const photo = await deps.assets.put(readFileSync(photoPath), 'image/png', { role: 'product-photo' });
   await preflight(photo.id);
-  const film = await deps.films.create({ aspect: '9:16', title: 'Pure Spoonful', brief: { text: BRIEF, productAssetId: photo.id }, assets: [photo] });
+  const film = await deps.films.create({ aspect: '9:16', title: 'Pure Spoonful', brief: { text: brief, productAssetId: photo.id }, assets: [photo] });
   const base = deps.makeToolCtx(film.id);
   // the sheets are saved as assets and announced as art.asset events; they are not on the film itself
   const sheetIds: string[] = [];
