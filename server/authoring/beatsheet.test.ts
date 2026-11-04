@@ -387,6 +387,16 @@ describe('planBoard', () => {
     expect(r.source).toBe('muse');
     expect(c.chat).toHaveBeenCalledTimes(1);
   });
+  it('sends a board that misses the asked length back once, then keeps Muse\'s board either way', async () => {
+    const parsed = parseBoard(lemonBoard());
+    if (!parsed.ok) throw new Error(parsed.reason);
+    const asked = totalSeconds(reviewBoard(parsed.board).board.sheet) + 2;
+    const c = ctx([lemonBoard(), lemonBoard()]);
+    const r = await planBoard(c.ctx, { title: 'Citrus Soda', photo, seconds: asked });
+    expect(r.source).toBe('muse');
+    expect(c.reviewImages).toHaveBeenCalledTimes(2);
+    expect((c.reviewImages.mock.calls[1] as unknown as [unknown, string])[1]).toContain(`the film must run ${asked} s`);
+  });
   it('asks once more with the broken rules, then takes the second board', async () => {
     const bad = { ...lemonBoard(), beats: [{ size: 'wide', move: 'push', seconds: 1 }] };
     const c = ctx([bad, lemonBoard()]);

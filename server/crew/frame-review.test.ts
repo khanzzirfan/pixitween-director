@@ -188,6 +188,12 @@ describe('the washed-out check and the second revision', () => {
     expect(await measureFrames([wash, dark, dark, dark])).toEqual([]);
     expect(await measureFrames([dark, dark, dark])).toEqual([]);
   });
+
+  it('leaves a bright cream set alone when the product stands out from it (the pink yoghurt tub on cream that was graded brown)', async () => {
+    const cream = await field('#fff6e8', '#d9708c');
+    expect(await washedShare(cream)).toBeGreaterThan(0.9);
+    expect((await measureFrames([cream, cream, cream, cream])).join('|')).not.toMatch(/washed out/);
+  });
   it('asks for a second revision when the revised frames still measure washed, and keeps the first revision when they are clean', async () => {
     const wash = await field('#f2e6a0', '#f6efb0');
     const dark = await field('#101820', '#808890');

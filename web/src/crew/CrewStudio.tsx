@@ -81,7 +81,7 @@ export function CrewStudio({ film, events, playerRef, frozenNow, panels = {}, re
   const tabs = railTabs(
     {
       board: <StudioBoard {...filmBoard(film, crew, brief.text)} />,
-      plan: <LiveStoryboard crew={crew} now={now} onOps={replay ? undefined : (ops) => actions!.postStoryboard(ops)} />,
+      plan: <LiveStoryboard crew={crew} now={now} onOps={replay ? undefined : (ops) => actions!.postStoryboard(ops)} onRebuild={replay ? undefined : (sceneId) => actions!.rebuildScene(sceneId)} filmStatus={filmStatus} {...(film.storyboard ? { stored: film.storyboard.scenes } : {})} />,
       crew: (
         <>
           <CrewBoard crew={crew} now={now} onCancel={replay ? undefined : (id) => void actions!.cancelJob(id)} />
@@ -113,7 +113,7 @@ export function CrewStudio({ film, events, playerRef, frozenNow, panels = {}, re
       strip={
         <>
           {lineup?.tabs}
-          <Filmstrip scenes={scenes} selected={selected} onSelect={jump} ringOf={(id) => ringFor(jobs, id)} />
+          <Filmstrip scenes={scenes} selected={selected} onSelect={jump} ringOf={(id) => ringFor(jobs, id, filmStatus)} />
         </>
       }
       side={

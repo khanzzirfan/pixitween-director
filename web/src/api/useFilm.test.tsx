@@ -90,3 +90,28 @@ it('does nothing for a null film id', () => {
   expect(getFilm).not.toHaveBeenCalled();
   expect(FakeEventSource.instances).toHaveLength(0);
 });
+
+const status = (st: string) => ({ filmId: ID, at: 'x', type: 'film.status', status: st });
+
+it('looks once more 1.5 s after the film is ready, so a commit around "ready" is not missed', async () => {
+  getFilm.mockResolvedValueOnce(film(1)).mockResolvedValueOnce(film(2)).mockResolvedValueOnce(film(3));
+  const { result } = renderHook(() => useFilm(ID));
+  await act(async () => void (await vi.advanceTimersByTimeAsync(0)));
+  act(() => FakeEventSource.instances[0]!.push(status('ready')));
+  await act(async () => void (await vi.advanceTimersByTimeAsync(300)));
+  expect(result.current.film?.version).toBe(2);
+  await act(async () => void (await vi.advanceTimersByTimeAsync(1300)));
+  expect(getFilm).toHaveBeenCalledTimes(3);
+  expect(result.current.film?.version).toBe(3);
+});
+
+it('shows the film as it is now when the tab is brought back', async () => {
+  getFilm.mockResolvedValueOnce(film(1)).mockResolvedValueOnce(film(5));
+  const { result } = renderHook(() => useFilm(ID));
+  await act(async () => void (await vi.advanceTimersByTimeAsync(0)));
+  await act(async () => {
+    window.dispatchEvent(new Event('focus'));
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(result.current.film?.version).toBe(5);
+});

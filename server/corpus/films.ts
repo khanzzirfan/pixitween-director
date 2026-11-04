@@ -1,6 +1,6 @@
 // Reference films in the corpus: measured per shot from frames sampled at 25 fps (debug/movies/_tools/analyze.py), reviewed by eye from contact sheets.
 // The committed snapshots (docs/direction/corpus/films/<slug>.json) are the source of truth; the DB rows and the lessons derived from them can be rebuilt.
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Db } from '../db/open';
 import { tx } from '../db/open';
@@ -182,9 +182,10 @@ export function ingestFilms(db: Db, films: FilmSnapshot[]): number {
       const labels = new Map((f.review?.shot_labels ?? []).map((l) => [l.shot, l]));
       for (const s of f.shots) {
         const l = labels.get(s.idx);
+        // a hand-written snapshot may leave a measure out (a first shot has nothing before it to measure a move against): it is 0 or empty, not a refusal to load
         shot.run(
-          f.slug, s.idx, s.start_s, s.end_s, s.dur_s, s.enters_via, s.move, s.ease, s.zoom_pct, s.pan_pct, s.tilt_pct, s.jitter, s.luma, s.contrast,
-          s.saturation, s.warmth, s.key_style, s.temperature, s.hue, s.dof_ratio, l?.scale ?? null, l?.beat ?? null, l?.note ?? null,
+          f.slug, s.idx, s.start_s, s.end_s, s.dur_s, s.enters_via ?? '', s.move ?? '', s.ease ?? '', s.zoom_pct ?? 0, s.pan_pct ?? 0, s.tilt_pct ?? 0, s.jitter ?? 0, s.luma ?? 0, s.contrast ?? 0,
+          s.saturation ?? 0, s.warmth ?? 0, s.key_style ?? '', s.temperature ?? '', s.hue ?? '', s.dof_ratio ?? 0, l?.scale ?? null, l?.beat ?? null, l?.note ?? null,
         );
       }
     }
@@ -354,7 +355,7 @@ export function ingestFilmLessons(db: Db, films: FilmSnapshot[]): number {
 
 const loaded = new WeakSet<Db>();
 
-/** Everything above, once per connection: films from the committed snapshots, then their lessons. Quiet when there are no snapshots. */
+/** Everything above: films from the committed snapshots, then their lessons. Quiet when there are no snapshots. */
 export function ingestAllFilms(db: Db, dir = FILMS_DIR): { films: number; lessons: number } {
   const films = readSnapshots(dir);
   if (!films.length) return { films: 0, lessons: 0 };
@@ -362,10 +363,20 @@ export function ingestAllFilms(db: Db, dir = FILMS_DIR): { films: number; lesson
   return { films: films.length, lessons: deriveLessons(db) + ingestFilmLessons(db, films) };
 }
 
-/** As `ingestAllFilms`, but only the first call on a connection does the work. */
+/** As `ingestAllFilms`, but only the first call on a connection does the work, and only when the snapshots hold something the database does not. */
 export function ensureFilms(db: Db, dir = FILMS_DIR): void {
   if (loaded.has(db)) return;
   loaded.add(db);
-  const have = (db.prepare('SELECT COUNT(*) AS n FROM corpus_films').get() as { n: number }).n;
-  if (have === 0) ingestAllFilms(db, dir);
+  if (snapshotsAreNewer(db, dir)) ingestAllFilms(db, dir);
+}
+
+/** Whether the snapshot files hold films the database has not seen: an empty database, a snapshot added since, or one edited after the last load. */
+function snapshotsAreNewer(db: Db, dir: string): boolean {
+  if (!existsSync(dir)) return false;
+  const files = readdirSync(dir).filter((f) => f.endsWith('.json'));
+  if (!files.length) return false;
+  const row = db.prepare('SELECT COUNT(*) AS n, MAX(ingested_at) AS last FROM corpus_films').get() as { n: number; last: string | null };
+  if (files.length > row.n || !row.last) return true;
+  const last = Date.parse(row.last);
+  return files.some((f) => statSync(join(dir, f)).mtimeMs > last);
 }

@@ -11,7 +11,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, 
 export function filmBoard(film: FilmState | null, crew: CrewState, story: string): Omit<StudioBoardProps, 'onPoint'> {
   const jobs: Job[] = Object.values(crew.jobs);
   const scenes = crew.storyboard?.scenes ?? film?.storyboard?.scenes ?? [];
-  const shots: BoardShot[] = scenes.map((s) => ({ id: s.id, title: s.text || s.intent, state: STATE[ringFor(jobs, s.id)] }));
+  const shots: BoardShot[] = scenes.map((s) => ({ id: s.id, title: s.text || s.intent, state: STATE[ringFor(jobs, s.id, film?.status)] }));
   const crewLines = Object.entries(crew.lanes)
     .filter(([, l]) => l.state !== 'idle')
     .map(([key, l]) => {

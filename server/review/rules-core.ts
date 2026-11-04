@@ -6,6 +6,9 @@ import { layerBoxAt, listScenes, sampleSceneFrames, isProductVisible } from './g
 import { restFrames } from '../crew/text-lane';
 import { parseColor, relLuminance, ratioFromLuminance } from './contrast';
 
+/** How much of the product's box a picture drawn over it may hide in most of a scene's samples. A cut-out's box is larger than its pixels, so this is generous. */
+export const PRODUCT_COVER_LIMIT = 0.35;
+
 export async function runRulesCore(
   comp: AepCompositionJson,
   o: { storyboard?: Storyboard; deps?: RuleDeps; sceneIds?: string[]; safeInset?: number } = {},
@@ -209,6 +212,35 @@ export async function runRulesCore(
           metrics: { visibleSamples: pass.length, samples: samples.length, fraction: round2(pass.length / samples.length), limit: 0.6 },
           evidence: `product visible in ${pass.length} of ${samples.length} samples (${Math.round((pass.length / samples.length) * 100)}% < 60%)`,
         });
+      // a picture drawn over the product (a falling raspberry scaled to fill the frame) hides it as surely as the frame's edge does
+      for (const layer of layers) {
+        if ((layer.kind !== 'image' && layer.kind !== 'video') || layer.id === p.id || String(layer.id).startsWith('finish:')) continue;
+        const role = metas[layer.id]?.role;
+        if (role === 'bg' || role === 'product' || role === 'product3d') continue;
+        const hits: { frame: number; cov: number }[] = [];
+        for (const f of samples) {
+          const pb = box(p.id, f);
+          const lb = box(layer.id, f);
+          if (!pb.visible || !lb.visible || lb.opacity < 0.5 || lb.drawIndex < pb.drawIndex) continue;
+          const overlap = intersect(lb.box, pb.box);
+          const cov = overlap ? boxArea(overlap) / Math.max(1, boxArea(pb.box)) : 0;
+          if (cov >= PRODUCT_COVER_LIMIT) hits.push({ frame: f, cov });
+        }
+        if (hits.length / samples.length < 0.5) continue;
+        const worst = hits.reduce((a, b) => (a.cov >= b.cov ? a : b));
+        findings.push({
+          id: `R4:${layer.id}:product-covered`,
+          rule: 'R4',
+          kind: 'product-covered',
+          severity: 'error',
+          sceneId: scene.sceneId,
+          layerId: layer.id,
+          atSec: round2(worst.frame / scene.fps),
+          samplesFailing: hits.map((x) => round2(x.frame / scene.fps)),
+          metrics: { coverage: round2(worst.cov), limit: PRODUCT_COVER_LIMIT },
+          evidence: `'${layer.id}' is drawn over ${Math.round(worst.cov * 100)}% of the product at ${(worst.frame / scene.fps).toFixed(2)} s (limit ${Math.round(PRODUCT_COVER_LIMIT * 100)}%): make it smaller, move it off the product or put it behind`,
+        });
+      }
     }
     for (const layer of layers)
       if (layer.outPoint > scene.durationFrames)

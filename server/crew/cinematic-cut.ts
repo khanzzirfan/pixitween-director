@@ -43,7 +43,20 @@ export function isReadName(name: string): boolean {
   return /[a-z]/i.test(name) && !isFailureText(name) && !/^(no|none|null|nothing|undefined|na)\b|\bno (name|text|label)\b/i.test(name.trim());
 }
 
-/** A short name for the end card: the one Muse reads off the pack, else the brief's first words (a brief is a sentence, not a name). */
+/** A product name the client wrote in quotes in the brief ("Pure Spoonful"): the surest name there is, ahead of reading the pack. */
+export function quotedName(brief: string): string | undefined {
+  for (const m of brief.matchAll(/["\u201c\u2018']([^"\u201d\u2019'\n]{2,32})["\u201d\u2019']/g)) {
+    const name = m[1]!.trim();
+    const words = name.split(/\s+/).length;
+    if (words >= 1 && words <= 4 && /[a-z]/i.test(name) && !/[.!?]$/.test(name) && isReadName(name)) return name;
+  }
+  return undefined;
+}
+
+/** Words a brief opens with that describe the film, not the product ("Cinematic 10s vertical (9:16) ..."): never a name for the end card. */
+const FILM_WORDS = /^(cinematic|vertical|horizontal|square|portrait|landscape|ad|ads|advert|video|film|reel|spot|commercial|promo|\d+(\.\d+)?s?|\(?\d+:\d+\)?|for|a|an|the|of)$/i;
+
+/** A short name for the end card: one the brief quotes, else the one Muse reads off the pack, else the brief's first words that are not about the film (a brief is a sentence, not a name). */
 async function productName(ctx: ToolCtx, photo: Buffer, brief: string): Promise<string> {
   try {
     const reply = (await ctx.meta.spark.reviewImages([photo], 'Read the product name printed on this pack. Reply as JSON {"name": "<brand and product, at most 4 words, title case>"}.')) as { name?: unknown };
@@ -53,7 +66,7 @@ async function productName(ctx: ToolCtx, photo: Buffer, brief: string): Promise<
   } catch {
     /* fall through to the brief */
   }
-  return brief.split(/[,.—-]/)[0]!.trim().split(/\s+/).slice(0, 4).join(' ').slice(0, 32) || 'New';
+  return brief.split(/[,.—-]/)[0]!.trim().split(/\s+/).filter((w) => !FILM_WORDS.test(w)).slice(0, 4).join(' ').slice(0, 32) || 'New';
 }
 
 /** The relative luminance of a picture's top third, where the end card's words sit. */
@@ -163,7 +176,7 @@ async function prepareParts(ctx: ToolCtx, log: (line: string) => void): Promise<
   const photoRef = film.assets.find((a) => a.role === 'product-photo');
   if (!photoRef) return undefined;
   const photo = await ctx.assets.read(photoRef.id);
-  const title = isProductTitle(film.title, film.brief.text) ? film.title!.trim() : await productName(ctx, photo, film.brief.text);
+  const title = isProductTitle(film.title, film.brief.text) ? film.title!.trim() : (quotedName(film.brief.text) ?? (await productName(ctx, photo, film.brief.text)));
   const made = await prepareProduct(ctx, photo, title);
   if (!made) return undefined;
   const { prep } = made;

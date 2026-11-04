@@ -669,6 +669,9 @@ export function reviewBoard(board: CinematicBoard, gone: readonly string[] = [])
  * rules AND the board that broke them when the first fails the checker (so Muse mends it instead of starting over), else the floor board. About
  * $0.005 a call. Without a photo it asks with the words alone. `prior` starts from a board already known (a saved one that fails the checker).
  */
+/** How far (seconds) a board may run from the length asked for before it goes back to Muse. */
+export const LENGTH_SLACK = 0.5;
+
 export async function planBoard(ctx: ToolCtx, o: { title: string; brief?: string; brand?: string; category?: string; photo?: Buffer; seconds?: number; flat?: boolean; prior?: { board: CinematicBoard; violations: string[] } }): Promise<PlannedBoard> {
   const seconds = o.seconds ?? 8;
   let violations: string[] = o.prior?.violations ?? [];
@@ -694,6 +697,12 @@ export async function planBoard(ctx: ToolCtx, o: { title: string; brief?: string
       const review = reviewBoard(parsed.board, parsed.gone);
       violations = review.hard;
       previous = parsed.board;
+      // a board that misses the length the client asked for goes back once; a second miss keeps Muse's board rather than the floor's
+      const total = totalSeconds(review.board.sheet);
+      if (!violations.length && o.seconds !== undefined && Math.abs(total - o.seconds) > LENGTH_SLACK && attempt === 0) {
+        violations = [`the film must run ${o.seconds} s (your shots add up to ${total} s): lengthen or add shots to fill it`];
+        continue;
+      }
       if (!violations.length) return { board: review.board, source: 'muse', violations: [], dropped: parsed.dropped };
     } catch (err) {
       // a failed call (a busy service, a reply cut short) is tried again once with the same prompt, not given up on

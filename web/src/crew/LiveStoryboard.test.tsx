@@ -1,8 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { FilmEvent } from '@shared/events';
+import type { Scene } from '@shared/storyboard';
 import { foldCrew, crewReducer } from './crewReducer';
 import { LiveStoryboard } from './LiveStoryboard';
+import { SceneCard } from './SceneCard';
 import { FIXTURE, MARKS, upTo } from './test-fixture';
 
 afterEach(() => vi.restoreAllMocks());
@@ -90,4 +92,27 @@ it("shows the tag '3D' on the card of a 3d scene (S13b)", () => {
   sb.scenes[0]!.mode = '3d';
   render(<LiveStoryboard crew={{ ...crew, storyboard: sb }} now={0} onOps={() => undefined} />);
   expect(screen.getByText('3D', { selector: '.tag' })).toBeInTheDocument();
+});
+
+it('offers Regenerate on a shot that failed, and only there', () => {
+  const scene: Scene = { id: 'berries', durationSec: 2.5, intent: 'berries fall', shotType: 'lifestyle', camera: 'static', layersWanted: ['bg'], mode: 'motion', modeReason: 'r' };
+  const props = { scene, index: 0, total: 3, isNew: false, canRemove: true, onPatch: vi.fn(), onRemove: vi.fn(), onMove: vi.fn(), onDragStart: vi.fn(), onDropOn: vi.fn() };
+  const onRebuild = vi.fn();
+  const { rerender } = render(<SceneCard {...props} ring="failed" onRebuild={onRebuild} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Regenerate berries' }));
+  expect(onRebuild).toHaveBeenCalledWith('berries');
+  rerender(<SceneCard {...props} ring="building" onRebuild={onRebuild} />);
+  expect(screen.queryByRole('button', { name: 'Regenerate berries' })).toBeNull();
+  rerender(<SceneCard {...props} ring="failed" />);
+  expect(screen.queryByRole('button', { name: 'Regenerate berries' })).toBeNull();
+});
+
+it('shows the shots of a film made in one piece (no job per shot) by the film\'s own status', async () => {
+  const { ringFor } = await import('./SceneCard');
+  expect(ringFor([], 'hook')).toBe('queued');
+  expect(ringFor([], 'hook', 'building')).toBe('building');
+  expect(ringFor([], 'hook', 'ready')).toBe('done');
+  const scene: Scene = { id: 'hook', durationSec: 2, intent: 'tub drops in', shotType: 'hero', camera: 'dolly-in', layersWanted: ['bg'], mode: '3d', modeReason: '3D film' };
+  render(<LiveStoryboard crew={foldCrew([])} now={NOW} onOps={vi.fn()} filmStatus="ready" stored={[scene]} />);
+  expect(within(document.querySelector('[data-scene="hook"]') as HTMLElement).getByTestId('ring')).toHaveTextContent('done');
 });
