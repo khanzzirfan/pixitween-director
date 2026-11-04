@@ -259,14 +259,11 @@ The AI movie carries no title or price text, because video models garble letteri
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  Browser["Browser<br/>React studio, GSAP + Three.js player<br/>frame capture, MP4 export"] -- "REST + SSE" --> API["Server<br/>Hono"]
-  API --> Film["Sheet film<br/>parts · sheets · check · film sheet"]
-  Film --> Tools["Tools<br/>authoring · art · 3D · review"]
-  Tools --> Store[("SQLite: films, versions,<br/>event logs · asset files")]
-  Tools --> Meta["Meta models"]
-```
+<p align="center">
+  <img src="docs/images/architecture.svg" alt="MuseReels architecture. The browser's React studio (brief, plan, the Motion engine player, export) talks to a Node Hono server over REST and live SSE. The server runs the sheet film in five steps: Parts (SAM 3.1, Muse Spark, Muse Image), Sheets (drawn by our engine), Check (Muse Spark against the photo), Film sheet (code rules, engine, Muse Spark) and Commit. Beside it: code rules that turn the board into film JSON, headless Chromium running the same Motion engine to draw sheets and frames, the catalog line-up and the event log. On the right: the Meta Model API with Muse Spark 1.3, SAM 3.1, Muse Image and Muse Voice Transcribe; the optional Fal MiniMax H3 final cut on the visitor's own key; and SQLite plus asset files." width="100%">
+</p>
+
+The key idea: **the same Motion engine runs in two places.** In the browser it plays the film; on the server, in headless Chromium, it draws the sheets Muse checks and the frames the AI movie starts from. So what Muse reviews is exactly what the viewer sees.
 
 | Folder | What it holds |
 |--------|---------------|
