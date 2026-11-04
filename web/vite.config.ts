@@ -20,5 +20,6 @@ export default defineConfig({
     fs: { allow: ['..'] },
     proxy: { '/api': { target: process.env.DIRECTOR_API_URL ?? 'http://localhost:8787', changeOrigin: true } },
   },
-  build: { outDir: 'dist', emptyOutDir: true },
+  // stage-check.html is built too: the server draws frames and exports on it in headless Chromium, on a deployed host as well
+  build: { outDir: 'dist', emptyOutDir: true, rollupOptions: { input: { main: `${webRoot}index.html`, stage: `${webRoot}stage-check.html` } } },
 });

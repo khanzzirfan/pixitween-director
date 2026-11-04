@@ -18,8 +18,10 @@ primary_region = "iad"
   PUBLIC_BASE_URL = "https://musereels.fly.dev"
   # The Muse crew: Wonder leads parallel Spark builders. Set CREW_ENABLED = "false" to fall back to the single director.
   CREW_ENABLED = "true"
-  # The cinematic cut is checked by a headless-Chromium frame review, and this image has no Chromium: keep the flat finish here.
+  # The cinematic cut is checked by a headless-Chromium frame review. The image has Chromium now, but keep the flat finish until it is judged here.
   CINEMATIC_CUT = "0"
+  # Headless Chromium draws the 3D sheets and exports on this server's own stage-check page.
+  EXPORT_RENDER_BASE = "http://localhost:8080"
   SHOWRUNNER_MODEL = "muse-wonder-1.0"
   # The full Muse Spark 1.3, not the contributor tier: storyboard, builders, frame review and chat edits.
   META_SPARK_MODEL = "muse-spark-1.3"
@@ -45,9 +47,9 @@ primary_region = "iad"
     path = "/api/health"
 
 [[vm]]
-  cpu_kind = "shared"
-  cpus = 1
-  memory = "1gb"
+  size = "shared-cpu-4x"
+  # Headless Chromium with SwiftShader runs beside Node, so 1 GB is not enough.
+  memory = "4gb"
 
 [mounts]
   source = "director_data"

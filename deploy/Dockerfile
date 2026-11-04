@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certi
 WORKDIR /app
 ENV NODE_ENV=production PORT=8080
 COPY --from=build /app /app
+# Headless Chromium for the 3D sheets, the frame review and exports: they draw on the app's own stage-check page
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN npx playwright install --with-deps --only-shell chromium && rm -rf /var/lib/apt/lists/*
 EXPOSE 8080
 # Runs as root on purpose: a Fly volume is mounted root-owned. Secrets are set with `fly secrets`, never baked in here.
 CMD ["npm", "start"]
