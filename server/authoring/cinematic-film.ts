@@ -4,6 +4,7 @@ import { newFilmComposition, registerAsset } from './composition';
 import { addLayer, type AddLayerOptions } from './layers';
 import { readDirector, writeDirector, sceneMeta } from './meta';
 import { defaultFinish, type Grade, type FocusTarget, type Handheld, type ShotFocus, type BoardLight, type EndCard, effectiveAngles, effectiveSizes, totalSeconds, type EASES, type Angle, type Beat, type BeatSheet, type CameraPoint, type Finish, type KeyLevel, type ShotSize, type Tone } from './beatsheet';
+import { ELEMENT_BODY } from './forms';
 import type { IngredientAsset } from './ingredients';
 import { shade, type ClipAsset, type Rect } from './retail-clip';
 import { addScene } from './scenes';
@@ -49,6 +50,17 @@ export const SOLID = { depth: 0.55, section: 2.6 } as const;
 
 /** Engine limits (STAGE3D_LIMITS in aep-32). */
 export const LIMITS = { props: 12, instances: 400, swarm: 200 } as const;
+
+/** A solid element's 3D source. A round piece (a berry) is swept round like a body, as deep as it is wide; a thin one (a leaf) is a thin
+ * extrusion; a chunk (a slice, or no form given) keeps the plain extrusion, a quarter of its longest side deep. */
+function elementSource(a: IngredientAsset): Obj {
+  const w = a.frames[0]?.width ?? 100;
+  const h = a.frames[0]?.height ?? 100;
+  const contour = a.contour ?? [[0, 0], [1, 0], [1, 1], [0, 1]];
+  if (a.form === 'round') return { type: 'extrude', contour, depth: r2(Math.min(w, h) * ELEMENT_BODY.round.depth), section: ELEMENT_BODY.round.section };
+  if (a.form === 'thin') return { type: 'extrude', contour, depth: r2(Math.max(w, h) * ELEMENT_BODY.thin.depth), bevel: r2(Math.max(w, 1) * 0.01) };
+  return { type: 'extrude', contour, depth: r2(Math.max(w, h) * (a.form === 'chunk' ? ELEMENT_BODY.chunk.depth : 0.25)), bevel: r2(Math.max(w, 1) * 0.03) };
+}
 
 export interface CinematicInput {
   aspect: Aspect;
@@ -633,7 +645,7 @@ function ingredientProp(i: number, b: Beat, f: BeatFrames, a: IngredientAsset | 
   const glass = a.procedural === 'glass-cube';
   const source: Obj = glass
     ? { type: 'primitive', shape: 'box', proportions: { width: 1, height: 1 }, round: MATERIALS.iceRound }
-    : { type: 'extrude', contour: a.contour ?? [[0, 0], [1, 0], [1, 1], [0, 1]], depth: r2(Math.max(a.frames[0]?.width ?? 100, a.frames[0]?.height ?? 100) * 0.25), bevel: r2(Math.max(a.frames[0]?.width ?? 100, 1) * 0.03) };
+    : elementSource(a);
   const look: Obj = glass
     ? { material: { ...MATERIALS.ice } }
     : { textures: { ...(a.frames[0] ? { front: a.frames[0].id } : {}), side: a.side ?? '#3b2416' }, material: { roughness: 0.45, clearcoat: 0.3 } };

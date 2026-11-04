@@ -9,7 +9,7 @@ import { AI_VIDEO_RESOLUTIONS, type AiVideoResolution } from '@shared/api';
 import { isFilmId } from '@shared/composition';
 import { createFalClient } from '../../server/fal/client';
 import { buildDeps } from '../../server/main';
-import { buildH3Request, captureFrames, H3_LIMITS, planAiFilm, quoteAiFilm } from '../../server/video/ai-film';
+import { aiFilmContext, chatNotes, buildH3Request, captureFrames, H3_LIMITS, planAiFilm, quoteAiFilm } from '../../server/video/ai-film';
 import type { LiveScript } from './run';
 
 const POLL_MS = 5_000;
@@ -36,7 +36,7 @@ export const run: LiveScript['run'] = async ({ env, log, args }) => {
   const deps = await buildDeps(env);
   const film = await deps.films.get(filmId);
   if (!film.composition) throw new Error(`${filmId} has no composition yet`);
-  const plan = planAiFilm(film.composition);
+  const plan = planAiFilm(film.composition, aiFilmContext(film, chatNotes((await deps.bus.replay(filmId).catch(() => [])).map((e) => e.event as never))));
   if (!plan.shots.length) throw new Error(`${filmId} has no scene with pictures to make a movie from`);
   const quote = quoteAiFilm(plan, resolution);
   log(`${film.title ?? filmId}: ${plan.shots.length} frames from ${plan.shots.map((s) => s.sceneId).join(', ')}${plan.skipped.length ? ` (left out: ${plan.skipped.join(', ')})` : ''}`);

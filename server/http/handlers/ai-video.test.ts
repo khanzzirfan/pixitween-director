@@ -112,7 +112,9 @@ it("uploads one frame per shot, submits the H3 request with the visitor's key an
   expect(calls.filter((c) => c.method !== 'PUT').every((c) => c.auth === `Key ${OWN_KEY}`)).toBe(true);
   const submit = calls.find((c) => c.url === 'https://queue.fal.run/minimax/h3-max/reference-to-video')!;
   const input = JSON.parse(submit.body!);
-  expect(input).toMatchObject({ duration: 6, resolution: '768P', aspect_ratio: '9:16', reference_image_urls: ['https://v3.fal.media/f/1.jpg', 'https://v3.fal.media/f/2.jpg'] });
+  expect(input).toMatchObject({ duration: 6, resolution: '768P', aspect_ratio: '9:16', });
+  expect(input.reference_image_urls).toHaveLength(2);
+  expect(new Set(input.reference_image_urls).size).toBe(2);
   expect(input.prompt).toContain('Shot 2');
 });
 

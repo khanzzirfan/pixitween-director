@@ -241,3 +241,10 @@
 .replay-speeds button { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 8px; padding: 3px 7px; font-size: 12px; font-weight: 700; }
 .replay-speeds button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .replay-missing { padding: 40px 20px; text-align: center; }
+
+/* S23: the sheets a 3D film was checked on, above the plan */
+.sheet-strip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 8px; }
+.sheet-thumb { padding: 0; border: 0; background: none; cursor: zoom-in; flex: 0 0 auto; }
+.sheet-thumb img { height: 72px; border-radius: 6px; display: block; }
+.sheet-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); display: grid; place-items: center; z-index: 50; }
+.sheet-overlay img { max-width: 94vw; max-height: 94vh; border-radius: 8px; }

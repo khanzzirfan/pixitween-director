@@ -187,6 +187,20 @@ describe('buildCinematicFilm', () => {
     const mid = Math.round((macro.start + macro.end) / 2);
     expect(can.rotation.find((k: any) => k.t === mid)?.v[1]).toBe(0);
   });
+  it('builds a solid element by its form: a round berry swept round, a thin leaf a sliver, a chunk the plain extrusion', () => {
+    const film = (form?: 'round' | 'thin' | 'chunk') => {
+      const i = input();
+      const bean = Object.values(i.ingredients ?? {}).find((x) => x.use === 'solid' && !x.procedural)!;
+      return props(buildCinematicFilm({ ...i, ingredients: { ...i.ingredients, [bean.kind]: { ...bean, ...(form ? { form } : {}) } } }) as any).find((p: any) => p.id.includes(`-${bean.kind}`)) as any;
+    };
+    const round = film('round').source;
+    expect(round.section).toBe(2);
+    expect(round.bevel).toBeUndefined();
+    const plain = film().source;
+    expect(plain.section).toBeUndefined();
+    expect(film('thin').source.depth).toBeLessThan(plain.depth / 2);
+    expect(film('chunk').source.depth).toBeGreaterThan(plain.depth);
+  });
   it('plays each beat\'s ingredient: beans fall as a swarm, ice is glass, the splash is a flipbook card', () => {
     const c = buildCinematicFilm(input()) as any;
     const beans = props(c).find((p: any) => p.id.includes('-bean')) as any;

@@ -7,6 +7,7 @@ import { cutoutSheet, whiteKeySheet } from '../art/cutout-sheet';
 import { lintPrompt } from '../art/lint';
 import { PRICE } from '../art/prices';
 import { prepareProduct3D, type PrepareCache } from '../product3d/prepare';
+import { ELEMENT_FORMS, type ElementForm } from './forms';
 import type { ClipAsset } from './retail-clip';
 
 // The elements of a cinematic film: the real things round the product (coffee beans, ice, a splash, a lemon slice, steam...). Muse decides
@@ -40,6 +41,8 @@ export interface ElementSpec {
   pieces: number;
   /** Size of one piece in metres, longest side (the product is 0.16 m tall). */
   sizeM: number;
+  /** A solid's 3D shape, Muse's word: round (a berry), thin (a leaf), chunk (a slice). Absent means chunk. */
+  form?: ElementForm;
 }
 
 const SHOT = 'on a plain white studio backdrop, clearly separated from it, high-end macro product photograph, sharp focus, soft key light from the upper left. Nothing else in the frame. No text, no logos, no hands.';
@@ -64,6 +67,7 @@ export const elementSchema = z.object({
   look: z.string().min(8).max(220),
   pieces: z.number().int().min(1).max(6),
   sizeM: z.number().positive().max(1),
+  form: z.enum(ELEMENT_FORMS).optional().catch(undefined),
 });
 
 export const MAX_ELEMENTS = 5;
@@ -181,6 +185,8 @@ export interface IngredientAsset {
   contour?: Array<[number, number]>;
   /** Solids only: the colour of the sides of the extrusion, #rrggbb. */
   side?: string;
+  /** Solids only: how the piece is built in 3D (round, thin, chunk). Absent means chunk. */
+  form?: ElementForm;
   /** Liquids and vapours: the colour; liquids: whether it is see-through. */
   color?: string;
   clear?: boolean;
@@ -254,5 +260,6 @@ export async function makeElement(ctx: ToolCtx, e: ElementSpec, o: { sceneId?: s
     frames: [ref(prep.texture.id, prep.texture.width ?? first.width, prep.texture.height ?? first.height)],
     ...(prep.contour ? { contour: prep.contour as Array<[number, number]> } : {}),
     side: prep.side,
+    ...(e.form ? { form: e.form } : {}),
   };
 }

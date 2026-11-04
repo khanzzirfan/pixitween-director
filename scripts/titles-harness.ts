@@ -17,7 +17,8 @@ import sharp from 'sharp';
 import { loadEnv } from '../server/env';
 import { planBoard, type CinematicBoard } from '../server/authoring/beatsheet';
 import { buildCinematicFilm, type CinematicInput } from '../server/authoring/cinematic-film';
-import { TITLE_PROPS_MAX, titleSpace, wordsBox, type TitleFace } from '../server/authoring/titles3d';
+import { TITLE_PROPS_MAX } from '../server/authoring/titles3d';
+import { layoutProblems, titleBoxes } from '../server/crew/sheet-film/json-rules';
 import { ASPECT_SIZES } from '@shared/composition';
 import type { Aspect, Obj } from '../server/authoring/types';
 
@@ -119,35 +120,20 @@ const main = async () => {
   const layers = comp.precomps.cine.layers as Obj[];
   const titles = layers.filter((l) => l.kind === 'prop3d' && l.stage === 'cine:titles');
   const words = titles.filter((l) => l.source.type === 'text3d');
-  const { ppu } = titleSpace(W, H);
-  const faceOf = (font: string): TitleFace => (font.includes('optimer') ? 'soft' : font.includes('gentilis') ? 'serif' : 'sans');
 
   console.log('\nTHE WORDS AS BUILT');
-  const boxes = words.map((l) => {
-    const box = wordsBox(l.source.text, faceOf(l.source.font), l.source.font.endsWith('bold'), l.source.size * ppu);
-    const cx = W / 2 + l.position[0] * ppu;
-    const cy = H / 2 - l.position[1] * ppu;
-    const from = l.source.enter.atFrame / fps;
-    const to = l.outPoint / fps;
-    const leaves = l.source.exit ? l.source.exit.atFrame / fps : to;
-    console.log(`  "${String(l.source.text).replace(/\n/g, ' / ')}" ${l.source.font.replace('font-', '')} ${l.material.metalness === 1 ? 'metal' : 'lacquer'} ${l.source.enter.style}, ${from.toFixed(2)}-${to.toFixed(2)} s, centre ${Math.round(cx)},${Math.round(cy)}, ${Math.round(box.w)}x${Math.round(box.h)} px`);
-    return { l, left: cx - box.w / 2, right: cx + box.w / 2, top: cy - box.h / 2, bottom: cy + box.h / 2, from, to, leaves };
-  });
+  const boxes = titleBoxes(layers, { W, H, fps });
+  for (const x of boxes) {
+    const l = x.l;
+    console.log(`  "${String(l.source.text).replace(/\n/g, ' / ')}" ${l.source.font.replace('font-', '')} ${l.material.metalness === 1 ? 'metal' : 'lacquer'} ${l.source.enter.style}, ${x.from.toFixed(2)}-${x.to.toFixed(2)} s, centre ${Math.round(x.cx)},${Math.round(x.cy)}, ${Math.round(x.w)}x${Math.round(x.h)} px`);
+  }
   console.log(`  plates ${titles.filter((l) => String(l.id).includes('-plate-')).length}, price slab ${titles.some((l) => String(l.id).includes('-price-slab-')) ? 'yes' : 'no'}`);
 
   console.log('\nCHECKS');
   const problems: string[] = [];
   if (!words.length) problems.push('no words were built');
   if (titles.length > TITLE_PROPS_MAX) problems.push(`${titles.length} title props, over the limit of ${TITLE_PROPS_MAX}`);
-  const edge = W * 0.03;
-  for (const x of boxes) if (x.left < edge || x.right > W - edge || x.top < edge || x.bottom > H - edge) problems.push(`"${x.l.source.text}" runs past the frame's edge`);
-  for (const [n, a] of boxes.entries())
-    for (const z of boxes.slice(n + 1)) {
-      const together = Math.min(a.to, z.to) - Math.max(a.from, z.from) > 0.1;
-      const overlap = Math.min(a.right, z.right) > Math.max(a.left, z.left) && Math.min(a.bottom, z.bottom) > Math.max(a.top, z.top);
-      // the price sits on its slab and the old price on it too; only lines of their own count
-      if (together && overlap) problems.push(`"${a.l.source.text}" and "${z.l.source.text}" are on screen at once on top of each other`);
-    }
+  problems.push(...layoutProblems(boxes, { W, H }));
   const said = b.sheet.beats.filter((x, n) => x.text && n < b.sheet.beats.length - 1 && x.size !== 'macro').map((x) => x.text!);
   for (const s of said) if (!words.some((l) => String(l.source.text).replace(/\n/g, ' ').toLowerCase() === s.toLowerCase())) problems.push(`the shot line "${s}" was not built`);
   console.log(problems.length ? problems.map((p) => `  FAIL ${p}`).join('\n') : '  PASS every line inside the frame, none on top of another, all of Muse\'s lines built');

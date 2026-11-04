@@ -15,6 +15,12 @@ export interface ChatProps extends PanelProps {
   version?: number;
   player?: PlayerHandle | null;
 }
+function layerCount(comp?: AepCompositionJson | null): string {
+  const scenes = Object.keys(((comp?.meta as any)?.director?.scenes ?? {}) as object);
+  const layers = scenes.reduce((n, id) => n + (((comp?.precomps as any)?.[id]?.layers ?? []) as unknown[]).length, 0);
+  return scenes.length ? `${scenes.length} scenes · ${layers} layers` : '';
+}
+
 export default function Chat({
   film,
   events,
@@ -57,13 +63,16 @@ export default function Chat({
         </div>
         <BackendBadge events={events} />
       </header>
-      <details>
-        <summary>Layers</summary>
+      <details className="layers-desk">
+        <summary>
+          Layers
+          <span className="layers-count">{layerCount(comp)}</span>
+        </summary>
         <LayerList comp={comp ?? undefined} selection={selection} onSelect={select} />
       </details>
       {selection && (
-        <p>
-          Editing: {selection.layerId ?? selection.sceneId}{' '}
+        <p className="editing-chip">
+          <span>Editing</span> <strong>{selection.layerId ?? selection.sceneId}</strong>
           <button type="button" aria-label="Clear selection" onClick={clear}>
             ×
           </button>
