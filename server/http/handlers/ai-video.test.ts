@@ -5,6 +5,7 @@ import { Hono } from 'hono';
 import sharp from 'sharp';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { towelFilm } from '../../authoring/test-helpers';
+import { film3d } from '../../video/ai-film.test';
 import { saveVideoSession } from '../../video/session';
 import type { AppDeps } from '../deps';
 import { registerAiVideoRoutes } from './ai-video';
@@ -47,7 +48,7 @@ function fakeFal(state: { status: string; queuePosition?: number; video?: string
 const IP = { 'fly-client-ip': '203.0.113.7' };
 
 /** An app with a film, and the headers of a visitor who has saved a Fal key (`key: false` for one who has not). */
-async function appFor(fal = fakeFal(), film: unknown = { id: FILM, title: 'Towel', composition: towelFilm({ count: 2, sec: 3 }) }, key = true) {
+async function appFor(fal = fakeFal(), film: unknown = { id: FILM, title: 'Towel', composition: towelFilm({ count: 2, sec: 3 }) }, key = true, renderFrames?: (comp: any, times: number[]) => Promise<Buffer[]>) {
   const photo = await sharp({ create: { width: 400, height: 300, channels: 3, background: '#2a6f97' } }).png().toBuffer();
   const dir = mkdtempSync(join(tmpdir(), 'ai-video-'));
   const deps = {
@@ -55,7 +56,7 @@ async function appFor(fal = fakeFal(), film: unknown = { id: FILM, title: 'Towel
     assets: { read: async () => photo },
   } as unknown as AppDeps;
   const app = new Hono();
-  registerAiVideoRoutes(app, deps, { dataDir: () => dir, fetchImpl: fal.fetchImpl });
+  registerAiVideoRoutes(app, deps, { dataDir: () => dir, fetchImpl: fal.fetchImpl, ...(renderFrames ? { renderFrames } : {}) });
   const session = key ? saveVideoSession(dir, undefined, '203.0.113.7', { fal: OWN_KEY }, true) : undefined;
   if (session && 'error' in session) throw new Error('session not saved');
   const h = { ...IP, ...(session ? { cookie: `mr_video=${session.id}` } : {}) };
@@ -198,4 +199,23 @@ it("shows Fal's own refusal, such as an empty balance, without the key", async (
   const body = await res.json();
   expect(body.message).toContain('Exhausted balance');
   expect(JSON.stringify(body)).not.toContain(OWN_KEY);
+});
+
+it('makes an AI movie from a 3D film: frames drawn by the stage with titles out, one upload each, the director prompt to MiniMax', async () => {
+  const frame = await sharp({ create: { width: 360, height: 640, channels: 3, background: '#553' } }).jpeg().toBuffer();
+  const asked: Array<{ titles: boolean; times: number[] }> = [];
+  const r = await appFor(fakeFal(), { id: FILM, title: 'Cold Brew', composition: film3d(), storyboard: { scenes: [{ id: 'shot-1', durationSec: 10, intent: 'Can centred, swirl behind' }] } }, true, async (comp, times) => {
+    asked.push({ titles: comp.precomps.cine.layers.some((l: { id: string }) => l.id.startsWith('cine:title')), times });
+    return times.map(() => frame);
+  });
+  expect(await quote(r)).toMatchObject({ durationSec: 10, frames: 3, keyReady: true });
+  const res = await post(r);
+  expect(res.status).toBe(202);
+  expect(asked).toEqual([{ titles: false, times: expect.any(Array) }]);
+  expect(asked[0]!.times).toHaveLength(3);
+  const submit = r.fal.calls.find((c) => c.method === 'POST' && c.url.startsWith('https://queue.fal.run/'))!;
+  const input = JSON.parse(submit.body!);
+  expect(input.reference_image_urls).toHaveLength(3);
+  expect(input.prompt).toContain('Make that same film again, richer');
+  expect(input.prompt).toContain('Camera: slow push-in with a slight arc.');
 });

@@ -299,12 +299,12 @@ export const REVIEW_TIMEOUT_MS = 120_000;
 export const reviewEnabled = (): boolean => process.env.FRAME_REVIEW !== '0' && process.env.NODE_ENV !== 'test';
 
 /** Draws the composition at `times` (seconds) in headless Chromium on the app's own stage page, at half size, as JPEGs. The web server must be reachable at `base`. */
-export async function renderKeyFrames(composition: unknown, times: number[], base = process.env.EXPORT_RENDER_BASE ?? `http://localhost:${process.env.DIRECTOR_WEB_PORT ?? 5173}`, /** how long each frame is given to draw after a seek (a 2D film's pictures load as it plays) */ settleMs = 900): Promise<Buffer[]> {
+export async function renderKeyFrames(composition: unknown, times: number[], base = process.env.EXPORT_RENDER_BASE ?? `http://localhost:${process.env.DIRECTOR_WEB_PORT ?? 5173}`, /** how long each frame is given to draw after a seek (a 2D film's pictures load as it plays) */ settleMs = 900, /** JPEG quality of each frame */ quality = 72, /** device pixel ratio of the page: 2 draws each frame at twice the size */ scale = 1): Promise<Buffer[]> {
   const pw = await import('playwright');
   const browser = await pw.chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const timer = setTimeout(() => void browser.close().catch(() => undefined), REVIEW_TIMEOUT_MS);
   try {
-    const page = await (await browser.newContext({ viewport: { width: 700, height: 1300 } })).newPage();
+    const page = await (await browser.newContext({ viewport: { width: 700, height: 1300 }, deviceScaleFactor: scale })).newPage();
     await page.route('**/__review-film.json', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify(composition) }));
     await page.goto(`${base}/stage-check.html?film=live&file=${encodeURIComponent('/__review-film.json')}`);
     await page.waitForFunction(() => Boolean((window as unknown as { __stage?: unknown }).__stage), undefined, { timeout: STAGE_WAIT_MS });
@@ -320,7 +320,7 @@ export async function renderKeyFrames(composition: unknown, times: number[], bas
     for (const t of times) {
       await page.evaluate((s) => (window as unknown as { __stage: Stage }).__stage.seek(s), t);
       await page.waitForTimeout(settleMs);
-      out.push(await page.locator('canvas').first().screenshot({ type: 'jpeg', quality: 72 }));
+      out.push(await page.locator('canvas').first().screenshot({ type: 'jpeg', quality }));
     }
     return out;
   } finally {
