@@ -45,7 +45,8 @@ export interface ElementSpec {
   form?: ElementForm;
 }
 
-const SHOT = 'on a plain white studio backdrop, clearly separated from it, high-end macro product photograph, sharp focus, soft key light from the upper left. Nothing else in the frame. No text, no logos, no hands.';
+// floating, with no shadow or reflection under it: the cut-out keeps whatever touches the piece, and a blueberry came back fused to a white disc
+const SHOT = 'on a plain white studio backdrop, floating clear of it, with no shadow, reflection, plate or surface under it, high-end macro product photograph, sharp focus, soft key light from the upper left. Nothing else in the frame. No text, no logos, no hands.';
 
 /** The picture prompt for an element, and the size to ask for (a row of stages is wide). Null for glass, liquid and vapour, which have no picture. */
 export function elementPrompt(e: ElementSpec): { prompt: string; size: '1024x1024' | '1536x1024' } | null {
