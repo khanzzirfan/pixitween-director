@@ -3,7 +3,7 @@ import type { ToolCtx } from '@shared/tools';
 import { emitAsset } from '../../art/events';
 import type { Comp } from '../../authoring/types';
 import { composeSheet, labelCrop, swatchesOf } from './compose';
-import { elementSheetComp, productSheetComp, setSheetComp, sheetLabels } from './sheets';
+import { elementSheetComp, panelTimes, productSheetComp, setSheetComp, sheetLabels } from './sheets';
 
 export interface PartSheets {
   product?: Buffer;
@@ -17,7 +17,6 @@ export interface PartSheets {
 
 type Render = (comp: Comp, times: number[]) => Promise<Buffer[]>;
 
-const timesOf = (comp: Comp): number[] => Array.from({ length: comp.durationInFrames as number }, (_, i) => i / (comp.fps as number));
 
 /** Draws the product, element and set sheets of a built film, saves each as a film asset (role 'sheet') and tells the app. A sheet with nothing to show
  * is left out; a sheet that fails to draw is skipped and the others are kept. Throws only when none could be drawn. */
@@ -28,7 +27,7 @@ export async function drawSheets(ctx: ToolCtx, o: { film: Comp; photo: Buffer; r
   const setComp = setSheetComp(o.film);
 
   const names = ['product', 'elements', 'set'] as const;
-  const drawn = await Promise.allSettled([productComp, elementComp, setComp].map((comp) => (comp ? o.render(comp, timesOf(comp)) : Promise.resolve(undefined))));
+  const drawn = await Promise.allSettled([productComp, elementComp, setComp].map((comp) => (comp ? o.render(comp, panelTimes(comp)) : Promise.resolve(undefined))));
   const skipped = drawn.flatMap((d, i) => (d.status === 'rejected' ? [`${names[i]}: ${d.reason instanceof Error ? d.reason.message : String(d.reason)}`] : []));
   if (skipped.length && drawn.every((d) => d.status === 'rejected' || !d.value)) throw new Error(skipped.join('; '));
   const [turns, elementShots, setShots] = drawn.map((d) => (d.status === 'fulfilled' ? d.value : undefined));

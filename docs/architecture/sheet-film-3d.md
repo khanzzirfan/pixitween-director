@@ -129,7 +129,7 @@ tub turned into a card at 90 degrees and berries were coins.
 
 Muse's spots add to the key, and on 4 Nov a white tub under a 3.4 key, two spots (4 and 3), a 1.8 rim and a 0.72 glow threshold burned its
 lid to flat white. `lightBudget` (cinematic-film.ts) now takes a share of the key and rim per unit of spot strength (never below 0.55), and a
-pale product (side colour luma over 0.6) takes less key, rim and spot and glows only above 0.88. The numbers are `LIGHT.pale` and
+pale product (side colour luma over 0.6) takes less rim and spot and glows only above 0.88; its key stays (a cut key lost a low-key tub in black). The element sheet draws each element halfway through its own two frames, so a splash shows risen, not as the flat disc of its first instant. The numbers are `LIGHT.pale` and
 `SPOT.share`/`SPOT.floor` in cinematic-rules.ts.
 
 The element sheet shows one piece of each element (not its swarm, which is empty in a still), and the set sheet keeps the film's air

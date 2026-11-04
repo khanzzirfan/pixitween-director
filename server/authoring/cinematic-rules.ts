@@ -126,9 +126,9 @@ export const LIGHT = {
   shadow: 0.6,
   /** a set's exposure is scaled by this: the stronger key would otherwise burn the floor to cream */
   exposure: 0.85,
-  /** a pale product (its side colour brighter than `luma`: a white tub, a cream bottle) burns to flat white under the full rig, so its key,
-   * rim and spots are scaled by these and the glow starts no lower than `bloom` */
-  pale: { luma: 0.6, key: 0.8, rim: 0.65, spot: 0.7, bloom: 0.88 },
+  /** a pale product (its side colour brighter than `luma`: a white tub, a cream bottle) burns to flat white under the full rig, so its rim
+   * and spots are scaled by these and the glow starts no lower than `bloom`. Its key stays (key 1): cut too, a low-key film lost the tub in black */
+  pale: { luma: 0.6, key: 1, rim: 0.65, spot: 0.7, bloom: 0.88 },
 } as const;
 
 /**
