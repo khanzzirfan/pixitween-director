@@ -31,3 +31,6 @@ data=s19-hero3d/
 docs/demo/
 scripts/demo-cut.py
 scripts/demo-record.ts
+
+# Playwright output; never commit scratch files with keys here
+test-results/
