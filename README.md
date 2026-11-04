@@ -13,7 +13,7 @@
 <p align="center"><em>Three real runs on 4 Nov 2026, one photo and one sentence each, 10 s, 9:16. Each product is a real 3D object wearing the customer's photo, with the title and price set in 3D type. Nothing is painted or edited by hand. Shot-by-shot frames are under <a href="#three-briefs-three-films">Three briefs, three films</a>.</em></p>
 
 <p align="center">
-  <a href="https://youtu.be/xi4DvqrCDm8"><b>Watch the 3-minute demo</b></a> · <a href="#try-it-in-10-minutes"><b>Run it in 10 minutes</b></a> · <a href="https://github.com/khanzzirfan/pixitween-director"><b>Code (Apache 2.0)</b></a> · <b>Team:</b> Irfan
+  <a href="https://youtu.be/VFWEXzESuGU"><b>Watch the 3-minute demo</b></a> · <a href="#try-it-in-10-minutes"><b>Run it in 10 minutes</b></a> · <a href="https://github.com/khanzzirfan/pixitween-director"><b>Code (Apache 2.0)</b></a> · <b>Team:</b> Irfan
 </p>
 
 > **Judges, short on time?** Jump straight to **[Run it locally](#1-run-it-locally)**: one Muse API key, then `npm ci` and `npm run dev`, and open http://localhost:5173.
@@ -146,7 +146,7 @@ Design documents: [sheet film](docs/architecture/sheet-film-3d.md) · [cinematic
 | 4 | [Turn a whole catalog into ads](#4-turn-a-whole-catalog-into-ads) | 1 min to start |
 | 5 | [Export an MP4, or a final AI movie](#5-export-an-mp4-or-a-final-ai-movie) | 1 min, or a few minutes for the AI movie |
 
-No time to run it? [Watch the 3-minute demo](https://youtu.be/xi4DvqrCDm8).
+No time to run it? [Watch the 3-minute demo](https://youtu.be/VFWEXzESuGU).
 
 ### 1. Run it locally
 
@@ -314,7 +314,7 @@ A film's cost is its Muse Spark calls (about $0.005 each), a few Muse Image elem
 
 ## Demo
 
-- **Video (3 min):** [https://youtu.be/xi4DvqrCDm8](https://youtu.be/xi4DvqrCDm8)
+- **Video (3 min):** [https://youtu.be/VFWEXzESuGU](https://youtu.be/VFWEXzESuGU)
 - **Run it yourself:** see [Try it in 10 minutes](#try-it-in-10-minutes). You only need a Meta API key.
 
 ## Limitations
