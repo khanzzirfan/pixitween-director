@@ -15,26 +15,32 @@ const env = (over: Record<string, string | undefined>) => loadEnv({ ...over });
 
 it('a Director code spends the server key, even when a visitor key is also sent', () => {
   const headers = new Headers({ [PASSCODE_HEADER]: 'studio-code', [MUSE_KEY_HEADER]: 'visitor-key-123' });
-  const resolved = resolveAccess(headers, env({ DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' }));
+  const resolved = resolveAccess(headers, env({ IS_SERVER: 'true', DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' }));
   expect(resolved).toEqual({ ok: true, access: { source: 'code', key: 'server-key-123' } });
 });
 
 it('a visitor key is used when the code is missing or wrong', () => {
   const headers = new Headers({ [MUSE_KEY_HEADER]: 'visitor-key-123' });
-  const resolved = resolveAccess(headers, env({ DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' }));
+  const resolved = resolveAccess(headers, env({ IS_SERVER: 'true', DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' }));
   expect(resolved).toEqual({ ok: true, access: { source: 'user', key: 'visitor-key-123' } });
   const wrong = resolveAccess(new Headers({ [PASSCODE_HEADER]: 'nope', [MUSE_KEY_HEADER]: 'visitor-key-123' }), env({ DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' }));
   expect(wrong).toEqual({ ok: true, access: { source: 'user', key: 'visitor-key-123' } });
 });
 
-it('LOCALHOST_RUN lets a request through with no code and no key, even when a code is set', () => {
-  const resolved = resolveAccess(new Headers(), env({ LOCALHOST_RUN: 'true', DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' }));
+it('without IS_SERVER a request runs like localhost, even when a code is set', () => {
+  const resolved = resolveAccess(new Headers(), env({ DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' }));
   expect(resolved).toEqual({ ok: true, access: { source: 'server', key: 'server-key-123' } });
 });
 
-it('refuses a deployed request that has neither a code nor a key', () => {
-  expect(resolveAccess(new Headers(), env({ DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' })).ok).toBe(false);
-  expect(resolveAccess(new Headers({ [MUSE_KEY_HEADER]: 'short' }), env({ DIRECTOR_PASSCODE: 'studio-code' })).ok).toBe(false);
+it('IS_SERVER with its keys missing runs like localhost', () => {
+  expect(resolveAccess(new Headers(), env({ IS_SERVER: 'true', META_API_KEY: 'server-key-123' })).ok).toBe(true);
+  expect(resolveAccess(new Headers(), env({ IS_SERVER: 'true', DIRECTOR_PASSCODE: 'studio-code' })).ok).toBe(true);
+});
+
+it('IS_SERVER with its keys set refuses a request that has neither a code nor a key', () => {
+  const server = { IS_SERVER: 'true', DIRECTOR_PASSCODE: 'studio-code', META_API_KEY: 'server-key-123' };
+  expect(resolveAccess(new Headers(), env(server)).ok).toBe(false);
+  expect(resolveAccess(new Headers({ [MUSE_KEY_HEADER]: 'short' }), env(server)).ok).toBe(false);
 });
 
 it('uses the server key when no code is configured', () => {

@@ -53,8 +53,8 @@ const schema = z.object({
   GLIMMER_BASE_URL: z.string().default('http://localhost:11434'),
   GLIMMER_MODEL: z.string().default('muse-glimmer:30b-mlx'),
   DIRECTOR_PASSCODE: optStr,
-  /** A judge running on their own machine: skip the studio code and key checks. Never set this on a shared host. */
-  LOCALHOST_RUN: bool,
+  /** A deployed host: check the studio code and keys. If those keys are not set, or this is unset, run like localhost. */
+  IS_SERVER: bool,
   DIRECTOR_REPLAY: bool,
   DIRECTOR_RECORD: bool,
   DIRECTOR_FIXTURES_DIR: z.string().default('fixtures/replay'),
