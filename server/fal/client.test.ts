@@ -1,6 +1,8 @@
 import { afterEach, expect, it } from 'vitest';
 import { sendJson, startTestServer } from '../meta/test-server';
-import { createFalClient, falReel, FAL_REEL_IMAGE, FAL_REEL_TEXT } from './client';
+import { createFalClient } from './client';
+
+const MODEL = 'minimax/h3-max/reference-to-video';
 import { FalApiError } from './errors';
 
 const servers: Array<{ close(): Promise<void> }> = [];
@@ -8,12 +10,27 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => s.close()));
 });
 
-it('builds a 9:16 text reel and an image reel without an aspect field', () => {
-  expect(falReel({ prompt: 'a towel turns' })).toMatchObject({ model: FAL_REEL_TEXT, input: { aspect_ratio: '9:16' } });
-  const image = falReel({ prompt: 'a towel turns', imageUrl: 'https://cdn.example/towel.jpg' });
-  expect(image.model).toBe(FAL_REEL_IMAGE);
-  expect(image.input).not.toHaveProperty('aspect_ratio');
-  expect(image.input.image_url).toBe('https://cdn.example/towel.jpg');
+it('stores a file on the Fal CDN and returns the url a model can fetch', async () => {
+  const calls: Array<{ url: string; method?: string; auth: string | null; body: unknown }> = [];
+  const fetchImpl: typeof fetch = async (input, init) => {
+    calls.push({ url: String(input), method: init?.method, auth: new Headers(init?.headers).get('authorization'), body: init?.body });
+    if (String(input).includes('/storage/upload/initiate')) {
+      return new Response(JSON.stringify({ upload_url: 'https://v3.fal.media/upload/abc', file_url: 'https://v3.fal.media/files/abc.jpg' }), { status: 200 });
+    }
+    return new Response(null, { status: 200 });
+  };
+  const client = createFalClient({ apiKey: 'fal-key-1234567890', fetchImpl });
+  const url = await client.upload(new Uint8Array([1, 2, 3]), 'image/jpeg', 'shot-1.jpg');
+  expect(url).toBe('https://v3.fal.media/files/abc.jpg');
+  expect(JSON.parse(String(calls[0]!.body))).toEqual({ content_type: 'image/jpeg', file_name: 'shot-1.jpg' });
+  expect(calls[0]!.auth).toBe('Key fal-key-1234567890');
+  expect(calls[1]).toMatchObject({ url: 'https://v3.fal.media/upload/abc', method: 'PUT' });
+});
+
+it('refuses an upload target that is not https', async () => {
+  const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({ upload_url: 'http://10.0.0.1/put', file_url: 'https://v3.fal.media/files/abc.jpg' }), { status: 200 });
+  const client = createFalClient({ apiKey: 'fal-key-1234567890', fetchImpl });
+  await expect(client.upload(new Uint8Array([1]), 'image/jpeg', 'a.jpg')).rejects.toBeInstanceOf(FalApiError);
 });
 
 it('submits with the Fal key and refuses a status URL on another host', async () => {
@@ -27,7 +44,7 @@ it('submits with the Fal key and refuses a status URL on another host', async ()
   });
   servers.push(srv);
   const client = createFalClient({ apiKey: 'fal-key-1234567890', baseUrl: srv.baseUrl.replace(/\/v1$/, '') });
-  await expect(client.submit(FAL_REEL_TEXT, { prompt: 'a reel' })).rejects.toBeInstanceOf(FalApiError);
+  await expect(client.submit(MODEL, { prompt: 'a reel' })).rejects.toBeInstanceOf(FalApiError);
 });
 
 it('polls the queue host and reads the video url', async () => {
@@ -49,7 +66,7 @@ it('polls the queue host and reads the video url', async () => {
   });
   servers.push(srv);
   const client = createFalClient({ apiKey: 'fal-key-1234567890', baseUrl: srv.baseUrl.replace(/\/v1$/, ''), sleep: async () => undefined, pollIntervalMs: 0 });
-  const handle = await client.submit(FAL_REEL_TEXT, { prompt: 'a reel', aspect_ratio: '9:16' });
+  const handle = await client.submit(MODEL, { prompt: 'a reel', aspect_ratio: '9:16' });
   const result = await client.waitFor(handle, { timeoutMs: 1000 });
   expect(result.videoUrl).toBe('https://v3.fal.media/reel.mp4');
 });

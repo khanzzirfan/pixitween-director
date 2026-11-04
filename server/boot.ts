@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import { registerCrew } from './crew/boot';
 import type { AppDeps } from './http/deps';
+import { registerAiVideoRoutes } from './http/handlers/ai-video';
 import { registerVideoRoutes } from './http/handlers/video-keys';
 import { installFilmQueue } from './http/film-queue-install';
 import { resumeGenerations } from './tools/generate';
@@ -16,5 +17,8 @@ export const bootHooks: BootHook[] = [
   },
   installFilmQueue,
   registerCrew,
-  ({ app }) => registerVideoRoutes(app),
+  ({ app, deps }) => {
+    registerVideoRoutes(app);
+    registerAiVideoRoutes(app, deps);
+  },
 ];

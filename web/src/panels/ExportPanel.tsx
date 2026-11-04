@@ -10,6 +10,7 @@ import { recordCanvas } from '../export/recordCanvas';
 import { cancelRenderExport, downloadRenderExport, pollRenderExport, renderExportAvailable, startRenderExport, type ExportQuality } from '../export/renderExport';
 import { checkMp4OnServer, exportMp4ViaServer } from '../export/serverExport';
 import { EXPORT_READY_WAIT_SEC, ExportError, NOT_READY_MESSAGE, type ExportPlayerHandle } from '../export/types';
+import AiMovieCard, { type AiMovieDeps } from './AiMovieCard';
 import type { PanelProps } from './types';
 
 export const STUB_OWNER = 'S8a' as const;
@@ -33,6 +34,8 @@ export interface ExportPanelProps extends PanelProps {
     pollRenderExport?: typeof pollRenderExport;
     downloadRenderExport?: typeof downloadRenderExport;
     cancelRenderExport?: typeof cancelRenderExport;
+    /** The AI movie card's calls (quote, start, poll). */
+    aiVideo?: AiMovieDeps;
   };
 }
 
@@ -255,6 +258,7 @@ export default function ExportPanel({ film, getPlayer, deps = {} }: ExportPanelP
       {notes.map((n) => (
         <p key={n}>{n}</p>
       ))}
+      <AiMovieCard filmId={film?.id} title={film?.title} hasContent={hasContent} deps={deps.aiVideo} />
     </div>
   );
 }

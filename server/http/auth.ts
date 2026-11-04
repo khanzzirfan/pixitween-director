@@ -24,7 +24,7 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** Video keys are the visitor's own. They are not the Muse passcode, and they are locked to the session and IP. */
 function isVisitorVideoRoute(path: string): boolean {
-  return path === '/api/video-keys' || path === '/api/videos' || path.startsWith('/api/videos/');
+  return path === '/api/video-keys';
 }
 
 export const passcode: MiddlewareHandler = async (c, next) => {

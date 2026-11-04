@@ -39,15 +39,18 @@ export function staticBox(
 
 const FLAT_ROLES = ['bg', 'subject', 'product'];
 
-/** `frame` is a frame of the scene; the layers are placed where they are at that moment (default: the first frame). */
-export async function flattenScene(ctx: Pick<ToolCtx, 'assets'>, comp: Comp, sceneId: string, size: { width: number; height: number }, frame = 0): Promise<Buffer> {
+/** The picture layers of a scene that flattenScene draws: visible images in the bg, subject and product roles. */
+export function flatLayers(comp: Comp, sceneId: string): Array<Record<string, any>> {
   const precomp = (comp.precomps as Record<string, { layers: Array<Record<string, any>> }> | undefined)?.[sceneId];
   const roles = (comp.meta as { director?: { layers?: Record<string, { role: string }> } } | undefined)?.director?.layers ?? {};
+  return (precomp?.layers ?? []).filter((l) => l.kind === 'image' && !l.hidden && l.assetId && (!roles[l.id] || FLAT_ROLES.includes(roles[l.id]!.role)));
+}
+
+/** `frame` is a frame of the scene; the layers are placed where they are at that moment (default: the first frame). */
+export async function flattenScene(ctx: Pick<ToolCtx, 'assets'>, comp: Comp, sceneId: string, size: { width: number; height: number }, frame = 0): Promise<Buffer> {
   const draw: Array<{ png: Buffer; left: number; top: number }> = [];
 
-  for (const layer of precomp?.layers ?? []) {
-    if (layer.kind !== 'image' || layer.hidden || !layer.assetId) continue;
-    if (roles[layer.id] && !FLAT_ROLES.includes(roles[layer.id]!.role)) continue;
+  for (const layer of flatLayers(comp, sceneId)) {
     const bytes = await ctx.assets.read(layer.assetId);
     const natural = await imageSize(bytes);
     const box = staticBox(layer as never, natural, size, frame);

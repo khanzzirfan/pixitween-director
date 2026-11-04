@@ -1,10 +1,9 @@
-// A visitor's Fal, Higgsfield, and Revana keys. The file is named by an HttpOnly cookie.
+// A visitor's Fal key. The file is named by an HttpOnly cookie.
 // The key is read back only when the request IP hashes to the same value that saved it.
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { VIDEO_PROVIDERS, type VideoKeyStatus, type VideoKeyUpdate, type VideoProvider } from '@shared/api';
-import { parseHiggsfieldKey } from '../higgsfield/client';
+import { VIDEO_PROVIDERS, type VideoKeyStatus, type VideoKeyUpdate } from '@shared/api';
 
 export const VIDEO_SESSION_COOKIE = 'mr_video';
 const MAX_AGE_SEC = 12 * 60 * 60;
@@ -12,8 +11,6 @@ const ID = /^[a-f0-9]{64}$/;
 
 export interface VideoSecrets {
   fal?: string;
-  higgsfield?: string;
-  revana?: string;
 }
 
 interface SessionRecord {
@@ -66,16 +63,14 @@ export function clearVideoSessionCookie(secure: boolean): string {
 }
 
 export function keyStatus(keys: VideoSecrets): VideoKeyStatus {
-  return { fal: Boolean(keys.fal), higgsfield: Boolean(keys.higgsfield), revana: Boolean(keys.revana) };
+  return { fal: Boolean(keys.fal) };
 }
 
 /** A reason the pasted value cannot be stored, or undefined when it is acceptable. The value is never included. */
-export function rejectKey(provider: VideoProvider, value: string): string | undefined {
+export function rejectKey(value: string): string | undefined {
   const key = value.trim();
   if (/\s/.test(key)) return 'bad_key';
-  if (provider === 'higgsfield') return parseHiggsfieldKey(key) ? undefined : 'bad_key';
-  const min = provider === 'fal' ? 16 : 12;
-  if (key.length < min || key.length > 400) return 'bad_key';
+  if (key.length < 16 || key.length > 400) return 'bad_key';
   return undefined;
 }
 
@@ -141,7 +136,7 @@ export function validateUpdate(update: VideoKeyUpdate): string | undefined {
   for (const provider of VIDEO_PROVIDERS) {
     const value = update[provider];
     if (value === undefined || !value.trim()) continue;
-    if (rejectKey(provider, value)) return provider;
+    if (rejectKey(value)) return provider;
   }
   for (const provider of update.clear ?? []) {
     if (!VIDEO_PROVIDERS.includes(provider)) return provider;
@@ -163,7 +158,7 @@ export function saveVideoSession(dataDir: string, cookieHeader: string | undefin
   if (existing && live(existing) && !same(existing.ipHash, hashIp(ip))) return { error: 'ip_locked' };
   const id = existing && same(existing.ipHash, hashIp(ip)) ? existingId! : randomBytes(32).toString('hex');
   const keys = apply(existing && id === existingId ? existing.keys : {}, update);
-  const empty = !keys.fal && !keys.higgsfield && !keys.revana;
+  const empty = !keys.fal;
   if (empty) {
     const path = pathFor(dataDir, id);
     if (path) rmSync(path, { force: true });
