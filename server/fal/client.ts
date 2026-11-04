@@ -2,6 +2,7 @@
 import { FalApiError, FalTimeoutError } from './errors';
 
 export const FAL_QUEUE_ORIGIN = 'https://queue.fal.run';
+export const FAL_STORAGE_ORIGIN = 'https://rest.alpha.fal.ai';
 const MODEL_ID = /^[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)+$/;
 const MAX_TRANSIENT = 3;
 
@@ -9,6 +10,8 @@ export interface FalClientConfig {
   apiKey: string;
   /** Queue origin, including scheme. Tests point this at a local server. */
   baseUrl?: string;
+  /** Storage origin, including scheme. Tests point this at a local server. */
+  storageUrl?: string;
   fetchImpl?: typeof fetch;
   pollIntervalMs?: number;
   sleep?: (ms: number) => Promise<void>;
@@ -32,6 +35,8 @@ export interface FalResult {
 }
 
 export interface FalClient {
+  /** Store a file on Fal's CDN and return the public URL a model can fetch. */
+  upload(bytes: Uint8Array, contentType: string, fileName: string, opts?: { signal?: AbortSignal }): Promise<string>;
   submit(model: string, input: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<FalHandle>;
   status(handle: FalHandle, opts?: { signal?: AbortSignal }): Promise<FalStatus>;
   result(handle: FalHandle, opts?: { signal?: AbortSignal }): Promise<FalResult>;
@@ -74,6 +79,7 @@ export function createFalClient(config: FalClientConfig): FalClient {
   const key = config.apiKey.trim();
   if (!key) throw new FalApiError('Fal apiKey is required', 401, 'unauthorized');
   const origin = (config.baseUrl ?? FAL_QUEUE_ORIGIN).replace(/\/$/, '');
+  const storage = (config.storageUrl ?? FAL_STORAGE_ORIGIN).replace(/\/$/, '');
   const doFetch = config.fetchImpl ?? fetch;
   const pollMs = config.pollIntervalMs ?? 4_000;
   const sleep = config.sleep ?? sleepDefault;
@@ -96,6 +102,15 @@ export function createFalClient(config: FalClientConfig): FalClient {
   }
 
   const client: FalClient = {
+    async upload(bytes, contentType, fileName, opts) {
+      const start = await call(`${storage}/storage/upload/initiate?storage_type=fal-cdn-v3`, { method: 'POST', headers, body: JSON.stringify({ content_type: contentType, file_name: fileName }) }, opts?.signal);
+      const target = (await start.json()) as { upload_url?: string; file_url?: string };
+      if (!target.upload_url || !target.file_url) throw new FalApiError('Fal upload returned no URL', 502, 'bad_response');
+      for (const url of [target.upload_url, target.file_url]) if (!/^https:\/\//.test(url)) throw new FalApiError('Fal returned an upload URL that is not https', 502, 'bad_url');
+      await call(target.upload_url, { method: 'PUT', headers: { 'Content-Type': contentType }, body: bytes as BodyInit }, opts?.signal);
+      return target.file_url;
+    },
+
     async submit(model, input, opts) {
       if (!MODEL_ID.test(model)) throw new FalApiError('Fal model id is not a path like owner/app/endpoint', 400, 'bad_model');
       const res = await call(`${origin}/${model}`, { method: 'POST', headers, body: JSON.stringify(input) }, opts?.signal);
@@ -132,16 +147,4 @@ export function createFalClient(config: FalClientConfig): FalClient {
   };
 
   return client;
-}
-
-/** MiniMax H3 Max on Fal. A still is the opening frame. Text-only reels are 9:16. */
-export const FAL_REEL_TEXT = 'minimax/h3-max/text-to-video';
-export const FAL_REEL_IMAGE = 'minimax/h3-max/image-to-video';
-
-export function falReel(req: { prompt: string; imageUrl?: string; duration?: number }): { model: string; input: Record<string, unknown> } {
-  const duration = req.duration ?? 6;
-  if (req.imageUrl) {
-    return { model: FAL_REEL_IMAGE, input: { prompt: req.prompt, image_url: req.imageUrl, resolution: '768P', duration, prompt_expansion_mode: 'balanced' } };
-  }
-  return { model: FAL_REEL_TEXT, input: { prompt: req.prompt, aspect_ratio: '9:16', resolution: '768P', duration, prompt_expansion_mode: 'balanced' } };
 }

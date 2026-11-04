@@ -18,7 +18,7 @@ it('sends the visitor key only when no code is saved', () => {
 
 it('names a saved video key without sending it as the Muse key', () => {
   saveAccess({ code: '', museKey: '' });
-  expect(accessLabel('none', { fal: true, higgsfield: false, revana: false })).toBe('Video key');
+  expect(accessLabel('none', { fal: true })).toBe('Video key');
   expect(credentialHeaders()).toEqual({});
 });
 

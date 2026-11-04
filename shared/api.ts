@@ -80,35 +80,50 @@ export interface ExportCheckResponse {
   problems: string[];
 }
 
-/** Video providers a visitor can paste in Settings. Each key is stored for that browser session and that IP only. */
-export const VIDEO_PROVIDERS = ['fal', 'higgsfield', 'revana'] as const;
+/** The one video provider a visitor can paste a key for. The key is stored for that browser session and that IP only. */
+export const VIDEO_PROVIDERS = ['fal'] as const;
 export type VideoProvider = (typeof VIDEO_PROVIDERS)[number];
 
 export interface VideoKeyStatus {
   fal: boolean;
-  higgsfield: boolean;
-  revana: boolean;
 }
 
 /** Omitted fields stay as they are. A name in `clear` removes that key. Values are write-only. */
 export interface VideoKeyUpdate {
   fal?: string;
-  higgsfield?: string;
-  revana?: string;
   clear?: VideoProvider[];
 }
 
-/** A 9:16 reel. The server spends only the key saved for this browser session and this IP. */
-export interface VideoCreateRequest {
-  provider: VideoProvider;
-  prompt: string;
-  imageUrl?: string;
-  duration?: number;
+/** Resolutions the AI movie is offered at: a cheap draft and the standard cut. */
+export const AI_VIDEO_RESOLUTIONS = ['480P', '768P'] as const;
+export type AiVideoResolution = (typeof AI_VIDEO_RESOLUTIONS)[number];
+
+/** What an AI movie of this film would be and cost, before anything is spent. */
+export interface AiVideoQuote {
+  resolution: AiVideoResolution;
+  /** Length of the clip the model makes. A film longer than the model allows is cut to fit. */
+  durationSec: number;
+  filmSec: number;
+  costUsd: number;
+  /** How many of the film's scenes become reference frames. */
+  frames: number;
+  /** Scenes with nothing to draw a frame from (a generated clip, a bare 3D stage). */
+  skippedScenes: string[];
+  /** Whether the visitor has saved a Fal key. The server never spends one of its own. */
+  keyReady: boolean;
 }
 
-export interface VideoJobResponse {
+export type AiVideoStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface AiVideoJob {
   id: string;
-  provider: VideoProvider;
-  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  filmId: string;
+  status: AiVideoStatus;
+  resolution: AiVideoResolution;
+  durationSec: number;
+  costUsd: number;
+  queuePosition?: number;
+  /** Same-origin URL of the finished MP4, set once the job has succeeded. */
   videoUrl?: string;
+  error?: string;
 }

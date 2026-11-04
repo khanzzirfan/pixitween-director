@@ -3,7 +3,7 @@ import type { VideoKeyStatus, VideoKeyUpdate, VideoProvider } from '@shared/api'
 import { accessMode, readAccess, saveAccess, type AccessMode } from './access';
 import './settings.css';
 
-const emptyVideo: VideoKeyStatus = { fal: false, higgsfield: false, revana: false };
+const emptyVideo: VideoKeyStatus = { fal: false };
 
 async function readVideoKeys(): Promise<{ status: VideoKeyStatus; locked: boolean }> {
   const response = await fetch('/api/video-keys');
@@ -17,8 +17,6 @@ export function SettingsDialog({ onClose }: { onClose(): void }) {
   const [code, setCode] = useState(saved.code);
   const [museKey, setMuseKey] = useState(saved.museKey);
   const [fal, setFal] = useState('');
-  const [higgsfield, setHiggsfield] = useState('');
-  const [revana, setRevana] = useState('');
   const [clear, setClear] = useState<VideoProvider[]>([]);
   const [video, setVideo] = useState<VideoKeyStatus>(emptyVideo);
   const [locked, setLocked] = useState(false);
@@ -69,10 +67,8 @@ export function SettingsDialog({ onClose }: { onClose(): void }) {
     setVideoError('');
     const update: VideoKeyUpdate = {};
     if (fal.trim()) update.fal = fal.trim();
-    if (higgsfield.trim()) update.higgsfield = higgsfield.trim();
-    if (revana.trim()) update.revana = revana.trim();
     if (clear.length) update.clear = clear;
-    const sending = Boolean(update.fal || update.higgsfield || update.revana || update.clear?.length);
+    const sending = Boolean(update.fal || update.clear?.length);
     try {
       if (sending || locked) {
         const response = await fetch(`/api/video-keys${locked ? '?fresh=1' : ''}`, {
@@ -82,7 +78,7 @@ export function SettingsDialog({ onClose }: { onClose(): void }) {
         });
         const body = (await response.json().catch(() => ({}))) as { error?: string; provider?: string };
         if (!response.ok) {
-          setVideoError(body.error === 'ip_locked' ? 'This browser session is locked to another network.' : body.error === 'bad_key' ? `That ${body.provider ?? 'video'} key was not accepted.` : 'The video keys could not be saved.');
+          setVideoError(body.error === 'ip_locked' ? 'This browser session is locked to another network.' : body.error === 'bad_key' ? 'That Fal key was not accepted.' : 'The video keys could not be saved.');
           setBusy(false);
           return;
         }
@@ -99,8 +95,6 @@ export function SettingsDialog({ onClose }: { onClose(): void }) {
     setCode('');
     setMuseKey('');
     setFal('');
-    setHiggsfield('');
-    setRevana('');
     setClear([]);
     setVideo(emptyVideo);
     setLocked(false);
@@ -120,7 +114,7 @@ export function SettingsDialog({ onClose }: { onClose(): void }) {
           <button type="button" className="set-x" aria-label="Close settings" onClick={onClose}>×</button>
         </header>
         <p className="set-lead">
-          A Director code from us runs films on our Muse key. Without a code, this server uses the Muse key you paste here. Fal, Higgsfield, and Revana keys make 9:16 reels and stay on this browser session and this network.
+          A Director code from us runs films on our Muse key. Without a code, this server uses the Muse key you paste here. An optional Fal key turns a finished film into an AI movie from the Export panel. It is yours, not ours: it stays on this browser session and this network, and we never spend one of our own.
         </p>
         <label className="set-field">
           <span>Director code</span>
@@ -131,19 +125,9 @@ export function SettingsDialog({ onClose }: { onClose(): void }) {
           <input type="password" autoComplete="off" spellCheck={false} value={museKey} placeholder="Used when there is no code" onChange={(e) => setMuseKey(e.target.value)} />
         </label>
         <label className="set-field">
-          <span className="set-field-head"><span>Fal API key</span>{savedLabel('fal') && <span className="set-saved">{savedLabel('fal')}</span>}</span>
-          <input type="password" autoComplete="off" spellCheck={false} value={fal} placeholder={video.fal ? 'Saved for this network' : 'Key from fal.ai'} onChange={(e) => setFal(e.target.value)} />
+          <span className="set-field-head"><span>Fal API key (optional)</span>{savedLabel('fal') && <span className="set-saved">{savedLabel('fal')}</span>}</span>
+          <input type="password" autoComplete="off" spellCheck={false} value={fal} placeholder={video.fal ? 'Saved for this network' : 'Key from fal.ai/dashboard/keys'} onChange={(e) => setFal(e.target.value)} />
           {video.fal && <button type="button" className="set-remove" onClick={() => toggleClear('fal')}>{clear.includes('fal') ? 'Keep saved key' : 'Remove saved key'}</button>}
-        </label>
-        <label className="set-field">
-          <span className="set-field-head"><span>Higgsfield API key</span>{savedLabel('higgsfield') && <span className="set-saved">{savedLabel('higgsfield')}</span>}</span>
-          <input type="password" autoComplete="off" spellCheck={false} value={higgsfield} placeholder={video.higgsfield ? 'Saved for this network' : 'keyId:secret'} onChange={(e) => setHiggsfield(e.target.value)} />
-          {video.higgsfield && <button type="button" className="set-remove" onClick={() => toggleClear('higgsfield')}>{clear.includes('higgsfield') ? 'Keep saved key' : 'Remove saved key'}</button>}
-        </label>
-        <label className="set-field">
-          <span className="set-field-head"><span>Revana API key</span>{savedLabel('revana') && <span className="set-saved">{savedLabel('revana')}</span>}</span>
-          <input type="password" autoComplete="off" spellCheck={false} value={revana} placeholder={video.revana ? 'Saved for this network' : 'Key from revana.si'} onChange={(e) => setRevana(e.target.value)} />
-          {video.revana && <button type="button" className="set-remove" onClick={() => toggleClear('revana')}>{clear.includes('revana') ? 'Keep saved key' : 'Remove saved key'}</button>}
         </label>
         <p className={`set-status is-${mode}`} role="status">{using}</p>
         {locked && <p className="set-status is-locked" role="status">The keys in this browser were saved on another network. Saving again starts a new session for this network and leaves the old keys unused.</p>}

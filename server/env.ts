@@ -47,9 +47,6 @@ const schema = z.object({
   META_SPARK_MODEL: z.string().default('muse-spark-1.3-contributor'),
   CLIPPY_MCP_URL: optStr,
   CLIPPY_TOKEN: optStr,
-  /** Optional. One Revana key pays for Seedance 2.5 video and MiniMax M3 chat. Unset means that path is off. */
-  REVANA_API_KEY: optStr,
-  REVANA_BASE_URL: z.string().default('https://api.revana.si/v1'),
   GLIMMER_BASE_URL: z.string().default('http://localhost:11434'),
   GLIMMER_MODEL: z.string().default('muse-glimmer:30b-mlx'),
   DIRECTOR_PASSCODE: optStr,

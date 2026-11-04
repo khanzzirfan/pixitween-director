@@ -49,3 +49,19 @@ export function mugScene(): Comp {
   c = addLayer(c, { sceneId: 's1', role: 'headline', kind: 'text', text: 'Slow mornings' });
   return c;
 }
+
+export const TOWEL_PHOTO = 'ast_0123456789abcdef0123456789abcdef';
+
+/** A 9:16 film: `count` motion scenes of `sec` seconds, each with a backdrop and a product picture, plus optional scenes with nothing to draw from. */
+export function towelFilm(o: { count?: number; sec?: number; bare?: number } = {}): Comp {
+  let c = newFilmComposition({ aspect: '9:16', title: 'Towel', palette: ['#0F3B4D'] });
+  c = registerAsset(c, { id: TOWEL_PHOTO, kind: 'image', src: `/api/assets/${TOWEL_PHOTO}`, width: 400, height: 300 });
+  for (let i = 1; i <= (o.count ?? 3); i++) {
+    c = addScene(c, { id: `s${i}`, durationSec: o.sec ?? 3, mode: 'motion', intent: `Shot ${i} of the towel.` });
+    c = addLayer(c, { sceneId: `s${i}`, role: 'bg', kind: 'image', assetId: TOWEL_PHOTO });
+    c = addLayer(c, { sceneId: `s${i}`, role: 'product', kind: 'image', assetId: TOWEL_PHOTO });
+    c = addLayer(c, { sceneId: `s${i}`, role: 'headline', kind: 'text', text: 'Soft terry' });
+  }
+  for (let i = 1; i <= (o.bare ?? 0); i++) c = addScene(c, { id: `b${i}`, durationSec: 3, mode: 'motion' });
+  return c;
+}
