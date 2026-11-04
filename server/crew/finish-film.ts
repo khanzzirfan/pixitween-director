@@ -6,6 +6,7 @@ import { finishComposition } from '../authoring/finish';
 import type { Comp, Obj } from '../authoring/types';
 import { bestFlatTextColor } from '../review/contrast';
 import { listScenes, runRules } from '../review/rules';
+import { fillBackdrops } from './backdrop';
 import { settleTextBoxes } from './text-lane';
 
 /**
@@ -48,7 +49,8 @@ export async function finishedComposition(films: FilmStore, filmId: string, asse
     musicAssetId = ref.id;
   }
   // every box behind words is tied to them once more, after the last edit of any scene
-  for (const s of listScenes(comp)) comp = settleTextBoxes(comp, s.sceneId).comp;
+  // and every backdrop covers its frame, whatever zoom a fix pass left it at
+  for (const s of listScenes(comp)) comp = fillBackdrops(settleTextBoxes(comp, s.sceneId).comp, s.sceneId).comp;
   const finished = finishComposition(comp, { musicAssetId, brief: film.brief.text, ...(film.styleBible?.palette[0] ? { accent: film.styleBible.palette[0] } : {}) });
   return (await settleContrast(finished, assets).catch(() => ({ comp: finished, fixed: [] as string[] }))).comp;
 }

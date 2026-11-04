@@ -110,6 +110,20 @@ export function registerCrewRoutes(app: Hono, deps: AppDeps): void {
     return r.ok ? c.json({ version: r.version ?? (await deps.films.get(film.id)).version }) : c.json({ error: 'pick_failed', message: r.error }, 409);
   });
 
+  // "Regenerate" on a shot: the builder takes it from the start again. A shot that is already being built is left alone.
+  app.post('/api/films/:id/scenes/:sceneId/rebuild', async (c) => {
+    const film = await getFilm(deps, c.req.param('id'));
+    if (!film?.crew) return c.json(film ? { error: 'not_a_crew_film' } : notFound, film ? 409 : 404);
+    const sceneId = c.req.param('sceneId');
+    const scene = film.storyboard?.scenes.find((s) => s.id === sceneId);
+    if (!scene) return c.json(notFound, 404);
+    const session = await ensureCrewSession(film.id);
+    if (session.crew.board.list().some((j) => j.sceneId === sceneId && WRITING_KINDS.includes(j.kind) && !TERMINAL.includes(j.status))) return c.json({ error: 'scene_busy' }, 409);
+    const job = await session.scheduler.dispatch({ kind: 'rebuild-scene', sceneId, origin: 'user', brief: scene.intent, reason: 'the user asked to regenerate it' });
+    session.push({ from: 'system', text: `The user asked to regenerate ${sceneId}.` });
+    return c.json({ jobId: job.id });
+  });
+
   app.post('/api/films/:id/scenes/:sceneId/revert', async (c) => {
     const film = await getFilm(deps, c.req.param('id'));
     if (!film?.crew) return c.json(film ? { error: 'not_a_crew_film' } : notFound, film ? 409 : 404);

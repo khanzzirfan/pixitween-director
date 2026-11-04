@@ -77,6 +77,8 @@ export async function burntShare(frame: Buffer): Promise<number> {
 export const WASHED_LEVEL = 215;
 /** A frame is washed out when more than this share of the picture round the product is near white; the film is when at least half of its frames are. */
 export const WASHED_SHARE = 0.2;
+/** ...and the product, in the middle, differs from that bright surround by less than this in colour (0 to 1): it has lost its edges. */
+export const WASHED_GAP = 0.1;
 
 /**
  * The share of the picture round the product (everything outside its middle half across and middle half down) that is near white, on a small copy.
@@ -154,7 +156,8 @@ export async function measureFrames(frames: Buffer[], photo?: Buffer): Promise<s
     const was = photo ? await middleSaturation(photo).catch(() => undefined) : undefined;
     problems.push(`over-saturated: the middle of frames ${loud.map((x) => x.i + 1).join(', ')} is at ${Math.round(Math.min(...loud.map((x) => x.v)) * 100)}% colour saturation${was !== undefined ? ` (its photo is ${Math.round(was * 100)}%)` : ''}, so the product's own colours (glass, metal, print) merge into one flat colour (lower the grade's saturation and contrast, and soften the coloured key and rim lights)`);
   }
-  const washed = (await Promise.all(frames.map((f) => washedShare(f).catch(() => 0)))).map((v, i) => ({ v, i })).filter((x) => x.v > WASHED_SHARE);
+  // a bright set alone is a choice (a cream studio, a beach): it is a wash only where the product also melts into it
+  const washed = (await Promise.all(frames.map((f) => washedShare(f).catch(() => 0)))).map((v, i) => ({ v, i })).filter((x) => x.v > WASHED_SHARE && gaps[x.i]! < WASHED_GAP);
   if (burnt.length < 2) {
     if (washed.length * 2 >= frames.length && washed.length >= 2) problems.push(`washed out: in ${washed.map((x) => `frame ${x.i + 1} ${Math.round(x.v * 100)}% of the picture round the product is near white`).join(', ')}; the bright wash takes the product's edges and colour (lower the grade's brightness, the glow and the key light, or set the product against a darker world)`);
   }

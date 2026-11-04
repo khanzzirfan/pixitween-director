@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { boardPrompt } from '../authoring/beatsheet';
 import sharp from 'sharp';
-import { isProductTitle, isReadName, isStraightCylinder, otherNouns, pricesIn, productNoun, topLuma } from './cinematic-cut';
+import { isProductTitle, isReadName, quotedName, isStraightCylinder, otherNouns, pricesIn, productNoun, topLuma } from './cinematic-cut';
 
 describe('pricesIn', () => {
   it('shows the lowest price and keeps the highest as the one it was', () => {
@@ -61,6 +61,15 @@ describe('isStraightCylinder', () => {
   });
   it('refuses a bottle with a neck and cap, so it keeps its own outline', async () => {
     expect(await isStraightCylinder(await shape('<rect x="38" y="0" width="24" height="70" fill="#a80"/><rect x="10" y="70" width="80" height="230" fill="#123"/>'))).toBe(false);
+  });
+});
+
+describe('quotedName', () => {
+  it('takes the product name the brief puts in quotes, and nothing from a brief without one', () => {
+    expect(quotedName('Cinematic 10s vertical (9:16) yoghurt ad for the "Pure Spoonful" mixed-berry tub, built from the tub photo')).toBe('Pure Spoonful');
+    expect(quotedName('A soda ad, tagline \u201cFizz Up\u201d')).toBe('Fizz Up');
+    expect(quotedName('Cold brew for energy, VO: "Thick. Creamy. Real."')).toBeUndefined();
+    expect(quotedName('Cold brew for energy')).toBeUndefined();
   });
 });
 

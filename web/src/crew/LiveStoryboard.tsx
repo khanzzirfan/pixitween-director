@@ -41,9 +41,9 @@ function AddSlot({ onAdd }: { onAdd(intent: string): void }) {
   );
 }
 
-/** Without onOps the storyboard is a replay's: nothing on it can be edited. */
-export function LiveStoryboard({ crew, now = Date.now(), onOps }: { crew: CrewState; now?: number; onOps?(ops: StoryboardOp[]): Promise<unknown> | void }) {
-  const scenes = crew.storyboard?.scenes ?? [];
+/** Without onOps the storyboard is a replay's: nothing on it can be edited. `stored` is the film's own plan, shown when no revision came as an event (a 3D film writes its plan in one go). */
+export function LiveStoryboard({ crew, now = Date.now(), onOps, onRebuild, filmStatus, stored }: { crew: CrewState; now?: number; onOps?(ops: StoryboardOp[]): Promise<unknown> | void; onRebuild?(sceneId: string): Promise<unknown> | void; filmStatus?: string; stored?: Scene[] }) {
+  const scenes = crew.storyboard?.scenes ?? stored ?? [];
   const jobs = Object.values(crew.jobs);
   const dragged = useRef<string | null>(null);
   const [error, setError] = useState('');
@@ -70,6 +70,14 @@ export function LiveStoryboard({ crew, now = Date.now(), onOps }: { crew: CrewSt
     const rest = ids.filter((i) => i !== from);
     const at = rest.indexOf(targetId);
     void send([{ op: 'move', sceneId: from, after: rest[at - 1] ?? null }]);
+  };
+  const rebuild = async (sceneId: string) => {
+    setError('');
+    try {
+      await onRebuild?.(sceneId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The shot could not be regenerated.');
+    }
   };
   const remove = (sceneId: string) => {
     if (typeof window.confirm === 'function' && !window.confirm(`Remove ${sceneId}? Its work is stopped.`)) return;
@@ -99,11 +107,12 @@ export function LiveStoryboard({ crew, now = Date.now(), onOps }: { crew: CrewSt
                 scene={s}
                 index={i}
                 total={scenes.length}
-                ring={ringFor(jobs, s.id)}
+                ring={ringFor(jobs, s.id, filmStatus)}
                 isNew={crew.fresh.ids.includes(s.id) && now - freshAt < NEW_GLOW_MS}
                 canRemove={scenes.length > MIN_SCENES}
                 onPatch={(sceneId, patch) => void send([{ op: 'update', sceneId, patch }])}
                 onRemove={remove}
+                {...(onRebuild ? { onRebuild: rebuild } : {})}
                 onMove={move}
                 onDragStart={(id) => { dragged.current = id; }}
                 onDropOn={dropOn}

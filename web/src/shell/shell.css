@@ -212,7 +212,6 @@
 .sh-pane .crew-head { margin-bottom: 8px; align-items: center; }
 .sh-pane .crew-head h2 { font-size: 15px; margin: 0; }
 .sh .scene-card { padding: 10px 12px; gap: 6px; }
-.sh .scene-card .card-actions { position: absolute; right: 8px; bottom: 7px; padding-left: 8px; background: linear-gradient(90deg, transparent, var(--surface) 30%); }
 .sh .add-slot { height: 14px; }
 
 /* empty stage */
