@@ -117,12 +117,20 @@ Sheets are saved as film assets with role `sheet` (`shared/composition.ts`, `sha
 
 ### Shape: Muse names the form, code writes the numbers
 
-A product that is not a straight can is a body swept from its outline. Muse names its form on the board (`body.form`: `round` for a
-bottle, can, tub, jar or fruit; `boxy`; `slab` for a folded towel, pouch or book; `lying` for a rolled towel or loaf), and
-`server/authoring/forms.ts` turns the word into depth and cross-section (round: 0.95 deep, section 2). If the board names no form,
-`formFromPhoto` asks Muse once with the photo ($0.005); the answer is kept on the parts so a revised board cannot lose it. Solid elements
+A product that is not a straight can is a body swept from its outline. Its form (`round` for a bottle, can, tub, jar or fruit; `boxy`;
+`slab` for a folded towel, pouch or book; `lying` for a rolled towel or loaf) is read by `formFromPhoto`, one focused Muse look at the photo
+($0.005) asked while the board is written, and `server/authoring/forms.ts` turns the word into depth and cross-section (round: 0.95 deep,
+section 2). The look wins over the board's own `body.form` (`bodyFor`): on 4 Nov a board called the tub a slab, and the sheet check and a
+revision spent 89 s mending it. The board's depth is kept only when its form agrees; with no form seen, the board's body is used. Solid elements
 carry a form too (`round` berry, `thin` leaf, `chunk` slice). Before this, every body was 0.55 deep with a boxy section, so a round
 tub turned into a card at 90 degrees and berries were coins.
+
+### Light budget
+
+Muse's spots add to the key, and on 4 Nov a white tub under a 3.4 key, two spots (4 and 3), a 1.8 rim and a 0.72 glow threshold burned its
+lid to flat white. `lightBudget` (cinematic-film.ts) now takes a share of the key and rim per unit of spot strength (never below 0.55), and a
+pale product (side colour luma over 0.6) takes less key, rim and spot and glows only above 0.88. The numbers are `LIGHT.pale` and
+`SPOT.share`/`SPOT.floor` in cinematic-rules.ts.
 
 The element sheet shows one piece of each element (not its swarm, which is empty in a still), and the set sheet keeps the film's air
 (bokeh, dust, smoke) with every keyframe held at its first value.

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
 import { PULSE, TITLE_PROPS_MAX, TITLE_REST_TILT, titleExit, titleLeaveAt, titleSpace, wordsBox } from './titles3d';
 import { checkBeatSheet, defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
-import { ELEVATION, rampKeysFor, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, SOLID, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, faceOffset, cutSpeeds, finishPost, shaderCuts, cutParams, spotLights, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
+import { ELEVATION, rampKeysFor, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, SOLID, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, faceOffset, cutSpeeds, finishPost, shaderCuts, cutParams, spotLights, lightBudget, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
 import { CAMERA, LIGHT, MATERIALS, SURFACES } from './cinematic-rules';
 import { FLOOR, floorElements, glassAsset, liquidAsset, vapourAsset, type IngredientAsset } from './ingredients';
 import type { Obj } from './types';
@@ -728,7 +728,8 @@ describe('a set: backdrop on the wall, a floor and air', () => {
     expect((world(plain) as any).camera.target).toEqual([0, PRODUCT_Y, 0]);
   });
   it('a set is lit by the board\'s key level: a low key keeps its mood, a high key opens up', () => {
-    const lights = (key: 'low' | 'mid' | 'high') => (world(buildCinematicFilm(withSet('none', key))) as any).lights;
+    // a dark product takes the full rig (a pale one is tested in "the light budget")
+    const lights = (key: 'low' | 'mid' | 'high') => (world(buildCinematicFilm({ ...withSet('none', key), side: '#3b2416' })) as any).lights;
     for (const k of ['low', 'mid', 'high'] as const) {
       const l = lights(k);
       expect(l.key.intensity).toBe(LIGHT[k].key);
@@ -1400,6 +1401,36 @@ describe('reflection studio', () => {
   it('the world lights its reflections with the board\'s studio, and leaves the preset\'s own when none is written', () => {
     expect(JSON.stringify(world(buildCinematicFilm(input({ reflect: 'ring' }))))).toContain('"environment":"ring"');
     expect(JSON.stringify(world(buildCinematicFilm(input())))).not.toContain('"environment"');
+  });
+});
+
+describe('the light budget', () => {
+  it('a dark product with no spots takes the full rig, and no glow floor', () => {
+    expect(lightBudget(undefined, '#3b2416')).toEqual({ key: 1, rim: 1, spot: 1 });
+  });
+  it('spots take a share of the key and rim, never below the floor', () => {
+    const two = lightBudget([{ side: 'left', strength: 0.8 }, { side: 'right', strength: 0.6 }], '#3b2416');
+    expect(two.key).toBeLessThan(1);
+    expect(two.key).toBeGreaterThanOrEqual(0.55);
+    expect(lightBudget([{ side: 'left', strength: 3 }, { side: 'right', strength: 3 }], '#3b2416').key).toBe(0.55);
+  });
+  it('a white tub takes less key, rim and spot, and its glow starts higher (the burned lid of 4 Nov)', () => {
+    const pale = lightBudget([{ side: 'left', strength: 0.8 }], '#f6f6f6');
+    expect(pale.key).toBeLessThan(lightBudget([{ side: 'left', strength: 0.8 }], '#3b2416').key);
+    expect(pale.spot).toBeLessThan(1);
+    expect(pale.bloom).toBe(LIGHT.pale.bloom);
+  });
+  it('the built world carries it: the white tub\'s spots, key and glow are turned down', () => {
+    const spots = [{ side: 'left' as const, strength: 0.8 }, { side: 'right' as const, strength: 0.6 }];
+    const set = { look: 'studio' as const, air: 'none' as const, backdrop: pic('ast_back', 2000, 1000), ground: '#d8d4ce' };
+    const w = (side: string) => world(buildCinematicFilm(input({ key: 'low', set, spots, side, finish: { glow: 'soft', grain: 'none', vignette: 'none', floor: 'none', wet: 'none', caustics: 'none' } as any }))) as any;
+    const white = w('#f6f6f6');
+    const dark = w('#3b2416');
+    expect(white.lights.key.intensity).toBeLessThan(dark.lights.key.intensity);
+    expect(dark.lights.key.intensity).toBeLessThan(LIGHT.low.key);
+    expect(white.lights.spots[0].intensity).toBeLessThan(dark.lights.spots[0].intensity);
+    expect(white.post.bloom.threshold).toBe(LIGHT.pale.bloom);
+    expect(dark.post.bloom.threshold).toBeLessThan(LIGHT.pale.bloom);
   });
 });
 

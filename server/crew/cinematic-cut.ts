@@ -95,7 +95,7 @@ export function otherNouns(title: string, first: string): string[] {
   return [...new Set(w.reverse())].slice(0, 3);
 }
 
-/** The product's form (round, boxy, slab, lying), asked of Muse with the photo when its board did not name one: one call, $0.005. Undefined when the look fails. */
+/** The product's form (round, boxy, slab, lying), asked of Muse with the photo alone: one call, $0.005. Undefined when the look fails. */
 export async function formFromPhoto(ctx: ToolCtx, photo: Buffer, title: string): Promise<ProductForm | undefined> {
   try {
     const reply = (await ctx.meta.spark.reviewImages(
@@ -118,6 +118,15 @@ async function nounsFromPhoto(ctx: ToolCtx, photo: Buffer): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * The product's body: the form seen in the photo wins over the board's (a board written with the whole film in mind once called a tub a slab),
+ * and the board's depth is kept only when its form agrees. With no form seen, the board's body as written.
+ */
+export function bodyFor(seen: ProductForm | undefined, board: BoardBody | undefined): BoardBody | undefined {
+  if (!seen) return board;
+  return productBody(seen, board?.form === seen ? board.depth : undefined);
 }
 
 /** The narrowest row of the top part of a pack, over its body's typical width, below which it has a neck, shoulders or a cap. */
@@ -179,8 +188,8 @@ export interface CinematicParts {
   prep: Prepared3D;
   accent: string;
   board: ReturnType<typeof reviewBoard>['board'];
-  /** the product's body, from Muse's form (on the board, or asked with the photo when the board had none); a later board with a form wins */
-  body?: BoardBody;
+  /** the product's form as one look at the photo saw it; it decides the body over any board's (bodyFor) */
+  form?: ProductForm;
   ingredients: Record<string, IngredientAsset>;
   set: CinematicInput['set'];
   bed?: { id: string; url: string };
@@ -201,11 +210,15 @@ async function prepareParts(ctx: ToolCtx, log: (line: string) => void, o: { seco
   const flat = prep.shape === 'other';
   const accent = await dominantAccent(await ctx.assets.read(made.cutId));
 
-  const planned = await planBoard(ctx, { title, brief: film.brief.text, photo, seconds: o.seconds ?? Math.min(10, film.storyboard?.durationSec ?? 8), flat });
+  // the form is one focused look at the photo, asked while the board is written, so it costs no time
+  const [planned, form] = await Promise.all([
+    planBoard(ctx, { title, brief: film.brief.text, photo, seconds: o.seconds ?? Math.min(10, film.storyboard?.durationSec ?? 8), flat }),
+    flat ? formFromPhoto(ctx, photo, title) : Promise.resolve(undefined),
+  ]);
   const { board } = reviewBoard(planned.board);
-  // the body's form is always Muse's word: from the board, or one look at the photo when the board left it out
-  const body = !flat ? undefined : board.body?.form ? board.body : await formFromPhoto(ctx, photo, title).then((f) => (f ? productBody(f, board.body?.depth) : board.body));
-  log(`board by ${planned.source}: ${board.concept}${flat ? ` (a body from its outline: ${body?.form ?? 'no form, the default depth'}${body?.form && !board.body?.form ? ', asked with the photo' : ''})` : ''}`);
+  const body = flat ? bodyFor(form, board.body) : undefined;
+  const differs = form && board.body?.form && board.body.form !== form ? `; the board said ${board.body.form}` : '';
+  log(`board by ${planned.source}: ${board.concept}${flat ? ` (a body from its outline: ${body?.form ?? 'no form, the default depth'}${form ? ', seen in the photo' : ''}${differs})` : ''}`);
   if (planned.source === 'floor') log(`Muse's board was not used: ${planned.violations.slice(0, 4).join('; ')}`);
   else if (planned.violations.length) log(`Muse's board kept; taste rules it still breaks: ${planned.violations.slice(0, 4).join('; ')}`);
 
@@ -244,7 +257,7 @@ async function prepareParts(ctx: ToolCtx, log: (line: string) => void, o: { seco
     }
   }
   const bed = await ctx.assets.put(await readFile(new URL('./media/bed.wav', import.meta.url)), 'audio/wav', { role: 'audio' }).catch(() => undefined);
-  return { title, aspect: film.aspect, prep, accent: accent.chroma > 0.05 ? accent.hex : FALLBACK_ACCENT, board, ...(body ? { body } : {}), ingredients, set, ...(bed ? { bed: { id: bed.id, url: bed.url } } : {}) };
+  return { title, aspect: film.aspect, prep, accent: accent.chroma > 0.05 ? accent.hex : FALLBACK_ACCENT, board, ...(form ? { form } : {}), ingredients, set, ...(bed ? { bed: { id: bed.id, url: bed.url } } : {}) };
 }
 
 /** Makes the slow parts of a cinematic film (3D product, board, element pictures, set, music); undefined when there is no photo or the product cannot be cut out. */
@@ -254,8 +267,7 @@ export const prepareCinematicParts = (ctx: ToolCtx, log: (line: string) => void,
 export function buildCinematic(ctx: ToolCtx, parts: CinematicParts, board: CinematicBoard, prices?: { price: number; was?: number }): AepCompositionJson {
   const { prep, set, bed, title } = parts;
   const flat = prep.shape === 'other';
-  // a board that names a form decides the body; otherwise the form found when the parts were made
-  const body = board.body?.form ? board.body : (parts.body ?? board.body);
+  const body = bodyFor(parts.form, board.body);
   const t = prep.texture;
   return buildCinematicFilm({
     aspect: parts.aspect,
