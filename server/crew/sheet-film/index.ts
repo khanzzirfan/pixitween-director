@@ -4,7 +4,7 @@ import { SHEET_STEPS, type SheetStepId } from '@shared/crew';
 import type { ToolCtx } from '@shared/tools';
 import { choosesFlat, reviewBoard, type CinematicBoard } from '../../authoring/beatsheet';
 import type { Comp } from '../../authoring/types';
-import { buildCinematic, pricesIn, prepareCinematicParts } from '../cinematic-cut';
+import { buildCinematic, drawSet, pricesIn, prepareCinematicParts } from '../cinematic-cut';
 import { commitCuts } from '../form-pick';
 import { renderKeyFrames } from '../frame-review';
 import { checkSheets } from './check';
@@ -53,7 +53,7 @@ export async function makeSheetFilm(
     const photoRef = film.assets.find((a) => a.role === 'product-photo');
     const photo = photoRef ? await ctx.assets.read(photoRef.id).catch(() => undefined) : undefined;
 
-    const parts = await prepareCinematicParts(ctx, log, { seconds: asked });
+    const parts = await prepareCinematicParts(ctx, log, { seconds: asked, solid: true });
     if (!parts || !photo) {
       return { ok: false, reason: 'the film needs a product photo, and the product in it could not be cut out' };
     }
@@ -63,7 +63,12 @@ export async function makeSheetFilm(
     // a flat cut-out product is told so on every board Muse writes, revisions included
     const flat = parts.prep.shape === 'other';
     if (choosesFlat(board)) log(`Muse chose a flat 2D film (${board.traits ? JSON.stringify(board.traits) : 'no traits'}); it is built in 3D anyway`.slice(0, 300));
-    const build = (b: CinematicBoard): Comp => buildCinematic(ctx, parts, b, prices);
+    // the set's picture: painted again when the revision after the film sheet changes its colours
+    let set = parts.set;
+    const build = (b: CinematicBoard): Comp => buildCinematic(ctx, { ...parts, set }, b, prices);
+    const restage = async (b: CinematicBoard) => {
+      set = (await drawSet(ctx, film.aspect, b, log)) ?? set;
+    };
 
     // the product, element and set sheets, drawn from the built film
     let sheets: PartSheets | undefined;
@@ -102,17 +107,19 @@ export async function makeSheetFilm(
 
     // the film sheet and one Muse look at it, with at most one revision, which also mends what the part sheets showed
     let comp: Comp = build(board);
+    let seenProblems: string[] = [];
     const rules = (c: Comp) => jsonRules(c, { askedSeconds: asked, aspect: film.aspect });
     try {
-      const seen = await lookAtFilm(ctx, { board, title: parts.title, brief: film.brief.text, photo, askedSeconds: asked, flat, build, render, jsonProblems: rules, log, fromSheets: problems });
+      const seen = await lookAtFilm(ctx, { board, title: parts.title, brief: film.brief.text, photo, askedSeconds: asked, flat, build, render, jsonProblems: rules, log, fromSheets: problems, restage, ...(parts.idea ? { idea: parts.idea } : {}) });
       board = seen.board;
       comp = seen.film;
+      seenProblems = seen.problems;
     } catch (err) {
       log(`film sheet look skipped: ${err instanceof Error ? err.message : String(err)}`);
     }
     lap('look');
     crewOn('commit');
-    const left = rules(comp);
+    const left = [...new Set([...rules(comp), ...seenProblems])];
     if (left.length) log(`accepted problems: ${left.join('; ')}`);
 
     // only the solid film is committed: no 2D cut is kept as an alternative

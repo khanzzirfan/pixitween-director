@@ -6,7 +6,7 @@ import type { AepCompositionJson } from '@shared/aep';
 import type { ToolCtx } from '@shared/tools';
 import { cutout } from '../art/cutout';
 import { dominantAccent } from '../art/palette';
-import { pitchIdeas } from '../authoring/pitch';
+import { pitchIdeas, type Idea } from '../authoring/pitch';
 import { choosesFlat, isFailureText, planBoard, reviewBoard, type BoardBody, type CinematicBoard } from '../authoring/beatsheet';
 import { PRODUCT_FORMS, productBody, type ProductForm } from '../authoring/forms';
 import { finishedComposition } from './finish-film';
@@ -204,13 +204,15 @@ export interface CinematicParts {
   depthShare?: number;
   ingredients: Record<string, IngredientAsset>;
   set: CinematicInput['set'];
+  /** The film Muse chose at the idea step; every revision of the board is written from it too. */
+  idea?: Idea;
   bed?: { id: string; url: string };
 }
 
 /** Parts started early (startCinematic), by film id, so the finish only builds. */
 const early = new Map<string, Promise<CinematicParts | undefined>>();
 
-async function prepareParts(ctx: ToolCtx, log: (line: string) => void, o: { seconds?: number } = {}): Promise<CinematicParts | undefined> {
+async function prepareParts(ctx: ToolCtx, log: (line: string) => void, o: { seconds?: number; solid?: boolean } = {}): Promise<CinematicParts | undefined> {
   const film = await ctx.films.get(ctx.filmId);
   const photoRef = film.assets.find((a) => a.role === 'product-photo');
   if (!photoRef) return undefined;
@@ -225,6 +227,7 @@ async function prepareParts(ctx: ToolCtx, log: (line: string) => void, o: { seco
 
   // the form is one focused look at the photo, and the turnaround (off by default) one drawing of its side and back; both are asked while the board is written, so they cost little time
   const others = film.assets.filter((a) => a.role === 'product-photo' && a.id !== photoRef.id);
+  let idea: Idea | undefined;
   const [planned, form, turn] = await Promise.all([
     (async () => {
       // the idea step: Muse pitches three different films for this product and picks one; the board is written from it
@@ -232,7 +235,8 @@ async function prepareParts(ctx: ToolCtx, log: (line: string) => void, o: { seco
       const pitch = await pitchIdeas(ctx, { title, brief: film.brief.text, photo, seconds });
       if (pitch) log(`Muse pitched ${pitch.ideas.map((i) => `"${i.name}"`).join(', ')} and chose "${pitch.chosen.name}"${pitch.why ? `: ${pitch.why}` : ''}`.slice(0, 500));
       else log('no ideas pitched; the board is written without one');
-      return planBoard(ctx, { title, brief: film.brief.text, photo, seconds, flat, ...(pitch ? { idea: pitch.chosen } : {}) });
+      idea = pitch?.chosen;
+      return planBoard(ctx, { title, brief: film.brief.text, photo, seconds, flat, ...(idea ? { idea } : {}), ...(o.solid ? { solid: true } : {}) });
     })(),
     flat ? formFromPhoto(ctx, photo, title) : Promise.resolve(undefined),
     loadEnv().TURNAROUND
@@ -269,30 +273,37 @@ async function prepareParts(ctx: ToolCtx, log: (line: string) => void, o: { seco
   );
 
   // the board's world: a backdrop drawn for its look, the floor in the same light, and the soft dot the bokeh is made of
-  let set: CinematicInput['set'];
-  if (board.set) {
-    try {
-      const size = ASPECT_SIZES[film.aspect];
-      const art = await renderBackdrop({ look: board.set.look, ratio: size.width / size.height, ...(board.tone ? { tone: board.tone } : {}), ...(board.key ? { key: board.key } : {}), ...(board.set.palette ? { palette: board.set.palette } : {}) });
-      const bd = await ctx.assets.put(art.png, 'image/png', { role: 'plate', width: art.width, height: art.height });
-      const backdrop = { id: bd.id, src: ctx.assets.url(bd.id), width: art.width, height: art.height };
-      let dot: { id: string; src: string; width: number; height: number } | undefined;
-      if (board.set.air === 'bokeh') {
-        const d = await renderDot();
-        const da = await ctx.assets.put(d.png, 'image/png', { role: 'cutout', width: d.width, height: d.height });
-        dot = { id: da.id, src: ctx.assets.url(da.id), width: d.width, height: d.height };
-      }
-      set = { look: board.set.look, air: board.set.air, backdrop, ground: groundColor(board.set.look, board.tone, board.key, board.set.palette), ...(dot ? { dot } : {}), skyLuma: await topLuma(art.png) };
-    } catch (err) {
-      log(`set not drawn: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
+  const set = await drawSet(ctx, film.aspect, board, log);
   const bed = await ctx.assets.put(await readFile(new URL('./media/bed.wav', import.meta.url)), 'audio/wav', { role: 'audio' }).catch(() => undefined);
-  return { title, aspect: film.aspect, prep, accent: accent.chroma > 0.05 ? accent.hex : FALLBACK_ACCENT, board, ...(form ? { form } : {}), ...(turn ? { turnaround: { views: turn.views, ...(turn.sheet ? { sheet: turn.sheet } : {}) } } : {}), ...(flat && turn?.depthShare !== undefined && prep.back ? { depthShare: turn.depthShare } : {}), ingredients, set, ...(bed ? { bed: { id: bed.id, url: bed.url } } : {}) };
+  return { title, aspect: film.aspect, prep, accent: accent.chroma > 0.05 ? accent.hex : FALLBACK_ACCENT, board, ...(form ? { form } : {}), ...(turn ? { turnaround: { views: turn.views, ...(turn.sheet ? { sheet: turn.sheet } : {}) } } : {}), ...(flat && turn?.depthShare !== undefined && prep.back ? { depthShare: turn.depthShare } : {}), ingredients, set, ...(idea ? { idea } : {}), ...(bed ? { bed: { id: bed.id, url: bed.url } } : {}) };
+}
+
+/**
+ * The board's world: a backdrop painted from its look and palette, the floor in the same light, and the soft dot the bokeh is made of. Painted by
+ * code, so it costs nothing to paint again when a revision changes the palette. Undefined when the board has no set or it could not be drawn.
+ */
+export async function drawSet(ctx: ToolCtx, aspect: CinematicParts['aspect'], board: CinematicBoard, log: (line: string) => void = () => {}): Promise<CinematicInput['set']> {
+  if (!board.set) return undefined;
+  try {
+    const size = ASPECT_SIZES[aspect];
+    const art = await renderBackdrop({ look: board.set.look, ratio: size.width / size.height, ...(board.tone ? { tone: board.tone } : {}), ...(board.key ? { key: board.key } : {}), ...(board.set.palette ? { palette: board.set.palette } : {}) });
+    const bd = await ctx.assets.put(art.png, 'image/png', { role: 'plate', width: art.width, height: art.height });
+    const backdrop = { id: bd.id, src: ctx.assets.url(bd.id), width: art.width, height: art.height };
+    let dot: { id: string; src: string; width: number; height: number } | undefined;
+    if (board.set.air === 'bokeh') {
+      const d = await renderDot();
+      const da = await ctx.assets.put(d.png, 'image/png', { role: 'cutout', width: d.width, height: d.height });
+      dot = { id: da.id, src: ctx.assets.url(da.id), width: d.width, height: d.height };
+    }
+    return { look: board.set.look, air: board.set.air, backdrop, ground: groundColor(board.set.look, board.tone, board.key, board.set.palette), ...(dot ? { dot } : {}), skyLuma: await topLuma(art.png) };
+  } catch (err) {
+    log(`set not drawn: ${err instanceof Error ? err.message : String(err)}`);
+    return undefined;
+  }
 }
 
 /** Makes the slow parts of a cinematic film (3D product, board, element pictures, set, music); undefined when there is no photo or the product cannot be cut out. */
-export const prepareCinematicParts = (ctx: ToolCtx, log: (line: string) => void, o: { seconds?: number } = {}): Promise<CinematicParts | undefined> => prepareParts(ctx, log, o);
+export const prepareCinematicParts = (ctx: ToolCtx, log: (line: string) => void, o: { seconds?: number; solid?: boolean } = {}): Promise<CinematicParts | undefined> => prepareParts(ctx, log, o);
 
 /** The film as the pipeline builds it from a board and the parts made for it. A price, when the brief names one, lands on the end card. */
 export function buildCinematic(ctx: ToolCtx, parts: CinematicParts, board: CinematicBoard, prices?: { price: number; was?: number }): AepCompositionJson {
@@ -385,7 +396,7 @@ export async function cinematicCut(ctx: ToolCtx, log: (line: string) => void = (
     // Muse looks at six frames of what it wrote and may revise the board once; the pictures it needs are already made
     const photoRef = film.assets.find((a) => a.role === 'product-photo');
     const photo = photoRef ? await ctx.assets.read(photoRef.id).catch(() => undefined) : undefined;
-    const seen = await reviewFrames(ctx, { board, title, brief: film.brief.text, ...(photo ? { photo } : {}), flat, render: (times, revised) => renderKeyFrames(revised ? build(revised) : comp, times), log });
+    const seen = await reviewFrames(ctx, { board, title, brief: film.brief.text, ...(photo ? { photo } : {}), flat, ...(parts.idea ? { idea: parts.idea } : {}), render: (times, revised) => renderKeyFrames(revised ? build(revised) : comp, times), log });
     if (seen.revised) comp = build(seen.board);
     // a last look: Muse sees both cuts, and the film goes back to its 2D cut only when that cut clearly wins (the 3D one broke the product)
     flatCut = (await finishedComposition(ctx.films, ctx.filmId, ctx.assets).catch(() => undefined)) as AepCompositionJson | undefined;

@@ -39,9 +39,12 @@ brief + photo
   3. sheet check (new, one Muse call): the sheets beside the photo and the board -> fine, or problems + elements to drop
      -> an element to drop leaves the board now; the problems wait for the one revision in step 5
   4. build (exists: buildCinematicFilm) -> JSON rules (new, code only, no render)
-  5. film sheet (new): one frame per shot in reading order, labelled "[0.0-1.2s] wide push, hard cut"
-     -> measured checks (exists: measureFrames) + one Muse look -> at most one board revision, which also mends the sheet
-     problems of step 3, rebuilt, film sheet drawn again. (Until 4 Nov the sheet problems had a revision of their own: about 50 s
+  5. film sheet: two frames per shot in reading order (just in, and just before it leaves, so each cut is seen from both
+     sides), labelled "shot 2 in [2.6s] medium orbit, after a hard cut"
+     -> measured checks (exists: measureFrames) + JSON rules, which name repeated framings and jump cuts measured on the
+     camera keys + one Muse look as director and cinematographer -> at most one board revision, written from the chosen
+     idea, which also mends the sheet problems of step 3 and may repaint the set's colours (look and air stay), rebuilt,
+     film sheet drawn again. (Until 4 Nov the sheet problems had a revision of their own: about 50 s
      each run, and the concept never changed.)
   6. commit the 3D film (exists: commitCuts with no flat cut), write the storyboard from the board, status ready.
 ```
@@ -107,7 +110,8 @@ Every module is under `server/crew/sheet-film/` unless a path is given.
 - `server/crew/sheet-film/render.ts`: `drawSheets`; draws the three part sheets and saves each as a film asset with role `sheet` (an `art.asset` event follows).
 - `server/crew/sheet-film/check.ts`: `sheetCheckPrompt`, `parseSheetCheck`, `checkSheets`; one Muse look at the sheets beside the photo ($0.005).
 - `server/crew/sheet-film/json-rules.ts`: `jsonRules`, `titleBoxes`, `layoutProblems`; code rules on the built JSON, shared with `scripts/titles-harness.ts`.
-- `server/crew/sheet-film/film-sheet.ts`: `filmSheetTimes`, `filmSheetLabels`, `lookAtFilm`; the film sheet, one Muse look, at most one revision.
+- `server/crew/sheet-film/film-sheet.ts`: `filmSheetTimes`, `filmSheetLabels`, `lookAtFilm`, `keptSet`, `recoloured`; the film sheet, one Muse look, at most one revision (which may repaint the set through `drawSet`).
+- `server/crew/sheet-film/json-rules.ts`: `framingProblems` (repeated framing, jump cuts; `SAME_FRAME`, `CUT_JUMP`).
 - `server/crew/sheet-film/index.ts`: `makeSheetFilm`; the whole run from brief to committed 3D film, returning the seconds of each step.
 - `server/authoring/beatsheet.ts`: the board's `locks` (2 to 4 lines, at most 120 characters each).
 - `server/crew/cinematic-cut.ts`: `prepareCinematicParts` and `buildCinematic` (additive; `cinematicCut` is unchanged).

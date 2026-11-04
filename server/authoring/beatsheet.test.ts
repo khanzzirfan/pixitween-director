@@ -172,6 +172,20 @@ describe('parseBoard', () => {
     expect(FORM_VERDICTS.some((v) => v.form === '3d')).toBe(true);
   });
 
+  it('does not ask a film that is always 3D to choose 2D, but still asks for its traits', () => {
+    const p = boardPrompt({ title: 'Cold brew', seconds: 10, solid: true }).system;
+    expect(p).not.toMatch(/3D OR 2D/);
+    expect(p).not.toContain('"form":"3d|2d"');
+    expect(p).toMatch(/"traits"/);
+    expect(boardPrompt({ title: 'Cold brew', seconds: 10 }).system).toContain('"form":"3d|2d"');
+  });
+
+  it('teaches shot grammar: every cut changes the size, the angle or the side', () => {
+    const p = boardPrompt({ title: 'Tub', seconds: 15 }).system;
+    expect(p).toMatch(/SHOT GRAMMAR/);
+    expect(p).toMatch(/jump cut/);
+  });
+
   it('drops words that say the model could not see the product, from a shot and from the tagline', () => {
     const b = lemonBoard() as { beats: Array<Record<string, unknown>>; tagline?: string };
     b.beats[1]!.text = 'No pack visible';
