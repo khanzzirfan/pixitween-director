@@ -45,10 +45,16 @@ export function readUserKey(headers: Headers): string | undefined {
 /**
  * Code first: a matching Director code spends the server key.
  * Otherwise a visitor key, if they sent one.
- * Otherwise, when no code is configured (local), the server key.
- * When a code is configured and they sent neither, the request is refused.
+ * IS_SERVER with a code and a server key configured: a request with neither a code nor a visitor key is refused.
+ * Anything else (IS_SERVER unset, or its keys missing) runs like localhost.
  */
 export function resolveAccess(headers: Headers, env: Env): { ok: true; access: Access } | { ok: false } {
+  // Not a server, or a server missing its keys: run like localhost. No code or visitor key is needed, and a key the page sends still wins.
+  const enforced = env.IS_SERVER && Boolean(env.DIRECTOR_PASSCODE) && Boolean(env.metaApiKey);
+  if (!enforced) {
+    const own = readUserKey(headers);
+    return { ok: true, access: own ? { source: 'user', key: own } : { source: 'server', key: env.metaApiKey } };
+  }
   if (codeMatches(headers, env.DIRECTOR_PASSCODE)) return { ok: true, access: { source: 'code', key: env.metaApiKey } };
   const own = readUserKey(headers);
   if (own) return { ok: true, access: { source: 'user', key: own } };

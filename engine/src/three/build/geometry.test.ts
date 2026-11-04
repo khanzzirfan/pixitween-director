@@ -106,6 +106,70 @@ describe('buildGeometry', () => {
     expect(geometry.groups.map((g) => g.materialIndex)).toEqual([0, 1]);
   });
 
+  describe('extrude with axis across: a solid body lying on its side', () => {
+    // a loaf: 100 long and 40 tall, tapering at both ends (y down)
+    const loaf: Array<[number, number]> = [[0, 18], [8, 4], [25, 0], [75, 0], [92, 4], [100, 18], [100, 22], [92, 36], [75, 40], [25, 40], [8, 36], [0, 22]];
+    const body = () => buildGeometry({ type: 'extrude', contour: loaf, depth: 40, section: 2, axis: 'across' });
+
+    it('is centred and as long and tall as the outline, as deep as depth says of its tallest column', () => {
+      const size = boundingSize(body());
+      expect(size.x).toBeCloseTo(100, 0);
+      expect(size.y).toBeCloseTo(40, 0);
+      expect(size.z).toBeCloseTo(40, 0);
+      const box = geometryBox(body());
+      expect((box.min.x + box.max.x) / 2).toBeCloseTo(0, 1);
+      expect((box.min.y + box.max.y) / 2).toBeCloseTo(0, 1);
+    });
+    it('is round across its length: the middle is as deep as it is tall, and the tapered ends are shallower', () => {
+      const pos = body().getAttribute('position');
+      const reach = (x0: number, x1: number) => {
+        let z = 0;
+        for (let i = 0; i < pos.count; i++) if (pos.getX(i) >= x0 && pos.getX(i) <= x1) z = Math.max(z, Math.abs(pos.getZ(i)));
+        return z;
+      };
+      expect(reach(-10, 10)).toBeCloseTo(20, 0);
+      expect(reach(-50, -45)).toBeLessThan(reach(-10, 10) * 0.7);
+    });
+    it('lays the photo flat on the front (u rises to the right, v rises upward) and reads it the other way on the back', () => {
+      const g = body();
+      const pos = g.getAttribute('position');
+      const uv = g.getAttribute('uv');
+      let frontLeft = 1, frontRight = 0, topV = 0, bottomV = 1, backLeft = 0;
+      for (let i = 0; i < pos.count; i++) {
+        if (pos.getZ(i) > 15 && Math.abs(pos.getY(i)) < 2) {
+          if (pos.getX(i) < -30) frontLeft = Math.min(frontLeft, uv.getX(i));
+          if (pos.getX(i) > 30) frontRight = Math.max(frontRight, uv.getX(i));
+        }
+        if (pos.getZ(i) > 15) {
+          if (pos.getY(i) > 12) topV = Math.max(topV, uv.getY(i));
+          if (pos.getY(i) < -12) bottomV = Math.min(bottomV, uv.getY(i));
+        }
+        if (pos.getZ(i) < -15 && Math.abs(pos.getY(i)) < 2 && pos.getX(i) < -30) backLeft = Math.max(backLeft, uv.getX(i));
+      }
+      expect(frontRight).toBeGreaterThan(frontLeft);
+      expect(topV).toBeGreaterThan(bottomV);
+      expect(backLeft).toBeGreaterThan(0.6);
+    });
+    it('keeps the side wall clear of the photo edge (its picture is eased to the edge row, not stretched)', () => {
+      const uv = body().getAttribute('uv');
+      for (let i = 0; i < uv.count; i++) {
+        expect(uv.getY(i)).toBeGreaterThanOrEqual(0);
+        expect(uv.getY(i)).toBeLessThanOrEqual(1);
+      }
+    });
+    it('faces outward all round', () => {
+      const g = body();
+      const pos = g.getAttribute('position');
+      const nor = g.getAttribute('normal');
+      let inward = 0;
+      for (let i = 0; i < pos.count; i++) {
+        const out = pos.getX(i) * nor.getX(i) * 0 + pos.getY(i) * nor.getY(i) + pos.getZ(i) * nor.getZ(i);
+        if (Math.abs(pos.getY(i)) < 17 && Math.abs(pos.getX(i)) < 40 && out < 0) inward++;
+      }
+      expect(inward).toBe(0);
+    });
+  });
+
   describe('extrude with a section: a solid body', () => {
     // a bottle: a narrow neck on a wide body, 40 wide at most and 100 tall (y down)
     const bottle: Array<[number, number]> = [[15, 0], [25, 0], [25, 30], [40, 40], [40, 100], [0, 100], [0, 40], [15, 30]];
@@ -145,6 +209,41 @@ describe('buildGeometry', () => {
       }
       expect(front).toBeGreaterThan(0.5);
       expect(back).toBeLessThan(0.5);
+    });
+    it('has two groups, the front half then the back half, that add up to every index', () => {
+      const g = body();
+      expect(g.groups).toHaveLength(2);
+      expect(g.groups.map((x) => x.materialIndex)).toEqual([0, 1]);
+      expect(g.groups[0]!.start).toBe(0);
+      expect(g.groups[0]!.count + g.groups[1]!.count).toBe(g.getIndex()!.count);
+    });
+    it('carries the views coordinates only when asked: the photo\'s u straight across the front and the side picture\'s u across the depth', () => {
+      expect(body().getAttribute('views')).toBeUndefined();
+      const g = buildGeometry({ type: 'extrude', contour: bottle, depth: 40, section: 2, views: true });
+      const pos = g.getAttribute('position');
+      const views = g.getAttribute('views');
+      expect(views.count).toBe(pos.count);
+      for (let i = 0; i < pos.count; i += 7) {
+        // the photo's u follows x on both halves (no ease toward the edge); the side picture's u follows z, the front (+z) at its left
+        expect(views.getX(i)).toBeCloseTo((pos.getX(i) + 20) / 40, 1);
+        // across the row's own depth: a row that is narrower is shallower too, and still spans the whole side picture
+        expect(views.getZ(i)).toBeGreaterThanOrEqual(-1e-6);
+        expect(views.getZ(i)).toBeLessThanOrEqual(1 + 1e-6);
+      }
+    });
+    it('carries no views coordinates for a body lying across', () => {
+      expect(buildGeometry({ type: 'extrude', contour: bottle, depth: 40, section: 2, axis: 'across', views: true }).getAttribute('views')).toBeUndefined();
+    });
+    it('reads the photo\'s edge column on the side wall, so the side is not striped', () => {
+      const g = body();
+      const pos = g.getAttribute('position');
+      const uv = g.getAttribute('uv');
+      // on the body rows (image y 50-100) the widest points: x = +20 (right edge) at any z
+      const us = new Set<number>();
+      for (let i = 0; i < pos.count; i++) if (pos.getX(i) > 19.5 && pos.getY(i) < -10 && pos.getZ(i) > 0) us.add(Math.round(uv.getX(i) * 1000));
+      expect(us.size).toBeGreaterThan(0);
+      for (const u of us) expect(u).toBeGreaterThanOrEqual(970);
+      expect(Math.max(...us) - Math.min(...us)).toBeLessThanOrEqual(30);
     });
     it('faces its normals outward, and none is zero', () => {
       const g = body();

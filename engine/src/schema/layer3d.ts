@@ -105,6 +105,13 @@ export const ExtrudeGeometrySchema = z
      * as deep as `depth` is to the widest row, so the product has a back and sides and can turn all the way round. The photo wraps the front and, read the right way, the back.
      */
     section: z.number().min(1).max(6).optional(),
+    /**
+     * Which way the body's cross-sections are cut. 'up' (the default) sweeps every row of the outline, for a product that stands upright; 'across' sweeps every column,
+     * for a product lying on its side (a roll, a board, a loaf), so its round cross-section is at its ends and `depth` is how deep it is at its tallest column.
+     */
+    axis: z.enum(['up', 'across']).optional(),
+    /** The body carries the `views` coordinates, for a material that blends the front, back and side pictures by view (engine/src/three/build/views.ts). Upright bodies only. */
+    views: z.boolean().optional(),
   })
   .strict();
 
@@ -203,6 +210,10 @@ export const MaterialSchema = z
     emissiveIntensity: z.number().min(0).default(0),
     opacity: z.number().min(0).max(1).default(1),
     map: IdSchema.optional(),
+    /** A solid body's drawn back (seen from behind): shown as the camera goes round, blended with `map` by view. */
+    backMap: IdSchema.optional(),
+    /** A solid body's drawn side: shown as the camera looks from either side, blended with `map` by view. */
+    profileMap: IdSchema.optional(),
     /** Flat colours, no shading: the map (or colour) shows as authored. */
     unlit: z.boolean().optional(),
     /** The map has an alpha channel: transparent pixels are cut out. */

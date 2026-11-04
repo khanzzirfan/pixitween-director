@@ -32,6 +32,10 @@
 .sh-spacer { flex: 1; min-width: 0; }
 .sh-chip { padding: 3px 11px; border-radius: 999px; font-size: 11.5px; font-weight: 700; text-transform: capitalize; background: color-mix(in srgb, var(--sh-info) 18%, var(--surface)); white-space: nowrap; }
 .sh-chip.st-planning, .sh-chip.st-building, .sh-chip.st-reviewing { background: color-mix(in srgb, var(--sh-warn) 24%, var(--surface)); }
+.sh-chip.st-planning::before, .sh-chip.st-building::before, .sh-chip.st-reviewing::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: var(--sh-warn); animation: sh-blink 1s ease-in-out infinite; }
+.sh-chip.st-planning, .sh-chip.st-building, .sh-chip.st-reviewing { display: inline-flex; align-items: center; }
+@keyframes sh-blink { 0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--sh-warn) 60%, transparent); } 50% { opacity: .25; box-shadow: 0 0 0 5px transparent; } }
+@media (prefers-reduced-motion: reduce) { .sh-chip.st-planning::before, .sh-chip.st-building::before, .sh-chip.st-reviewing::before { animation-duration: 2.4s; } }
 .sh-chip.st-ready { background: color-mix(in srgb, var(--sh-ok) 24%, var(--surface)); }
 .sh-chip.st-failed { background: color-mix(in srgb, var(--sh-bad) 24%, var(--surface)); }
 .sh-icon-btn { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--muted); font-size: 14px; transition: background .15s, color .15s, border-color .15s; }
@@ -212,7 +216,6 @@
 .sh-pane .crew-head { margin-bottom: 8px; align-items: center; }
 .sh-pane .crew-head h2 { font-size: 15px; margin: 0; }
 .sh .scene-card { padding: 10px 12px; gap: 6px; }
-.sh .scene-card .card-actions { position: absolute; right: 8px; bottom: 7px; padding-left: 8px; background: linear-gradient(90deg, transparent, var(--surface) 30%); }
 .sh .add-slot { height: 14px; }
 
 /* empty stage */
@@ -279,3 +282,31 @@
 /* the crew badge style is global; the gallery's "Includes generated clip" is plain text */
 .sh .gallery-card .badge { background: none; color: var(--muted); padding: 0; border-radius: 0; font-weight: 500; }
 .gallery-new { margin: 0 0 10px; }
+
+/* the director's desk: a compact layer outline (one row per scene, role chips beneath) and a tighter composer */
+.sh-side .layers-desk { flex: none; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.sh-side .layers-desk > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 11px; font-size: 12px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; list-style-position: inside; }
+.sh-side .layers-desk .layers-count { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.sh-side .layer-list { display: grid; gap: 8px; max-height: 240px; overflow: auto; padding: 2px 10px 10px; scrollbar-width: thin; }
+.sh-side .layer-scene { display: grid; gap: 5px; padding: 0; }
+.sh-side .layer-scene-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 9px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: inherit; font-size: 12px; font-weight: 650; text-align: left; transform: none; }
+.sh-side .layer-scene-btn[aria-pressed='true'] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--surface)); }
+.sh-side .layer-scene-mode { padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.sh-side .layer-scene-btn[data-mode='generate'] .layer-scene-mode { background: color-mix(in srgb, #e8895a 22%, transparent); color: #e8895a; }
+.sh-side .layer-scene-dur { margin-left: auto; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.sh-side .layer-chips { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 4px; }
+.sh-side .layer-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: inherit; font-size: 11px; font-weight: 550; transform: none; box-shadow: none; }
+.sh-side .layer-chip:hover:not(:disabled) { transform: none; box-shadow: none; border-color: var(--accent); }
+.sh-side .layer-chip[aria-pressed='true'] { border-color: var(--accent); background: var(--accent); color: white; }
+.sh-side .layer-chip-icon { display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; background: color-mix(in srgb, var(--muted) 20%, transparent); font-size: 9px; }
+.sh-side .layer-chip[data-role='product'] .layer-chip-icon, .sh-side .layer-chip[data-role='product3d'] .layer-chip-icon { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.sh-side .layer-chip[data-role='headline'] .layer-chip-icon, .sh-side .layer-chip[data-role='caption'] .layer-chip-icon { background: color-mix(in srgb, #e8895a 30%, transparent); }
+.sh-side .editing-chip { display: flex; align-items: center; gap: 6px; margin: 0; padding: 4px 6px 4px 11px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); font-size: 12px; }
+.sh-side .editing-chip span { color: var(--muted); }
+.sh-side .editing-chip button { margin-left: auto; padding: 0 8px; border-radius: 999px; line-height: 1.4; }
+.sh-side .chat-composer { display: grid; gap: 4px; }
+.sh-side .chat-composer > span:first-child { font-size: 12px; color: var(--muted); font-weight: 600; }
+.sh-side .chat-composer textarea { min-height: 52px; border-radius: 12px; }
+.sh-side .chat-actions { flex-wrap: nowrap; gap: 6px; }
+.sh-side .chat-actions button { padding: 6px 11px; font-size: 13px; border-radius: 10px; }
+.sh-side .chat-actions .primary { flex: 1; margin-right: 0; }

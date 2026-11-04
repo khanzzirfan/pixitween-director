@@ -19,6 +19,7 @@ export const cancelJob = (filmId: string, jobId: string) => request<{ ok: boolea
 export const pickTake = (filmId: string, jobId: string, takeFilmId: string) =>
   request<{ version: number }>('POST', `/api/films/${filmId}/takes/${enc(jobId)}/pick`, JSON.stringify({ takeFilmId }), true);
 export const revertScene = (filmId: string, sceneId: string) => request<{ version: number }>('POST', `/api/films/${filmId}/scenes/${enc(sceneId)}/revert`);
+export const rebuildScene = (filmId: string, sceneId: string) => request<{ jobId: string }>('POST', `/api/films/${filmId}/scenes/${enc(sceneId)}/rebuild`);
 export const getCrew = (filmId: string) => request<CrewSnapshot>('GET', `/api/films/${filmId}/crew`);
 export const getCrewConfig = () => request<CrewConfig>('GET', '/api/crew/config');
 export function postVoice(filmId: string, blob: Blob) {
@@ -32,6 +33,7 @@ export interface CrewActions {
   cancelJob(jobId: string): Promise<unknown>;
   pickTake(jobId: string, takeFilmId: string): Promise<unknown>;
   revertScene(sceneId: string): Promise<unknown>;
+  rebuildScene(sceneId: string): Promise<unknown>;
   postVoice(blob: Blob): Promise<unknown>;
 }
 export const actionsFor = (filmId: string): CrewActions => ({
@@ -39,5 +41,6 @@ export const actionsFor = (filmId: string): CrewActions => ({
   cancelJob: (jobId) => cancelJob(filmId, jobId),
   pickTake: (jobId, takeFilmId) => pickTake(filmId, jobId, takeFilmId),
   revertScene: (sceneId) => revertScene(filmId, sceneId),
+  rebuildScene: (sceneId) => rebuildScene(filmId, sceneId),
   postVoice: (blob) => postVoice(filmId, blob),
 });

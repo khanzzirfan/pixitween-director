@@ -5,6 +5,8 @@ import { api } from './client';
 import { useFilmEvents } from './sse';
 
 export const REFETCH_DEBOUNCE_MS = 300;
+/** A film is committed a moment around its "ready" event (the finish pass, the chosen cut): one more look shortly after, so the page never keeps the last build. */
+export const READY_SETTLE_MS = 1500;
 
 /** Loads a film and re-fetches (debounced) when its status changes or a tool commits a new version. */
 export function useFilm(filmId: string | null): { film: FilmState | null; events: FilmEvent[]; error: unknown } {
@@ -14,6 +16,7 @@ export function useFilm(filmId: string | null): { film: FilmState | null; events
   const latest = useRef(0); // request counter: responses older than the newest request are dropped
   const handled = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const load = useCallback(() => {
     if (!filmId) return;
@@ -30,6 +33,7 @@ export function useFilm(filmId: string | null): { film: FilmState | null; events
     handled.current = 0;
     latest.current++;
     clearTimeout(timer.current);
+    clearTimeout(settle.current);
     load();
     return () => clearTimeout(timer.current);
   }, [filmId, load]);
@@ -42,7 +46,27 @@ export function useFilm(filmId: string | null): { film: FilmState | null; events
     if (!relevant) return;
     clearTimeout(timer.current);
     timer.current = setTimeout(load, REFETCH_DEBOUNCE_MS);
+    if (fresh.some((e) => e.type === 'film.status' && e.status === 'ready')) {
+      clearTimeout(settle.current);
+      settle.current = setTimeout(load, READY_SETTLE_MS);
+    }
   }, [events, load]);
+
+  // coming back to the tab (it may have slept, or the server restarted while it was away) shows the film as it is now
+  useEffect(() => {
+    if (!filmId) return;
+    const back = () => {
+      if (document.visibilityState !== 'hidden') load();
+    };
+    window.addEventListener('focus', back);
+    document.addEventListener('visibilitychange', back);
+    return () => {
+      window.removeEventListener('focus', back);
+      document.removeEventListener('visibilitychange', back);
+    };
+  }, [filmId, load]);
+
+  useEffect(() => () => clearTimeout(settle.current), []);
 
   return { film, events, error };
 }

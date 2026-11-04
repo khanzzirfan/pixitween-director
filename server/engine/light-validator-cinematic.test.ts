@@ -48,7 +48,8 @@ describe('light validator, cinematic stage (schema 1.12.0)', () => {
   it('allows 12 props but not 13', () => {
     const c = base();
     const ls = layers(c);
-    const have = ls.filter((l) => l.kind === 'prop3d').length;
+    // the product world's own props (the titles live in a world of their own)
+    const have = ls.filter((l) => l.kind === 'prop3d' && l.stage === 'cine:world').length;
     for (let n = have; n < 12; n++) ls.push(prop(`p${n}`));
     expect(issues(c)).not.toMatch(/holds at most/);
     ls.push(prop('p13'));
@@ -104,5 +105,15 @@ describe('light validator, cinematic stage (schema 1.12.0)', () => {
       layers(c).push(prop('x', extra));
       expect(issues(c)).toMatch(/swarm, material, card, liquid, smoke and source\.round need schema >= 1\.12\.0/);
     }
+  });
+  it('wants a body\'s textures.back to name an asset of the composition', () => {
+    const c = base();
+    const body = { source: { type: 'extrude', contour: [[0, 0], [10, 0], [10, 20]], depth: 5, section: 2 }, textures: { front: 'ast_label', back: 'ast_nope', side: '#ffffff' } };
+    layers(c).push(prop('cine:body', body));
+    expect(issues(c)).toMatch(/textures\.back/);
+    c.assets.ast_back = { type: 'image', src: '/b.png', width: 10, height: 20 };
+    c.precomps.cine.assets = { ...(c.precomps.cine.assets ?? {}), ast_back: c.assets.ast_back };
+    layers(c).find((l: any) => l.id === 'cine:body').textures.back = 'ast_back';
+    expect(issues(c)).not.toMatch(/textures\.back/);
   });
 });

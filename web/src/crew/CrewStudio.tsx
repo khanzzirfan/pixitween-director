@@ -17,6 +17,7 @@ import { recallIntake } from './intakeHandoff';
 import { CrewBoard } from './CrewBoard';
 import { filmBoard } from './filmBoard';
 import { LiveStoryboard } from './LiveStoryboard';
+import { SheetStrip } from './SheetStrip';
 import { ringFor } from './SceneCard';
 import { TakesPicker } from './TakesPicker';
 import { useCaptureRequests } from './useCaptureRequests';
@@ -51,7 +52,9 @@ export function CrewStudio({ film, events, playerRef, frozenNow, panels = {}, re
 
   const product = film.assets.find((a) => a.id === film.brief.productAssetId);
   // what the user first sent: the copy from the intake chat, or the brief and photo stored on the film (a reload, a shared link)
-  const brief = recallIntake(film.id) ?? { text: film.brief?.text || film.brief?.transcript || '', photoUrl: product?.url };
+  const sent = recallIntake(film.id);
+  // a voice brief was sent as sound, so its words are the transcript the server stored on the film
+  const brief = sent ? { ...sent, text: sent.text || film.brief?.text || film.brief?.transcript || '' } : { text: film.brief?.text || film.brief?.transcript || '', photoUrl: product?.url };
   const status = [...events].reverse().find((e) => e.type === 'film.status');
   const filmStatus = status?.type === 'film.status' ? status.status : film.status;
 
@@ -81,7 +84,12 @@ export function CrewStudio({ film, events, playerRef, frozenNow, panels = {}, re
   const tabs = railTabs(
     {
       board: <StudioBoard {...filmBoard(film, crew, brief.text)} />,
-      plan: <LiveStoryboard crew={crew} now={now} onOps={replay ? undefined : (ops) => actions!.postStoryboard(ops)} />,
+      plan: (
+        <>
+          <SheetStrip assets={[...film.assets, ...events.flatMap((e) => (e.type === 'art.asset' ? [e.asset] : []))]} />
+          <LiveStoryboard crew={crew} now={now} onOps={replay ? undefined : (ops) => actions!.postStoryboard(ops)} onRebuild={replay ? undefined : (sceneId) => actions!.rebuildScene(sceneId)} filmStatus={filmStatus} {...(film.storyboard ? { stored: film.storyboard.scenes } : {})} />
+        </>
+      ),
       crew: (
         <>
           <CrewBoard crew={crew} now={now} onCancel={replay ? undefined : (id) => void actions!.cancelJob(id)} />
@@ -113,7 +121,7 @@ export function CrewStudio({ film, events, playerRef, frozenNow, panels = {}, re
       strip={
         <>
           {lineup?.tabs}
-          <Filmstrip scenes={scenes} selected={selected} onSelect={jump} ringOf={(id) => ringFor(jobs, id)} />
+          <Filmstrip scenes={scenes} selected={selected} onSelect={jump} ringOf={(id) => ringFor(jobs, id, filmStatus)} />
         </>
       }
       side={

@@ -73,7 +73,7 @@ export const VOCAB = {
 export const SHEET = {
   /** Only what the render needs: Muse decides the rest (how many shots, what order, which moves, where the peak sits). */
   minTotal: 4,
-  maxTotal: 20,
+  maxTotal: 30,
   minBeats: 3,
   maxBeats: 14,
   /** every shot but the last */
@@ -126,6 +126,9 @@ export const LIGHT = {
   shadow: 0.6,
   /** a set's exposure is scaled by this: the stronger key would otherwise burn the floor to cream */
   exposure: 0.85,
+  /** a pale product (its side colour brighter than `luma`: a white tub, a cream bottle) burns to flat white under the full rig, so its rim
+   * and spots are scaled by these and the glow starts no lower than `bloom`. Its key stays (key 1): cut too, a low-key film lost the tub in black */
+  pale: { luma: 0.6, key: 1, rim: 0.65, spot: 0.7, bloom: 0.88 },
 } as const;
 
 /**
@@ -140,6 +143,10 @@ export const SPOT = {
   power: 5,
   cone: { min: 10, max: 60, default: 24 },
   soft: 0.6,
+  /** spots add to the key: the key and rim lose this share of themselves per unit of spot strength, so two spots light the product, not burn it */
+  share: 0.3,
+  /** the key and rim keep at least this share however many spots there are */
+  floor: 0.55,
   /** where each side puts the light, as multiples of `distance` (x right, z toward the lens) and the height above the product's middle in metres */
   sides: { left: [-0.8, 0.3, 0.35], right: [0.8, 0.3, 0.35], above: [0.05, 1.1, 0.1], behind: [0.15, 0.25, -1], front: [0, 0.2, 1] },
 } as const;
@@ -199,6 +206,20 @@ export const MATERIALS = {
   drop: { color: '#eaf7ff', roughness: 0.04, metalness: 0, opacity: 0.8, clearcoat: 1 },
 } as const;
 
+/**
+ * The product's surface, chosen by Muse from the photo. The photo carries the colour; the surface only says how light sits on it. Metal mirrors the
+ * set and tints a printed pack the set's colour (a cream can turned gold), so it is for bare metal seen in the photo; satin, the default, keeps the
+ * photo's own colours.
+ */
+export const SURFACES = {
+  matte: { roughness: 0.8, metalness: 0, clearcoat: 0 },
+  satin: { roughness: 0.5, metalness: 0.05, clearcoat: 0.25 },
+  gloss: { roughness: 0.22, metalness: 0, clearcoat: 0.9 },
+  metal: { roughness: 0.3, metalness: 0.6, clearcoat: 0.8 },
+} as const;
+export type Surface = keyof typeof SURFACES;
+export const SURFACE_NAMES = Object.keys(SURFACES) as Surface[];
+
 export const CAMERA = {
   /** a push starts this many times further than it arrives: the hook comes in hard (the references push 40-90 %), later pushes ease in */
   pushFromHook: 1.7,
@@ -223,6 +244,8 @@ export const CAMERA = {
   shakeKeysMax: 3,
   /** A shot with a speed ramp is sampled along its curve at this many keys between its ends (each costs a tween). */
   rampKeys: 5,
+  /** how far from facing the lens (degrees) the product may end the film: past this its side or back shows under the price */
+  endFaceMax: 40,
   /** a layer may hold 64 tweens; the tremor must leave room for everything else */
   tweenBudget: 190,
   /** How far behind the product the lens focuses when it pulls to the far set, in metres (the wall's distance). */
@@ -277,7 +300,7 @@ export function ruleSentences(): string[] {
     `Every shot but the last lasts ${S.minBeat} to ${S.maxBeat} s.`,
     `The last shot is a hold of ${pct(S.holdMin)} to ${pct(S.holdMax)} of the film, with no element and no words: the price, name and tagline land there.`,
     `Everything else about the shots is Muse's: how many, in what order, which moves, how long, where the peak sits. A move is only a preset (push starts ${C.pushFromLater} times further out, ${C.pushFromWide} in a wide shot, ${C.pushFromHook} in the hook); Muse can write a shot's camera out (fill, height, around, lens, side, ease, focus) and the numbers win. On a flat cut-out the macro's camera is aimed at the label: the spot of the picture with the most small sharp detail (a logo, printed text), kept inside the product.`,
-    `The set's colours and the end card's style are Muse's: any #rrggbb for the sky, horizon, floor, glow, sea band and texture colour (set.palette over the look's own recipe), and an end card of a pill, bar or no plate, a disc, tag or plain price, centred or left, as written or in capitals, light to bold, in any accent. A palette colour that is not #rrggbb is dropped.`,
+    `The set's colours and the end card's style are Muse's: any #rrggbb for the sky, horizon, floor, glow, sea band and texture colour (set.palette over the look's own recipe), and an end card of a pill, bar or no plate, a coin, tag or plain price, centred or left, as written or in capitals, light to bold, in any accent. Every word is glossy 3D type in a titles world of its own over the product's: a sans, soft or serif face, lacquered, chrome, gold or satin letters that rise, pop or flip in one after another, on glassy plates. A palette colour that is not #rrggbb is dropped.`,
     `A cut lands while the camera is moving: the shot before leaves, and the shot after enters, at at least ${pct(C.minCutSpeed)} of its mean speed (a hold and the end of a whip are exempt).`,
     `The tremor is ${pct(C.shakeAmount)} of the camera distance, at most ${C.shakeKeysMax} keys a shot, and is dropped when the world's ${C.tweenBudget}-tween budget has no room.`,
     `The product's motion, the light and the shutter are Muse's: a shot's spin is up to two full turns either way, with a lean up to 40 degrees, a roll up to 30 and a toss up to two product heights at the middle of the shot; a shot's light slides the key between any two directions, sets its height (5 to 85 degrees) and its strength and the rim's strength (up to 2.5 and 3 times the film's); the key and rim colours are any #rrggbb; and the shutter is 0 to 1 of a frame's time, per film or per shot, drawn as 4 to 10 pictures averaged in an exact export. Light keys count in the world's ${C.tweenBudget}-tween budget, so the tremor gives way to them. Nothing is on unless Muse writes it.`,

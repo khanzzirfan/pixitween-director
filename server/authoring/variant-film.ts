@@ -55,12 +55,16 @@ export function tint(hex: string, f: number): string {
   return `#${ch((n >> 16) & 255)}${ch((n >> 8) & 255)}${ch(n & 255)}`;
 }
 
-/** Dark text on light colours, white on dark ones (relative luminance). */
-export function inkOn(hex: string): string {
+/** The relative luminance of a colour, 0 black to 1 white. */
+export function luma(hex: string): number {
   const n = parseInt(hex.replace('#', '').padEnd(6, '0').slice(0, 6), 16);
   const lin = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-  const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
-  return L > 0.45 ? '#1a1a1a' : '#ffffff';
+  return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+}
+
+/** Dark text on light colours, white on dark ones (relative luminance). */
+export function inkOn(hex: string): string {
+  return luma(hex) > 0.45 ? '#1a1a1a' : '#ffffff';
 }
 
 export type Added = { c: Comp; id: string };

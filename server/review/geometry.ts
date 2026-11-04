@@ -111,6 +111,10 @@ export function layerBoxAt(
     // a 3D layer is its own offscreen rectangle: the viewport is its size
     iw = layer.viewport?.width ?? iw;
     ih = layer.viewport?.height ?? ih;
+  } else if (layer.kind === 'shape' && Array.isArray(layer.path?.size)) {
+    // a shape is as big as its path, not the frame (a box behind words, a band)
+    iw = layer.path.size[0] ?? iw;
+    ih = layer.path.size[1] ?? ih;
   }
   let w = iw * Math.abs(sx),
     h = ih * Math.abs(sy);

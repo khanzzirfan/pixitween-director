@@ -71,3 +71,16 @@ it('falls back to the product photo when the capture rejects', async () => {
   render(<ChatThread crew={foldCrew(FIXTURE)} filmStatus="ready" aspect="16:9" productUrl="/api/assets/ast_p" getPoster={async () => { throw new Error('no canvas'); }} onPlay={() => {}} onSend={() => {}} onVoice={() => {}} />);
   expect(await screen.findByAltText('First frame of your film')).toHaveAttribute('src', '/api/assets/ast_p');
 });
+
+it('says the film is updating while a correction builds, then shows the ready bubble again', () => {
+  const idle = { ...foldCrew(FIXTURE), jobs: {} };
+  const props = { filmStatus: 'ready', aspect: '9:16' as const, getPoster: async () => 'blob:poster', onPlay: () => {}, onSend: () => {}, onVoice: () => {} };
+  const { rerender } = render(<ChatThread crew={idle} {...props} />);
+  expect(screen.getAllByText('Your film is ready')).toHaveLength(1);
+  const busy = { ...idle, jobs: { j1: { id: 'j1', kind: 'build', sceneId: 's1', status: 'running' } as never } };
+  rerender(<ChatThread crew={busy} {...props} />);
+  expect(screen.getByText('Updating your film…')).toBeInTheDocument();
+  expect(screen.queryByText('Your film is ready')).toBeNull();
+  rerender(<ChatThread crew={idle} {...props} />);
+  expect(screen.getAllByText('Your film is ready')).toHaveLength(1);
+});

@@ -40,7 +40,7 @@ export function accessMode(saved: SavedAccess = readAccess()): AccessMode {
   return 'none';
 }
 
-const videoOn = (video?: VideoKeyStatus | null): boolean => Boolean(video && (video.fal || video.higgsfield || video.revana));
+const videoOn = (video?: VideoKeyStatus | null): boolean => Boolean(video?.fal);
 
 export function accessLabel(mode: AccessMode, video?: VideoKeyStatus | null): string {
   const videos = videoOn(video);

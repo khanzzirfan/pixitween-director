@@ -1,16 +1,23 @@
 import type { Buffer } from 'node:buffer';
 import { z } from 'zod';
+import { TITLE_ENTERS, TITLE_FACE_NAMES, TITLE_FINISHES, type TitleEnter, type TitleFace, type TitleFinish } from './titles3d';
 import type { ToolCtx } from '@shared/tools';
 import { RATE_MAX, RATE_MIN, type RatePoint } from '@engine/core/speedRamp';
 import { referenceDeck } from './reference-deck';
-import { CUT_SHADERS, FINISH_LEVELS, SHEET, SPOT, TEXT_RULES, VOCAB } from './cinematic-rules';
+import { verdictLines } from './form-verdicts';
+import { ideaLines, type Idea } from './pitch';
+import { CUT_SHADERS, FINISH_LEVELS, SHEET, SPOT, SURFACE_NAMES, TEXT_RULES, VOCAB, type Surface } from './cinematic-rules';
 import { SET_AIR, SET_HELP, SET_LOOKS, SET_TEXTURES, type BoardSet } from './set-art';
+import { PRODUCT_FORMS, productBody, type ProductForm } from './forms';
 import { floorElements, sanitizeElements, MAX_ELEMENTS, type ElementSpec, type IngredientAction, type IngredientUse } from './ingredients';
 
 // The cinematic board: what one 3D product film is made of (docs/direction/corpus/06-reference-films.md). Muse looks at the product photo and
 // writes the board: a concept line, the elements that belong round this product (beans, a splash, a lemon slice...) and the shot list that uses
 // them. A checker holds the shots to what the reference films do and every element to being used; the builder (cinematic-film.ts) plays the board
 // as camera moves and element motions in one stage3d world. Pure except planBoard, which makes one Spark call (about $0.005).
+
+/** How freely Muse samples its board (0 repeats itself, 1 is loose). */
+export const BOARD_TEMPERATURE = 0.9;
 
 export const SHOT_SIZES = ['wide', 'medium', 'close', 'macro'] as const;
 /**
@@ -133,6 +140,7 @@ const finishSchema = z.object({
  * The end card as Muse styles it. plate: what sits behind the words (a pill, a full-width bar, nothing but a shadow). price: a round disc, a
  * rounded tag, or plain big type. align: the name and tagline centred or set to the left margin. text: as written or in capitals. weight: how
  * heavy the name is. accent: the colour of the disc or tag (otherwise the product's own). pulse: whether the price beats with the music.
+ * Every word is glossy 3D type (titles3d.ts): face is its typeface, letters how its surface is finished, entrance how its letters arrive.
  */
 export const END_PLATES = ['pill', 'bar', 'none'] as const;
 export const END_PRICES = ['disc', 'tag', 'plain'] as const;
@@ -140,6 +148,9 @@ export const END_ALIGNS = ['center', 'left'] as const;
 export const END_CASES = ['normal', 'upper'] as const;
 export const END_WEIGHTS = ['light', 'regular', 'bold'] as const;
 export interface EndCard {
+  face?: TitleFace;
+  letters?: TitleFinish;
+  entrance?: TitleEnter;
   plate?: (typeof END_PLATES)[number];
   price?: (typeof END_PRICES)[number];
   align?: (typeof END_ALIGNS)[number];
@@ -150,6 +161,9 @@ export interface EndCard {
 }
 const hexColour = z.string().regex(/^#[0-9a-fA-F]{6}$/).transform((h) => h.toLowerCase());
 const endCardSchema = z.object({
+  face: z.enum(TITLE_FACE_NAMES as [TitleFace, ...TitleFace[]]).optional().catch(undefined),
+  letters: z.enum(TITLE_FINISHES).optional().catch(undefined),
+  entrance: z.enum(TITLE_ENTERS).optional().catch(undefined),
   plate: z.enum(END_PLATES).optional().catch(undefined),
   price: z.enum(END_PRICES).optional().catch(undefined),
   align: z.enum(END_ALIGNS).optional().catch(undefined),
@@ -194,7 +208,7 @@ export interface ShotLight {
   key?: number;
   rim?: number;
 }
-/** The colours of the film's two lights (otherwise the key follows the tone and the rim is white): a warm key with a cold rim is the classic commercial look. */
+/** The colours of the film's two lights (otherwise the key follows the tone and the rim is white); Muse picks the pair from the product and the world. */
 /**
  * The colour grade over the whole film, every field optional. exposure (-0.3 darker to 0.3 brighter), contrast (0 to 0.5), saturation (-1 grey to 1 vivid) and
  * hue (-40 to 40 degrees) are the tone controls. shadows and highlights are #rrggbb tints for the dark and the bright parts (split toning, as in teal and
@@ -215,10 +229,34 @@ export interface Grade {
   halation?: number;
   letterbox?: number;
 }
-/** The solid body a flat cut-out is built into: how deep it is (a share of its width) and how round its cross-section is. */
+/** Which film the board is for: the 3D world, or the product's own photo played as a 2D film. */
+export const BOARD_FORMS = ['3d', '2d'] as const;
+export type BoardForm = (typeof BOARD_FORMS)[number];
+/** What Muse read from the photo before it chose a form. */
+export interface BoardTraits {
+  rigid?: boolean;
+  sits?: 'upright' | 'lying' | 'flat';
+  edge?: 'crisp' | 'fuzzy';
+  sells?: string;
+}
+/**
+ * Whether the board's choice of "2d" stands. Muse's own traits must give the reason (soft, lying on its side, or a fuzzy edge): a 2d written beside
+ * traits that say a rigid, upright, crisp thing (a bottle) contradicts itself, and the 3D film is built instead. Without traits the choice is not trusted.
+ */
+export function choosesFlat(board: Pick<CinematicBoard, 'form' | 'traits'>): boolean {
+  if (board.form !== '2d') return false;
+  const t = board.traits;
+  return t !== undefined && (t.rigid === false || t.edge === 'fuzzy' || t.sits === 'lying');
+}
+
+/** The solid body a flat cut-out is built into: how deep it is (a share of its shorter side) and how round its cross-section is. */
 export interface BoardBody {
+  /** what Muse read the product as: the builder takes its section and axis from it, and its depth unless Muse gave one */
+  form?: ProductForm;
   depth?: number;
   section?: number;
+  /** 'up' sweeps the outline's rows (a product standing upright, the default); 'across' sweeps its columns (a product lying on its side: a roll, a board, a loaf). */
+  axis?: 'up' | 'across';
 }
 
 export interface BoardLight {
@@ -292,7 +330,10 @@ const gradeSchema = z.object({
   halation: within(0, 1),
   letterbox: within(1.85, 2.6),
 });
-const boardBodySchema = z.object({ depth: within(0.05, 1.2), section: within(1, 6) });
+const boardTraitsSchema = z.object({ rigid: z.boolean().optional().catch(undefined), sits: z.enum(['upright', 'lying', 'flat']).optional().catch(undefined), edge: z.enum(['crisp', 'fuzzy']).optional().catch(undefined), sells: z.string().max(80).optional().catch(undefined) });
+const boardBodySchema = z.object({ form: z.enum(PRODUCT_FORMS).optional().catch(undefined), depth: within(0.05, 1.2), section: within(1, 6), axis: z.enum(['up', 'across']).optional().catch(undefined) });
+/** A form decides the body (its section and axis; its depth, inside the form's range, unless Muse gave one); without one Muse's numbers stand. */
+const resolveBody = (b: BoardBody): BoardBody => (b.form ? productBody(b.form, b.depth) : b);
 const spotSchema = z.object({ side: z.enum(SPOT_SIDES), color: hexColour.optional().catch(undefined), strength: within(0.2, 3), cone: within(SPOT.cone.min, SPOT.cone.max), soft: within(0, 1) });
 const boardLightSchema = z.object({ key: hexColour.optional().catch(undefined), rim: hexColour.optional().catch(undefined) });
 const beatSchema = z.object({
@@ -440,6 +481,8 @@ export interface CinematicBoard {
   set?: BoardSet;
   /** The line under the name in the end hold, at most TEXT_RULES.taglineWords words. */
   tagline?: string;
+  /** Two to four short lines about the product and the world that must hold in every shot; the sheets and the film sheet are checked against them. */
+  locks?: string[];
   /** A live, hand-held tremor on the camera. Absent means on: a small sway is how a moving camera feels like a person holding it. */
   handheld?: boolean | Handheld;
   /** The screen grade over the world. Absent means the one its key level gets (defaultFinish). */
@@ -448,7 +491,13 @@ export interface CinematicBoard {
   endCard?: EndCard;
   /** The colours of the key and rim lights. Absent means the key follows the tone and the rim is white. */
   light?: BoardLight;
-  /** The product's body: depth as a share of its width, and the section's exponent (2 round, higher boxier). Absent means the film's own. */
+  /** How light sits on the product: matte, satin, gloss or metal. Absent means satin. */
+  surface?: Surface;
+  /** What Muse read from the photo (rigid or soft, how it sits, its edge, what it sells on). Kept so the choice of form can be read back. */
+  traits?: BoardTraits;
+  /** 3d plays the 3D world; 2d plays the product's own photo as a 2D film. Absent means 3d. */
+  form?: BoardForm;
+  /** The product's body: depth as a share of its shorter side, and the section's exponent (2 round, higher boxier). Absent means the film's own. */
   body?: BoardBody;
   /** Spot lights on the product (at most SPOT.max): a pool of light from one side. Absent means none. */
   spots?: BoardSpot[];
@@ -473,27 +522,39 @@ export function floorSet(text: string): BoardSet {
 }
 
 /** A board in the shape Muse writes it (beats at the top). */
-const boardJson = (b: CinematicBoard) => ({ concept: b.concept, mood: b.mood, ...(b.endCard ? { endCard: b.endCard } : {}), ...(b.light ? { light: b.light } : {}), ...(b.body ? { body: b.body } : {}), ...(b.blur !== undefined ? { blur: b.blur } : {}), ...(b.grade ? { grade: b.grade } : {}), ...(b.bokeh !== undefined ? { bokeh: b.bokeh } : {}), ...(b.reflect ? { reflect: b.reflect } : {}), ...(b.spots?.length ? { spots: b.spots } : {}), ...(b.aperture !== undefined ? { aperture: b.aperture } : {}), ...(b.tone ? { tone: b.tone } : {}), ...(b.key ? { key: b.key } : {}), ...(b.set ? { set: b.set } : {}), ...(b.handheld !== undefined ? { handheld: b.handheld } : {}), ...(b.finish ? { finish: b.finish } : {}), ...(b.tagline ? { tagline: b.tagline } : {}), elements: b.elements, beats: b.sheet.beats });
+const boardJson = (b: CinematicBoard) => ({ concept: b.concept, mood: b.mood, ...(b.traits ? { traits: b.traits } : {}), ...(b.form ? { form: b.form } : {}), ...(b.surface ? { surface: b.surface } : {}), ...(b.endCard ? { endCard: b.endCard } : {}), ...(b.light ? { light: b.light } : {}), ...(b.body ? { body: b.body } : {}), ...(b.blur !== undefined ? { blur: b.blur } : {}), ...(b.grade ? { grade: b.grade } : {}), ...(b.bokeh !== undefined ? { bokeh: b.bokeh } : {}), ...(b.reflect ? { reflect: b.reflect } : {}), ...(b.spots?.length ? { spots: b.spots } : {}), ...(b.aperture !== undefined ? { aperture: b.aperture } : {}), ...(b.tone ? { tone: b.tone } : {}), ...(b.key ? { key: b.key } : {}), ...(b.set ? { set: b.set } : {}), ...(b.handheld !== undefined ? { handheld: b.handheld } : {}), ...(b.finish ? { finish: b.finish } : {}), ...(b.tagline ? { tagline: b.tagline } : {}), ...(b.locks?.length ? { locks: b.locks } : {}), elements: b.elements, beats: b.sheet.beats });
+
+/** The shape of the board's JSON, as the prompt shows it. */
+const BOARD_TEMPLATE = `{"traits":{"rigid":true,"sits":"upright|lying|flat","edge":"crisp|fuzzy","sells":"what it sells on"},"form":"3d|2d","surface":"matte|satin|gloss|metal","concept":"one sentence","mood":"a few words","tone":"warm|cool|neutral","key":"low|mid|high","set":{"look":"beach|pool|sunset|sky|studio|night|garden","air":"none|dust|bokeh|spray|smoke","palette?":{"top":"#rrggbb","horizon":"#rrggbb","ground":"#rrggbb","glow?":{"x":0.7,"y":0.7,"color":"#rrggbb","size":0.3},"band?":{"color":"#rrggbb","height":0.09,"foam":false},"stars?":false,"texture?":"none|clouds|spots|rays|bands|grid","accent?":"#rrggbb"}},"endCard?":{"face":"sans|soft|serif","letters":"gloss|chrome|gold|satin","entrance":"rise|pop|flip","plate":"pill|bar|none","price":"disc|tag|plain","align":"center|left","text":"normal|upper","weight":"light|regular|bold","accent":"#rrggbb","pulse":true},"light?":{"key":"#rrggbb","rim":"#rrggbb"},"body":{"form":"round|boxy|slab|lying","depth?":"0.05 to 1.2"},"blur?":"0 to 1","bokeh?":"0 to 1","aperture?":"0 to 1","reflect?":"room|softbox|ring|sunset|none","spots?":[{"side":"left|right|above|behind|front","color?":"#rrggbb","strength?":1,"cone?":24,"soft?":0.6}],"grade?":{"exposure?","contrast?","saturation?","hue?","shadows?":"#rrggbb","highlights?":"#rrggbb","split?","balance?","streak?":{"color?","strength","reach?"},"halation?","letterbox?":2.39},"handheld":true,"finish":{"glow":"none|soft|strong","grain":"none|fine|heavy","vignette":"none|soft|strong","fringe":false,"floor":"none|matte|glossy|mirror","wet":"none|light|heavy","caustics":"none|soft|bright"},"tagline":"at most ${TEXT_RULES.taglineWords} words","locks?":["what must stay true in every shot"],"elements":[{"id":"slug","name":"what SAM should find","use":"solid|card|liquid|vapour","form":"round|thin|chunk (solid)","glass":false,"color":"#rrggbb (liquid or vapour)","clear":false,"look":"one piece, concrete colours and materials","pieces":1,"sizeM":0.02}],"beats":[{"size","move","seconds","angle?","product?","cut?","camera?":{"from?":{"fill","height","around","lens","side"},"via?":[{...}],"to?":{...},"ease?","focus?":"product|rack|{from?,to?,aperture?}","shake?":1},"ingredient?":{"kind":"element id","action","place?","scale?"},"spin?":{"degrees","ease?","tilt?","roll?","lift?"},"light?":{"from","to","elevation","key","rim"},"ramp?":[{"at":0,"rate":1},{"at":0.35,"rate":0.2}],"dir?":"left|right|up|down","blur?":0.5,"text?":"words on screen","note"}]}`;
 
 /** The prompt that asks Muse (looking at the product photo) for a board. `violations` is set on the retry. */
-export function boardPrompt(o: { title: string; brief?: string; brand?: string; category?: string; seconds: number; flat?: boolean; violations?: string[]; previous?: CinematicBoard }): { system: string; user: string } {
+export function boardPrompt(o: { title: string; brief?: string; brand?: string; category?: string; seconds: number; flat?: boolean; violations?: string[]; previous?: CinematicBoard; idea?: Idea; solid?: boolean }): { system: string; user: string } {
   const R = SHEET_RULES;
+  // a film that is always built in 3D (the sheet film) is not asked to choose 2D: the choice was thrown away and cost Muse's attention
+  const template = o.solid ? BOARD_TEMPLATE.replace('"form":"3d|2d",', '') : BOARD_TEMPLATE;
   return {
     system: [
-      'You are the creative director of a short photoreal 3D product ad: the real product in a dark, moody world with real things around it, shot like the best commercials for its kind of product (food, sport, tech, home, fashion, outdoor).',
+      'You are the creative director of a short photoreal 3D product ad: the real product in a world with real things around it, shot like the best commercials for its kind of product (food, sport, tech, home, fashion, outdoor). The world can be anything the idea needs: bright and airy, sunlit, pastel, playful, raw and gritty, clean and white, or dark and moody; no one look is the default.',
       referenceDeck(`${o.category ?? ''} ${o.title} ${o.brief ?? ''}`),
-      'YOUR TASK. You are shown the product photo. First find its ONE idea (a contrast or a device, as above) and write it as the concept. Then decide what belongs in the film, and write a shot list in which every shot has a reason (the note) that serves the idea. Vary the actions and the lengths of your shots; do not copy the worked boards. Reply with JSON only, in this shape:',
-      `{"concept":"one sentence","mood":"a few words","tone":"warm|cool|neutral","key":"low|mid|high","set":{"look":"beach|pool|sunset|sky|studio|night|garden","air":"none|dust|bokeh|spray|smoke","palette?":{"top":"#rrggbb","horizon":"#rrggbb","ground":"#rrggbb","glow?":{"x":0.7,"y":0.7,"color":"#rrggbb","size":0.3},"band?":{"color":"#rrggbb","height":0.09,"foam":false},"stars?":false,"texture?":"none|clouds|spots|rays|bands|grid","accent?":"#rrggbb"}},"endCard?":{"plate":"pill|bar|none","price":"disc|tag|plain","align":"center|left","text":"normal|upper","weight":"light|regular|bold","accent":"#rrggbb","pulse":true},"light?":{"key":"#rrggbb","rim":"#rrggbb"},"body?":{"depth":0.55,"section":2.6},"blur?":0.5,"bokeh?":0.4,"aperture?":0.3,"reflect?":"room|softbox|ring|sunset|none","spots?":[{"side":"left|right|above|behind|front","color?":"#rrggbb","strength?":1,"cone?":24,"soft?":0.6}],"grade?":{"exposure?","contrast?","saturation?","hue?","shadows?":"#rrggbb","highlights?":"#rrggbb","split?","balance?","streak?":{"color?","strength","reach?"},"halation?","letterbox?":2.39},"handheld":true,"finish":{"glow":"none|soft|strong","grain":"none|fine|heavy","vignette":"none|soft|strong","fringe":false,"floor":"none|matte|glossy|mirror","wet":"none|light|heavy","caustics":"none|soft|bright"},"tagline":"at most ${TEXT_RULES.taglineWords} words","elements":[{"id":"slug","name":"what SAM should find","use":"solid|card|liquid|vapour","glass":false,"color":"#rrggbb (liquid or vapour)","clear":false,"look":"one piece, concrete colours and materials","pieces":1,"sizeM":0.02}],"beats":[{"size","move","seconds","angle?","product?","cut?","camera?":{"from?":{"fill","height","around","lens","side"},"via?":[{...}],"to?":{...},"ease?","focus?":"product|rack|{from?,to?,aperture?}","shake?":1},"ingredient?":{"kind":"element id","action","place?","scale?"},"spin?":{"degrees","ease?","tilt?","roll?","lift?"},"light?":{"from","to","elevation","key","rim"},"ramp?":[{"at":0,"rate":1},{"at":0.35,"rate":0.2}],"dir?":"left|right|up|down","blur?":0.5,"text?":"words on screen","note"}]}`,
+      'YOUR TASK. You are shown the product photo. First find its ONE idea (any of the kinds above, or one of your own, chosen for this product) and write it as the concept. Then decide what belongs in the film, and write a shot list in which every shot has a reason (the note) that serves the idea. Vary the actions and the lengths of your shots; do not copy the worked boards. Reply with JSON only, in this shape:',
+      template,
       `THE SET. The product does not float in nothing: it stands in a place, with depth behind it, so the camera's moves slide the near and far apart (parallax). Pick the look that suits the idea and the campaign: ${SET_LOOKS.map((l) => `${l} (${SET_HELP[l]})`).join('; ')}. Pick the air: ${SET_AIR.join(', ')}; dust is fine specks drifting round the product, bokeh is big soft lights drifting near the lens (use it for warm, festive, night or dreamy films), spray is a burst of droplets in the peak shot (water, fizz, sea), smoke is slow smoke drifting up behind the product the whole film (oud, incense, whisky, night, mystery). Match the set to the light: a low key suits night or sunset, a high key suits beach, pool, sky or garden.`,
       `THE WORLD'S COLOURS are yours. "look" is only a starting recipe; write "set.palette" to paint the world this film needs and every colour you write replaces the look's own: top (the sky overhead), horizon (the sky where it meets the floor; the camera sees mostly this low part), ground (the floor), glow (a light in the sky: x across 0-1, y down 0.3-1 where 0.7 is low and seen, size 0.1 small to 0.6 huge, its colour: a sun, a lamp, a moon, a neon sign), band (a strip along the horizon: a sea, a skyline, hills; height 0.02-0.3), stars, texture (${SET_TEXTURES.join(', ')}: clouds soft blobs, spots warm out-of-focus lights, rays light fanning from the glow, bands soft horizontal haze, grid a faint perspective grid) and accent (the colour of the texture's shapes). Pick colours from the idea and the product (a deep wine red room for a red lipstick, a pale dawn for a calm morning, hot pink and violet for a night out) and do not default to blue; a dark world suits a low key and a pale one a high key, and the ground should be a colour that sits well under the product.`,
-      `THE END CARD is styled by you with "endCard", every field optional: plate (${END_PLATES.join(', ')}: what sits behind the name and the words, a rounded pill, a full-width bar, or nothing but a soft shadow), price (${END_PRICES.join(', ')}: a round disc, a rounded tag, or big plain type), align (${END_ALIGNS.join(', ')}: the name and tagline centred or on the left margin), text (${END_CASES.join(', ')}: as written or in capitals), weight (${END_WEIGHTS.join(', ')}: how heavy the name is), accent (#rrggbb: the colour of the disc or tag, otherwise the product's own), pulse (whether the price beats with the music). A calm luxury film might want left-aligned light capitals on no plate and a plain price; a loud one a bold name on a bar and a bright disc.`,
+      `THE WORDS are real 3D type, extruded and bevelled, lit by the studio, and THE END CARD is styled by you with "endCard", every field optional: face (${TITLE_FACE_NAMES.join(', ')}: a clean sans, a softer humanist sans, or a serif), letters (${TITLE_FINISHES.join(', ')}: lacquered colour, polished chrome, polished gold, or soft satin), entrance (${TITLE_ENTERS.join(', ')}: the letters rise from below, pop from nothing or flip up, one after another), plate (${END_PLATES.join(', ')}: what sits behind the name and the words, a glassy rounded pill, a full-width glassy bar, or nothing), price (${END_PRICES.join(', ')}: a glossy coin that spins in, a rounded tag, or big plain type), align (${END_ALIGNS.join(', ')}: the name and tagline centred or on the left margin), text (${END_CASES.join(', ')}: as written or in capitals), weight (${END_WEIGHTS.join(', ')}: how heavy the name is), accent (#rrggbb: the colour of the disc or tag, otherwise the product's own), pulse (whether the price beats with the music). A calm luxury film might want left-aligned light serif capitals in gold on no plate and a plain price; a loud one a bold sans in gloss popping in on a bar and a bright coin.`,
       `THE PRODUCT'S MOTION is yours. A shot's "spin" says what the product does: degrees (how far it turns about its upright axis over the shot: 90 a quarter turn, 360 a full hero spin, -180 half a turn the other way; 0 or none lets it rest), ease (${EASES.join(', ')}: a spin that eases out settles like a turntable, whip throws it round and brakes), tilt (degrees it leans toward or away from the lens at the middle of the shot, -40 to 40), roll (degrees it rolls sideways at the middle), lift (how high it is tossed at the middle, in product heights: 0.5 a hop, 1.5 a toss; it comes back down by the end of the shot). Use it where the idea wants the product to move: a full spin as the reveal, a slow quarter turn under a light sweep, a toss and catch for something playful, nothing for something calm and monumental. A cut-out product is a solid body built from its photo: its back repeats the front picture, so a full spin shows a plausible back, but a slow quarter or half turn sells it best.`,
-      `THE LIGHT is yours. "light" at the top sets the colours of the two lights: key (the main light on the product, #rrggbb) and rim (the thin light behind it that outlines its edges, #rrggbb): a warm key with a cold teal or magenta rim is the classic commercial look. A shot's "light" directs the light inside that shot: from and to (degrees round the product where the key light starts and ends: 0 in front, -90 its left, 90 its right, 180 behind; a light that slides from -80 to 70 over a shot sweeps a bright streak across the label, a light behind the product at 160 turns its edges to fire), elevation (5 grazing, 80 overhead), key and rim (how strong each is in that shot as a multiple of the film's, 0 off, 2 twice as hard: a rim at 2.5 on the reveal makes the outline blaze, a key at 0.3 with a hard rim is a silhouette). Give the light a story across the film like the camera has.`,
-      `THE PRODUCT'S BODY is yours. The product is built as a solid from its own outline, so it has sides and a back and can turn all the way round. "body" sets its depth (0.05 to 1.2, a share of its width: 0.3 a slim box or pouch, 0.55 a pack, 0.9 a bottle or can nearly as deep as it is wide) and its section (1 to 6: 2 a round bottle or can, 3 to 4 a rounded box or cooler, 5 or more a slab with sharp corners). Judge it from the photo and what the product is; leave it out and the film uses 0.55 and 2.6.`,
+      `THE LIGHT is yours. "light" at the top sets the colours of the two lights: key (the main light on the product, #rrggbb) and rim (the thin light behind it that outlines its edges, #rrggbb): the pair can be anything the idea needs: warm key with a cold rim, both warm, both cool, a soft white key with a coloured rim, or one coloured light only; pick from the product and the world, not from habit. A shot's "light" directs the light inside that shot: from and to (degrees round the product where the key light starts and ends: 0 in front, -90 its left, 90 its right, 180 behind; a light that slides from -80 to 70 over a shot sweeps a bright streak across the label, a light behind the product at 160 turns its edges to fire), elevation (5 grazing, 80 overhead), key and rim (how strong each is in that shot as a multiple of the film's, 0 off, 2 twice as hard: a rim at 2.5 on the reveal makes the outline blaze, a key at 0.3 with a hard rim is a silhouette). Give the light a story across the film like the camera has.`,
+      o.solid
+        ? 'THE PRODUCT\'S TRAITS. Read the product into "traits" (rigid: true for a hard thing, false for cloth, a bag or anything that drapes; sits: upright, lying on its side, or flat; edge: crisp for metal, glass and plastic, fuzzy for fabric, fur and plants; sells: what it is sold on). The film is always 3D: the product is built as a solid from its outline.'
+        : `3D OR 2D is your first decision, made from the photo before anything else. Read the product into "traits" (rigid: true for a hard thing, false for cloth, a bag or anything that drapes; sits: upright, lying on its side, or flat; edge: crisp for metal, glass and plastic, fuzzy for fabric, fur and plants; sells: what it is sold on, its form and shine, or its softness and pattern), then write "form". The 3D film builds the product as a solid from its outline, so it works for a rigid thing that stands upright and is round or boxy, with a crisp edge, sold on form. It fails on a soft thing, on a thing lying on its side (a roll turns into a flat pill), on a fuzzy edge, and where the photo's own softness or pattern is the point: for those write "2d", and the photo is played as a 2D film. When in doubt about a soft or fuzzy product, choose "2d". Verdicts on real films:\n${verdictLines().join('\n')}`,
+      `LIGHT AND PALE PRODUCTS. A white, cream or pale product clips to pure white under strong glow, exposure or key light and vanishes on a pale set (seen on real films: a white yoghurt pot burnt out in every shot, then disappeared into a cream world). Give it contrast: a darker or more saturated world, a modest glow and exposure, and a rim light that outlines it; keep the brightest areas of the picture off the product.`,
+      `VIVID PRODUCTS. A product whose photo is already richly coloured (jewel-coloured glass, bold print) is pushed to one flat colour by grade saturation above about 0.3, high contrast, or a strong coloured key or rim light (seen on a real film: magenta glass with rose-gold metal turned all red, with saturation 0.55, contrast 0.4 and hot pink lights). For such a product keep the grade's saturation near 0 and tint the lights toward its own colours so glass, metal and print stay apart; a neutral product can take a stronger tint.`,
+      `THE PRODUCT'S SURFACE is yours: "surface" says how light sits on it, read from the photo (the photo itself carries the colour). matte for paper, card, fabric and matte-coated packs; satin (the default) for most printed packs and bottles; gloss for lacquer, shiny plastic and glossy labels; metal only for bare metal you can see in the photo (polished chrome, a bare aluminium can, a gold cap that is the whole product). Metal mirrors the set: it turns a printed pack the set's colour (seen on a real film: a matte cream can rendered metal came out silver-gold and lost to its 2D cut).`,
+      `THE PRODUCT'S BODY: always write "body", read from the photo and what the product is. The product is built as a solid from its own outline, so it has sides and a back and turns all the way round; "form" says how: round (a bottle, can, tub, jar, cup or fruit, round when seen from above, so as deep as it is wide; a taper is fine, the outline carries it), boxy (a carton, box, cooler or square bottle, flat faces and rounded corners), slab (a thin flat thing standing up: a folded towel, a pouch, a book, a phone, a card), lying (a round thing lying on its side: a rolled towel or mat, a rolling pin, a loaf, a torch). "depth" (optional) is how deep it is as a share of its shorter side, if you can tell better than the form's usual (round 0.95, boxy 0.6, slab 0.25, lying 0.95). Never call a round product boxy or slab: a tub or bottle built thin looks like a cardboard cut-out when it turns.`,
       `MOTION BLUR is the shutter. "blur" at the top is how much of each frame's time it stays open (0 none, 0.5 the film look, 1 smeared); a shot's own "blur" replaces it for that shot: sharp for calm holds, 0.7 to 1 for whips and spins so the speed smears the way a real camera shows it.`,
+      'LOCKS. "locks" are 2 to 4 short lines about the product and the world that must hold in every shot (its colours, its label facing, what the elements are). They are checked on the sheets and on the film, so write only what is true of this product.',
       `THE WORDS. Copy is part of the film. "tagline" is a line of at most ${TEXT_RULES.taglineWords} words that lands under the product name in the last shot (a feeling or a promise, not a slogan cliché). A shot's "text" is the words on screen in that shot, ${TEXT_RULES.minWords} to ${TEXT_RULES.maxWords} words, popped in one after another: a hook line on the first shot, a feeling or a benefit on one or two middle shots. Never the price, the product name or the brand (they land at the end by themselves), never in a macro or the last shot, at most ${TEXT_RULES.maxShots} shots with text, and a short shot takes fewer words (about ${TEXT_RULES.wordsPerSecond} words a second at most). Most shots have no text.`,
       `SPEED is yours. A shot's "ramp" is its speed over its own time, a few points of a curve: at (0 the start of the shot, 1 the end) and rate (the speed there: 1 normal, 0.25 a quarter speed slow motion, 2 double). The speed runs in straight lines between the points, and the shot still ends where it would have, so cuts do not move: a ramp of [{"at":0,"rate":1},{"at":0.3,"rate":0.2},{"at":0.7,"rate":0.2},{"at":1,"rate":1}] opens at full speed, sinks into slow motion for the middle and snaps back to speed before the cut. The camera, the product's spin (when the shot has one) and the world's own motion (a splash, steam, falling pieces) all follow it, so use it where a moment wants to be seen: a splash in slow motion, a toss that hangs at its top, a spin that whips and settles. Rates run ${RATE_MIN} to ${RATE_MAX}. At most 5 points.`,
-      `THE GRADE is the colour of the picture, over the whole film, and is yours: write "grade" with any of exposure (-0.3 darker to 0.3 brighter), contrast (0 to 0.5), saturation (-1 grey to 1 vivid), hue (-40 to 40 degrees round the colour wheel) for the tone; shadows and highlights (#rrggbb) to tint the dark parts and the bright parts differently (teal shadows with orange highlights is the cinema look; a cold blue with a warm gold is a luxury one), split (0 to 1, how strongly) and balance (-1 to 1, where the line between dark and bright falls); streak ({"color":"#rrggbb","strength":0 to 2,"reach":0.02 to 0.6 of the frame's width}) to draw a horizontal lens streak through every bright light (a cold blue one is the anamorphic look, for glass, chrome, night and neon); halation (0 to 1) for a soft glow round the highlights, as a diffusion filter gives; and letterbox (1.85 to 2.6; 2.39 is the cinema's) for black bars top and bottom that lift for the end card (in a tall frame the bars stop at 30% of the height each, and the words sit on them, so pair it with a plate). Choose them from the idea; leave out what the film does not want.`,
+      `THE GRADE is the colour of the picture, over the whole film, and is yours: write "grade" with any of exposure (-0.3 darker to 0.3 brighter), contrast (0 to 0.5), saturation (-1 grey to 1 vivid), hue (-40 to 40 degrees round the colour wheel) for the tone; shadows and highlights (#rrggbb) to tint the dark parts and the bright parts differently (many pairs work: teal shadows with orange highlights, cold blue with warm gold, green with cream, violet with peach, plum with mint, or none at all; pick from the product's own colours and the world), split (0 to 1, how strongly) and balance (-1 to 1, where the line between dark and bright falls); streak ({"color":"#rrggbb","strength":0 to 2,"reach":0.02 to 0.6 of the frame's width}) to draw a horizontal lens streak through every bright light (a cold blue one is the anamorphic look, for glass, chrome, night and neon); halation (0 to 1) for a soft glow round the highlights, as a diffusion filter gives; and letterbox (1.85 to 2.6; 2.39 is the cinema's) for black bars top and bottom that lift for the end card (in a tall frame the bars stop at 30% of the height each, and the words sit on them, so pair it with a plate). Choose them from the idea; leave out what the film does not want.`,
       'THE FINISH is the screen grade over the whole film, as in a commercial: glow makes bright things bloom (the halo behind a product, a hot rim, a sunlit sky); grain is fine film noise; vignette darkens the corners; fringe:true splits the colours slightly at the edges (energetic, glitchy, sport, tech); floor is how shiny the ground is, a soft reflection of the product in it (mirror for a lacquered black studio or a glass table, glossy for a dark moody set, matte for a soft studio, none for sand, grass or a bright airy set); wet puts beads of condensation on the product (heavy for an ice-cold can or bottle, light for something fresh and dewy, none for anything dry: a trainer, a candle, a gadget). Pick them from the idea: a dark moody low-key film wants a strong glow and a strong vignette, a bright airy one a soft glow and no vignette, a gritty one heavy grain, a clean premium one none.',
       'handheld is true for a live, hand-held sway on the camera (energetic, sport, summer, street, documentary: the default) and false for a calm, locked-off camera (premium, still, studio). It can also be written out: {"amount":0.3 a breath to 2 a nervous camera,"keys":1 a slow drift to 6 a jitter,"seed":a whole number, another seed shakes another way}. "bokeh" (0-1) makes the bright lights in the soft parts of the picture spread into big discs (night, festive, glamour), and "aperture" (0-1) is how shallow the whole film is (0.3 normal). CUTS: a cut should land while the camera is moving, so the shot before leaves at speed and the next enters at speed; the film does this for you, so do not put a hold in the middle of the film.',
       `tone and key set the light the film plays: tone is the colour of the key light, key is low (dark room, one bright object), mid or high (bright, airy). Pick them from the idea and the product's colours.`,
@@ -501,12 +562,13 @@ export function boardPrompt(o: { title: string; brief?: string; brand?: string; 
 `A shot needs only size, move and seconds; every other field is yours to use when the idea wants it. angle (${ANGLES.join(', ')}): camera height. product (${PRODUCT_MOVES.join(', ')}): what the product does. cut (${CUTS.join(', ')}): how the shot starts; hard is a plain cut, wipe dips to dark, cloud blooms light, and three cuts happen inside the scene itself and do not count in that limit: flash (a hot white flash of the key light that fades at once), pass (the product passes the lens as a wipe: the shot before ends by plunging at the product until it fills the frame, and this shot pulls out of that crop, so write pass on the shot that comes AFTER the plunge) and match (a match cut on shape: this shot opens with the product exactly as large and on the same lens as the last shot ended, while the camera angle jumps to somewhere else, so the product stays and the world turns round it); and the rest are shader transitions (${SHADER_CUT_NOTES}): pick the one that suits what the story does at that cut and the mood of the film (a calm premium film wants defocus, dream or iris; an energetic one lenswhip, punch or spin; the same one twice in a film looks careless; whip, lenswhip and leak travel the way "dir" says on that shot: ${CUT_DIRS.join(', ')}), at most ${CUT_SHADERS.max} in the film that are not hard (each renders the world twice). ingredient: an element with its action, and optionally "place" (${PLACES.join(', ')}: in front toward the lens, behind the product, or round it) and "scale" (0.3 to 2.5 times its size).`,
       'Write each note as what the camera, the product or the world DOES in that shot, using only the fields above; the film cannot play anything else (no match cuts, no liquid physics, no text effects).',
       `Elements: 2 to 4 real things that belong round THIS product, chosen from what you see: what it is made of, what it is used with, what it feels like (a coffee can: beans, ice, a milk splash; swim goggles: water droplets, sand, a sea-shell; a camping stove: sparks, pine needles, smoke; a trainer: dust, a grass blade, a mud splash; a jar of honey: a dripping ribbon of honey, a flower). Pick from the product's own world, never from these examples. Never the product itself, people, hands, text, logos or brand names, and no more than ${MAX_ELEMENTS}.`,
-      'use "solid" for a small physical object that can fall, fly or orbit (a bean, a slice, a leaf); glass:true for clear things drawn by the engine as glass (ice, sugar, droplets): they need no picture. use "liquid" for ANY liquid (coffee, milk, juice, water, honey, sauce, perfume, oil, a drink): the engine draws real moving 3D liquid that catches the light, so never draw a liquid as a card; give its "color" (#rrggbb, the colour of the liquid itself) and "clear":true when it is see-through (water, a clear perfume, a light juice). use "vapour" for steam, smoke, mist or a cloud of powder or spice: the engine draws soft moving vapour behind and round the product (it never needs an open top), so never draw one as a card; give its "color" (#rrggbb: white steam, grey smoke, brown cocoa). use "card" only for something flat that is neither a liquid nor a vapour and always faces the camera (a sparkle, a flare); a card may be a sequence of 1 to 6 stages in "pieces". sizeM is metres: a solid 0.01-0.08, a card 0.15-0.5, a liquid 0.2-0.42 (the size of its splash), a vapour 0.2-0.5 (how tall it rises; the product is 0.16 m tall). "look" describes one piece, or each stage in order.',
+      'use "solid" for a small physical object that can fall, fly or orbit (a bean, a slice, a leaf); glass:true for clear things drawn by the engine as glass (ice, sugar, droplets): they need no picture. use "liquid" for ANY liquid (coffee, milk, juice, water, honey, sauce, perfume, oil, a drink): the engine draws real moving 3D liquid that catches the light, so never draw a liquid as a card; give its "color" (#rrggbb, the colour of the liquid itself) and "clear":true when it is see-through (water, a clear perfume, a light juice). use "vapour" for steam, smoke, mist or a cloud of powder or spice: the engine draws soft moving vapour behind and round the product (it never needs an open top), so never draw one as a card; give its "color" (#rrggbb: white steam, grey smoke, brown cocoa). the "form" of a solid is its 3D shape: round for a berry, cherry, grape, blueberry, bean, nut, pea or droplet-like piece (as deep as it is wide); thin for a leaf, petal, chip, flake or shaving; chunk for a slice, wedge, cube or piece with flat faces. use "card" only for something flat that is neither a liquid nor a vapour and always faces the camera (a sparkle, a flare); a card may be a sequence of 1 to 6 stages in "pieces". sizeM is metres: a solid 0.01-0.08, a card 0.15-0.5, a liquid 0.2-0.42 (the size of its splash), a vapour 0.2-0.5 (how tall it rises; the product is 0.16 m tall). "look" describes one piece, or each stage in order.',
 `size is one of ${SHOT_SIZES.join(', ')} (a preset for fill). move is one of ${MOVES.join(', ')}: ${MOVES.map((m) => `${m} = ${MOVE_HELP[m]}`).join('; ')}. action is one of: ${ACTION_HELP}. A solid may fall, burst, orbit or drift; a liquid may splash, pour, swirl or drift; a vapour may rise, wrap or burst; a card may only splash or swirl.`,
 `Only these hold the film together: ${R.minBeats}-${R.maxBeats} shots, ${R.minTotal}-${R.maxTotal} s in all; every shot but the last lasts ${R.minBeat}-${R.maxBeat} s; the last shot is a hold of ${R.holdMin * 100}-${R.holdMax * 100}% of the film, with no element and no words, where the price rests. Everything else is yours: how many shots, their order, their lengths, which moves, where a peak sits.`,
 'DIRECTOR\'S CRAFT. The client\'s brief may be short and cold; you are the director, so turn it into a film with a point of view: keep every fact it gives (price, claim, mood words, platform) and add what a great commercial adds: a clear idea, one consistent look (one light, one colour world, one lens language), camera and cuts chosen for that idea, and ingredient action that echoes the product\'s story. Make this film look and move unlike a generic one: choose its shape (fast or slow, many shots or few, one long move or many cuts), its lens, its pace and its set for THIS idea. Never contradict the brief.',
+      'SHOT GRAMMAR. Every shot earns its own frame, so a still from each looks different from the one before: at every cut change the size, the angle (low, eye, high) or the side the camera sees the product from (camera.around), and usually two of them; two shots in a row with the same size and angle read as a jump cut, and three straight-on eye-level shots in a row read as one shot. Let the sizes travel (out wide, in close, into a macro of what the product sells on, back out) and give the film at least one shot from an angle that is not straight on and eye level. Choose each cut for what happens at it: a cut on the product\'s motion, a match on its shape (a match cut matches one thing, an edge or a place on screen, and still changes the size or the angle, never the whole framing), a flash on a hit of light, a soft dissolve into calm; a hard cut is a choice, not the default.',
     ].join('\n'),
-    user: [...(o.brief?.trim() ? [`The client's brief, in their own words (take its facts, add your craft): ${o.brief.trim().slice(0, 600)}`] : []), `Product: ${o.title}${o.brand ? ` by ${o.brand}` : ''}${o.category ? ` (${o.category})` : ''}.`, `Aim for about ${o.seconds} seconds.`, ...(o.flat ? [`The product is a solid body built from its photo's outline (not a turned pack): it can turn, tilt and drop in, and its sides are the photo's edges, so the label macro is a close crop of its front.`] : []), ...(o.violations?.length ? ['Your last board broke these rules; fix them and keep everything else about it as it is:', ...o.violations.map((x) => `- ${x}`)] : []), ...(o.previous && o.violations?.length ? ['Your last board:', JSON.stringify(boardJson(o.previous))] : [])].join('\n'),
+    user: [...(o.brief?.trim() ? [`The client's brief, in their own words (take its facts, add your craft): ${o.brief.trim().slice(0, 600)}`] : []), `Product: ${o.title}${o.brand ? ` by ${o.brand}` : ''}${o.category ? ` (${o.category})` : ''}.`, `Aim for about ${o.seconds} seconds.`, ...(o.idea ? ideaLines(o.idea) : []), ...(o.flat ? [`The product is a solid body built from its photo's outline (not a turned pack): it can turn, tilt and drop in, and its sides are the photo's edges, so the label macro is a close crop of its front.`] : []), ...(o.violations?.length ? ['Your last board broke these rules; fix them and keep everything else about it as it is:', ...o.violations.map((x) => `- ${x}`)] : []), ...(o.previous && o.violations?.length ? ['Your last board:', JSON.stringify(boardJson(o.previous))] : [])].join('\n'),
   };
 }
 
@@ -522,7 +584,7 @@ const paletteSchema = z.object({
   accent: hexColour.optional().catch(undefined),
 });
 const setSchema = z.object({ look: z.enum(SET_LOOKS), air: z.enum(SET_AIR).catch('none'), palette: paletteSchema.optional().catch(undefined) });
-const boardSchema = z.object({ concept: z.string().max(240).default(''), mood: z.string().max(80).default(''), set: setSchema.optional().catch(undefined), handheld: handheldSchema.optional().catch(undefined), bokeh: within(0, 1), aperture: within(0, 1), reflect: z.enum(REFLECTIONS).optional().catch(undefined), spots: z.array(spotSchema).max(SPOT.max).optional().catch(undefined), grade: gradeSchema.optional().catch(undefined), finish: finishSchema.optional().catch(undefined), endCard: endCardSchema.optional().catch(undefined), light: boardLightSchema.optional().catch(undefined), body: boardBodySchema.optional().catch(undefined), blur: within(0, 1), tagline: z.string().max(60).optional().catch(undefined), tone: z.enum(TONES).optional().catch(undefined), key: z.enum(KEY_LEVELS).optional().catch(undefined), elements: z.array(z.unknown()).max(8), beats: z.array(beatSchema).min(1).max(14) });
+const boardSchema = z.object({ concept: z.string().max(240).default(''), mood: z.string().max(80).default(''), set: setSchema.optional().catch(undefined), handheld: handheldSchema.optional().catch(undefined), bokeh: within(0, 1), aperture: within(0, 1), reflect: z.enum(REFLECTIONS).optional().catch(undefined), spots: z.array(spotSchema).max(SPOT.max).optional().catch(undefined), grade: gradeSchema.optional().catch(undefined), finish: finishSchema.optional().catch(undefined), endCard: endCardSchema.optional().catch(undefined), light: boardLightSchema.optional().catch(undefined), body: boardBodySchema.optional().catch(undefined), surface: z.enum(SURFACE_NAMES as [Surface, ...Surface[]]).optional().catch(undefined), traits: boardTraitsSchema.optional().catch(undefined), form: z.enum(BOARD_FORMS).optional().catch(undefined), blur: within(0, 1), tagline: z.string().max(60).optional().catch(undefined), locks: z.array(z.string().trim().min(8).max(120).optional().catch(undefined)).transform((a) => a.filter((x): x is string => x !== undefined).slice(0, 4)).optional().catch(undefined), tone: z.enum(TONES).optional().catch(undefined), key: z.enum(KEY_LEVELS).optional().catch(undefined), elements: z.array(z.unknown()).max(8), beats: z.array(beatSchema).min(1).max(14) });
 
 /** Models write `null` for "none" ("ingredient": null); the schema wants the field absent, so every null is removed before parsing. */
 function stripNulls(v: unknown): unknown {
@@ -531,8 +593,19 @@ function stripNulls(v: unknown): unknown {
   return v;
 }
 
-/** The board in a Spark reply (an object or JSON text), or why it could not be read. Elements that fail the safety pass are listed in `dropped`. */
-export function parseBoard(raw: unknown, o: { stored?: boolean } = {}): { ok: true; board: CinematicBoard; dropped: string[]; notes: string[] } | { ok: false; reason: string } {
+/**
+ * True when words are a model saying it could not see or read something ("No pack visible", "label not readable", "Unknown", "N/A") rather than copy.
+ * A model that looked at a photo it could not make out sometimes writes that into the board; on screen it reads as the film's own failure.
+ */
+export function isFailureText(text: string): boolean {
+  return /\b(not|no|isn'?t|is not)\s+(\w+\s+){0,2}(visible|readable|legible|shown|found|detected|available|identifiable)\b|\b(unknown|unreadable|illegible|unidentified|n\/a|(cannot|can'?t|unable to) (see|read|identify|find))\b/i.test(text);
+}
+
+/**
+ * The board in a Spark reply (an object or JSON text), or why it could not be read. Elements that fail the safety pass are listed in `dropped`,
+ * and the ids Muse gave them in `gone`, so shots that used them can play without them.
+ */
+export function parseBoard(raw: unknown, o: { stored?: boolean } = {}): { ok: true; board: CinematicBoard; dropped: string[]; gone: string[]; notes: string[] } | { ok: false; reason: string } {
   let data: unknown = raw;
   if (typeof raw === 'string') {
     try {
@@ -545,6 +618,8 @@ export function parseBoard(raw: unknown, o: { stored?: boolean } = {}): { ok: tr
   const r = boardSchema.safeParse(stripNulls(data));
   if (!r.success) return { ok: false, reason: r.error.issues[0]?.message ?? 'wrong shape' };
   const { elements, dropped } = sanitizeElements(r.data.elements);
+  const kept = new Set(elements.map((e) => e.id));
+  const gone = (Array.isArray(r.data.elements) ? r.data.elements : []).map((e) => (e && typeof e === 'object' ? (e as { id?: unknown }).id : undefined)).filter((id): id is string => typeof id === 'string' && !kept.has(id));
   // a tagline over the word limit is dropped, not cut: a cut line ends mid-phrase ("Pack the cold, chase"); without one the end card shows the brand
   const notes: string[] = [];
   let tagline = r.data.tagline?.trim().replace(/\s+/g, ' ') || undefined;
@@ -554,7 +629,18 @@ export function parseBoard(raw: unknown, o: { stored?: boolean } = {}): { ok: tr
     notes.push(`tagline "${tagline}" is over ${TEXT_RULES.taglineWords} words and was dropped`);
     tagline = undefined;
   }
-  return { ok: true, board: { concept: r.data.concept, mood: r.data.mood, ...(r.data.tone ? { tone: r.data.tone } : {}), ...(r.data.key ? { key: r.data.key } : {}), ...(r.data.set ? { set: r.data.set } : {}), ...(r.data.handheld !== undefined ? { handheld: r.data.handheld } : {}), ...(r.data.finish ? { finish: r.data.finish } : {}), ...(r.data.endCard && Object.values(r.data.endCard).some((v) => v !== undefined) ? { endCard: r.data.endCard } : {}), ...(r.data.light && Object.values(r.data.light).some((v) => v !== undefined) ? { light: r.data.light } : {}), ...(r.data.body && Object.values(r.data.body).some((v) => v !== undefined) ? { body: r.data.body } : {}), ...(r.data.blur !== undefined ? { blur: r.data.blur } : {}), ...(r.data.grade && Object.values(r.data.grade).some((v) => v !== undefined) ? { grade: r.data.grade } : {}), ...(r.data.bokeh !== undefined ? { bokeh: r.data.bokeh } : {}), ...(r.data.reflect ? { reflect: r.data.reflect } : {}), ...(r.data.spots?.length ? { spots: r.data.spots } : {}), ...(r.data.aperture !== undefined ? { aperture: r.data.aperture } : {}), ...(tagline ? { tagline } : {}), elements, sheet: { beats: r.data.beats.map((b) => ({ ...b, seconds: Math.round(b.seconds * 100) / 100 })) } }, dropped, notes };
+  if (tagline && isFailureText(tagline)) {
+    notes.push(`tagline "${tagline}" reads as a failure to see the product and was dropped`);
+    tagline = undefined;
+  }
+  // a shot whose words say the model could not see the product plays without words
+  const beats = r.data.beats.map((b) => {
+    if (!b.text || !isFailureText(b.text)) return b;
+    notes.push(`shot text "${b.text}" reads as a failure to see the product and was dropped`);
+    const { text: _text, ...rest } = b;
+    return rest;
+  });
+  return { ok: true, board: { concept: r.data.concept, mood: r.data.mood, ...(r.data.traits && Object.values(r.data.traits).some((v) => v !== undefined) ? { traits: r.data.traits } : {}), ...(r.data.form ? { form: r.data.form } : {}), ...(r.data.surface ? { surface: r.data.surface } : {}), ...(r.data.tone ? { tone: r.data.tone } : {}), ...(r.data.key ? { key: r.data.key } : {}), ...(r.data.set ? { set: r.data.set } : {}), ...(r.data.handheld !== undefined ? { handheld: r.data.handheld } : {}), ...(r.data.finish ? { finish: r.data.finish } : {}), ...(r.data.endCard && Object.values(r.data.endCard).some((v) => v !== undefined) ? { endCard: r.data.endCard } : {}), ...(r.data.light && Object.values(r.data.light).some((v) => v !== undefined) ? { light: r.data.light } : {}), ...(r.data.body && Object.values(r.data.body).some((v) => v !== undefined) ? { body: resolveBody(r.data.body) } : {}), ...(r.data.blur !== undefined ? { blur: r.data.blur } : {}), ...(r.data.grade && Object.values(r.data.grade).some((v) => v !== undefined) ? { grade: r.data.grade } : {}), ...(r.data.bokeh !== undefined ? { bokeh: r.data.bokeh } : {}), ...(r.data.reflect ? { reflect: r.data.reflect } : {}), ...(r.data.spots?.length ? { spots: r.data.spots } : {}), ...(r.data.aperture !== undefined ? { aperture: r.data.aperture } : {}), ...(tagline ? { tagline } : {}), ...(r.data.locks?.length ? { locks: r.data.locks } : {}), elements, sheet: { beats: beats.map((b) => ({ ...b, seconds: Math.round(b.seconds * 100) / 100 })) } }, dropped, gone, notes };
 }
 
 /** A board as it is kept (shots under `sheet`), read back from disk: undefined when it is not a board any more. Elements go through the safety pass again. */
@@ -581,11 +667,14 @@ export function floorBoard(o: { title: string; category?: string }): CinematicBo
   return { concept: `${o.title}, the hero product with the things it is made of`, mood: 'dark, warm, glossy', set: floorSet(`${o.category ?? ''} ${o.title}`), elements, sheet: defaultBeatSheet(elements) };
 }
 
-/** Rule breaks in a board as it is: its elements through the safety pass and its shots through the checker. Used on boards read back from disk, which a person may have edited. */
-export function reviewBoard(board: CinematicBoard): { board: CinematicBoard; violations: string[]; hard: string[]; dropped: string[] } {
+/**
+ * Rule breaks in a board as it is: its elements through the safety pass and its shots through the checker. Used on boards read back from disk,
+ * which a person may have edited, and on fresh replies. `gone` names elements already dropped before (by `parseBoard`), whose shots also play without them.
+ */
+export function reviewBoard(board: CinematicBoard, gone: readonly string[] = []): { board: CinematicBoard; violations: string[]; hard: string[]; dropped: string[] } {
   const { elements, dropped } = sanitizeElements(board.elements);
   // a shot that used an element the safety pass dropped plays without it: the rest of Muse's board stands
-  const goneIds = new Set(dropped.map((d) => d.split(':')[0]!.trim()));
+  const goneIds = new Set([...gone, ...dropped.map((d) => d.split(':')[0]!.trim())]);
   const sheet: BeatSheet = { beats: board.sheet.beats.map((b) => (b.ingredient && goneIds.has(b.ingredient.kind) && !elements.some((e) => e.id === b.ingredient!.kind) ? (({ ingredient: _gone, ...rest }) => rest)(b) : b)) };
   const next = { ...board, elements, sheet };
   const hard = [...(elements.length ? [] : ['list 2 to 4 elements']), ...sheetBreaks(next.sheet, elements)];
@@ -597,7 +686,10 @@ export function reviewBoard(board: CinematicBoard): { board: CinematicBoard; vio
  * rules AND the board that broke them when the first fails the checker (so Muse mends it instead of starting over), else the floor board. About
  * $0.005 a call. Without a photo it asks with the words alone. `prior` starts from a board already known (a saved one that fails the checker).
  */
-export async function planBoard(ctx: ToolCtx, o: { title: string; brief?: string; brand?: string; category?: string; photo?: Buffer; seconds?: number; flat?: boolean; prior?: { board: CinematicBoard; violations: string[] } }): Promise<PlannedBoard> {
+/** How far (seconds) a board may run from the length asked for before it goes back to Muse. */
+export const LENGTH_SLACK = 0.5;
+
+export async function planBoard(ctx: ToolCtx, o: { title: string; brief?: string; brand?: string; category?: string; photo?: Buffer; seconds?: number; flat?: boolean; prior?: { board: CinematicBoard; violations: string[] }; idea?: Idea; solid?: boolean }): Promise<PlannedBoard> {
   const seconds = o.seconds ?? 8;
   let violations: string[] = o.prior?.violations ?? [];
   let previous: CinematicBoard | undefined = o.prior?.board;
@@ -607,9 +699,10 @@ export async function planBoard(ctx: ToolCtx, o: { title: string; brief?: string
     try {
       let reply: unknown;
       if (o.photo) {
-        reply = await ctx.meta.spark.reviewImages([o.photo], `${p.system}\n\n${p.user}`);
+        // the board is a creative draft: sampled freely, as on the text path, so two films for different products do not come out as one pattern
+        reply = await ctx.meta.spark.reviewImages([o.photo], `${p.system}\n\n${p.user}`, undefined, { temperature: BOARD_TEMPERATURE });
       } else {
-        reply = (await ctx.meta.spark.chat({ response_format: { type: 'json_object' }, temperature: 0.9, messages: [{ role: 'system', content: p.system }, { role: 'user', content: p.user }] })).content;
+        reply = (await ctx.meta.spark.chat({ response_format: { type: 'json_object' }, temperature: BOARD_TEMPERATURE, messages: [{ role: 'system', content: p.system }, { role: 'user', content: p.user }] })).content;
       }
       ctx.ledger.add(ctx.filmId, 'muse-spark-1.3-contributor', '1 call', o.photo ? 0.005 : 0.002);
       const parsed = parseBoard(reply);
@@ -618,9 +711,15 @@ export async function planBoard(ctx: ToolCtx, o: { title: string; brief?: string
         continue;
       }
       // only a board that would break the film goes back to Muse once; an element dropped for safety is reported, not a reason to refuse the board
-      const review = reviewBoard(parsed.board);
+      const review = reviewBoard(parsed.board, parsed.gone);
       violations = review.hard;
       previous = parsed.board;
+      // a board that misses the length the client asked for goes back once; a second miss keeps Muse's board rather than the floor's
+      const total = totalSeconds(review.board.sheet);
+      if (!violations.length && o.seconds !== undefined && Math.abs(total - o.seconds) > LENGTH_SLACK && attempt === 0) {
+        violations = [`the film must run ${o.seconds} s (your shots add up to ${total} s): lengthen or add shots to fill it`];
+        continue;
+      }
       if (!violations.length) return { board: review.board, source: 'muse', violations: [], dropped: parsed.dropped };
     } catch (err) {
       // a failed call (a busy service, a reply cut short) is tried again once with the same prompt, not given up on

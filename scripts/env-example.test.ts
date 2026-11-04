@@ -12,7 +12,7 @@ it('lists every env name at the start of a line', () => {
 });
 
 it('keeps the secrets empty', () => {
-  for (const key of ['META_API_KEY', 'MODEL_API_KEY', 'CLIPPY_TOKEN', 'BASETEN_API_KEY', 'DIRECTOR_PASSCODE', 'REVANA_API_KEY']) {
+  for (const key of ['META_API_KEY', 'MODEL_API_KEY', 'CLIPPY_TOKEN', 'BASETEN_API_KEY', 'DIRECTOR_PASSCODE']) {
     expect(example, key).toMatch(new RegExp(`^${key}=$`, 'm'));
   }
 });

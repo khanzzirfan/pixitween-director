@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import sharp from 'sharp';
 import type { ToolCtx } from '@shared/tools';
+import type { Idea } from '../authoring/pitch';
 import { planBoard, reviewBoard, totalSeconds, type CinematicBoard } from '../authoring/beatsheet';
 
 // Muse looks at its own film. The film is built from the board, a few key frames are drawn, Muse is shown them in order and says what looks wrong
@@ -60,6 +61,110 @@ export async function measureExposure(frames: Buffer[]): Promise<Exposure> {
 
 export const isBurnt = (e: Exposure): boolean => e.mean >= BURNT.mean || e.hot >= BURNT.hot;
 
+/** A pixel whose three channels are all at least this is burnt out (pure white). */
+export const BURNT_LEVEL = 245;
+/** A frame is burnt out when more than this share of its picture is pure white; the film is when at least two of its frames are. */
+export const BURNT_SHARE = 0.25;
+
+/** The share of a picture that is pure white (all channels at or above BURNT_LEVEL), measured on a small copy. */
+export async function burntShare(frame: Buffer): Promise<number> {
+  const { data, info } = await sharp(frame).removeAlpha().resize(96, 96, { fit: 'inside' }).raw().toBuffer({ resolveWithObject: true });
+  let white = 0;
+  for (let i = 0; i < data.length; i += info.channels) if (data[i]! >= BURNT_LEVEL && data[i + 1]! >= BURNT_LEVEL && data[i + 2]! >= BURNT_LEVEL) white++;
+  return white / (data.length / info.channels);
+}
+
+/** A pixel at or above this brightness (0 to 255) is near white. */
+export const WASHED_LEVEL = 215;
+/** A frame is washed out when more than this share of the picture round the product is near white; the film is when at least half of its frames are. */
+export const WASHED_SHARE = 0.2;
+/** ...and the product, in the middle, differs from that bright surround by less than this in colour (0 to 1): it has lost its edges. */
+export const WASHED_GAP = 0.1;
+
+/**
+ * The share of the picture round the product (everything outside its middle half across and middle half down) that is near white, on a small copy.
+ * Only the surround is counted, so a white product on a dark set is not a wash: a bright set, sand or sky filling the frame is.
+ */
+export async function washedShare(frame: Buffer): Promise<number> {
+  const size = 96;
+  const { data } = await sharp(frame).removeAlpha().greyscale().resize(size, size, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
+  let white = 0;
+  let total = 0;
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      if (x >= size * 0.3 && x < size * 0.7 && y >= size * 0.25 && y < size * 0.75) continue;
+      total++;
+      if (data[y * size + x]! >= WASHED_LEVEL) white++;
+    }
+  return white / total;
+}
+
+/** The middle of the picture, where the product sits, must differ from the rest of the picture by at least this much in colour (0 to 1). */
+export const CONTRAST_MIN = 0.05;
+
+/** The colour distance (0 to 1) between the middle of a picture (the middle half across, the middle half down) and the rest of it, on a small copy. */
+export async function surroundGap(frame: Buffer): Promise<number> {
+  const size = 96;
+  const { data } = await sharp(frame).removeAlpha().resize(size, size, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
+  const mid = [0, 0, 0];
+  const rest = [0, 0, 0];
+  let midN = 0;
+  let restN = 0;
+  for (let y = 0; y < size; y++)
+    for (let x = 0; x < size; x++) {
+      const inMid = x >= size * 0.3 && x < size * 0.7 && y >= size * 0.25 && y < size * 0.75;
+      const i = (y * size + x) * 3;
+      for (let k = 0; k < 3; k++) (inMid ? mid : rest)[k]! += data[i + k]! / 255;
+      if (inMid) midN++;
+      else restN++;
+    }
+  return Math.hypot(...mid.map((v, k) => v / midN - rest[k]! / restN)) / Math.sqrt(3);
+}
+
+/** The middle of the picture is over-saturated when its pixels average above this saturation (0 grey, 1 pure colour): its own colours merge into one flat hue. */
+export const SATURATION_MAX = 0.85;
+
+/** The mean saturation (HSV, 0 to 1) of the opaque pixels in the middle of a picture, on a small copy. */
+export async function middleSaturation(picture: Buffer): Promise<number> {
+  const size = 96;
+  const { data } = await sharp(picture).ensureAlpha().resize(size, size, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
+  let sum = 0;
+  let n = 0;
+  for (let y = Math.floor(size * 0.25); y < size * 0.75; y++)
+    for (let x = Math.floor(size * 0.3); x < size * 0.7; x++) {
+      const i = (y * size + x) * 4;
+      if (data[i + 3]! < 128) continue;
+      const hi = Math.max(data[i]!, data[i + 1]!, data[i + 2]!);
+      const lo = Math.min(data[i]!, data[i + 1]!, data[i + 2]!);
+      sum += hi ? (hi - lo) / hi : 0;
+      n++;
+    }
+  return n ? sum / n : 0;
+}
+
+/** What the frames measure as wrong, in words for Muse; nothing when they are fine. Muse decides what to change (glow, grade, light, the shots). */
+export async function measureFrames(frames: Buffer[], photo?: Buffer): Promise<string[]> {
+  const shares = await Promise.all(frames.map((f) => burntShare(f).catch(() => 0)));
+  const burnt = shares.map((v, i) => ({ v, i })).filter((x) => x.v > BURNT_SHARE);
+  const problems: string[] = [];
+  if (burnt.length >= 2) problems.push(`burnt out: ${burnt.map((x) => `frame ${x.i + 1} is ${Math.round(x.v * 100)}% pure white`).join(', ')}; the product's detail is lost in white (a light product under strong glow, exposure or key light clips)`);
+  const gaps = await Promise.all(frames.map((f) => surroundGap(f).catch(() => 1)));
+  const flat = gaps.map((v, i) => ({ v, i })).filter((x) => x.v < CONTRAST_MIN);
+  if (flat.length * 2 >= frames.length && flat.length >= 2) problems.push(`no contrast: in frames ${flat.map((x) => x.i + 1).join(', ')} the middle of the picture, where the product sits, is almost the same colour as everything round it, so the product does not stand out from its set (give the world a colour or brightness the product is not, or a rim light)`);
+  const sats = await Promise.all(frames.map((f) => middleSaturation(f).catch(() => 0)));
+  const loud = sats.map((v, i) => ({ v, i })).filter((x) => x.v > SATURATION_MAX);
+  if (loud.length * 2 >= frames.length && loud.length >= 2) {
+    const was = photo ? await middleSaturation(photo).catch(() => undefined) : undefined;
+    problems.push(`over-saturated: the middle of frames ${loud.map((x) => x.i + 1).join(', ')} is at ${Math.round(Math.min(...loud.map((x) => x.v)) * 100)}% colour saturation${was !== undefined ? ` (its photo is ${Math.round(was * 100)}%)` : ''}, so the product's own colours (glass, metal, print) merge into one flat colour (lower the grade's saturation and contrast, and soften the coloured key and rim lights)`);
+  }
+  // a bright set alone is a choice (a cream studio, a beach): it is a wash only where the product also melts into it
+  const washed = (await Promise.all(frames.map((f) => washedShare(f).catch(() => 0)))).map((v, i) => ({ v, i })).filter((x) => x.v > WASHED_SHARE && gaps[x.i]! < WASHED_GAP);
+  if (burnt.length < 2) {
+    if (washed.length * 2 >= frames.length && washed.length >= 2) problems.push(`washed out: in ${washed.map((x) => `frame ${x.i + 1} ${Math.round(x.v * 100)}% of the picture round the product is near white`).join(', ')}; the bright wash takes the product's edges and colour (lower the grade's brightness, the glow and the key light, or set the product against a darker world)`);
+  }
+  return problems;
+}
+
 export interface Critique {
   /** Muse is happy with the frames. */
   fine: boolean;
@@ -111,8 +216,10 @@ export async function judgeFrames(ctx: ToolCtx, o: { board: CinematicBoard; time
   const critique = parseCritique(await ctx.meta.spark.reviewImages(images, critiquePrompt(o.board, o.times, { ...(o.photo ? { photo: true } : {}), exposure, ...(o.final ? { final: true } : {}) })));
   ctx.ledger.add(ctx.filmId, 'muse-spark-1.3-contributor', 'frame review', 0.006);
   const burnt = isBurnt(exposure);
-  const problems = burnt ? [`the frames are burnt out (average brightness ${exposure.mean}, ${Math.round(exposure.hot * 100)}% near white)`, ...critique.problems].slice(0, 4) : critique.problems;
-  return { ship: critique.fine && !burnt, problems, exposure, critique };
+  // what the frames measure as wrong (burnt white frames, no contrast, over-saturation) goes to Muse in words whatever it said itself
+  const measured = await measureFrames(o.frames, o.photo);
+  const problems = [...(burnt ? [`the frames are burnt out (average brightness ${exposure.mean}, ${Math.round(exposure.hot * 100)}% near white)`] : []), ...measured, ...critique.problems].slice(0, 6);
+  return { ship: critique.fine && !burnt && measured.length === 0, problems, exposure, critique };
 }
 
 export interface ReviewResult {
@@ -130,8 +237,10 @@ export interface ReviewInput {
   brief?: string;
   photo?: Buffer;
   flat: boolean;
+  /** The film Muse chose at the idea step: revisions are written from it too. */
+  idea?: Idea;
   /** Draws the film as it is now at these seconds, one picture each (JPEG or PNG). */
-  render: (times: number[]) => Promise<Buffer[]>;
+  render: (times: number[], board?: CinematicBoard) => Promise<Buffer[]>;
   log?: (line: string) => void;
 }
 
@@ -155,12 +264,26 @@ export async function reviewFrames(ctx: ToolCtx, o: ReviewInput): Promise<Review
     }
     log(`Muse saw: ${first.problems.join('; ')}`);
     const asks = [...first.problems.map((p) => `seen in the film's own frames: ${p}`), 'keep the elements and the set exactly as they are; change only the shots, camera, light, grade and finish'];
-    const planned = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(10, Math.max(4, totalSeconds(o.board.sheet))), flat: o.flat, prior: { board: o.board, violations: asks } });
+    const planned = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(30, Math.max(4, totalSeconds(o.board.sheet))), flat: o.flat, ...(o.idea ? { idea: o.idea } : {}), prior: { board: o.board, violations: asks } });
     if (planned.source !== 'muse') return { ...keep, problems: first.problems };
     const merged = reviewBoard({ ...planned.board, elements: o.board.elements, ...(o.board.set ? { set: o.board.set } : {}) });
     if (merged.hard.length) return { ...keep, problems: first.problems };
     log(`Muse revised the board after looking: ${merged.board.concept}`);
-    return { board: merged.board, revised: true, problems: first.problems, ...(keep.judged ? { judged: keep.judged } : {}) };
+    let board = merged.board;
+    // frames that still measure as wrong after the revision (burnt or washed white, no contrast, over-saturation) get one more revision, asked in the measure's words
+    const again = await o.render(keyTimes(board), board).then(async (fr) => ({ measured: await measureFrames(fr, o.photo), exposure: await measureExposure(fr) })).catch(() => undefined);
+    const left = again ? [...(isBurnt(again.exposure) ? [`the frames are burnt out (average brightness ${again.exposure.mean}, ${Math.round(again.exposure.hot * 100)}% near white)`] : []), ...again.measured] : [];
+    if (left.length) {
+      log(`Muse saw after its revision: ${left.join('; ')}`);
+      const asks2 = [...left.map((p) => `still seen in the film's frames after your revision: ${p}`), 'keep the elements and the set exactly as they are; change only the shots, camera, light, grade and finish'];
+      const second = await planBoard(ctx, { title: o.title, ...(o.brief ? { brief: o.brief } : {}), ...(o.photo ? { photo: o.photo } : {}), seconds: Math.min(30, Math.max(4, totalSeconds(board.sheet))), flat: o.flat, ...(o.idea ? { idea: o.idea } : {}), prior: { board, violations: asks2 } });
+      const again2 = second.source === 'muse' ? reviewBoard({ ...second.board, elements: o.board.elements, ...(o.board.set ? { set: o.board.set } : {}) }) : undefined;
+      if (again2 && !again2.hard.length) {
+        board = again2.board;
+        log(`Muse revised the board a second time: ${board.concept}`);
+      }
+    }
+    return { board, revised: true, problems: first.problems, ...(keep.judged ? { judged: keep.judged } : {}) };
   } catch (err) {
     log(`frame review skipped: ${err instanceof Error ? err.message : String(err)}`);
     return keep;
@@ -176,24 +299,28 @@ export const REVIEW_TIMEOUT_MS = 120_000;
 export const reviewEnabled = (): boolean => process.env.FRAME_REVIEW !== '0' && process.env.NODE_ENV !== 'test';
 
 /** Draws the composition at `times` (seconds) in headless Chromium on the app's own stage page, at half size, as JPEGs. The web server must be reachable at `base`. */
-export async function renderKeyFrames(composition: unknown, times: number[], base = process.env.EXPORT_RENDER_BASE ?? `http://localhost:${process.env.DIRECTOR_WEB_PORT ?? 5173}`): Promise<Buffer[]> {
+export async function renderKeyFrames(composition: unknown, times: number[], base = process.env.EXPORT_RENDER_BASE ?? `http://localhost:${process.env.DIRECTOR_WEB_PORT ?? 5173}`, /** how long each frame is given to draw after a seek (a 2D film's pictures load as it plays) */ settleMs = 900, /** JPEG quality of each frame */ quality = 72, /** device pixel ratio of the page: 2 draws each frame at twice the size */ scale = 1): Promise<Buffer[]> {
   const pw = await import('playwright');
   const browser = await pw.chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const timer = setTimeout(() => void browser.close().catch(() => undefined), REVIEW_TIMEOUT_MS);
   try {
-    const page = await (await browser.newContext({ viewport: { width: 700, height: 1300 } })).newPage();
+    const page = await (await browser.newContext({ viewport: { width: 700, height: 1300 }, deviceScaleFactor: scale })).newPage();
     await page.route('**/__review-film.json', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify(composition) }));
     await page.goto(`${base}/stage-check.html?film=live&file=${encodeURIComponent('/__review-film.json')}`);
     await page.waitForFunction(() => Boolean((window as unknown as { __stage?: unknown }).__stage), undefined, { timeout: STAGE_WAIT_MS });
     await page.waitForTimeout(3000);
     type Stage = { seek(s: number): Promise<void>; whenReady(s: number): Promise<boolean> };
     const ready = await page.evaluate((s) => (window as unknown as { __stage: Stage }).__stage.whenReady(s), READY_WAIT_SEC);
-    if (!ready) throw new Error('the 3D product did not finish drawing');
+    if (!ready) {
+      // the stage page prints why (an invalid composition, a layer error); say it, not just that it failed
+      const why = await page.locator('[data-testid="errors"], body').first().innerText().then((t) => t.split('\n').find((l) => /invalid|error/i.test(l) && !/schema: ok/.test(l)), () => undefined);
+      throw new Error(`the 3D product did not finish drawing${why ? `: ${why.slice(0, 300)}` : ''}`);
+    }
     const out: Buffer[] = [];
     for (const t of times) {
       await page.evaluate((s) => (window as unknown as { __stage: Stage }).__stage.seek(s), t);
-      await page.waitForTimeout(900);
-      out.push(await page.locator('canvas').first().screenshot({ type: 'jpeg', quality: 72 }));
+      await page.waitForTimeout(settleMs);
+      out.push(await page.locator('canvas').first().screenshot({ type: 'jpeg', quality }));
     }
     return out;
   } finally {

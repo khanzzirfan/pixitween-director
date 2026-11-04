@@ -168,6 +168,47 @@ export async function plainKey(source: Buffer): Promise<SamObject | undefined> {
   }
 }
 
+/**
+ * A colour key is only trusted when it is solid: of the pixels it keeps, at most this share may be part see-through. A product close to its backdrop's
+ * colour (a cream can on a pale grey sweep) keys as a ghost, half of it see-through, and is built into a sliver of itself; a clean key is about 1 %.
+ */
+export const KEY_SEMI_MAX = 0.2;
+
+/** Of the pixels a mask keeps (alpha above 16), the share that is part see-through (below 200). 1 for an empty mask. */
+export function semiShare(alpha: Uint8Array): number {
+  let kept = 0;
+  let semi = 0;
+  for (const a of alpha) {
+    if (a <= 16) continue;
+    kept++;
+    if (a < 200) semi++;
+  }
+  return kept ? semi / kept : 1;
+}
+
+/**
+ * A SAM answer must cover most of what the photo shows against its backdrop: asked for "yoghurt", SAM can hand back the strawberry printed on
+ * the pot, which would be built into a red blob. Of the pixels the colour key marks as the product, at least this share must lie inside the mask.
+ */
+export const COVER_MIN = 0.6;
+/** A named answer this sure is cut from even when it covers less of the plain-backdrop reference than COVER_MIN (the reference may include a prop the product stands on). */
+export const SURE_CONFIDENCE = 0.9;
+
+/** Of the pixels `reference` marks as product (alpha above 16), the share that `mask` keeps (alpha above 127). 1 when the reference is empty. */
+export function coverage(mask: Uint8Array, reference: Uint8Array): number {
+  let total = 0;
+  let inside = 0;
+  for (let i = 0; i < reference.length; i++) {
+    if (reference[i]! <= 16) continue;
+    total++;
+    if (mask[i]! > 127) inside++;
+  }
+  return total ? inside / total : 1;
+}
+
+/** The key, when it is solid enough to build from; otherwise nothing, so the cut-out goes on to SAM. */
+const solidKey = (o: SamObject | undefined): SamObject | undefined => (o && semiShare(o.alpha) <= KEY_SEMI_MAX ? o : undefined);
+
 export async function cutout(
   ctx: ToolCtx,
   o: { source: Buffer; noun: string; /** other words to ask SAM for when the first finds nothing, one call each, in order */ alsoTry?: string[]; sceneId?: string; minConfidence?: number; feather?: number; cacheKey?: string },
@@ -176,19 +217,27 @@ export async function cutout(
   const pending = (async () => {
     const { width, height } = await imageSize(o.source);
     // a photo already cut out keeps its own edge; a studio pack shot is keyed; anything else goes to SAM
-    const keyed = (await ownAlpha(o.source)) ?? (await studioKey(o.source));
+    const keyed = (await ownAlpha(o.source)) ?? solidKey(await studioKey(o.source));
     // SAM answers to the word it is given (it finds "goggles" at 0.9 and "product" at nothing), so each word is tried in turn; a word that
     // finds something only just under the bar is kept, and used when no word clears it
     const bar = o.minConfidence ?? 0.5;
     let object = keyed;
     let loose: SamObject | undefined;
+    // a named object SAM is sure of (a mug on its coaster: the mug is found at 0.96, the coaster is not part of it) that the coverage check
+    // refused; used only when nothing else was found, so the film is cut from it instead of failing
+    let sure: SamObject | undefined;
+    // what the photo shows against its backdrop, when the backdrop is one colour: an answer that misses most of it found a part, not the product
+    const reference = keyed ? undefined : (await plainKey(o.source))?.alpha;
+    const whole = (c: SamObject | undefined): SamObject | undefined => (c && (!reference || coverage(c.alpha, reference) >= COVER_MIN) ? c : undefined);
     if (!keyed) {
       for (const word of [o.noun, ...(o.alsoTry ?? [])]) {
         const found = await ctx.meta.sam.segmentImage(o.source, word);
         charge(ctx, 'sam-3.1', '1 image', PRICE.samImageUsd);
-        object = selectObject(found, bar);
+        object = whole(selectObject(found, bar));
         if (object) break;
-        loose ??= selectObject(found, Math.min(bar, FALLBACK_CONFIDENCE));
+        loose ??= whole(selectObject(found, Math.min(bar, FALLBACK_CONFIDENCE)));
+        const top = selectObject(found, SURE_CONFIDENCE);
+        if (top && (top.confidence ?? 0) > (sure?.confidence ?? 0)) sure = top;
       }
       object ??= loose;
     }
@@ -196,11 +245,12 @@ export async function cutout(
     // more for the most general word, a little less strictly, before giving up
     if (!object && !keyed) {
       const generic = o.noun.toLowerCase() === FALLBACK_NOUN ? 'object' : FALLBACK_NOUN;
-      object = selectObject(await ctx.meta.sam.segmentImage(o.source, generic), Math.min(o.minConfidence ?? 0.5, FALLBACK_CONFIDENCE));
+      object = whole(selectObject(await ctx.meta.sam.segmentImage(o.source, generic), Math.min(o.minConfidence ?? 0.5, FALLBACK_CONFIDENCE)));
       charge(ctx, 'sam-3.1', '1 image', PRICE.samImageUsd);
     }
     // no word found it: a product on a plain backdrop can still be keyed by colour, for nothing
-    if (!object && !keyed) object = await plainKey(o.source);
+    if (!object && !keyed) object = solidKey(await plainKey(o.source));
+    if (!object && !keyed) object = sure;
     if (!object) throw new ArtError('no-object', `no ${o.noun} found in the photo`);
     if (object.alpha.length !== width * height)
       throw new ArtError('alpha-size-mismatch', `SAM alpha length ${object.alpha.length} does not match ${width}x${height}`);

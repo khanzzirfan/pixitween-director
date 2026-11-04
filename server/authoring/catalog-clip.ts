@@ -1,3 +1,4 @@
+import type { Buffer } from 'node:buffer';
 import type { AssetStore } from '@shared/ports';
 import { prepareProduct3D, type PrepareCache, type Prepared3D } from '../product3d/prepare';
 import type { PrimitiveShape } from '../product3d/types';
@@ -20,10 +21,11 @@ export async function prepareRound(
   cut: { id: string; width: number; height: number },
   noun: string,
   cache?: PrepareCache,
+  back?: Buffer,
 ): Promise<Prepared3D | undefined> {
   const shape = ROUND_NOUNS[noun];
   if (!shape || productShape(cut.width, cut.height) !== 'tall') return undefined;
-  const prep = await prepareProduct3D(assets, { cutoutAssetId: cut.id, shape }, cache);
+  const prep = await prepareProduct3D(assets, { cutoutAssetId: cut.id, shape, ...(back ? { back } : {}) }, cache);
   return prep.shape !== 'other' && prep.textureKind === 'label' ? prep : undefined;
 }
 

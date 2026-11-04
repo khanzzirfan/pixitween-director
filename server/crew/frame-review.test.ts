@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
 import { floorBoard, totalSeconds } from '../authoring/beatsheet';
 import sharp from 'sharp';
-import { critiquePrompt, isBurnt, judgeFrames, keyTimes, measureExposure, parseCritique, REVIEW_FRAMES, reviewFrames } from './frame-review';
+import { burntShare, washedShare, critiquePrompt, isBurnt, judgeFrames, keyTimes, measureExposure, measureFrames, middleSaturation, parseCritique, REVIEW_FRAMES, reviewFrames, surroundGap } from './frame-review';
 
 const board = floorBoard({ title: 'Citrus Soda', category: 'soda' });
 const jpg = Buffer.from('jpeg');
@@ -78,6 +78,13 @@ describe('reviewFrames', () => {
     expect(ask).toContain('keep the elements and the set');
     expect(log).toHaveBeenCalledWith(expect.stringContaining('revised the board'));
   });
+  it('writes the revision from the idea Muse chose for the film', async () => {
+    const c = setup([{ fine: false, problems: ['shot 2 crops the label: pull back'] }, revisedReply()]);
+    await reviewFrames(c.ctx, { ...input(), idea: { name: 'Citrus Noon', world: 'a sunlit lido', mood: '', light: '', colour: '', camera: '', elements: '', ending: '' } });
+    const ask = (c.chat.mock.calls[0] as unknown as [{ messages: Array<{ content: string }> }])[0].messages[1]!.content;
+    expect(ask).toContain('THE IDEA you chose');
+    expect(ask).toContain('a sunlit lido');
+  });
   it('keeps the board when the frames cannot be drawn, the reply is unreadable or the revision fails', async () => {
     const down = vi.fn(async () => {
       throw new Error('no browser');
@@ -93,6 +100,41 @@ describe('reviewFrames', () => {
     const c = setup([{ fine: true }]);
     await reviewFrames(c.ctx, input());
     expect(c.add).toHaveBeenCalledWith('f', 'muse-spark-1.3-contributor', 'frame review', 0.006);
+  });
+});
+
+describe('the burnt-out check', () => {
+  const field = (bg: string, mid: string) => sharp({ create: { width: 96, height: 96, channels: 3, background: bg } }).composite([{ input: { create: { width: 40, height: 48, channels: 3 as const, background: mid } }, left: 28, top: 24 }]).png().toBuffer();
+  const solid = (c: string) => sharp({ create: { width: 64, height: 64, channels: 3, background: c } }).png().toBuffer();
+  it('measures the share of pure white', async () => {
+    expect(await burntShare(await solid('#ffffff'))).toBe(1);
+    expect(await burntShare(await solid('#202020'))).toBe(0);
+    expect(await burntShare(await solid('#f0f0f0'))).toBe(0);
+  });
+  it('flags a film with two or more burnt frames, and not one with a single bright frame', async () => {
+    const white = await field('#ffffff', '#ffffff');
+    const dark = await field('#202020', '#808080');
+    expect((await measureFrames([dark, white, white, dark]))[0]).toMatch(/burnt out: frame 2 is 100% pure white, frame 3/);
+    expect(await measureFrames([dark, white, dark])).toEqual([]);
+    expect(await measureFrames([jpg, jpg])).toEqual([]);
+  });
+  it('measures the gap between the middle of the picture and its surround, and flags a product lost in its set', async () => {
+    const cream = '#e8e2d6';
+    const lost = await field(cream, '#efe9de');
+    const clear = await field('#10202e', '#b8b2a6');
+    expect(await surroundGap(lost)).toBeLessThan(0.05);
+    expect(await surroundGap(clear)).toBeGreaterThan(0.4);
+    expect((await measureFrames([lost, lost, clear, clear]))[0]).toMatch(/no contrast: in frames 1, 2/);
+    expect(await measureFrames([lost, clear, clear, clear])).toEqual([]);
+  });
+  it('flags a film whose product is pushed to full saturation, and says what its photo was', async () => {
+    const loud = await field('#10202e', '#ff0040');
+    const plain = await field('#10202e', '#b06070');
+    expect(await middleSaturation(loud)).toBeGreaterThan(0.85);
+    expect(await middleSaturation(plain)).toBeLessThan(0.6);
+    const r = await measureFrames([loud, loud, plain, plain], plain);
+    expect(r.join('|')).toMatch(/over-saturated: the middle of frames 1, 2 is at 100% colour saturation \(its photo is 45%\)/);
+    expect(await measureFrames([loud, plain, plain, plain], plain)).toEqual([]);
   });
 });
 
@@ -138,5 +180,48 @@ describe('the gate on a burnt or unfaithful film', () => {
     expect(prompt).toContain('real photo of the product');
     expect(prompt).toContain('Measured on the frames');
     expect(prompt).toContain('better advertisement');
+  });
+});
+
+describe('the washed-out check and the second revision', () => {
+  const field = (bg: string, mid: string) => sharp({ create: { width: 96, height: 96, channels: 3, background: bg } }).composite([{ input: { create: { width: 40, height: 48, channels: 3 as const, background: mid } }, left: 28, top: 24 }]).png().toBuffer();
+  it('measures the near-white share round the product, and flags a film washed in a bright set while leaving a bright product on a dark set alone', async () => {
+    const wash = await field('#f2e6a0', '#f6efb0');
+    const dark = await field('#101820', '#f6f6f6');
+    expect(await washedShare(wash)).toBeGreaterThan(0.9);
+    expect(await washedShare(dark)).toBeLessThan(0.05);
+    const r = await measureFrames([wash, wash, wash, dark]);
+    expect(r.join('|')).toMatch(/washed out: in frame 1 100% of the picture round the product is near white, frame 2/);
+    expect(await measureFrames([wash, dark, dark, dark])).toEqual([]);
+    expect(await measureFrames([dark, dark, dark])).toEqual([]);
+  });
+
+  it('leaves a bright cream set alone when the product stands out from it (the pink yoghurt tub on cream that was graded brown)', async () => {
+    const cream = await field('#fff6e8', '#d9708c');
+    expect(await washedShare(cream)).toBeGreaterThan(0.9);
+    expect((await measureFrames([cream, cream, cream, cream])).join('|')).not.toMatch(/washed out/);
+  });
+  it('asks for a second revision when the revised frames still measure washed, and keeps the first revision when they are clean', async () => {
+    const wash = await field('#f2e6a0', '#f6efb0');
+    const dark = await field('#101820', '#808890');
+    const revisedReply = (concept: string) => ({ concept, mood: 'soft', elements: board.elements, beats: board.sheet.beats });
+    const run = async (secondFrames: Buffer) => {
+      const replies: unknown[] = [{ fine: false, problems: ['x'] }, revisedReply('first take'), revisedReply('second take')];
+      const reviewImages = vi.fn(async () => replies.shift());
+      const chat = vi.fn(async () => ({ content: JSON.stringify(replies.shift()), toolCalls: [], ms: 1, model: 'spark' }));
+      const ctx = { filmId: 'f', meta: { spark: { chat, reviewImages } }, ledger: { add: vi.fn() } } as unknown as ToolCtx;
+      let call = 0;
+      const render = vi.fn(async (t: number[]) => t.map(() => (call++ === 0 ? dark : secondFrames)));
+      const log = vi.fn();
+      const r = await reviewFrames(ctx, { board, title: 'Citrus Soda', flat: false, render, log });
+      return { r, chat, log };
+    };
+    const washed = await run(wash);
+    expect(washed.chat).toHaveBeenCalledTimes(2);
+    expect(washed.r.board.concept).toBe('second take');
+    expect(washed.log).toHaveBeenCalledWith(expect.stringMatching(/after its revision: .*washed out/));
+    const clean = await run(dark);
+    expect(clean.chat).toHaveBeenCalledTimes(1);
+    expect(clean.r.board.concept).toBe('first take');
   });
 });

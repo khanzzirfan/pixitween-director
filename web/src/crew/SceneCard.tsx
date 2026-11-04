@@ -5,12 +5,15 @@ import type { Scene } from '@shared/storyboard';
 
 export type RingState = 'queued' | 'building' | 'reviewing' | 'done' | 'failed';
 
-/** The scene's status from its latest writing job, and whether a critique of it is under way. */
-export function ringFor(jobs: Job[], sceneId: string): RingState {
+/**
+ * The scene's status from its latest writing job, and whether a critique of it is under way. A 3D film is made in one piece, with no
+ * job per scene: its shots follow the film's own status.
+ */
+export function ringFor(jobs: Job[], sceneId: string, filmStatus?: string): RingState {
   const mine = jobs.filter((j) => j.sceneId === sceneId);
   const writing = mine.filter((j) => !['critique', 'continuity', 'take'].includes(j.kind));
   const latest = writing.at(-1);
-  if (!latest) return 'queued';
+  if (!latest) return filmStatus === 'ready' ? 'done' : filmStatus === 'building' ? 'building' : filmStatus === 'failed' ? 'failed' : 'queued';
   if (latest.status === 'running') return 'building';
   if (latest.status === 'queued') return 'queued';
   if (latest.status === 'awaiting-frames') return 'reviewing';
@@ -34,6 +37,8 @@ interface CardProps {
   canRemove: boolean;
   onPatch(sceneId: string, patch: Partial<Omit<Scene, 'id'>>): void;
   onRemove(sceneId: string): void;
+  /** Builds the shot again from the start; offered on a shot that failed. */
+  onRebuild?(sceneId: string): void;
   onMove(sceneId: string, dir: -1 | 1): void;
   onDragStart(sceneId: string): void;
   onDropOn(sceneId: string): void;
@@ -68,7 +73,7 @@ function EditableText({ value, label, multiline, onSave, readOnly }: { value: st
   );
 }
 
-export function SceneCard({ scene, index, total, ring, isNew, canRemove, onPatch, onRemove, onMove, onDragStart, onDropOn, readOnly }: CardProps) {
+export function SceneCard({ scene, index, total, ring, isNew, canRemove, onPatch, onRemove, onRebuild, onMove, onDragStart, onDropOn, readOnly }: CardProps) {
   const drag = (e: DragEvent) => {
     e.dataTransfer.setData('text/plain', scene.id);
     e.dataTransfer.effectAllowed = 'move';
@@ -114,16 +119,19 @@ export function SceneCard({ scene, index, total, ring, isNew, canRemove, onPatch
         </label>
         <span className="tag shot">{scene.shotType}</span>
         <span className={`tag mode-${scene.mode}`} title={scene.modeReason}>{scene.mode === '3d' ? '3D' : scene.mode}</span>
+        {!readOnly && (
+          <span className="card-actions">
+            {ring === 'failed' && onRebuild && (
+              <button type="button" className="icon retry" aria-label={`Regenerate ${scene.id}`} title="Regenerate: build this shot again" onClick={() => onRebuild(scene.id)}>
+                ↻
+              </button>
+            )}
+            <button type="button" className="icon" aria-label={`Move ${scene.id} up`} title="Move up" disabled={index === 0} onClick={() => onMove(scene.id, -1)}>↑</button>
+            <button type="button" className="icon" aria-label={`Move ${scene.id} down`} title="Move down" disabled={index === total - 1} onClick={() => onMove(scene.id, 1)}>↓</button>
+            <button type="button" className="icon danger" aria-label={`Remove ${scene.id}`} title={canRemove ? 'Remove this scene' : 'A film needs at least 2 scenes'} disabled={!canRemove} onClick={() => onRemove(scene.id)}>✕</button>
+          </span>
+        )}
       </div>
-      {!readOnly && (
-      <footer className="card-actions">
-        <button type="button" aria-label={`Move ${scene.id} up`} disabled={index === 0} onClick={() => onMove(scene.id, -1)}>↑</button>
-        <button type="button" aria-label={`Move ${scene.id} down`} disabled={index === total - 1} onClick={() => onMove(scene.id, 1)}>↓</button>
-        <button type="button" className="danger" aria-label={`Remove ${scene.id}`} disabled={!canRemove} title={canRemove ? 'Remove this scene' : 'A film needs at least 2 scenes'} onClick={() => onRemove(scene.id)}>
-          Remove
-        </button>
-      </footer>
-      )}
     </article>
   );
 }

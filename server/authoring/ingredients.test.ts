@@ -40,6 +40,11 @@ describe('sanitizeElements', () => {
     expect(r.elements).toEqual([good]);
     expect(r.dropped).toEqual([]);
   });
+  it("keeps a solid's form and drops one it does not know", () => {
+    const berry = { id: 'raspberry', name: 'raspberry', use: 'solid', look: 'one ripe red raspberry, dewy', pieces: 1, sizeM: 0.02 };
+    expect(sanitizeElements([{ ...berry, form: 'round' }]).elements[0]!.form).toBe('round');
+    expect(sanitizeElements([{ ...berry, form: 'blob' }]).elements[0]!.form).toBeUndefined();
+  });
   it('drops duplicates, brand words, bad ids and anything past five elements', () => {
     const many = Array.from({ length: 7 }, (_, i) => ({ ...good, id: `e${i}` }));
     const r = sanitizeElements([good, good, { ...good, id: 'x1', look: 'a Nike shoe on a table, glossy leather' }, { ...good, id: 'Bad Id' }, ...many]);

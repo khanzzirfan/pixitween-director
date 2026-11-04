@@ -14,7 +14,8 @@ export function BriefBubbles({ photoUrl, text, voice }: SentBrief) {
       )}
       {(text || voice) && (
         <div className="bubble you" data-testid="brief-text">
-          <p>{voice ? '🎙 Voice brief' : text}</p>
+          {/* a voice brief shows what was heard, once the film has it; until then only that it is a voice brief */}
+          <p>{voice ? (text ? `🎙 “${text}”` : '🎙 Voice brief') : text}</p>
         </div>
       )}
     </>
