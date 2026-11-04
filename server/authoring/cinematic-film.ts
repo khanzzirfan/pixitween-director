@@ -12,7 +12,8 @@ import { WALL, type SetAir, type SetLook } from './set-art';
 import { setKeyframes } from './transform';
 import { rampProgress, type RatePoint } from '@engine/core/speedRamp';
 import type { Aspect, Comp, Obj } from './types';
-import { inkOn, tint, words } from './variant-film';
+import { inkOn, tint } from './variant-film';
+import { TITLE_DEPTH, TITLE_PROPS_MAX, drawable, titleLeaveAt, lineWidth, plateMaterial, roundedRect, slabProp, titleFont, titleSpace, titlesWorld, wordsBox, wordsProp, wrapTitle } from './titles3d';
 
 import type { PrimitiveShape } from '../product3d/types';
 
@@ -1121,114 +1122,8 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   c.version = SCHEMA as never;
   ((c.precomps as Record<string, Obj>)[ID] as Obj).version = SCHEMA;
 
-  // the end card as Muse styled it: every choice has a plain default (a centred pill, a round disc, the product's own accent)
-  const ec = i.endCard ?? {};
-  const accent = ec.accent ?? i.accent;
-  const caps = (t: string): string => (ec.text === 'upper' ? t.toUpperCase() : t);
-  const baseWeight = ec.weight === 'light' ? 300 : ec.weight === 'bold' ? 700 : 500;
-  const leftAlign = ec.align === 'left';
-  const margin = W * 0.08;
-  // copy: brand over the first shots, gone for the macro, then brand, name and price in the end hold
-  // dark type on a bright world, white on a dark one: measured on the backdrop behind the words when there is one, else read from the key
-  const bright = i.set?.skyLuma !== undefined ? i.set.skyLuma > BRIGHT_SKY : keyLevel === 'high';
-  const ink = bright ? shade(accent, 0.8) : '#ffffff';
-  const top = H * (portrait ? 0.13 : 0.1);
-  // the product in the end hold: how high and wide it really stands (the wide lens and the camera height make it a little bigger than its fill)
-  const fill = Math.min(fillIn(sizes.at(-1) ?? 'medium'), holdFill);
-  const ph = H * fill * 1.16 * hFrac;
-  const pw = Math.min(ph / aspect, W * 0.9);
-  const canTop = H * 0.5 - ph / 2;
-  const name = i.brand && i.title.startsWith(i.brand) ? i.title.slice(i.brand.length).trim() || i.title : i.title;
-  const nameSize = Math.round(u * 0.09);
-  // the name sits clear above the can (and the brand clear above the name); on a tall can they move up together
-  // a tagline takes a line under the name, so the name and the brand move up to leave it room above the product
-  const hasTag = !!i.tagline?.trim();
-  const nameCy = Math.max(hasTag ? H * 0.045 + u * 0.1 : H * 0.07 + u * 0.11, Math.min(top + u * 0.11 - (hasTag ? u * 0.03 : 0), canTop - nameSize * 0.9 - (hasTag ? u * 0.05 : 0)));
-  if (i.brand) {
-    const bm = add(c, { role: 'caption', kind: 'text', text: i.brand.toUpperCase(), z: 0.2, style: { size: Math.round(u * 0.032), weight: 700, color: bright ? shade(accent, 0.5) : tint(accent, 0.6), align: leftAlign ? 'left' : 'center' }, box: { x: W * 0.1, y: nameCy - u * 0.11, w: W * 0.8, h: u * 0.045 } });
-    const fade: Array<[number, number]> = [[0, 0], [0.3, 0], [0.6, 1]];
-    if (macro) fade.push([r2(macro.start / fps - 0.1), 1], [r2(macro.start / fps), 0], [r2(macro.end / fps), 0]);
-    // the end card carries the name, the tagline and the price; the brand shows again there only when there is no tagline
-    if (!hasTag) fade.push([r2(holdStart), 0], [r2(holdStart + 0.3), 1]);
-    else fade.push([r2(holdStart - 0.1), fade.at(-1)![1]], [r2(holdStart), 0]);
-    c = setKeyframes(bm.c, bm.id, 'opacity', dedupe(fade), 'easeOut');
-  }
-  const nm = words(c, ID, caps(name), { cx: portrait ? W / 2 : W * 0.4, cy: nameCy, maxW: W * 0.84, size: nameSize, color: ink, boldLast: true, z: 0.2, weight: baseWeight, ...(leftAlign ? { left: margin } : {}) });
-  c = popWords(nm.c, nm.ids, nameCy, holdStart + 0.1, D);
-  const light = ink === '#ffffff';
-  for (const id of nm.ids) c = shadowed(c, id, light);
-  // the tagline, small under the name, a beat after it
-  const tag = i.tagline?.trim();
-  let span = wordsSpan(c, nm.ids);
-  let plateBottom = nameCy + nameSize * 0.75;
-  if (tag) {
-    const tagCy = nameCy + nameSize * 0.6 + u * 0.034;
-    const tagSize = Math.round(u * 0.036);
-    const tg = words(c, ID, caps(tag), { cx: portrait ? W / 2 : W * 0.4, cy: tagCy, maxW: W * 0.8, size: tagSize, color: bright ? shade(accent, 0.55) : tint(accent, 0.75), z: 0.2, ...(leftAlign ? { left: margin } : {}) });
-    c = popWords(tg.c, tg.ids, tagCy, holdStart + 0.45, D);
-    for (const id of tg.ids) c = shadowed(c, id, light);
-    const ts = wordsSpan(c, tg.ids);
-    span = { left: Math.min(span.left, ts.left), right: Math.max(span.right, ts.right) };
-    plateBottom = tagCy + tagSize * 0.9;
-  }
-  if (ec.plate !== 'none') c = plate(c, ec.plate === 'bar' ? { left: 0, right: W } : span, nameCy - nameSize * 0.75, plateBottom, light, holdStart + 0.1, D, undefined, ec.plate === 'bar');
-
-  // the shots' own words: a hook line, a feeling; popped in the lower third, gone before the cut (never in the macro or the last shot)
-  const textCy = H * (portrait ? 0.8 : 0.84);
-  i.sheet.beats.forEach((b, n) => {
-    const f = cam.beats[n]!;
-    if (!b.text || n === cam.beats.length - 1 || f.size === 'macro') return;
-    const size = Math.round(u * 0.085);
-    const line = words(c, ID, caps(b.text), { cx: W / 2, cy: textCy, maxW: W * 0.84, size, color: ink, boldLast: true, z: 0.2, weight: baseWeight });
-    const outAt = Math.max(f.start / fps + 0.5, (f.end + 1) / fps - 0.1);
-    c = popWords(line.c, line.ids, textCy, f.start / fps + 0.06, D, outAt);
-    for (const id of line.ids) c = shadowed(c, id, light);
-    if (ec.plate !== 'none') c = plate(c, ec.plate === 'bar' ? { left: 0, right: W } : wordsSpan(c, line.ids), textCy - size * 0.75, textCy + size * 0.75, light, f.start / fps + 0.06, D, outAt, ec.plate === 'bar');
-  });
-
-  // the price disc beside the can when there is room for it, else under it; never over it (no disc when the brief names no price)
-  if (i.price !== undefined) {
-    const price = i.price;
-    const priceText = formatPrice(price, i.currency);
-    const gap = u * 0.03;
-    const room = W - W * 0.03 - (pcx + pw / 2 + gap);
-    const dd = Math.min(u * 0.27, Math.max(room / 1.06, 0));
-    const beside = portrait ? dd >= u * 0.19 : true;
-    const ddUse = beside ? (portrait ? dd : u * 0.27) : u * 0.24;
-    const dcx = !portrait ? W * 0.75 : beside ? pcx + pw / 2 + gap + (ddUse * 1.06) / 2 : pcx;
-    const dcy = !portrait ? pcy : beside ? pcy + ph * 0.18 : Math.min(H - ddUse * 0.62, pcy + ph / 2 + gap + ddUse * 0.55);
-    const rd = ddUse * 1.06;
-    // the price's shape: a round disc with a ring, a rounded tag, or none at all (big plain type)
-    const priceKind = ec.price ?? 'disc';
-    const tagW = ddUse * 1.5;
-    const tagH = ddUse * 0.58;
-    const ring = priceKind === 'disc' ? shape(c, { x: dcx - rd / 2, y: dcy - rd / 2, w: rd, h: rd }, tint(accent, 0.6), 0.32, { kind: 'ellipse', size: [rd, rd] }) : { c, id: '' };
-    const disc =
-      priceKind === 'disc' ? shape(ring.c, { x: dcx - ddUse / 2, y: dcy - ddUse / 2, w: ddUse, h: ddUse }, accent, 0.3, { kind: 'ellipse', size: [ddUse, ddUse] })
-      : priceKind === 'tag' ? shape(ring.c, { x: dcx - tagW / 2, y: dcy - tagH / 2, w: tagW, h: tagH }, accent, 0.3, { kind: 'rect', size: [tagW, tagH], roundness: Math.round(tagH * 0.28) })
-      : { c: ring.c, id: '' };
-    const onPrice = priceKind === 'plain' ? ink : inkOn(accent);
-    const beat = 60 / (i.bpm ?? 120);
-    const pulse: Array<[number, number]> = [[0, 0], [r2(holdStart), 0], [r2(holdStart + 0.25), 1.18], [r2(holdStart + 0.45), 1]];
-    if (ec.pulse !== false) for (let t = holdStart + 0.45 + 2 * beat; t + 0.25 <= D; t += 2 * beat) pulse.push([r2(t - 0.2), 1], [r2(t), 1.1], [r2(t + 0.25), 1]);
-    c = disc.id ? setKeyframes(disc.c, disc.id, 'scale', pulse, 'easeInOut') : disc.c;
-    if (ring.id) c = setKeyframes(c, ring.id, 'scale', pulse, 'easeInOut');
-    const was = i.wasPrice !== undefined && i.wasPrice > price ? formatPrice(i.wasPrice, i.currency) : undefined;
-    const ps = Math.round(Math.min(ddUse * 0.3, (ddUse * 0.82) / (priceText.length * 0.6)));
-    const pr = add(c, { role: 'caption', kind: 'text', text: priceText, z: 0.15, style: { size: ps, weight: 800, color: onPrice, align: 'center' }, box: { x: dcx - ddUse / 2, y: dcy - ps * 0.6 + (was ? ps * 0.25 : 0), w: ddUse, h: ps * 1.2 } });
-    c = setKeyframes(pr.c, pr.id, 'scale', pulse, 'easeInOut');
-    if (was) {
-      const ws = Math.round(ps * 0.55);
-      const wy = dcy - ps * 0.55;
-      const old = add(c, { role: 'caption', kind: 'text', text: was, z: 0.15, style: { size: ws, weight: 500, color: onPrice, align: 'center' }, box: { x: dcx - ddUse / 2, y: wy - ws * 0.6, w: ddUse, h: ws * 1.2 } });
-      c = setKeyframes(old.c, old.id, 'scale', pulse, 'easeInOut');
-      const lw = was.length * ws * 0.56;
-      const line = shape(c, { x: dcx - lw / 2, y: wy - Math.max(2, ws * 0.05), w: lw, h: Math.max(3, ws * 0.1) }, '#ff5a6e', 0.1);
-      c = setKeyframes(line.c, line.id, 'opacity', [[0, 0], [r2(holdStart + 0.3), 0], [r2(holdStart + 0.5), 1]], 'easeOut');
-      c = setKeyframes(c, line.id, 'scale', pulse, 'easeInOut');
-    }
-  }
-
+  // the words: glossy 3D type in its own world over the product's (titles3d.ts), styled by Muse's end card
+  c = addTitles(c, { i, W, H, u, portrait, fps, frames, keyLevel, holdStart, macro, beats: cam.beats, pcx, pcy, fill: Math.min(fillIn(sizes.at(-1) ?? 'medium'), holdFill), hFrac, aspect });
   if (i.music) {
     c = registerAsset(c, { id: i.music.id, kind: 'audio', src: i.music.src });
     c = structuredClone(c);
@@ -1240,63 +1135,208 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   return c;
 }
 
-/** A soft shadow under a word, so it reads over a bright beach as well as a dark field. */
-function shadowed(c: Comp, id: string, light: boolean): Comp {
-  return patch(c, id, (l) => {
-    l.effects = [{ name: 'drop-shadow', params: { distance: 3, direction: 180, softness: 14, opacity: light ? 0.55 : 0.2, color: '#000000' } }];
-  });
+interface TitleSetting {
+  i: CinematicInput;
+  W: number;
+  H: number;
+  u: number;
+  portrait: boolean;
+  fps: number;
+  frames: number;
+  keyLevel: KeyLevel;
+  /** seconds */
+  holdStart: number;
+  macro?: { start: number; end: number };
+  beats: CameraPlan['beats'];
+  pcx: number;
+  pcy: number;
+  /** the product's fill of the frame in the end hold, its height share and its aspect */
+  fill: number;
+  hFrac: number;
+  aspect: number;
 }
 
 /**
- * Words that pop: each arrives a little after the one before (0.07 s), swelling from 60 % past full size (112 %) and settling, rising 26 px
- * as it fades in. With `outAt` they all fade out together from then. The overshoot is what makes copy feel like it was thrown in, not typed.
+ * Every word of the film as glossy 3D type (titles3d.ts): the brand over the first shots, a shot's own line in the lower third (never in the
+ * macro or the last shot), and in the end hold the name, the tagline and the price on a coin or tag, each where the flat words used to sit.
+ * Muse styles them with the end card; the type is dark on a bright world and white on a dark one, measured on the backdrop behind the words.
  */
-function popWords(c: Comp, ids: string[], cy: number, at: number, D: number, outAt?: number): Comp {
-  const cap = (t: number) => Math.min(r2(t), r2(D - 0.05));
-  ids.forEach((id, n) => {
-    const a = cap(Math.max(0.06, at + n * 0.07));
-    const op: Array<[number, number]> = [[0, 0], [a, 0], [cap(a + 0.1), 1]];
-    // a line is on screen at least 0.4 s; a short shot's line still goes, it never stays on into the next shot
-    if (outAt !== undefined) op.push([cap(Math.max(outAt, a + 0.4)), 1], [cap(Math.max(outAt, a + 0.4) + 0.12), 0]);
-    c = setKeyframes(c, id, 'opacity', dedupe(op), 'easeOut');
-    c = setKeyframes(c, id, 'scale', dedupe([[0, 0.6], [a, 0.6], [cap(a + 0.15), 1.12], [cap(a + 0.28), 1]]), 'easeOut');
-    c = setKeyframes(c, id, 'y', dedupe([[0, r2(cy + 26)], [a, r2(cy + 26)], [cap(a + 0.22), r2(cy)]]), 'easeOut');
-  });
-  return c;
-}
+function addTitles(c: Comp, s: TitleSetting): Comp {
+  const { i, W, H, u, portrait, fps, frames } = s;
+  const ec = i.endCard ?? {};
+  const accent = ec.accent ?? i.accent;
+  const face = ec.face ?? 'sans';
+  const finish = ec.letters ?? 'gloss';
+  const enter = ec.entrance ?? 'rise';
+  const heavy = ec.weight !== 'light';
+  const leftAlign = ec.align === 'left';
+  const margin = W * 0.08;
+  const bright = i.set?.skyLuma !== undefined ? i.set.skyLuma > BRIGHT_SKY : s.keyLevel === 'high';
+  const ink = bright ? shade(accent, 0.8) : '#ffffff';
+  const darkPlate = !bright;
+  const { ppu, at } = titleSpace(W, H);
+  const stage = `${ID}:titles`;
+  const members: Obj[] = [];
+  const fonts = new Set<string>();
+  const holdF = Math.round(s.holdStart * fps);
+  const F = (sec: number) => Math.round(sec * fps);
+  let n = 0;
+  const nextId = (what: string) => `${ID}:title-${what}-${++n}`;
+  // the letters' depth and the gap to a plate behind them, in world units
+  const depthOf = (px: number) => (px / ppu) * TITLE_DEPTH.depth;
+  const behind = (px: number, plateDepthPx: number) => -(depthOf(px) / 2 + 0.03 + plateDepthPx / ppu / 2);
+  /** The words, wrapped to `maxW` pixels; returns their box in pixels. */
+  const say = (o: { text: string; heavy?: boolean; px: number; cx: number; cy: number; maxW: number; ink: string; inAt: number; goneBy?: number; z?: number; drift?: boolean; swing?: number[]; left?: number }): { w: number; h: number; cx: number; cy: number; px: number; outAt?: number } | undefined => {
+    const cut = o.heavy ?? heavy;
+    const font = titleFont(face, cut);
+    const raw = drawable(ec.text === 'upper' ? o.text.toUpperCase() : o.text, font.file);
+    if (!raw) return undefined;
+    // a line shrinks (to 72 % at most) to stay on one row before it wraps; a wrapped block keeps clear of the frame's top and bottom
+    const one = lineWidth(raw, font.file, 1);
+    const px = Math.round(Math.max(o.px * 0.72, Math.min(o.px, o.maxW / Math.max(one, 0.01))));
+    const text = wrapTitle(raw, font.file, px, o.maxW).join('\n');
+    const box = wordsBox(text, face, cut, px);
+    // never past the frame's sides: a block too near an edge is moved in
+    const side = W * 0.045;
+    const cx = Math.min(W - side - box.w / 2, Math.max(side + box.w / 2, o.left !== undefined ? o.left + box.w / 2 : o.cx));
+    const edge = H * 0.045 + px * 0.3;
+    const cy = Math.min(H - edge - box.h / 2, Math.max(edge + box.h / 2, o.cy));
+    fonts.add(font.id);
+    // a line that must be gone by a frame (a cut, the macro, the end hold) starts to leave in time for its last letter to fade
+    const outAt = o.goneBy !== undefined ? titleLeaveAt(text, o.inAt, o.goneBy, fps) : undefined;
+    const [x, y] = at(cx, cy);
+    members.push({
+      ...wordsProp(stage, { id: nextId('words'), text, face, heavy: cut, px, cx, cy, align: o.left !== undefined ? 'left' : 'center', ink: o.ink, finish, enter, inAt: o.inAt, ...(outAt !== undefined ? { outAt } : {}), end: frames, ...(o.drift ? { drift: true } : {}), ...(o.swing ? { swing: o.swing } : {}) }, ppu, fps, at),
+      position: [x, y, Math.round((o.z ?? 0) * 1000) / 1000],
+    });
+    return { ...box, cx, cy, px, ...(outAt !== undefined ? { outAt } : {}) };
+  };
+  /** A glassy pill or bar behind a span of words. */
+  const plateUnder = (cx: number, cy: number, w: number, h: number, px: number, inAt: number, outAt?: number) => {
+    if (ec.plate === 'none') return;
+    const bar = ec.plate === 'bar';
+    const pw = bar ? W * 1.04 : w + h * 0.9;
+    const depthPx = h * 0.16;
+    members.push(slabProp(stage, { id: nextId('plate'), outline: roundedRect(pw, h, bar ? h * 0.08 : h / 2), w: pw, h, depthPx, cx: bar ? W / 2 : cx, cy, z: behind(px, depthPx), material: plateMaterial(darkPlate), inAt, ...(outAt !== undefined ? { outAt } : {}), end: frames, grow: 'across' }, ppu, fps, at));
+  };
 
-/** How strong the plate under a line of words is: enough that the type reads on any set and light, soft enough to stay part of the frame. */
-export const PLATE = { opacity: 0.5, dark: '#0b0b12', light: '#ffffff' } as const;
+  // the end hold's layout: the product's height and top, and the name clear above it (the brand clear above the name)
+  const ph = H * s.fill * 1.16 * s.hFrac;
+  const pw = Math.min(ph / s.aspect, W * 0.9);
+  const canTop = H * 0.5 - ph / 2;
+  const top = H * (portrait ? 0.13 : 0.1);
+  const name = i.brand && i.title.startsWith(i.brand) ? i.title.slice(i.brand.length).trim() || i.title : i.title;
+  const nameSize = Math.round(u * 0.085);
+  const tag = i.tagline?.trim();
+  const nameCy = Math.max(tag ? H * 0.045 + u * 0.1 : H * 0.07 + u * 0.11, Math.min(top + u * 0.11 - (tag ? u * 0.03 : 0), canTop - nameSize * 0.9 - (tag ? u * 0.05 : 0)));
+  const blockCx = portrait ? W / 2 : W * 0.4;
+  const left = leftAlign ? margin : undefined;
 
-/** The horizontal span a row of words covers, from their centres and sizes. */
-function wordsSpan(c: Comp, ids: string[]): { left: number; right: number } {
-  let left = Infinity;
-  let right = -Infinity;
-  for (const id of ids) {
-    const l = layersOf(c).find((x) => x.id === id)!;
-    const p = l.transform.position;
-    const x = (Array.isArray(p) && typeof p[0] === 'object' ? p[0].v : p)[0] as number;
-    const half = (String(l.source ?? '').length * (l.style?.size ?? 40) * 0.62) / 2;
-    left = Math.min(left, x - half);
-    right = Math.max(right, x + half);
+  // the brand over the first shots: gone before the macro, and gone at the end hold when a tagline takes its place
+  if (i.brand) {
+    const brandPx = Math.round(u * 0.036);
+    const brandCy = nameCy - u * 0.11;
+    const brandInk = bright ? shade(accent, 0.5) : tint(accent, 0.6);
+    const until = s.macro ? s.macro.start : tag ? holdF : undefined;
+    say({ text: i.brand.toUpperCase(), px: brandPx, cx: blockCx, cy: brandCy, maxW: W * 0.8, ink: brandInk, inAt: F(0.3), ...(until !== undefined ? { goneBy: Math.max(F(1.2), until) } : {}), ...(left !== undefined ? { left } : {}) });
+    if (s.macro && !tag) say({ text: i.brand.toUpperCase(), px: brandPx, cx: blockCx, cy: brandCy, maxW: W * 0.8, ink: brandInk, inAt: holdF, ...(left !== undefined ? { left } : {}) });
   }
-  return { left, right };
-}
 
-/**
- * A soft, rounded plate under words, in the tone opposite their ink, so they read whatever the world behind them does (a bright sky, pale
- * sand, a light studio). It fades in with the first word and out with the line.
- */
-function plate(c: Comp, span: { left: number; right: number }, top: number, bottom: number, dark: boolean, at: number, D: number, outAt?: number, bar = false): Comp {
-  // a pill hugs the words with a rounded end; a bar runs the full width of the span (the frame) with square ends
-  const pad = bar ? 0 : (bottom - top) * 0.45;
-  const box = { x: span.left - pad, y: top, w: span.right - span.left + pad * 2, h: bottom - top };
-  const s = shape(c, box, dark ? PLATE.dark : PLATE.light, 0.25, { kind: 'rect', size: [box.w, box.h], roundness: bar ? 0 : Math.round(box.h / 2) });
-  const cap = (t: number) => Math.min(r2(t), r2(D - 0.05));
-  const a = cap(Math.max(0.06, at));
-  const op: Array<[number, number]> = [[0, 0], [a, 0], [cap(a + 0.15), PLATE.opacity]];
-  if (outAt !== undefined) op.push([cap(Math.max(outAt, a + 0.4)), PLATE.opacity], [cap(Math.max(outAt, a + 0.4) + 0.12), 0]);
-  return setKeyframes(s.c, s.id, 'opacity', dedupe(op), 'easeOut');
+  // the shots' own words: a hook line, a feeling, in the lower third, gone before the cut
+  const textCy = H * (portrait ? 0.8 : 0.84);
+  i.sheet.beats.forEach((b, k) => {
+    const f = s.beats[k]!;
+    if (!b.text || k === s.beats.length - 1 || f.size === 'macro') return;
+    const px = Math.round(u * 0.075);
+    const inAt = f.start + F(0.06);
+    // the line is gone at the cut; on a short shot it leaves faster, so it is whole on screen for most of the shot
+    const box = say({ text: b.text, px, cx: W / 2, cy: textCy, maxW: W * 0.84, ink, inAt, goneBy: f.end + 1, drift: true });
+    if (box) plateUnder(W / 2, box.cy, box.w, box.h + box.px * 0.6, box.px, inAt, box.outAt);
+  });
+
+  // the end hold: the name, a beat later the tagline, on one plate
+  const nameBox = say({ text: name, px: nameSize, cx: blockCx, cy: nameCy, maxW: W * 0.84, ink, inAt: holdF + F(0.1), drift: true, ...(left !== undefined ? { left } : {}) });
+  const placedCy = nameBox?.cy ?? nameCy;
+  let spanW = nameBox?.w ?? 0;
+  let spanTop = placedCy - (nameBox?.h ?? nameSize) / 2;
+  let spanBottom = placedCy + (nameBox?.h ?? nameSize) / 2;
+  if (tag) {
+    const tagPx = Math.round(u * 0.038);
+    const tagCy = placedCy + (nameBox?.h ?? nameSize) / 2 + u * 0.055;
+    const tagBox = say({ text: tag, heavy: false, px: tagPx, cx: blockCx, cy: tagCy, maxW: W * 0.8, ink: bright ? shade(accent, 0.55) : tint(accent, 0.75), inAt: holdF + F(0.45), ...(left !== undefined ? { left } : {}) });
+    if (tagBox) {
+      spanW = Math.max(spanW, tagBox.w);
+      spanBottom = tagCy + tagBox.h / 2;
+    }
+  }
+  spanTop -= (nameBox?.px ?? nameSize) * 0.35;
+  spanBottom += (nameBox?.px ?? nameSize) * 0.35;
+  if (nameBox) plateUnder(left !== undefined ? left + spanW / 2 : blockCx, (spanTop + spanBottom) / 2, spanW, spanBottom - spanTop, nameBox.px, holdF + F(0.1));
+
+  // the price beside the product when there is room for it, else under it; never over it (no price when the brief names none)
+  if (i.price !== undefined) {
+    const priceText = formatPrice(i.price, i.currency);
+    const gap = u * 0.03;
+    const room = W - W * 0.03 - (s.pcx + pw / 2 + gap);
+    const dd = Math.min(u * 0.27, Math.max(room / 1.06, 0));
+    const beside = portrait ? dd >= u * 0.19 : true;
+    const ddUse = beside ? (portrait ? dd : u * 0.27) : u * 0.24;
+    const dcx = !portrait ? W * 0.75 : beside ? s.pcx + pw / 2 + gap + ddUse / 2 : s.pcx;
+    const dcy = !portrait ? s.pcy : beside ? s.pcy + ph * 0.18 : Math.min(H - ddUse * 0.62, s.pcy + ph / 2 + gap + ddUse * 0.55);
+    const kind = ec.price ?? 'disc';
+    const beat = 60 / (i.bpm ?? 120);
+    const swing: number[] = [];
+    // the coin spins in over 0.6 s, then swings on every other beat until the film ends
+    if (ec.pulse !== false) for (let t = s.holdStart + 0.9; t + 0.3 <= frames / fps; t += 2 * beat) swing.push(F(t));
+    const tagW = ddUse * 1.5;
+    const tagH = ddUse * 0.58;
+    const slabW = kind === 'disc' ? ddUse : tagW;
+    const slabH = kind === 'disc' ? ddUse : tagH;
+    const slabDepth = slabH * 0.16;
+    if (kind !== 'plain') {
+      const outline = kind === 'disc' ? roundedRect(ddUse, ddUse, ddUse / 2, 16) : roundedRect(tagW, tagH, tagH * 0.28);
+      members.push(slabProp(stage, { id: nextId('price-slab'), outline, w: slabW, h: slabH, depthPx: slabDepth, cx: dcx, cy: dcy, z: 0, material: { color: accent, metalness: 0.35, roughness: 0.16, clearcoat: 1 }, inAt: holdF, end: frames, grow: 'spin', swing }, ppu, fps, at));
+    }
+    const was = i.wasPrice !== undefined && i.wasPrice > i.price ? formatPrice(i.wasPrice, i.currency) : undefined;
+    const font = titleFont(face, true).file;
+    const fitPx = (t: string, share: number) => Math.round(Math.min(slabH * 0.34, (slabW * share) / Math.max(0.1, lineWidth(drawable(t, font), font, 1))));
+    const pricePx = kind === 'plain' ? Math.round(u * 0.09) : fitPx(priceText, 0.74);
+    const onPrice = kind === 'plain' ? ink : inkOn(accent);
+    const front = kind === 'plain' ? 0 : slabDepth / ppu / 2 + depthOf(pricePx) / 2 + 0.02 + (slabDepth / ppu) * 0.3; // clear of the face while the slab swells and swings
+    // plain big type gets the room beside the product (it is moved in from the edge if it still does not fit)
+    const priceRoom = kind === 'plain' ? Math.max(u * 0.2, 2 * Math.min(dcx - W * 0.045, W - W * 0.045 - dcx)) : W;
+    say({ text: priceText, heavy: true, px: pricePx, cx: dcx, cy: dcy + (was ? pricePx * 0.3 : 0), maxW: priceRoom, ink: onPrice, inAt: holdF + F(0.25), z: front, swing });
+    if (was) {
+      const wasPx = Math.round(pricePx * 0.5);
+      const wy = dcy - pricePx * 0.55;
+      const wasBox = say({ text: was, heavy: false, px: wasPx, cx: dcx, cy: wy, maxW: W, ink: onPrice, inAt: holdF + F(0.3), z: front, swing });
+      if (wasBox) {
+        const lw = wasBox.w * 1.08;
+        const lh = Math.max(4, wasPx * 0.12);
+        members.push(slabProp(stage, { id: nextId('strike'), outline: roundedRect(lw, lh, lh / 2), w: lw, h: lh, depthPx: lh, cx: dcx, cy: wy, z: front + depthOf(wasPx) / 2 + 0.02, material: { color: '#ff5a6e', metalness: 0, roughness: 0.2, clearcoat: 1 }, inAt: holdF + F(0.5), end: frames, grow: 'across' }, ppu, fps, at));
+      }
+    }
+  }
+
+  // a world holds TITLE_PROPS_MAX props: the shots' plates give way first, then the old price's strike
+  while (members.length > TITLE_PROPS_MAX) {
+    const drop = members.findIndex((m) => String(m.id).includes('-plate-')) >= 0 ? members.findIndex((m) => String(m.id).includes('-plate-')) : members.length - 1;
+    members.splice(drop, 1);
+  }
+  if (!members.length) return c;
+  for (const id of fonts) {
+    const src = `/fonts/${id.replace(/^font-/, '')}.typeface.json`;
+    c = share(registerAsset(c, { id, kind: 'font', src }), id);
+  }
+  const out = structuredClone(c);
+  const layers = layersOf(out);
+  const meta = readDirector(out);
+  // over everything else in the scene, the letterbox included
+  const world = titlesWorld(stage, W, H, frames);
+  layers.push(world, ...members);
+  meta.layers[world.id] = { sceneId: ID, role: 'stage3d', z: 0.1 };
+  for (const m of members) meta.layers[m.id] = { sceneId: ID, role: 'prop3d', z: 0.1 };
+  return writeDirector(out, meta);
 }
 
 /** The product's condensation for a finish's wet: nothing for `none`, else the book's amount. */

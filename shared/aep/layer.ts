@@ -849,6 +849,29 @@ const aepProp3DSmokeSourceSchema = z
   })
   .strict();
 
+// Real 3D type: extruded, bevelled letters lit like any prop (schema 1.12.0). `size` is about the cap height in world units;
+// the block is centred on the prop's position and is never fitted. `enter` brings the letters in one after another from
+// `atFrame` (rise from below, pop from nothing, or flip up); `exit` fades them out from the last letter back. Prop3d-only.
+export const PROP3D_TEXT_ENTERS = ["rise", "pop", "flip"] as const;
+const aepProp3DText3DSourceSchema = z
+  .object({
+    type: z.literal("text3d"),
+    text: z.string().min(1).max(200),
+    font: z.string().min(1),
+    size: z.number().positive(),
+    depth: z.number().min(0).optional(),
+    bevel: z.object({ thickness: z.number().min(0), size: z.number().min(0), segments: z.number().int().min(1).max(8).optional() }).strict().optional(),
+    align: z.enum(["left", "center", "right"]).optional(),
+    lineHeight: z.number().positive().optional(),
+    letterSpacing: z.number().optional(),
+    enter: z
+      .object({ style: z.enum(PROP3D_TEXT_ENTERS), atFrame: z.number().finite(), each: z.number().min(0).max(0.5).optional(), seconds: z.number().positive().max(2).optional() })
+      .strict()
+      .optional(),
+    exit: z.object({ atFrame: z.number().finite(), seconds: z.number().positive().max(2).optional(), each: z.number().min(0).max(0.5).optional() }).strict().optional(),
+  })
+  .strict();
+
 const aepProp3DSwarmSchema = z
   .object({
     count: z.number().int().min(1).max(STAGE3D_LIMITS.instancesPerSwarm),
@@ -900,7 +923,7 @@ const aepProp3DLayerSchema = z
     kind: z.literal("prop3d"),
     // "product" marks the hero object for Director / critic / lint; rendering is identical.
     role: z.enum(["prop", "product"]).optional(),
-    source: z.union([aepModel3DSourceSchema, aepProp3DCardSourceSchema, aepProp3DLiquidSourceSchema, aepProp3DSmokeSourceSchema]),
+    source: z.union([aepModel3DSourceSchema, aepProp3DCardSourceSchema, aepProp3DLiquidSourceSchema, aepProp3DSmokeSourceSchema, aepProp3DText3DSourceSchema]),
     textures: aepModel3DTexturesSchema.optional(),
     size: z.number().positive().optional(),
     position: aepAnimatableOf(stageVec3).optional(),
@@ -925,6 +948,7 @@ export type AepProp3DLayer = z.infer<typeof aepProp3DLayerSchema>;
 export type AepProp3DSource = AepProp3DLayer["source"];
 export type AepProp3DCardSource = z.infer<typeof aepProp3DCardSourceSchema>;
 export type AepProp3DLiquidSource = z.infer<typeof aepProp3DLiquidSourceSchema>;
+export type AepProp3DText3DSource = z.infer<typeof aepProp3DText3DSourceSchema>;
 export type AepProp3DMaterial = z.infer<typeof aepProp3DMaterialSchema>;
 export type AepProp3DSwarm = z.infer<typeof aepProp3DSwarmSchema>;
 export type AepStageMemberLayer = AepActor3DLayer | AepProp3DLayer;

@@ -14,7 +14,7 @@ import { loadEnv } from '../../env';
 import { getLocalMode } from '../../llm/local-mode';
 import { pickBackend } from '../../llm/router';
 import { BUILDER_DIRECTION, renderBibleBlock, renderJobBlock, renderOutlineBlock } from '../prompts';
-import { applyTextLane, fitTextToSafeArea } from '../text-lane';
+import { applyTextLane, fitTextToSafeArea, settleTextBoxes } from '../text-lane';
 import { restoreScene } from '../scene-snapshot';
 import { timedOut, type WorkerResult } from '../scheduler';
 import type { CrewCtx } from '../showrunner-tools';
@@ -58,18 +58,19 @@ async function clearScene(crew: CrewCtx, job: Job, sceneId: string): Promise<voi
   if (!r.ok) throw new Error('the scene could not be cleared for a rebuild');
 }
 
-/** The deterministic lane: bible type, then the rest position inside the safe area. A no-op writes no version. */
+/** The deterministic lane: bible type, the rest position inside the safe area, then any box behind words tied to them. A no-op writes no version. */
 async function runTextLane(crew: CrewCtx, job: Job, sceneId: string, bible: StyleBible | undefined): Promise<void> {
   const film = await crew.films.get(job.filmId);
   const c = film.composition as Comp | undefined;
   if (!c || !film.storyboard?.scenes.some((s) => s.id === sceneId)) return;
   const styled = bible ? applyTextLane(c, sceneId, bible) : c;
   const fitted = fitTextToSafeArea(styled, sceneId);
-  if (styled === c && !fitted.moved.length) return;
+  const boxed = settleTextBoxes(fitted.comp, sceneId);
+  if (styled === c && !fitted.moved.length && !boxed.fixed.length) return;
   const written = await crew.films.mutate(job.filmId, (f) => {
     const base = f.composition as Comp;
     const lane = fitTextToSafeArea(bible ? applyTextLane(base, sceneId, bible) : base, sceneId);
-    return { next: lane.comp, data: null };
+    return { next: settleTextBoxes(lane.comp, sceneId).comp, data: null };
   }, 'director', `text lane ${sceneId}`);
   if (!written.ok) throw new Error('the text lane was refused by the film');
 }

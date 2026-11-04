@@ -33,6 +33,9 @@ describe('runners', () => {
   });
   it('more wetness, more drops', () => {
     expect(runnerCount(1)).toBeGreaterThan(runnerCount(0.2));
+    // a few drops, never a crowd
+    expect(runnerCount(0)).toBe(2);
+    expect(runnerCount(1)).toBe(5);
   });
   it('follow a round body and skip a box', () => {
     const cylinder = roundProfile(new THREE.CylinderGeometry(0.03, 0.03, 0.16, 32), new THREE.Matrix4());

@@ -35,7 +35,7 @@ export function setRotationUnit(c: Comp, unit: AepRotationUnit): Comp {
 /** `duration` is passed through in the engine's own unit, FRAMES (asset.ts). */
 export function registerAsset(
   c: Comp,
-  a: { id: string; kind: 'image' | 'video' | 'audio' | 'model'; src: string; width?: number; height?: number; duration?: number },
+  a: { id: string; kind: 'image' | 'video' | 'audio' | 'model' | 'font'; src: string; width?: number; height?: number; duration?: number },
 ): Comp {
   const out = structuredClone(c);
   out.assets[a.id] = {

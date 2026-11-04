@@ -113,8 +113,8 @@ export function runnerState(i: number, t: number, o: Pick<RunnerOptions, 'top' |
   };
 }
 
-/** How many drops run for a wetness of `amount`. */
-export const runnerCount = (amount: number): number => Math.round(6 + 14 * Math.min(1, Math.max(0, amount)));
+/** How many drops run for a wetness of `amount`: a few, 2 to 5, as on a can in a commercial; a crowd of them reads as a coat of grit. */
+export const runnerCount = (amount: number): number => Math.round(2 + 3 * Math.min(1, Math.max(0, amount)));
 
 /**
  * A round body's radius by height, from the vertices of its geometry under `matrix` (its fitted size in the parent): the widest point
