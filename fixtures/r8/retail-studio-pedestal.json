@@ -1,0 +1,1429 @@
+{
+  "version": "1.9.0",
+  "id": "film",
+  "name": "Coffee Co. Cold Brew 330ml",
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "durationInFrames": 120,
+  "bgColor": "#f4f1ec",
+  "assets": {
+    "ast_add1f1d051aba8d1c18e86ebf97f837c": {
+      "type": "image",
+      "src": "/api/assets/ast_add1f1d051aba8d1c18e86ebf97f837c",
+      "width": 720,
+      "height": 1280
+    },
+    "ast_5f70b53ecd06e5ce73d07b8d26bd69f0": {
+      "type": "image",
+      "src": "/api/assets/ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+      "width": 256,
+      "height": 752
+    }
+  },
+  "layers": [
+    {
+      "kind": "precomp",
+      "id": "clip",
+      "name": "clip",
+      "inPoint": 0,
+      "outPoint": 120,
+      "compId": "clip",
+      "width": 1080,
+      "height": 1920,
+      "transform": {
+        "position": [
+          0,
+          0
+        ],
+        "anchor": [
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1
+        ],
+        "rotation": 0,
+        "opacity": 1
+      }
+    }
+  ],
+  "precomps": {
+    "clip": {
+      "version": "1.9.0",
+      "id": "clip",
+      "name": "clip",
+      "width": 1080,
+      "height": 1920,
+      "fps": 30,
+      "durationInFrames": 120,
+      "assets": {
+        "ast_add1f1d051aba8d1c18e86ebf97f837c": {
+          "type": "image",
+          "src": "/api/assets/ast_add1f1d051aba8d1c18e86ebf97f837c",
+          "width": 720,
+          "height": 1280
+        },
+        "ast_5f70b53ecd06e5ce73d07b8d26bd69f0": {
+          "type": "image",
+          "src": "/api/assets/ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "width": 256,
+          "height": 752
+        }
+      },
+      "layers": [
+        {
+          "kind": "image",
+          "id": "clip:bg",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_add1f1d051aba8d1c18e86ebf97f837c",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              360,
+              640
+            ],
+            "scale": [
+              1.5,
+              1.5
+            ],
+            "rotation": 0,
+            "opacity": 1
+          },
+          "effects": [
+            {
+              "name": "gaussian-blur",
+              "params": {
+                "blurriness": 2
+              }
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "clip:bg-2",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "ellipse",
+            "size": [
+              285.63063829787234,
+              36.07965957446809
+            ]
+          },
+          "fill": "#000000",
+          "transform": {
+            "position": [
+              558.0398,
+              1264.436
+            ],
+            "anchor": [
+              142.81531914893617,
+              18.039829787234044
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.03,
+                  1.03
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 0.42
+          },
+          "effects": [
+            {
+              "name": "gaussian-blur",
+              "params": {
+                "blurriness": 12.62788085106383
+              }
+            }
+          ]
+        },
+        {
+          "kind": "image",
+          "id": "clip:subject",
+          "name": "subject",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  1707.84
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  540,
+                  1721.09
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.174468,
+                  -1.174468
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.209702,
+                  -1.209702
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 15,
+                "v": 0.24
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "gaussian-blur",
+              "params": {
+                "blurriness": 3
+              }
+            }
+          ]
+        },
+        {
+          "kind": "image",
+          "id": "clip:product",
+          "name": "product",
+          "inPoint": 0,
+          "outPoint": 120,
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  540,
+                  824.64
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  540,
+                  811.39
+                ]
+              }
+            ],
+            "anchor": [
+              128,
+              376
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  1.174468,
+                  1.174468
+                ],
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 120,
+                "v": [
+                  1.209702,
+                  1.209702
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 15,
+                "v": 1
+              }
+            ]
+          },
+          "effects": [
+            {
+              "name": "drop-shadow",
+              "params": {
+                "distance": 16,
+                "direction": 140,
+                "softness": 22,
+                "opacity": 0.36,
+                "color": "#1a1a1a"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "clip:bg-3",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              72.15931914893618,
+              794.8800000000001
+            ]
+          },
+          "fill": "#ffffff",
+          "transform": {
+            "position": [
+              {
+                "t": 0,
+                "v": [
+                  425.75,
+                  824.64
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 33,
+                "v": [
+                  425.75,
+                  824.64
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": [
+                  654.25,
+                  824.64
+                ]
+              }
+            ],
+            "anchor": [
+              36.07965957446809,
+              397.44000000000005
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 8,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 33,
+                "v": 0,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 50,
+                "v": 0.55,
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 66,
+                "v": 0
+              }
+            ]
+          },
+          "blendMode": "screen",
+          "effects": [
+            {
+              "name": "gaussian-blur",
+              "params": {
+                "blurriness": 15.88
+              }
+            }
+          ]
+        },
+        {
+          "kind": "shape",
+          "id": "clip:bg-4",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              1920
+            ]
+          },
+          "fill": "#e8d6c0",
+          "transform": {
+            "position": [
+              540,
+              960
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.1
+          },
+          "blendMode": "soft-light"
+        },
+        {
+          "kind": "shape",
+          "id": "clip:bg-9",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              324,
+              149.04000000000002
+            ],
+            "roundness": 74.52000000000001
+          },
+          "fill": "#7a3b12",
+          "transform": {
+            "position": [
+              884.7319,
+              577.44
+            ],
+            "anchor": [
+              162,
+              74.52000000000001
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0,
+                  0
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 21,
+                "v": [
+                  0,
+                  0
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 30,
+                "v": [
+                  1.18,
+                  1.18
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 36,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 54,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 60,
+                "v": [
+                  1.1,
+                  1.1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 68,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 84,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 90,
+                "v": [
+                  1.1,
+                  1.1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 98,
+                "v": [
+                  1,
+                  1
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "clip:bg-10",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              298.08000000000004,
+              119.23200000000003
+            ],
+            "roundness": 59.616000000000014
+          },
+          "fill": "#ffffff",
+          "transform": {
+            "position": [
+              884.7319,
+              577.44
+            ],
+            "anchor": [
+              149.04000000000002,
+              59.616000000000014
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0,
+                  0
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 21,
+                "v": [
+                  0,
+                  0
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 30,
+                "v": [
+                  1.18,
+                  1.18
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 36,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 54,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 60,
+                "v": [
+                  1.1,
+                  1.1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 68,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 84,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 90,
+                "v": [
+                  1.1,
+                  1.1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 98,
+                "v": [
+                  1,
+                  1
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "text",
+          "id": "clip:caption-2",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "$4.50",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 57,
+            "fill": "#111111",
+            "weight": 800,
+            "align": "center",
+            "boxWidth": 286.15680000000003
+          },
+          "transform": {
+            "position": [
+              884.7319,
+              577.44
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              {
+                "t": 0,
+                "v": [
+                  0,
+                  0
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 21,
+                "v": [
+                  0,
+                  0
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 30,
+                "v": [
+                  1.18,
+                  1.18
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 36,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 54,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 60,
+                "v": [
+                  1.1,
+                  1.1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 68,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 84,
+                "v": [
+                  1,
+                  1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 90,
+                "v": [
+                  1.1,
+                  1.1
+                ],
+                "easeOut": [
+                  0.42,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 98,
+                "v": [
+                  1,
+                  1
+                ]
+              }
+            ],
+            "rotation": 0,
+            "opacity": 1
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "clip:bg-11",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              259.2,
+              233.28
+            ],
+            "roundness": 46.656
+          },
+          "fill": "#7a3b12",
+          "transform": {
+            "position": [
+              907.2,
+              159.84
+            ],
+            "anchor": [
+              129.6,
+              116.64
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 30,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "clip:caption-3",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Coffee Co.",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 37,
+            "fill": "#ffffff",
+            "weight": 800,
+            "align": "center",
+            "boxWidth": 259.2
+          },
+          "transform": {
+            "position": [
+              907.2,
+              159.84
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 18,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 30,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "clip:bg-5",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              153.60000000000002
+            ]
+          },
+          "fill": "#000000",
+          "transform": {
+            "position": [
+              540,
+              1843.2
+            ],
+            "anchor": [
+              540,
+              76.80000000000001
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.08
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "clip:bg-6",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              153.60000000000002
+            ]
+          },
+          "fill": "#000000",
+          "transform": {
+            "position": [
+              540,
+              1843.2
+            ],
+            "anchor": [
+              540,
+              76.80000000000001
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.14
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "clip:bg-7",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              230.40000000000003
+            ]
+          },
+          "fill": "#000000",
+          "transform": {
+            "position": [
+              540,
+              1804.8
+            ],
+            "anchor": [
+              540,
+              115.20000000000002
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.2
+          }
+        },
+        {
+          "kind": "shape",
+          "id": "clip:bg-8",
+          "name": "bg",
+          "inPoint": 0,
+          "outPoint": 120,
+          "path": {
+            "kind": "rect",
+            "size": [
+              1080,
+              307.20000000000005
+            ]
+          },
+          "fill": "#000000",
+          "transform": {
+            "position": [
+              540,
+              1766.4
+            ],
+            "anchor": [
+              540,
+              153.60000000000002
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": 0.26
+          }
+        },
+        {
+          "kind": "text",
+          "id": "clip:headline",
+          "name": "headline",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "Coffee Co. Cold Brew 330ml",
+          "style": {
+            "font": "Georgia, \"Times New Roman\", serif",
+            "size": 42,
+            "fill": "#ffffff",
+            "weight": 400,
+            "align": "center",
+            "boxWidth": 907.1999999999999,
+            "letterSpacing": 3
+          },
+          "transform": {
+            "position": [
+              540,
+              1744.896
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 30,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 42,
+                "v": 1
+              }
+            ]
+          }
+        },
+        {
+          "kind": "text",
+          "id": "clip:caption",
+          "name": "caption",
+          "inPoint": 0,
+          "outPoint": 120,
+          "source": "330 ml  |  Smooth, low acid",
+          "style": {
+            "font": "Inter, system-ui, sans-serif",
+            "size": 34,
+            "fill": "#f2f2f2",
+            "weight": 400,
+            "align": "center",
+            "boxWidth": 907.1999999999999
+          },
+          "transform": {
+            "position": [
+              540,
+              1830.912
+            ],
+            "anchor": [
+              540,
+              960
+            ],
+            "scale": [
+              1,
+              1
+            ],
+            "rotation": 0,
+            "opacity": [
+              {
+                "t": 0,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 30,
+                "v": 0,
+                "easeOut": [
+                  0,
+                  0,
+                  0.58,
+                  1
+                ]
+              },
+              {
+                "t": 42,
+                "v": 1
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "meta": {
+    "director": {
+      "scenes": {
+        "clip": {
+          "precompId": "clip",
+          "startFrame": 0,
+          "durationFrames": 120,
+          "mode": "motion",
+          "intent": "Retail clip: Coffee Co. Cold Brew 330ml (studio-pedestal)"
+        }
+      },
+      "layers": {
+        "clip:bg": {
+          "sceneId": "clip",
+          "role": "bg",
+          "assetId": "ast_add1f1d051aba8d1c18e86ebf97f837c",
+          "z": 11
+        },
+        "clip:bg-2": {
+          "sceneId": "clip",
+          "role": "subject",
+          "z": 1.5
+        },
+        "clip:product": {
+          "sceneId": "clip",
+          "role": "product",
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "z": 1
+        },
+        "clip:subject": {
+          "sceneId": "clip",
+          "role": "subject",
+          "assetId": "ast_5f70b53ecd06e5ce73d07b8d26bd69f0",
+          "z": 1.4
+        },
+        "clip:bg-3": {
+          "sceneId": "clip",
+          "role": "subject",
+          "z": 0.9
+        },
+        "clip:bg-4": {
+          "sceneId": "clip",
+          "role": "subject",
+          "z": 0.8
+        },
+        "clip:bg-5": {
+          "sceneId": "clip",
+          "role": "subject",
+          "z": 0.2
+        },
+        "clip:bg-6": {
+          "sceneId": "clip",
+          "role": "subject",
+          "z": 0.2
+        },
+        "clip:bg-7": {
+          "sceneId": "clip",
+          "role": "subject",
+          "z": 0.2
+        },
+        "clip:bg-8": {
+          "sceneId": "clip",
+          "role": "subject",
+          "z": 0.2
+        },
+        "clip:headline": {
+          "sceneId": "clip",
+          "role": "headline",
+          "z": 0
+        },
+        "clip:caption": {
+          "sceneId": "clip",
+          "role": "caption",
+          "z": 0
+        },
+        "clip:bg-9": {
+          "sceneId": "clip",
+          "role": "subject",
+          "z": 0.6
+        },
+        "clip:bg-10": {
+          "sceneId": "clip",
+          "role": "subject",
+          "z": 0.55
+        },
+        "clip:caption-2": {
+          "sceneId": "clip",
+          "role": "caption",
+          "z": 0.5
+        },
+        "clip:bg-11": {
+          "sceneId": "clip",
+          "role": "subject",
+          "z": 0.4
+        },
+        "clip:caption-3": {
+          "sceneId": "clip",
+          "role": "caption",
+          "z": 0.3
+        }
+      }
+    },
+    "rotationUnit": "deg",
+    "layout": {
+      "tiers": {
+        "clip:bg": "backdrop",
+        "clip:product": "subject",
+        "clip:subject": "subject",
+        "clip:bg-5": "overlay",
+        "clip:bg-6": "overlay",
+        "clip:bg-7": "overlay",
+        "clip:bg-8": "overlay",
+        "clip:headline": "text",
+        "clip:caption": "text",
+        "clip:bg-9": "overlay",
+        "clip:bg-10": "overlay",
+        "clip:caption-2": "text",
+        "clip:bg-11": "overlay",
+        "clip:caption-3": "text"
+      },
+      "contains": [
+        {
+          "container": "clip:bg-10",
+          "content": "clip:caption-2"
+        },
+        {
+          "container": "clip:bg-11",
+          "content": "clip:caption-3"
+        }
+      ],
+      "grounded": [
+        "clip:product"
+      ],
+      "plate": {
+        "surface": "plinth top"
+      }
+    }
+  }
+}

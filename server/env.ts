@@ -1,0 +1,111 @@
+import { z } from 'zod';
+import { ConfigError } from './errors';
+
+const bool = z
+  .union([z.boolean(), z.string()])
+  .optional()
+  .transform((v) => v === true || v === '1' || v === 'true');
+/** A boolean that is on unless the value says otherwise. */
+const boolOn = z
+  .union([z.boolean(), z.string()])
+  .optional()
+  .transform((v) => !(v === false || v === '0' || v === 'false'));
+/** Hosted-tracing variables we refuse to use: the crew never ships film data to a trace service. */
+export const HOSTED_TRACING_PREFIXES = ['LANGSMITH_', 'LANGCHAIN_'] as const;
+
+/** Names of hosted-tracing env vars that are set and non-empty, for the startup warning. */
+export function hostedTracingVars(source: Record<string, string | undefined> = process.env): string[] {
+  return Object.keys(source).filter((k) => source[k] !== undefined && source[k] !== '' && HOSTED_TRACING_PREFIXES.some((p) => k.startsWith(p)));
+}
+
+/** A boolean that is off unless the value says it is on (an empty value is off). */
+const boolOff = bool;
+const int = (def: number, min?: number, max?: number) => {
+  let n = z.coerce.number().int();
+  if (min !== undefined) n = n.min(min);
+  if (max !== undefined) n = n.max(max);
+  return n.default(def);
+};
+const optStr = z.string().optional().transform((v) => (v === '' ? undefined : v));
+
+const schema = z.object({
+  PORT: int(8787),
+  PUBLIC_BASE_URL: z.string().url().optional(),
+  DATA_DIR: z.string().default('./data'),
+  GENERATE_MAX_PER_HOUR: int(4),
+  FILMS_PER_HOUR_PER_IP: int(3),
+  MAX_UPLOAD_MB: int(25),
+  TRUST_FLY_CLIENT_IP: bool,
+  LOCAL_MODE: bool,
+  EDIT_BACKEND: z.enum(['spark', 'glimmer', 'spark-open']).default('spark'),
+  BASETEN_API_KEY: optStr,
+  GLIMMER_NUM_CTX: z.coerce.number().int().optional(),
+  MCP_EDIT_WAIT_MS: int(45000),
+  META_BASE_URL: z.string().default('https://api.meta.ai/v1'),
+  META_API_KEY: optStr,
+  MODEL_API_KEY: optStr,
+  META_SPARK_MODEL: z.string().default('muse-spark-1.3-contributor'),
+  CLIPPY_MCP_URL: optStr,
+  CLIPPY_TOKEN: optStr,
+  GLIMMER_BASE_URL: z.string().default('http://localhost:11434'),
+  GLIMMER_MODEL: z.string().default('muse-glimmer:30b-mlx'),
+  DIRECTOR_PASSCODE: optStr,
+  /** A deployed host: check the studio code and keys. If those keys are not set, or this is unset, run like localhost. */
+  IS_SERVER: bool,
+  DIRECTOR_REPLAY: bool,
+  DIRECTOR_RECORD: bool,
+  DIRECTOR_FIXTURES_DIR: z.string().default('fixtures/replay'),
+  DIRECTOR_SCENE_CONCURRENCY: int(1, 1, 8),
+  META_MAX_INFLIGHT: int(8, 1, 16),
+  FILMS_IN_FLIGHT_MAX: int(2, 1, 6),
+  FILMS_QUEUE_MAX: int(4, 0, 20),
+  FILMS_STARTS_PER_WINDOW: int(3, 1, 50),
+  FILMS_WINDOW_SEC: int(300, 30, 3600),
+  // How a new product film is made: '3d' is the sheet film (one 3D film checked on sheets, no 2D crew); 'crew' keeps the 2D crew and its 3D cut.
+  FILM_PATH: z.enum(['3d', 'crew']).default('3d'),
+  CREW_ENABLED: boolOn,
+  PRODUCT_3D: boolOff,
+  // The 3D product's back and depth: Muse draws a side and a back beside the real front (server/product3d/turnaround-flow.ts). Off until the owner has judged it.
+  TURNAROUND: boolOff,
+  SHOWRUNNER_MODEL: z.string().default('muse-wonder-1.0'),
+  CREW_MAX_WORKERS: int(4, 1, 8),
+  CREW_FILM_BUDGET_USD: z.coerce.number().min(0.1).max(20).default(1.5),
+  CREW_TAKES_MAX: int(3, 2, 3),
+  CREW_INBOX_DEBOUNCE_MS: int(1500, 0, 10000),
+  CREW_CAPTURE_TIMEOUT_MS: int(20000, 5000, 600000),
+  CREW_MAX_FIXES_PER_SCENE: int(3, 1, 10),
+  CREW_AUTO_FINISH: boolOn,
+  // 12 minutes. deadline.ts splits this in the old 180 s shape (plan, build, polish, wrap).
+  // At 12 minutes a builder can think, cut the product out and animate the beats, and the critic still has a polish window.
+  CREW_FILM_DEADLINE_MS: int(720000, 1000, 3600000),
+  CREW_BUILD_MAX_TURNS: int(4, 1, 6),
+  CREW_IDLE_END_MS: int(90000, 30000, 3600000),
+  // How many times a scene is critiqued on its own after a build or fix. Each round can start another fix.
+  CREW_MAX_AUTO_CRITIQUES: int(3, 1, 5),
+  // A CSV line-up: how many product films run at once, and the tighter limits each of those films gets.
+  LINEUP_CONCURRENCY: int(2, 1, 4),
+  LINEUP_FILM_DEADLINE_MS: int(360000, 60000, 3600000),
+  LINEUP_MAX_FIXES_PER_SCENE: int(1, 1, 10),
+  LINEUP_MAX_AUTO_CRITIQUES: int(1, 1, 5),
+});
+
+export const ENV_KEYS = Object.keys(schema.shape);
+
+export type Env = Omit<z.infer<typeof schema>, 'PUBLIC_BASE_URL'> & {
+  PUBLIC_BASE_URL: string;
+  metaApiKey: string | undefined;
+};
+
+export function loadEnv(source: Record<string, string | undefined> = process.env): Env {
+  const input: Record<string, string | undefined> = {};
+  // an empty value (as copied from .env.example) means unset
+  for (const k of ENV_KEYS) input[k] = source[k] === '' ? undefined : source[k];
+  const r = schema.safeParse(input);
+  if (!r.success) {
+    const names = [...new Set(r.error.issues.map((i) => String(i.path[0])))];
+    throw new ConfigError(`invalid environment: ${names.join(', ')}`);
+  }
+  const d = r.data;
+  if (d.DIRECTOR_REPLAY && d.DIRECTOR_RECORD) throw new ConfigError('DIRECTOR_REPLAY and DIRECTOR_RECORD cannot both be set');
+  return { ...d, PUBLIC_BASE_URL: d.PUBLIC_BASE_URL ?? `http://localhost:${d.PORT}`, metaApiKey: d.META_API_KEY ?? d.MODEL_API_KEY };
+}

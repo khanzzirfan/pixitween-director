@@ -1,0 +1,126 @@
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import type { FilmEvent } from '@shared/events';
+import type { Scene } from '@shared/storyboard';
+import { foldCrew, crewReducer } from './crewReducer';
+import { LiveStoryboard } from './LiveStoryboard';
+import { SceneCard } from './SceneCard';
+import { FIXTURE, MARKS, upTo } from './test-fixture';
+
+afterEach(() => vi.restoreAllMocks());
+const NOW = Date.parse('2026-10-30T14:00:17.000Z'); // a second after rev 2
+const ids = () => [...document.querySelectorAll('[data-scene]')].map((e) => e.getAttribute('data-scene'));
+const setup = (events = FIXTURE, onOps = vi.fn().mockResolvedValue(undefined)) => {
+  render(<LiveStoryboard crew={foldCrew(events)} now={NOW} onOps={onOps} />);
+  return onOps;
+};
+
+it('lists cards in order and glows the scene the latest revision added', () => {
+  setup();
+  expect(ids()).toEqual(['s1', 's2', 's5', 's3', 's4']);
+  expect(document.querySelector('[data-scene="s5"]')).toHaveClass('is-new');
+  expect(document.querySelector('[data-scene="s1"]')).not.toHaveClass('is-new');
+});
+
+it('stops the glow after 2 s', () => {
+  render(<LiveStoryboard crew={foldCrew(FIXTURE)} now={NOW + 2500} onOps={vi.fn()} />);
+  expect(document.querySelector('[data-scene="s5"]')).not.toHaveClass('is-new');
+});
+
+it('labels a scene whose latest writing job runs as building', () => {
+  setup(upTo(MARKS.fourBuilds));
+  expect(within(document.querySelector('[data-scene="s1"]') as HTMLElement).getByTestId('ring')).toHaveTextContent('building');
+});
+
+it('sends one update op for a camera change, and nothing for an unchanged blur', () => {
+  const onOps = setup();
+  fireEvent.change(screen.getByLabelText('Camera of s2'), { target: { value: 'pan' } }); // s2 is already pan: pick another
+  fireEvent.change(screen.getByLabelText('Camera of s2'), { target: { value: 'orbit' } });
+  expect(onOps).toHaveBeenLastCalledWith([{ op: 'update', sceneId: 's2', patch: { camera: 'orbit' } }]);
+  onOps.mockClear();
+  const intent = screen.getByLabelText('Intent of s1');
+  fireEvent.focus(intent);
+  fireEvent.blur(intent);
+  expect(onOps).not.toHaveBeenCalled();
+  fireEvent.change(intent, { target: { value: 'A new hero shot' } });
+  fireEvent.blur(intent);
+  expect(onOps).toHaveBeenCalledWith([{ op: 'update', sceneId: 's1', patch: { intent: 'A new hero shot' } }]);
+});
+
+it('adds a scene after s2 from the plus slot', () => {
+  const onOps = setup();
+  fireEvent.click(screen.getAllByRole('button', { name: 'Add a scene here' })[2]!); // slots: first, after s1, after s2
+  fireEvent.change(screen.getByLabelText('New scene intent'), { target: { value: 'sunset on the beach' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+  const op = onOps.mock.calls[0]![0][0];
+  expect(op).toMatchObject({ op: 'add', after: 's2', scene: { intent: 'sunset on the beach' } });
+});
+
+it('moves a scene up past the one above it', () => {
+  const onOps = setup(); // order s1 s2 s5 s3 s4: s3 sits at index 3, two places up is s2
+  fireEvent.click(screen.getByRole('button', { name: 'Move s3 up' }));
+  expect(onOps).toHaveBeenCalledWith([{ op: 'move', sceneId: 's3', after: 's2' }]);
+  fireEvent.click(screen.getByRole('button', { name: 'Move s2 up' }));
+  expect(onOps).toHaveBeenLastCalledWith([{ op: 'move', sceneId: 's2', after: null }]);
+});
+
+it('removes after confirm, and disables remove at 2 scenes', () => {
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  const onOps = setup();
+  fireEvent.click(screen.getByRole('button', { name: 'Remove s4' }));
+  expect(onOps).toHaveBeenCalledWith([{ op: 'remove', sceneId: 's4' }]);
+  document.body.innerHTML = '';
+  const two = crewReducer(foldCrew(upTo(4)), { ...FIXTURE[3]!, storyboard: { ...(FIXTURE[3] as Extract<FilmEvent, { type: 'storyboard.revised' }>).storyboard, scenes: (FIXTURE[3] as Extract<FilmEvent, { type: 'storyboard.revised' }>).storyboard.scenes.slice(0, 2) } } as FilmEvent);
+  render(<LiveStoryboard crew={two} now={NOW} onOps={vi.fn()} />);
+  expect(screen.getByRole('button', { name: 'Remove s1' })).toBeDisabled();
+});
+
+it('shows why an edit was refused', async () => {
+  setup(FIXTURE, vi.fn().mockRejectedValue(new Error('scene durations sum to 31s')));
+  fireEvent.click(screen.getByRole('button', { name: 'Move s4 up' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('31s');
+});
+
+it('shows a hint before any storyboard exists', () => {
+  render(<LiveStoryboard crew={foldCrew([])} onOps={vi.fn()} />);
+  expect(screen.getByText(/sketching the plan/)).toBeInTheDocument();
+});
+
+it('shows the 3D film step that is running, with the steps before it done', () => {
+  const ev = { filmId: 'film_aaaaaaaaaaaa', at: '2026-10-30T14:00:00.000Z', type: 'crew.agent', lane: 'showrunner', worker: 'showrunner', state: 'waiting', note: 'Muse is checking the sheets' } as FilmEvent;
+  render(<LiveStoryboard crew={foldCrew([ev])} />);
+  expect(screen.getByRole('status')).toHaveTextContent('Muse is checking the sheets');
+  expect(screen.getByRole('list', { name: 'Film steps' }).querySelector('[aria-current="step"]')).toHaveTextContent('Muse is checking the sheets');
+  expect(screen.queryByText(/sketching the plan/)).toBeNull();
+});
+
+it("shows the tag '3D' on the card of a 3d scene (S13b)", () => {
+  const crew = foldCrew(FIXTURE);
+  const sb = structuredClone(crew.storyboard!);
+  sb.scenes[0]!.mode = '3d';
+  render(<LiveStoryboard crew={{ ...crew, storyboard: sb }} now={0} onOps={() => undefined} />);
+  expect(screen.getByText('3D', { selector: '.tag' })).toBeInTheDocument();
+});
+
+it('offers Regenerate on a shot that failed, and only there', () => {
+  const scene: Scene = { id: 'berries', durationSec: 2.5, intent: 'berries fall', shotType: 'lifestyle', camera: 'static', layersWanted: ['bg'], mode: 'motion', modeReason: 'r' };
+  const props = { scene, index: 0, total: 3, isNew: false, canRemove: true, onPatch: vi.fn(), onRemove: vi.fn(), onMove: vi.fn(), onDragStart: vi.fn(), onDropOn: vi.fn() };
+  const onRebuild = vi.fn();
+  const { rerender } = render(<SceneCard {...props} ring="failed" onRebuild={onRebuild} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Regenerate berries' }));
+  expect(onRebuild).toHaveBeenCalledWith('berries');
+  rerender(<SceneCard {...props} ring="building" onRebuild={onRebuild} />);
+  expect(screen.queryByRole('button', { name: 'Regenerate berries' })).toBeNull();
+  rerender(<SceneCard {...props} ring="failed" />);
+  expect(screen.queryByRole('button', { name: 'Regenerate berries' })).toBeNull();
+});
+
+it('shows the shots of a film made in one piece (no job per shot) by the film\'s own status', async () => {
+  const { ringFor } = await import('./SceneCard');
+  expect(ringFor([], 'hook')).toBe('queued');
+  expect(ringFor([], 'hook', 'building')).toBe('building');
+  expect(ringFor([], 'hook', 'ready')).toBe('done');
+  const scene: Scene = { id: 'hook', durationSec: 2, intent: 'tub drops in', shotType: 'hero', camera: 'dolly-in', layersWanted: ['bg'], mode: '3d', modeReason: '3D film' };
+  render(<LiveStoryboard crew={foldCrew([])} now={NOW} onOps={vi.fn()} filmStatus="ready" stored={[scene]} />);
+  expect(within(document.querySelector('[data-scene="hook"]') as HTMLElement).getByTestId('ring')).toHaveTextContent('done');
+});

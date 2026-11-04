@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 8,
+  "background": "#0b0f14",
+  "assets": {
+    "bold": { "type": "font", "url": "/fonts/helvetiker_bold.typeface.json" }
+  },
+  "layers": [
+    {
+      "id": "stage",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1800,
+      "height": 1000,
+      "background": "#0b0f14",
+      "lighting": { "preset": "studio" },
+      "camera": { "position": [0, 0, 8], "lookAt": [0, 0, 0], "fov": 32 },
+      "objects": [
+        {
+          "id": "title",
+          "geometry": { "type": "text3d", "font": "bold", "text": "Fresh every\nmorning", "size": 0.7, "depth": 0.25, "bevel": {}, "lineHeight": 1.25 },
+          "position": [0, 0.6, 0],
+          "material": { "color": "#ffd27a", "roughness": 0.3, "metalness": 0.2 }
+        },
+        {
+          "id": "tagline",
+          "geometry": { "type": "text3d", "font": "bold", "text": "per glyph motion", "size": 0.38, "depth": 0.1 },
+          "position": [0, -1.5, 0],
+          "material": { "color": "#4fc3f7", "roughness": 0.35 }
+        }
+      ],
+      "end": 8,
+      "enter": { "name": "glyphPop", "target": "glyphs:title" },
+      "loop": { "name": "glyphWave", "target": "glyphs:title" },
+      "exit": { "name": "glyphFadeOut", "target": "glyphs:title", "duration": 2.4 },
+      "tweens": [
+        {
+          "target": "words:title",
+          "at": 2.4,
+          "duration": 0.8,
+          "ease": "power2.inOut",
+          "from": { "rotation.y": 0 },
+          "to": { "rotation.y": 360 },
+          "stagger": { "each": 0.5, "from": "start" }
+        },
+        {
+          "target": "glyphs:tagline",
+          "at": 0.5,
+          "duration": 0.6,
+          "ease": "power3.out",
+          "from": { "offset.y": -0.4, "alpha": 0 },
+          "to": { "offset.y": 0, "alpha": 1 },
+          "stagger": { "each": 0.05, "from": "center" }
+        },
+        {
+          "target": "glyphs:tagline",
+          "at": 5.8,
+          "duration": 0.4,
+          "from": { "alpha": 1 },
+          "to": { "alpha": 0 },
+          "stagger": { "each": 0.12, "from": "end" }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+/* The Brief screen: a board that reflects, a chat that asks, one primary button. */
+.board { display: flex; flex-direction: column; gap: 10px; padding: 12px; overflow: auto; height: 100%; }
+.board-card { border: 1px solid var(--border, rgba(127, 127, 127, 0.25)); border-radius: 10px; padding: 10px 12px; }
+.board-card h3 { margin: 0 0 6px; font-size: 13px; }
+.board-card p { margin: 0; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.board-card ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.board-empty { opacity: 0.6; }
+.board-point { all: unset; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 13px; width: 100%; }
+.board-point:hover, .board-point:focus-visible { text-decoration: underline; }
+.board-point small { opacity: 0.7; }
+.board-missing { font-style: normal; font-size: 11px; color: #d9822b; }
+
+.stage-empty { display: grid; place-items: center; height: 100%; padding: 24px; text-align: center; opacity: 0.7; }
+.stage-empty .phone { width: 150px; aspect-ratio: 9 / 16; border: 1px solid currentColor; border-radius: 18px; display: grid; place-items: center; margin: 0 auto 10px; opacity: 0.5; }
+
+.brief-drop { position: relative; height: 100%; }
+.brief-drop.is-drag::after { content: 'Drop photos or a CSV anywhere'; position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; font-size: 18px; background: rgba(20, 20, 30, 0.72); color: #fff; border: 2px dashed #fff; pointer-events: none; }
+
+.brief-chat { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.brief-chat .notes { flex: 1; overflow: auto; }
+.brief-attached { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.quick button, .brief-example { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border, rgba(127, 127, 127, 0.4)); background: transparent; color: inherit; cursor: pointer; }
+.brief-example { border: 0; text-decoration: underline; padding: 0; }
+.brief-actions { display: flex; align-items: center; gap: 8px; }
+.brief-make { margin-left: auto; font: inherit; font-weight: 600; padding: 6px 14px; border-radius: 8px; border: 0; background: var(--accent, #6d5efc); color: #fff; cursor: pointer; }
+.brief-make:disabled { opacity: 0.45; cursor: default; }
+.brief-composer { padding: 10px; gap: 8px; }
+.brief-dropzone { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; font: inherit; color: inherit; text-align: left; cursor: pointer; background: var(--surface, transparent); border: 1.5px dashed var(--border, rgba(127, 127, 127, 0.5)); border-radius: 14px; }
+.brief-dropzone:hover, .brief-dropzone:focus-visible { border-color: var(--accent, #6d5efc); }
+.brief-dropzone > span:first-child { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--accent, #6d5efc); color: #fff; font-size: 20px; flex: none; }
+.brief-dropzone b { display: block; font-size: 13.5px; }
+.brief-dropzone small { display: block; font-size: 11.5px; opacity: 0.65; }
+.brief-box { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid var(--border, rgba(127, 127, 127, 0.4)); border-radius: 16px; background: var(--surface, transparent); transition: border-color .15s, box-shadow .15s; }
+.brief-box:focus-within { border-color: var(--accent, #6d5efc); box-shadow: 0 0 0 3px var(--ring, rgba(109, 94, 252, 0.25)); }
+.brief-composer textarea { width: 100%; resize: none; font: inherit; background: transparent; color: inherit; border: 0; outline: none; padding: 6px 2px; }
+
+.board-shot.is-done { color: #3fb950; }
+.board-shot.is-working { color: var(--accent, #6d5efc); }
+.board-shot.is-failed { color: #f85149; }
+.board-point:disabled { cursor: default; text-decoration: none; }
+.sh-empty-pane { padding: 18px 14px; }
+.sh-empty-pane h3 { margin: 0 0 6px; font-size: 14px; }
+.sh-empty-pane p { margin: 0; font-size: 13px; line-height: 1.45; opacity: 0.7; }
+
+.quick-make { background: var(--accent, #6d5efc); color: #fff; font-weight: 600; border-color: transparent; }
+.brief-make.is-ready { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent, #6d5efc) 35%, transparent); white-space: nowrap; }

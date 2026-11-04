@@ -1,0 +1,1887 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 20.5,
+  "background": "#0b0f14",
+  "assets": {
+    "plate": {
+      "type": "image",
+      "url": "/cartoon/backdrop.png"
+    }
+  },
+  "layers": [
+    {
+      "id": "bg",
+      "type": "image",
+      "asset": "plate",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "alpha": 0.5,
+      "end": 20.5
+    },
+    {
+      "id": "shot-extreme-wide",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "near": 0.05,
+        "far": 120,
+        "shot": {
+          "subject": "objects:robot-legs,robot-body,robot-head,robot-visor,robot-arm,can",
+          "size": "extremeWide",
+          "fov": 50
+        }
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 0,
+      "end": 1.2
+    },
+    {
+      "id": "shot-wide",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "near": 0.05,
+        "far": 120,
+        "shot": {
+          "subject": "objects:robot-legs,robot-body,robot-head,robot-visor,robot-arm,can",
+          "size": "wide",
+          "fov": 35
+        }
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 1.2,
+      "end": 2.4
+    },
+    {
+      "id": "shot-medium",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "near": 0.05,
+        "far": 120,
+        "shot": {
+          "subject": "objects:robot-body,robot-head",
+          "size": "medium",
+          "fov": 35
+        }
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 2.4,
+      "end": 3.6
+    },
+    {
+      "id": "shot-close-up",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "near": 0.05,
+        "far": 120,
+        "shot": {
+          "subject": "objects:robot-body,robot-head",
+          "size": "closeUp",
+          "fov": 20
+        }
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 3.6,
+      "end": 4.8
+    },
+    {
+      "id": "shot-extreme-close-up",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "near": 0.05,
+        "far": 120,
+        "shot": {
+          "subject": "objects:robot-body,robot-head",
+          "size": "extremeCloseUp",
+          "fov": 14
+        }
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 4.8,
+      "end": 6
+    },
+    {
+      "id": "move-camera-to",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "position": [
+          0.4,
+          1.6,
+          8.5
+        ],
+        "lookAt": [
+          -0.8,
+          1.7,
+          0
+        ],
+        "fov": 45,
+        "near": 0.05,
+        "far": 120
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 6,
+      "end": 8.5,
+      "enter": {
+        "name": "cameraTo",
+        "duration": 1.5,
+        "params": {
+          "shot": {
+            "subject": "objects:robot-body,robot-head",
+            "size": "medium",
+            "fov": 24
+          }
+        }
+      }
+    },
+    {
+      "id": "move-orbit",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "position": [
+          -0.2,
+          1.9,
+          6.2
+        ],
+        "lookAt": [
+          -0.9,
+          1.8,
+          0
+        ],
+        "fov": 35,
+        "near": 0.05,
+        "far": 120
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 8.5,
+      "end": 11.5,
+      "loop": {
+        "name": "orbit",
+        "duration": 3,
+        "params": {
+          "degrees": 35
+        }
+      }
+    },
+    {
+      "id": "move-crane",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "position": [
+          -0.3,
+          1.2,
+          5.6
+        ],
+        "lookAt": [
+          -1,
+          1.9,
+          0
+        ],
+        "fov": 35,
+        "near": 0.05,
+        "far": 120
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 11.5,
+      "end": 14.5,
+      "enter": {
+        "name": "crane",
+        "duration": 2,
+        "params": {
+          "height": 1.6
+        }
+      }
+    },
+    {
+      "id": "move-dolly-zoom",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "position": [
+          -0.2,
+          1.7,
+          6
+        ],
+        "lookAt": [
+          -1,
+          1.8,
+          0
+        ],
+        "fov": 35,
+        "near": 0.05,
+        "far": 120
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 14.5,
+      "end": 16.5,
+      "enter": {
+        "name": "dollyZoom",
+        "duration": 1.5,
+        "params": {
+          "amount": 0.5
+        }
+      }
+    },
+    {
+      "id": "move-handheld",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "position": [
+          -0.2,
+          1.8,
+          5
+        ],
+        "lookAt": [
+          -1,
+          1.8,
+          0
+        ],
+        "fov": 35,
+        "near": 0.05,
+        "far": 120
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 16.5,
+      "end": 18.5,
+      "loop": {
+        "name": "handheld",
+        "duration": 1,
+        "params": {
+          "amount": 2.5
+        }
+      }
+    },
+    {
+      "id": "move-path",
+      "type": "three",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "background": "transparent",
+      "lighting": {
+        "preset": "studio"
+      },
+      "shadow": {
+        "enabled": true,
+        "opacity": 0.4,
+        "y": 0
+      },
+      "camera": {
+        "near": 0.05,
+        "far": 120,
+        "path": {
+          "curve": "smooth",
+          "keys": [
+            {
+              "t": 0,
+              "position": [
+                2.6,
+                1.6,
+                6
+              ],
+              "lookAt": [
+                -0.8,
+                1.7,
+                0
+              ],
+              "fov": 38
+            },
+            {
+              "t": 1,
+              "position": [
+                0.4,
+                2.2,
+                4.6
+              ],
+              "lookAt": [
+                -1,
+                1.8,
+                0
+              ],
+              "fov": 35
+            },
+            {
+              "t": 2,
+              "position": [
+                -2.8,
+                1.7,
+                5.2
+              ],
+              "lookAt": [
+                -0.9,
+                1.9,
+                0
+              ],
+              "fov": 34
+            }
+          ]
+        }
+      },
+      "objects": [
+        {
+          "id": "robot-legs",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.7,
+              1,
+              0.6
+            ]
+          },
+          "position": [
+            -1.3,
+            0.5,
+            0
+          ],
+          "material": {
+            "color": "#475569",
+            "roughness": 0.5,
+            "metalness": 0.1
+          }
+        },
+        {
+          "id": "robot-body",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.2,
+              1.6,
+              0.7
+            ]
+          },
+          "position": [
+            -1.3,
+            1.8,
+            0
+          ],
+          "material": {
+            "color": "#e2e8f0",
+            "roughness": 0.35,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "robot-head",
+          "geometry": {
+            "type": "box",
+            "size": [
+              1.1,
+              0.8,
+              0.16
+            ]
+          },
+          "position": [
+            -1.3,
+            2.95,
+            0
+          ],
+          "material": {
+            "color": "#38bdf8",
+            "roughness": 0.25,
+            "metalness": 0.2
+          }
+        },
+        {
+          "id": "robot-visor",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.9,
+              0.2,
+              0.06
+            ]
+          },
+          "position": [
+            -1.3,
+            3.15,
+            0.11
+          ],
+          "material": {
+            "color": "#0f172a",
+            "roughness": 0.2,
+            "metalness": 0.3
+          }
+        },
+        {
+          "id": "robot-arm",
+          "geometry": {
+            "type": "box",
+            "size": [
+              0.24,
+              1.4,
+              0.24
+            ]
+          },
+          "position": [
+            -0.6,
+            1.9,
+            0.05
+          ],
+          "rotation": [
+            0,
+            0,
+            -12
+          ],
+          "material": {
+            "color": "#cbd5e1",
+            "roughness": 0.4,
+            "metalness": 0.05
+          }
+        },
+        {
+          "id": "can",
+          "geometry": {
+            "type": "cylinder",
+            "radiusTop": 0.3,
+            "radiusBottom": 0.3,
+            "height": 1.4
+          },
+          "position": [
+            1.4,
+            0.7,
+            0
+          ],
+          "material": {
+            "color": "#fbbf24",
+            "roughness": 0.3,
+            "metalness": 0.35
+          }
+        }
+      ],
+      "start": 18.5,
+      "end": 20.5
+    }
+  ]
+}

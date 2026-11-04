@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "duration": 7,
+  "background": "#0b0f14",
+  "assets": {
+    "plate": { "type": "image", "url": "/cartoon/backdrop.png" }
+  },
+  "layers": [
+    {
+      "id": "bg",
+      "type": "image",
+      "asset": "plate",
+      "x": 960,
+      "y": 540,
+      "width": 1920,
+      "height": 1080,
+      "alpha": 0.35,
+      "end": 7
+    },
+    {
+      "id": "stage",
+      "type": "three",
+      "x": 960,
+      "y": 560,
+      "width": 1400,
+      "height": 1000,
+      "background": "#0b0f14",
+      "lighting": { "preset": "studio" },
+      "shadow": { "enabled": true, "opacity": 0.4, "y": 0 },
+      "camera": { "position": [0, 1.4, 6.4], "lookAt": [0, 0.7, 0], "fov": 32 },
+      "lights": [
+        { "id": "rimlight", "type": "directional", "color": "#8fd6ff", "intensity": 1.6, "position": [-4, 6, -3] }
+      ],
+      "objects": [
+        {
+          "id": "box",
+          "geometry": { "type": "box", "size": [1.1, 1.1, 1.1] },
+          "position": [-1.7, 0.55, 0],
+          "material": { "color": "#4fc3f7", "roughness": 0.35, "metalness": 0.1 }
+        },
+        {
+          "id": "ball",
+          "geometry": { "type": "sphere", "radius": 0.62 },
+          "position": [0, 0.62, 0],
+          "material": { "color": "#ffd27a", "roughness": 0.2 }
+        },
+        {
+          "id": "ring",
+          "geometry": { "type": "torus", "radius": 0.8, "tube": 0.24 },
+          "position": [1.7, 0.85, 0],
+          "rotation": [72, 0, 0],
+          "material": { "color": "#ff6b9d", "roughness": 0.25, "metalness": 0.6 }
+        }
+      ],
+      "end": 7,
+      "tweens": [
+        {
+          "target": "camera",
+          "at": 0,
+          "duration": 7,
+          "ease": "sine.inOut",
+          "from": { "position.z": 6.4 },
+          "to": { "position.z": 4.2 }
+        },
+        { "target": "object:box", "at": 0, "duration": 7, "ease": "none", "to": { "rotation.y": 360 } },
+        { "target": "object:ring", "at": 0, "duration": 7, "ease": "none", "to": { "rotation.z": -360 } },
+        {
+          "target": "object:ball",
+          "at": 0,
+          "duration": 3.5,
+          "ease": "power1.inOut",
+          "from": { "material.color": "#ffd27a" },
+          "to": { "material.color": "#ff4d4d" },
+          "repeat": 1,
+          "yoyo": true
+        }
+      ]
+    }
+  ]
+}

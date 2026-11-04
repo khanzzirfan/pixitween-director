@@ -1,0 +1,503 @@
+{
+  "name": "PixiTween Director S24: turnaround (the real front, a Muse-drawn back, the true depth)",
+  "branchName": "ralph/s24-turnaround-3d",
+  "description": "The 3D product stops showing its front on its back and stops guessing its depth. The real cut-out is placed in a three-panel sheet and Muse's image model draws the right side and the back beside it; code splits and measures the views (front kept, back the same outline, colours close, depth from the side), Muse checks them against the photo with one redraw at most; the body's front half wears the real photo, its back half the drawn (or a supplied) back, at the measured depth. The engine gets a back material for the body. Off by default (TURNAROUND=1); any failure keeps today's body. Leaves out: boxes, an image-to-3D mesh, characters, an approval gate.",
+  "metadata": {
+    "specs": [
+      "docs/architecture/turnaround-3d.md"
+    ],
+    "readFirst": [
+      "docs/architecture/turnaround-3d.md (the rule: the front is always the real photo; the spike's measured results; the flow; who does what)",
+      "debug/turnaround-spike/spike.ts and its outputs, if the owner linked debug/ into this worktree (the measured prompt, canvas and renders)",
+      "docs/architecture/sheet-film-3d.md (the s23 sheet film this PRD feeds)",
+      "server/product3d/prepare.ts, unwrap.ts, contour.ts (how the single-photo body is made today)",
+      "engine/src/three/build/geometry.ts (buildBody) and object.ts (the extrude material)",
+      "server/art/cutout-sheet.ts (whiteKeySheet) and server/crew/sheet-film/ (drawSheets, checkSheets, makeSheetFilm)"
+    ],
+    "requires": [
+      "prd-s23-sheet-film-3d"
+    ],
+    "owns": [
+      "server/product3d/turnaround.ts",
+      "server/product3d/turnaround.test.ts",
+      "server/product3d/turnaround.split.test.ts",
+      "server/product3d/agree.ts",
+      "server/product3d/agree.test.ts",
+      "server/product3d/turnaround-check.ts",
+      "server/product3d/turnaround-check.test.ts",
+      "server/product3d/back.ts",
+      "server/product3d/back.test.ts",
+      "server/product3d/wrap360.ts",
+      "server/product3d/wrap360.test.ts",
+      "server/product3d/turnaround-flow.ts",
+      "server/product3d/turnaround-flow.test.ts",
+      "scripts/live/s24-turnaround.ts",
+      "scripts/live/s24-turnaround.test.ts",
+      "docs/architecture/turnaround-3d.md"
+    ],
+    "sharedEdits": [
+      "engine/src/three/build/geometry.ts",
+      "engine/src/three/build/geometry.test.ts",
+      "engine/src/three/build/object.ts",
+      "engine/src/three/build/object.test.ts",
+      "shared/aep/layer.ts",
+      "server/engine/light-validator.ts",
+      "web/src/motion/aep/stage3d.ts",
+      "server/product3d/prepare.ts",
+      "server/product3d/prepare.test.ts",
+      "server/authoring/catalog-clip.ts",
+      "server/authoring/cinematic-film.ts",
+      "server/authoring/cinematic-film.test.ts",
+      "server/art/prices.ts",
+      "server/env.ts",
+      ".env.example",
+      "server/crew/cinematic-cut.ts",
+      "server/crew/sheet-film/render.ts",
+      "server/crew/sheet-film/sheets.ts",
+      "server/crew/sheet-film/check.ts"
+    ],
+    "extraGuardrails": [
+      "Start only on a branch that already holds the s23 sheet film: confirm server/crew/sheet-film/index.ts exports makeSheetFilm. If it does not, set notes to 'blocked: s23 not merged' and stop.",
+      "Run this PRD in its own git worktree (ralph/README.md section 3). Never edit files in the owner's main checkout: its dev server restarts on any server/ edit and kills a film that is building.",
+      "Every Muse call in code goes through ctx.meta.spark (chat or reviewImages) and is added to ctx.ledger like planBoard does. Tests fake ctx.meta.spark; nothing calls the network.",
+      "Creative choices stay with Muse (the board, the look, what to revise). Code draws the sheets, measures, checks rules and passes problems back to Muse as words; it never rewrites the board itself except to drop an element Muse named.",
+      "Renders in tests are faked: inject the render function (the shape of renderKeyFrames: (composition, times) => Promise<Buffer[]>) and return small sharp-made PNGs. Never launch Chromium in a unit test.",
+      "For a browser check never run `npm run dev` and never touch ports 8787, 8797, 5173 or 5199 (the owner's servers). Start your own pair and stop it after: `PORT=8798 DATA_DIR=data-s23 npx tsx server/main.ts` and `DIRECTOR_WEB_PORT=5180 DIRECTOR_API_URL=http://localhost:8798 npx vite --config web/vite.config.ts --port 5180 --strictPort`, then open http://localhost:5180.",
+      "debug/ is gitignored: the Clippy example sheets named in readFirst are reachable only if the owner linked debug/storyboard into this worktree. If they are missing, read the design doc's description of them instead; they are for the idea only.",
+      "`npm test` has 7 known failures outside your files: server/agent/director.test.ts (1), server/http/app.test.ts (1), server/http/middleware.chain.test.ts (2), server/http/handlers/exports.test.ts (1), server/http/handlers/local.test.ts (1), server/media/plate-map.test.ts (the file fails to load), web/src/motion/aep/films.test.ts (1). Do not edit those files. The gate passes when no other test fails.",
+      "THE RULE: the front of the product in the film is always the real photo. A drawn front is used only to line the views up and to measure that Muse kept it; it is never stored as a texture.",
+      "Drawn views are never painted on by code (no repainting, no label fixes). Trimming, resizing to the front's box and one global colour match are allowed (calibration). A failed view is redrawn by the image model once, or the film uses the single-photo body.",
+      "TURNAROUND is off by default; never turn it on by default in this PRD (the owner decides after MG-1).",
+      "`npm test` has 7 known failures outside your files: server/agent/director.test.ts (1), server/http/app.test.ts (1), server/http/middleware.chain.test.ts (2), server/http/handlers/exports.test.ts (1), server/http/handlers/local.test.ts (1), server/media/plate-map.test.ts (the file fails to load), web/src/motion/aep/films.test.ts (1). Do not edit those files. The gate passes when no other test fails.",
+      "THE RULE: the front of the product in the film is always the real photo. A drawn front is used only to line the views up and to measure that Muse kept it; it is never stored as a texture.",
+      "Drawn views are never painted on by code (no repainting, no label fixes). Trimming, resizing to the front's box and one global colour match are allowed (calibration). A failed view is redrawn by the image model once, or the film uses the single-photo body.",
+      "Tests never call the image model, a vision model or Chromium: fake ctx.meta.image.edit, ctx.meta.spark and the render function. Test images are made with sharp.",
+      "TURNAROUND is off by default; never turn it on by default in this PRD (the owner decides after MG-1)."
+    ],
+    "manualGates": [
+      "MG-1: owner runs `npm run live -- s24-turnaround --yes` with the web server on 5199 (perfume and yoghurt fixtures by default); open debug/turnaround/<stamp>/<name>/compare.jpg and judge, at 90, 135, 180 and 270 degrees, whether the turnaround body beats today's while 0 degrees is unchanged. Expect about +45 s and $0.045 per product (+$0.045 with a redraw).",
+      "MG-2: owner sets TURNAROUND=1 and makes one perfume film in the app: the Plan panel shows the turnaround sheet first, the product sheet shows the drawn views above the 3D turns, and the spin shows the drawn back with the true depth."
+    ]
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Turnaround prompt and the reference canvas",
+      "description": "As a drawer of the turnaround (the Muse image model), I want the real front placed in the sheet and a prompt that keeps it so that the side and back I draw are built round the true product.",
+      "steps": [
+        "Read docs/architecture/turnaround-3d.md (the rule and the spike), debug/turnaround-spike/spike.ts if present (referenceCanvas and prompt are the measured starting point), server/art/invent-photo.ts and server/art/lint.ts (brand-term lint).",
+        "Create server/product3d/turnaround.ts exporting TURNAROUND_SIZE = { width: 1536, height: 1024 } and PANELS = 3.",
+        "Export referenceCanvas(cut: Buffer): Promise<{ png: Buffer; panel: Buffer }>: a white 1536 x 1024 canvas with the trimmed transparent cut-out fitted inside 88 % of the LEFT third's width and 90 % of the height, centred across the third, standing on a floor line at 95 % of the height; `panel` is the left third as drawn.",
+        "Export turnaroundPrompt(o: { what: string }): string: a turnaround sheet of three panels in one row; the left panel is the real product from the front and is kept exactly as it is; panel 2 is its right side (turned 90 degrees), panel 3 its back (turned 180 degrees); same size, height and floor line; same shape, materials, colours, cap and metalwork; the back shows what the back of this product really carries, small print as plain marks, never a new brand name or new words; orthographic, eye level, even soft shadowless light matching the left panel, pure white background, clear white space between panels, no floor shadow, no captions, no extra objects.",
+        "Take brand and person terms out of `what` with the lint helpers invent-photo uses.",
+        "Create server/product3d/turnaround.test.ts with sharp-made cut-outs."
+      ],
+      "acceptance": [
+        "referenceCanvas of a 200 x 400 transparent rectangle returns a 1536 x 1024 PNG whose pixels outside the left third are all white",
+        "the product in referenceCanvas's left panel is centred across the third within 4 px and its bottom edge is at 95 % of the height within 4 px",
+        "turnaroundPrompt({ what: 'a bottle' }) contains 'right side', 'back', 'kept exactly' and 'pure white background', and never the words 'left side'",
+        "turnaroundPrompt with `what` holding a brand term from extractBrandTerms does not contain that term",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "turnaround"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Draw the turnaround sheet",
+      "description": "As a step of the product build, I want one image call that draws the side and back beside the real front so that the views exist as one consistent picture and the cost is on the film's ledger.",
+      "steps": [
+        "Read shared/ports.ts (MetaClients.image.edit), server/art/events.ts (charge), server/art/prices.ts and server/product3d/turnaround.ts.",
+        "Add `turnaroundUsd: 0.04` to PRICE in server/art/prices.ts (additive).",
+        "In server/product3d/turnaround.ts export drawTurnaround(ctx: ToolCtx, o: { cut: Buffer; photo: Buffer; what: string; extra?: string[] }): Promise<{ sheet: Buffer; reference: { png: Buffer; panel: Buffer } }>.",
+        "It builds referenceCanvas(o.cut), calls ctx.meta.image.edit(prompt, [reference.png, o.photo], '1536x1024') where prompt is turnaroundPrompt plus, when `extra` is given, a line 'Fix these problems of the last drawing:' and one line per problem; it charges PRICE.turnaroundUsd with charge(ctx, 'muse-image-1.0', 'turnaround', ...).",
+        "An image error becomes an Error whose message starts 'turnaround: '.",
+        "Extend server/product3d/turnaround.test.ts with a fake ctx (image.edit recording its arguments, ledger recording adds)."
+      ],
+      "acceptance": [
+        "drawTurnaround calls image.edit once with exactly two references, the reference canvas first and the photo second, and size '1536x1024'",
+        "drawTurnaround with extra ['the back has a stray lump'] sends a prompt that contains that sentence",
+        "drawTurnaround adds one ledger entry of 0.04 USD, and when image.edit rejects it rejects with a message that starts 'turnaround: '",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "turnaround"
+      ],
+      "dependsOn": [
+        "US-001"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Split the sheet into front, side and back",
+      "description": "As a step of the product build, I want the sheet cut into three transparent views and a measure of how well the front was kept so that the views can be checked and used.",
+      "steps": [
+        "Read server/art/cutout-sheet.ts (whiteKeySheet, columnPieces), server/media/image.ts and server/product3d/turnaround.ts.",
+        "Export type TurnaroundViews = { front: Buffer; side: Buffer; back: Buffer } (trimmed transparent PNGs) from server/product3d/turnaround.ts.",
+        "Export splitTurnaround(ctx: ToolCtx, o: { sheet: Buffer; reference: { panel: Buffer } }): Promise<{ ok: true; views: TurnaroundViews; frontKept: number } | { ok: false; reason: string }>.",
+        "Resize the sheet to 1536 x 1024 first (the model may return another size). Use whiteKeySheet(ctx, { source, max: 3 }); exactly 3 pieces are required, in left-to-right order front, side, back (else ok false, reason 'found N views, need 3').",
+        "frontKept is the mean absolute difference (0 to 1, three decimals) between reference.panel and the sheet's left third, both resized to 96 x 256.",
+        "Create server/product3d/turnaround.split.test.ts with sharp-made sheets: three coloured shapes on white, two shapes, a blank sheet, and a sheet of a different size."
+      ],
+      "acceptance": [
+        "a 1536 x 1024 sheet with three separated shapes returns ok true with the views in left-to-right order",
+        "a sheet with two shapes returns ok false and a reason that contains 'found 2 views'",
+        "a sheet whose left third equals the reference panel returns frontKept 0, and a 1024 x 683 sheet is split like its 1536 x 1024 copy",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "turnaround"
+      ],
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Code checks that the views agree, and the measured depth",
+      "description": "As a gate before any model look, I want measured checks on the three views so that a drawing of another shape or colour is redrawn without a vision call, and the side gives the true depth.",
+      "steps": [
+        "Read server/product3d/colour.ts (rgbToLab), server/product3d/pixels.ts and the TurnaroundViews type in server/product3d/turnaround.ts.",
+        "Create server/product3d/agree.ts exporting viewsAgree(o: { views: TurnaroundViews; frontKept: number }): Promise<{ ok: boolean; problems: string[]; depthShare: number }>.",
+        "depthShare = (side width / side height) / (front width / front height), rounded to two decimals: the product's depth as a share of its width.",
+        "Rules, each a problem sentence naming the view when it fails: (1) frontKept <= 0.08 ('the front panel was redrawn'); (2) the back's outline, scaled to the front's height and flipped left to right, overlaps the front's outline with intersection over union >= 0.85 ('the back is another shape'); (3) the back's mean Lab colour of opaque pixels is within distance 25 of the front's; (4) depthShare is between 0.15 and 1.25; (5) no view is more than 60 % transparent inside its own box.",
+        "Create server/product3d/agree.test.ts with sharp-made views."
+      ],
+      "acceptance": [
+        "viewsAgree of three same-colour views of matching outlines and frontKept 0.02 returns ok true, no problems and depthShare equal to the side's aspect over the front's within 0.01",
+        "viewsAgree whose back is a triangle where the front is a rectangle returns ok false with a problem that mentions 'back' and 'shape'",
+        "viewsAgree with frontKept 0.2 returns ok false with a problem that mentions 'front', and one whose side is 3 times wider than the front returns a problem that mentions 'side'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "turnaround"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Muse checks the sheet against the photo",
+      "description": "As a reviewer (Muse, with the photo beside the sheet), I want to say whether the drawn side and back are the same product as the photo so that a wrong cage, cap, colour or invented mark is redrawn once.",
+      "steps": [
+        "Read server/crew/sheet-film/check.ts (checkSheets: call shape, parsing, ledger) and debug/turnaround-spike/spike.ts if present (the check prompt that named real problems).",
+        "Create server/product3d/turnaround-check.ts exporting turnaroundCheckPrompt(o: { what: string; locks?: string[] }): string, parseTurnaroundCheck(raw: unknown): { ok: boolean; problems: string[] } and checkTurnaround(ctx, o: { photo: Buffer; sheet: Buffer; what: string; locks?: string[] }).",
+        "The prompt: the first picture is the real photo, the second a sheet of front, right side and back drawn from it; is the product in the side and back the same physical product (shape, cap, metalwork, glass, label art, colours); is anything invented (a lump, a new mark, new words); does the side read as the depth of the real product; the lock lines when given; reply JSON {\"ok\":boolean,\"problems\":[string]} with at most 4 problems.",
+        "parseTurnaroundCheck reads JSON in a code fence or with text around it; anything unreadable gives ok true and no problems (the check never blocks a film).",
+        "checkTurnaround makes one ctx.meta.spark.reviewImages call with [photo, sheet] and one ledger line of 0.005 USD.",
+        "Create server/product3d/turnaround-check.test.ts with a faked ctx.meta.spark."
+      ],
+      "acceptance": [
+        "parseTurnaroundCheck('{\"ok\":false,\"problems\":[\"the back has a stray lump\"]}') returns ok false and that problem",
+        "parseTurnaroundCheck('no json here') returns ok true and an empty problems list",
+        "checkTurnaround makes exactly one reviewImages call whose images are the photo then the sheet, and adds one ledger entry of 0.005",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "turnaround",
+        "muse"
+      ],
+      "dependsOn": [
+        "US-002"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "The back texture: fitted to the front and colour-matched",
+      "description": "As a 3D body builder, I want the drawn back laid in the front texture's own box and colour so that the back half lines up with the real front at the sides.",
+      "steps": [
+        "Read server/product3d/prepare.ts (how the front texture of shape 'other' is trimmed and sized), server/product3d/contour.ts and server/product3d/pixels.ts.",
+        "Create server/product3d/back.ts exporting backTexture(o: { back: Buffer; front: Buffer }): Promise<Buffer>, where front is the front texture PNG as prepareProduct3D stores it.",
+        "Trim the back view and resize it to exactly the front texture's width and height (fill: the outlines match by rule 2 of viewsAgree).",
+        "Colour match: on pixels opaque in both, shift each RGB channel of the back so its mean and standard deviation equal the front's (clamped 0 to 255); keep the back's own alpha. This is calibration; nothing else is painted.",
+        "Create server/product3d/back.test.ts with sharp-made pictures."
+      ],
+      "acceptance": [
+        "backTexture returns a PNG of exactly the front texture's width and height",
+        "a back of mean grey 100 against a front of mean grey 160 comes back with a mean within 3 of 160 on opaque pixels",
+        "a transparent pixel of the back stays transparent",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "turnaround"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Engine: the body's back half wears its own picture",
+      "description": "As a 3D engine, I want an extruded body to take a second picture for its back half so that a turned product shows its back instead of its front read the other way.",
+      "steps": [
+        "Read engine/src/three/build/geometry.ts (buildBody: the front and back halves, their UVs), engine/src/three/build/object.ts (how the extrude material is made, the sideColor material array), engine/src/three/build/materials.ts and the engine's object spec type for `material.map`.",
+        "In buildBody add two geometry groups: group 0 the front half's indices, group 1 the back half's (including the side wall each half owns). Without a back picture everything renders as before.",
+        "Add an optional `backMap` (texture id) beside `map` in the engine's material spec; in object.ts, for an extrude with `section` and a backMap, use a material array [front material, the same material with map = backMap]; alphaTest stays 0.5 on both.",
+        "Keep the back half's UVs as they are (read the other way so a drawn back is not mirrored): a back picture drawn as seen from behind appears the right way round.",
+        "Add tests in engine/src/three/build/geometry.test.ts and a new engine/src/three/build/object.test.ts case."
+      ],
+      "acceptance": [
+        "buildBody returns a geometry with exactly 2 groups whose counts add up to the index count",
+        "a body vertex on the back half at the largest x has a back u within 0.05 of 0 (the drawn back's left edge is the viewer's left when looking from behind)",
+        "buildObject for an extrude with section and backMap gives a mesh with 2 materials whose maps are map and backMap, and without backMap gives one material as before",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "engine",
+        "three"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Schema and adapter: textures.back on a product",
+      "description": "As a film document, I want a product prop to name a back picture so that the engine draws the drawn back and old films stay as they are.",
+      "steps": [
+        "Read shared/aep/layer.ts (aepModel3DTexturesSchema), server/engine/light-validator.ts (asset references), web/src/motion/aep/stage3d.ts (the extrude branch that sets `map` from textures.front) and web/src/motion/aep/films.test.ts.",
+        "Add `back: assetIdField.optional()` to aepModel3DTexturesSchema (additive; no version bump).",
+        "In light-validator, a prop3d textures.back must name an asset of the composition, like textures.front for cards.",
+        "In web/src/motion/aep/stage3d.ts's extrude branch set the material's backMap from textures.back when present.",
+        "Add tests beside the existing adapter and validator tests."
+      ],
+      "acceptance": [
+        "a prop3d extrude with textures.front and textures.back converts to an object whose material has map and backMap",
+        "lightValidate reports an issue for a textures.back that names no asset, and accepts one that does",
+        "every film fixture in web/src/motion/aep/films.test.ts converts with the same warning count as before this story",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "shared",
+        "web",
+        "three"
+      ],
+      "dependsOn": [
+        "US-007"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Round labels: the real front half and the drawn back half",
+      "description": "As a can-path builder (a straight cylinder wearing a label strip), I want the strip's front half from the photo and its back half from the drawn back so that a turned can shows its back.",
+      "steps": [
+        "Read server/product3d/unwrap.ts (findBodyBand, unwrapCylinder, LABEL_WIDTH, LABEL_HEIGHT, which columns are the front), server/authoring/catalog-clip.ts (prepareRound) and engine/src/three/build/object.ts (the lathe label offset).",
+        "Create server/product3d/wrap360.ts exporting wrapStrip(o: { front: Buffer; back: Buffer }): Promise<Buffer | undefined>: unwrapCylinder of each (the back's band found on the back view itself); undefined when either has no straight body band.",
+        "The strip's columns for angles -90 to +90 come from the front's unwrap unchanged; the columns for +90 to +270 from the back's unwrap; a 10-degree cross-fade at each seam. Same LABEL_WIDTH x LABEL_HEIGHT and the same angle-to-column mapping as unwrapCylinder, so the renderer needs no change.",
+        "Create server/product3d/wrap360.test.ts with sharp-made cylinders of a different colour front and back."
+      ],
+      "acceptance": [
+        "wrapStrip's column at angle 0 equals today's unwrapCylinder of the front at that column, pixel for pixel",
+        "the column at angle 180 has the back's colour within 3 per channel, and the strip is LABEL_WIDTH x LABEL_HEIGHT",
+        "wrapStrip returns undefined when the back view has no straight body band",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "three"
+      ],
+      "dependsOn": [
+        "US-003"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "turnaroundFor: draw, split, agree, check, redraw once, or fall back",
+      "description": "As a pipeline step for the product, I want one function that turns a photo and its cut-out into checked views and a depth, or a plain reason, so that a film never fails because of the turnaround.",
+      "steps": [
+        "Read server/product3d/turnaround.ts, agree.ts, turnaround-check.ts, back.ts and server/env.ts (how booleans that are off by default are declared).",
+        "Add TURNAROUND to server/env.ts as a boolean off by default, and to .env.example as TURNAROUND=0.",
+        "Create server/product3d/turnaround-flow.ts exporting turnaroundFor(ctx, o: { photo: Buffer; cut: Buffer; what: string; locks?: string[]; log: (line: string) => void }): Promise<{ views: TurnaroundViews; sheet: Buffer; depthShare: number } | undefined>.",
+        "Steps: drawTurnaround, splitTurnaround, viewsAgree; when they pass, checkTurnaround. Any problem from any step: redraw once with `extra` = the problems and run the steps again; a second failure returns undefined and logs 'turnaround: <reason>, using the single-photo body'.",
+        "Run checkTurnaround only on a sheet that passed viewsAgree (no vision call on a sheet code already refused).",
+        "Cache the result in the process by the sha1 of the photo bytes, so the same photo is drawn once; a failure is not cached.",
+        "Every thrown error becomes undefined plus the log line; nothing here throws. Returns undefined at once, with no call, when TURNAROUND is off.",
+        "Create server/product3d/turnaround-flow.test.ts with every step faked through vi.mock."
+      ],
+      "acceptance": [
+        "when the first sheet passes every step turnaroundFor returns views and a depthShare and calls drawTurnaround once and checkTurnaround once",
+        "when the first sheet fails viewsAgree and the second passes, drawTurnaround is called twice, the second time with the first problem in `extra`, and checkTurnaround once",
+        "when both sheets fail or drawTurnaround rejects, turnaroundFor resolves to undefined and logs a line that contains 'single-photo body'; a second call with the same photo after a success makes no new draw",
+        "with TURNAROUND off turnaroundFor returns undefined and calls nothing",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "pipeline"
+      ],
+      "dependsOn": [
+        "US-002",
+        "US-003",
+        "US-004",
+        "US-005",
+        "US-006"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "A supplied back photo wins over a drawn one",
+      "description": "As a person who uploads the back of the product too, I want my real back photo used so that the back in the film is true and nothing is drawn.",
+      "steps": [
+        "Read server/crew/run-crew.ts (how extra product photos of a film are found), server/crew/cinematic-cut.ts (prepareParts, cutout) and server/product3d/turnaround-flow.ts.",
+        "In server/product3d/turnaround-flow.ts export suppliedBack(ctx, o: { photo: Buffer; others: Buffer[]; what: string }): Promise<Buffer | undefined>: one ctx.meta.spark.reviewImages call with [photo, ...others] asking which picture, if any, shows the back of the same product; reply JSON {\"back\": index or null}; one ledger line of 0.005.",
+        "When a picture is named, cut it out with cutout (as prepareParts does for the front) and return the cut-out; else undefined.",
+        "Give turnaroundFor an optional `others: Buffer[]`: when suppliedBack returns a back, skip drawing; the views are { front: cut, side: undefined, back } and depthShare comes from the film's board (body.depth) or the default.",
+        "Make `side` optional in TurnaroundViews and skip rules that need it when it is absent.",
+        "Extend the tests with fakes."
+      ],
+      "acceptance": [
+        "turnaroundFor with others and a check naming index 1 calls cutout once on that photo and never calls drawTurnaround",
+        "a check reply of {\"back\": null} or an unreadable reply falls through to drawing",
+        "suppliedBack adds exactly one ledger entry",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "pipeline",
+        "muse"
+      ],
+      "dependsOn": [
+        "US-010"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "prepareProduct3D and the film use the views and the depth",
+      "description": "As a product builder, I want the drawn or supplied back and the measured depth used for the 3D product so that the film shows the real front, a believable back and the true depth.",
+      "steps": [
+        "Read server/product3d/prepare.ts, server/authoring/catalog-clip.ts (prepareRound), server/crew/cinematic-cut.ts (prepareProduct, prepareParts, buildCinematic), server/authoring/cinematic-film.ts (the cine:product prop's source.depth and textures) and server/product3d/back.ts and wrap360.ts.",
+        "Add optional `back?: Buffer` to the input of prepareProduct3D and prepareRound, and `back?: AssetRef` and `depthShare?: number` to Prepared3D (additive). Without them the output is byte-identical to today's.",
+        "Body (shape 'other'): store backTexture(back, front texture) as an image asset and return it as `back`. Can path: the label strip is wrapStrip(front, back) when it returns a strip, else today's unwrap.",
+        "The cache key gains ':turn' when a back is given.",
+        "In prepareParts call turnaroundFor after the cut-out exists (with the other product photos of the film as `others`) and pass the back to the prepare call; put depthShare on the parts.",
+        "In buildCinematic pass textures.back for the body, and source depth from depthShare (the measured depth wins over the board's body.depth; convert from a share of the width to the share of the shorter side cinematic-film expects).",
+        "Extend prepare.test.ts and cinematic-film.test.ts; s23 tests stay green."
+      ],
+      "acceptance": [
+        "prepareProduct3D for shape 'other' with a back returns a `back` asset of the front texture's size and keeps texture and textureKind 'front' unchanged",
+        "prepareProduct3D without a back returns the same texture asset bytes as before this story, and all existing prepare.test.ts cases pass",
+        "buildCinematicFilm with a back texture and depthShare 0.96 gives a cine:product prop with textures.back set and source.depth equal to 0.96 of the texture width",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "three",
+        "pipeline"
+      ],
+      "dependsOn": [
+        "US-008",
+        "US-009",
+        "US-010"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Show the turnaround in the sheet film",
+      "description": "As a person watching a film being made, I want to see the drawn turnaround and the drawn back on the 3D product so that I can judge what the product was made from.",
+      "steps": [
+        "Read server/crew/sheet-film/render.ts and sheets.ts (the product sheet), server/crew/sheet-film/check.ts (checkSheets prompt), web/src/crew/SheetStrip.tsx and server/product3d/turnaround-flow.ts.",
+        "Save the turnaround sheet as an asset with role 'sheet' and emit art.asset, before the s23 sheets, so it is the first thumbnail in the strip.",
+        "The product sheet gains a row above the four 3D turns: the drawn views (front, side, back) when the film has them; skipped otherwise.",
+        "checkSheets' prompt says, when the film has a drawn back, that the back of the 3D product is drawn from Muse's turnaround and is compared with it.",
+        "Add tests with the render faked."
+      ],
+      "acceptance": [
+        "a film whose parts carry views saves the turnaround sheet first, and its product sheet composes 3 more panels than without views",
+        "a film without views builds the same assets and the same product sheet panels as an s23 film",
+        "the check prompt mentions the drawn back only when the film has one",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "backend",
+        "web",
+        "sheets"
+      ],
+      "dependsOn": [
+        "US-012"
+      ]
+    },
+    {
+      "id": "US-014",
+      "title": "Live script: today's body against the turnaround body",
+      "description": "As an owner judging the result, I want a script that builds both bodies from one photo and shows them turning side by side so that I decide on TURNAROUND=1 from real renders.",
+      "steps": [
+        "Read debug/turnaround-spike/spike.ts if present (the measured spike: canvas, prompt, data-URI textures, orbit camera), scripts/live/s23-sheet-film.ts and its test.",
+        "Create scripts/live/s24-turnaround.ts: describe() names the renderer port (--base, default http://localhost:5199) and the DATA_DIR data-s-review; estimateUsd() returns 0.1 (one draw, one check, a possible redraw).",
+        "run(): for each photo argument (default the perfume and the yoghurt fixtures) cut out, run turnaroundFor with TURNAROUND forced on, build today's body and the turnaround body with prepareProduct3D, render both orbiting at 0, 45, 90, 135, 180 and 270 degrees, and write debug/turnaround/<stamp>/<name>/{sheet.png,views.png,compare.jpg,timings.json}.",
+        "compare.jpg: two rows, today on top and the turnaround body below, each panel labelled with its angle (use composeSheet).",
+        "Create scripts/live/s24-turnaround.test.ts for describe, estimate and argument parsing; nothing calls a model or a browser."
+      ],
+      "acceptance": [
+        "`npm run live -- s24-turnaround` without --yes prints an estimate that contains '$' and exits 0 without creating a film",
+        "describe() contains '5199' and estimateUsd() is at most 0.15",
+        "the argument parser takes several .png/.jpg paths and --base, and rejects an unknown flag with a message",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "scripts",
+        "tooling"
+      ],
+      "dependsOn": [
+        "US-012"
+      ]
+    },
+    {
+      "id": "US-015",
+      "title": "Docs: what was built and what is next",
+      "description": "As a next reader, I want the design doc to say what was built so that the next PRD starts from facts.",
+      "steps": [
+        "Read docs/architecture/turnaround-3d.md and every file this PRD created.",
+        "Add a 'Built' section: one line per module (turnaround.ts, agree.ts, turnaround-check.ts, back.ts, wrap360.ts, turnaround-flow.ts, the engine back material, textures.back, the sheet row), the TURNAROUND flag (off by default) and how to run MG-1.",
+        "Add a 'Next' section: turn TURNAROUND on by default once MG-1 and MG-2 pass; textured sides from the drawn side view; an image-to-3D mesh option; boxes.",
+        "Add an MG-1 table (time, cost, verdict per product) with cells 'to fill'."
+      ],
+      "acceptance": [
+        "docs/architecture/turnaround-3d.md contains the headings 'Built' and 'Next'",
+        "every module path named in the Built section exists in the repository",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "labels": [
+        "docs"
+      ],
+      "dependsOn": [
+        "US-013",
+        "US-014"
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@
       "docs/hackathon/steps/step-03-brief-to-composition/design.md"
     ],
     "readFirst": [
+      "docs/engine/README.md (engine behaviour: composition JSON, Player slot props, layer kinds, effects, validation; read before writing code that touches the engine)",
       "docs/hackathon/06-contracts.md (sections 3-6: ToolCtx.emit stamping, AppDeps, D-1 handlers, D-2 makeToolCtx, D-4 cost via ctx.ledger, D-10 runDirector signature)",
       "docs/hackathon/steps/step-03-brief-to-composition/design.md (sections 5.9-5.14 flow and rules, 6 full prompts, 7 errors, 11 verified facts)",
       "server/authoring/api.ts and server/tools/authoring.ts (S3a: the tools the director calls; layer ids are '<sceneId>:<role>')",

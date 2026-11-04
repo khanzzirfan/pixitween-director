@@ -1,0 +1,31 @@
+/* Fit a 375 px phone without horizontal scrolling. Nothing here hides overflow on html or body. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+}
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+pre,
+code,
+td {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .grid > * {
+    min-width: 0;
+  }
+}

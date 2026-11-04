@@ -9,6 +9,7 @@
       "docs/hackathon/steps/step-04-muse-image-sam-layers/contract-issues.md"
     ],
     "readFirst": [
+      "docs/engine/README.md (engine behaviour: composition JSON, Player slot props, layer kinds, effects, validation; read before writing code that touches the engine)",
       "docs/hackathon/06-contracts.md (sections 3, 3a, 4, 4a, 4b and section 6: D-4 cost, D-11 assets and productNoun)",
       "docs/hackathon/steps/step-04-muse-image-sam-layers/design.md (all of it; sections 5 and 6 hold the algorithms and prompts)",
       "docs/hackathon/steps/step-04-muse-image-sam-layers/contract-issues.md (assumptions about S3a that tests verify)",

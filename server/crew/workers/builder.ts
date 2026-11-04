@@ -1,0 +1,205 @@
+// Owned by S12c. The scene builder: one worker for every job kind that writes a scene (design.md 5.8).
+// build, rebuild, restyle, edit and fix run S3b's buildScene on the job's scene only; revert restores a snapshot with no model.
+import { WRITING_KINDS, type Job, type StyleBible } from '@shared/crew';
+import { ASPECT_SIZES } from '@shared/composition';
+import type { LlmBackend } from '@shared/ports';
+import type { Storyboard } from '@shared/storyboard';
+import type { ToolCtx, ToolDef } from '@shared/tools';
+import { EDIT_ONLY_TOOLS, buildScene } from '../../agent/build-scene';
+import { ensureSceneBasics } from '../../agent/scene-basics';
+import { removeLayer } from '../../authoring/api';
+import { readDirector } from '../../authoring/meta';
+import type { Comp } from '../../authoring/types';
+import { loadEnv } from '../../env';
+import { getLocalMode } from '../../llm/local-mode';
+import { pickBackend } from '../../llm/router';
+import { BUILDER_DIRECTION, renderBibleBlock, renderJobBlock, renderOutlineBlock } from '../prompts';
+import { fillBackdrops } from '../backdrop';
+import { applyTextLane, fitTextToSafeArea, settleTextBoxes } from '../text-lane';
+import { restoreScene } from '../scene-snapshot';
+import { timedOut, type WorkerResult } from '../scheduler';
+import type { CrewCtx } from '../showrunner-tools';
+import { bestFlatTextColor } from '../../review/contrast';
+import { layerBoxAt, listScenes, runRules, suggestFix } from '../../review/rules';
+import { scopedRunTool } from './scope';
+
+export class SceneGoneError extends Error {
+  constructor(sceneId: string) {
+    super(`scene ${sceneId} is not in the storyboard`);
+    this.name = 'SceneGoneError';
+  }
+}
+
+export interface BuilderOptions {
+  /** Which model answers this job. Defaults to the router; tests supply a scripted one. */
+  backendFor?: (job: Job) => LlmBackend;
+}
+
+const abortError = () => Object.assign(new Error('The job was stopped'), { name: 'AbortError' });
+const SAFE_AREA = 'SAFE AREA: keep all text and the product inside a 5 % inset from every canvas edge, including while it animates.';
+const EDIT_KINDS = ['edit', 'fix'];
+
+function defaultBackend(job: Job): LlmBackend {
+  // small edits may run on the local model in Local mode; building and restyling need new art, so they stay on Spark
+  return EDIT_KINDS.includes(job.kind) ? pickBackend('edit', { local: getLocalMode() }) : pickBackend('build');
+}
+
+/** Removes every layer of the scene except a camera layer, in one commit. */
+async function clearScene(crew: CrewCtx, job: Job, sceneId: string): Promise<void> {
+  const r = await crew.films.mutate(
+    job.filmId,
+    (f) => {
+      let c = f.composition as Comp;
+      for (const [id, m] of Object.entries(readDirector(c).layers)) if (m.sceneId === sceneId && m.role !== 'camera') c = removeLayer(c, id);
+      return { next: c, data: null };
+    },
+    'director',
+    `clear ${sceneId} (${job.id})`,
+  );
+  if (!r.ok) throw new Error('the scene could not be cleared for a rebuild');
+}
+
+/** The deterministic lane: bible type, the rest position inside the safe area, then any box behind words tied to them. A no-op writes no version. */
+async function runTextLane(crew: CrewCtx, job: Job, sceneId: string, bible: StyleBible | undefined): Promise<void> {
+  const film = await crew.films.get(job.filmId);
+  const c = film.composition as Comp | undefined;
+  if (!c || !film.storyboard?.scenes.some((s) => s.id === sceneId)) return;
+  const styled = bible ? applyTextLane(c, sceneId, bible) : c;
+  const fitted = fitTextToSafeArea(styled, sceneId);
+  const boxed = settleTextBoxes(fitted.comp, sceneId);
+  const filled = fillBackdrops(boxed.comp, sceneId);
+  if (styled === c && !fitted.moved.length && !boxed.fixed.length && !filled.fixed.length) return;
+  const written = await crew.films.mutate(job.filmId, (f) => {
+    const base = f.composition as Comp;
+    const lane = fitTextToSafeArea(bible ? applyTextLane(base, sceneId, bible) : base, sceneId);
+    return { next: fillBackdrops(settleTextBoxes(lane.comp, sceneId).comp, sceneId).comp, data: null };
+  }, 'director', `text lane ${sceneId}`);
+  if (!written.ok) throw new Error('the text lane was refused by the film');
+}
+
+async function revert(crew: CrewCtx, job: Job, sceneId: string): Promise<WorkerResult> {
+  const previous = crew.board
+    .list()
+    .filter((j) => j.id !== job.id && j.sceneId === sceneId && j.filmId === job.filmId && WRITING_KINDS.includes(j.kind) && j.kind !== 'revert' && j.status === 'done')
+    .at(-1);
+  const snap = previous ? await crew.snapshots?.load(previous.id) : undefined;
+  if (!previous || !snap) throw new Error('nothing to revert to');
+  const r = await crew.films.mutate(job.filmId, (f) => ({ next: restoreScene(f.composition as Comp, sceneId, snap), data: null }), 'director', `revert ${sceneId} to before ${previous.id}`);
+  if (!r.ok) throw new Error('the reverted scene was refused');
+  return { summary: `back to before ${previous.id}`, version: r.version };
+}
+
+/** Text the model left outside the safe area, or over the product, is moved by exactly the overflow (the review loop's own fixes), so the result does not depend on the model getting the arithmetic right. */
+export async function snapText(ctx: ToolCtx, sceneId: string, storyboard: Storyboard | undefined): Promise<number> {
+  const run = scopedRunTool(sceneId);
+  let moved = 0;
+  for (let pass = 0; pass < 3; pass++) {
+    const comp = (await ctx.films.get(ctx.filmId)).composition;
+    if (!comp) return moved;
+    const { findings } = await runRules(comp, { read: (id: string) => ctx.assets.read(id) }, { sceneIds: [sceneId], storyboard });
+    const fps = listScenes(comp).find((x) => x.sceneId === sceneId)?.fps ?? 30;
+    const fixes = [];
+    for (const f of findings.filter((x) => x.layerId && ((x.rule === 'R2' && x.kind === 'outside-safe-area') || (x.rule === 'R1' && x.kind === 'text-over-product')))) {
+      let boxes;
+      try {
+        boxes = { [f.layerId!]: layerBoxAt(comp, f.layerId!, Math.round((f.atSec ?? 0) * fps)).box };
+      } catch {
+        continue;
+      }
+      const fix = suggestFix(f, { comp, sceneId, boxes, storyboard });
+      if (fix?.tool === 'setTransform') fixes.push(fix);
+    }
+    if (!fixes.length) return moved;
+    for (const fix of fixes) if ((await run(ctx, fix.tool, fix.args)).ok) moved++;
+  }
+  return moved;
+}
+
+/**
+ * Text that fails the 4.5:1 contrast check gets the flat colour (near-white or near-black) that reads best on its plate,
+ * so the critic does not have to send the scene back for a fix round. Text whose best colour is no better is left alone.
+ */
+export async function fixContrast(ctx: ToolCtx, sceneId: string, storyboard: Storyboard | undefined): Promise<number> {
+  const comp = (await ctx.films.get(ctx.filmId)).composition;
+  if (!comp) return 0;
+  const { findings } = await runRules(comp, { read: (id: string) => ctx.assets.read(id) }, { sceneIds: [sceneId], storyboard });
+  const run = scopedRunTool(sceneId);
+  let fixed = 0;
+  for (const f of findings.filter((x) => x.rule === 'R3' && x.kind === 'low-contrast' && x.layerId)) {
+    const lum = Number(f.metrics?.plateLuminance);
+    const ratio = Number(f.metrics?.ratio);
+    if (!Number.isFinite(lum)) continue;
+    const best = bestFlatTextColor(lum);
+    if (Number.isFinite(ratio) && best.ratio <= ratio) continue;
+    if ((await run(ctx, 'restyleText', { layerId: f.layerId, color: best.color })).ok) fixed++;
+  }
+  return fixed;
+}
+
+export async function runBuilderJob(job: Job, signal: AbortSignal, crew: CrewCtx, o: BuilderOptions = {}): Promise<WorkerResult> {
+  const sceneId = job.sceneId;
+  if (!sceneId) throw new Error(`${job.kind} needs a scene`);
+  if (signal.aborted) throw abortError();
+  if (job.kind === 'revert') return revert(crew, job, sceneId);
+
+  const film = await crew.films.get(job.filmId);
+  const scene = film.storyboard?.scenes.find((s) => s.id === sceneId);
+  if (!scene) throw new SceneGoneError(sceneId);
+  // a shot may name one of the film's other photos; anything else falls back to the hero photo
+  const photoId = scene.photoId && film.assets.some((a) => a.id === scene.photoId) ? scene.photoId : film.brief.productAssetId;
+  const product = film.assets.find((a) => a.id === photoId);
+  const dims = ASPECT_SIZES[film.aspect];
+  const palette = film.styleBible?.palette ?? film.storyboard!.palette;
+  const spentBefore = crew.toolCtx.ledger.total(job.filmId);
+
+  if (job.kind === 'rebuild-scene') await clearScene(crew, job, sceneId);
+
+  // a shot that waits for a video clip has nothing for the model to draw: its drawing tools refuse a generate-mode scene, so a builder
+  // sent to it only fails. It gets the poster and the "clip pending" caption, and the clip comes in once the director approves it.
+  if ((job.kind === 'build-scene' || job.kind === 'rebuild-scene') && scene.mode === 'generate') {
+    const ctx: ToolCtx = { ...crew.toolCtx, signal, scope: { sceneId }, source: 'director' };
+    await ensureSceneBasics({ ctx, scene, product: { assetId: photoId, own: photoId !== film.brief.productAssetId }, palette });
+    const after = await crew.films.get(job.filmId);
+    return { summary: 'waiting for the video clip: poster and placeholder drawn', version: after.version, costUsd: 0 };
+  }
+
+  const backend = (o.backendFor ?? defaultBackend)(job);
+  const local = backend.id === 'glimmer';
+  const model = local ? loadEnv().GLIMMER_MODEL : loadEnv().META_SPARK_MODEL;
+  const lane = local ? 'local' : 'builder';
+  const worker = local ? 'local' : (job.worker ?? 'builder');
+  if (local) crew.board.update(job.id, { worker, model });
+  else crew.board.update(job.id, { model });
+  crew.emit({ type: 'crew.agent', lane, worker, state: 'working', jobId: job.id, model });
+
+  const ctx: ToolCtx = { ...crew.toolCtx, signal, scope: { sceneId }, source: job.kind === 'build-scene' || job.kind === 'rebuild-scene' ? 'director' : 'chat' };
+  const building = job.kind === 'build-scene' || job.kind === 'rebuild-scene';
+  try {
+    const r = await buildScene({
+      ctx,
+      backend,
+      scene,
+      canvas: { ...dims, aspect: film.aspect },
+      palette,
+      product: { assetId: photoId, width: product?.width ?? dims.width, height: product?.height ?? dims.height },
+      extraSystem: [film.styleBible ? renderBibleBlock(film.styleBible) : '', film.storyboard ? renderOutlineBlock(film.storyboard, sceneId) : '', SAFE_AREA, BUILDER_DIRECTION, renderJobBlock(job)].filter(Boolean).join('\n'),
+      toolFilter: building ? (t: ToolDef) => !EDIT_ONLY_TOOLS.includes(t.name) : () => true,
+      signal,
+      ...(building ? { maxTurns: loadEnv().CREW_BUILD_MAX_TURNS } : {}),
+      run: scopedRunTool(sceneId),
+    });
+    // a job that ran out of time keeps what it drew; the basics below fill the rest
+    const late = timedOut(signal);
+    if ((r.aborted || signal.aborted) && !late) throw abortError();
+    const basicsCtx: ToolCtx = late ? { ...ctx, signal: undefined } : ctx;
+    if (building) await ensureSceneBasics({ ctx: basicsCtx, scene, product: { assetId: photoId, own: photoId !== film.brief.productAssetId }, palette });
+    if (!late && r.calls && !r.stalled) await snapText(ctx, sceneId, film.storyboard).catch(() => 0);
+    if (!late && (!r.calls || r.stalled)) throw new Error(r.failures.at(-1) ? `builder stalled: ${r.failures.at(-1)}`.slice(0, 280) : 'builder made no progress');
+    await runTextLane(crew, job, sceneId, film.styleBible);
+    if (!late) await fixContrast(ctx, sceneId, film.storyboard).catch(() => 0);
+    const after = await crew.films.get(job.filmId);
+    return { summary: `${r.calls} tool calls, ${r.ok} ok${late ? ', out of time' : ''}`, version: after.version, costUsd: Math.max(0, crew.toolCtx.ledger.total(job.filmId) - spentBefore), model };
+  } finally {
+    crew.emit({ type: 'crew.agent', lane, worker, state: 'idle', jobId: job.id, model });
+  }
+}

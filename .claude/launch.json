@@ -1,0 +1,78 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:web"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "web-check",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--config",
+        "web/vite.config.ts",
+        "--port",
+        "5199",
+        "--strictPort"
+      ],
+      "port": 5199
+    },
+    {
+      "name": "dev-fake",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:fake"
+      ],
+      "port": 5180
+    },
+    {
+      "name": "review-api",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "tsx",
+        "server/main.ts"
+      ],
+      "port": 8797,
+      "env": {
+        "PORT": "8797",
+        "DATA_DIR": "data-s-review",
+        "EXPORT_RENDER_BASE": "http://localhost:5199",
+        "FILMS_PER_HOUR_PER_IP": "50",
+        "GENERATE_MAX_PER_HOUR": "50"
+      }
+    },
+    {
+      "name": "review-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--config",
+        "web/vite.config.ts",
+        "--port",
+        "5199",
+        "--strictPort"
+      ],
+      "port": 5199,
+      "env": {
+        "DIRECTOR_WEB_PORT": "5199",
+        "DIRECTOR_API_URL": "http://localhost:8797"
+      }
+    }
+  ]
+}

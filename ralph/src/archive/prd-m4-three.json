@@ -1,0 +1,193 @@
+{
+  "name": "Engine M4: three layer (offscreen renderer, scene build, glTF, ThreeNode)",
+  "branchName": "ralph/m4-three",
+  "description": "Ports the library's shared offscreen WebGL renderer and pool, lighting presets, geometry, material, disposal and glTF clip helpers, and builds ThreeNode: a Three.js scene drawn into a Pixi sprite, with tween targets for the camera, objects and lights. Includes a smoke page.",
+  "metadata": {
+    "profile": "motion",
+    "specs": [
+      "engine/docs/04-three.md"
+    ],
+    "readFirst": [
+      "engine/docs/README.md (decisions D2, D8)",
+      "engine/docs/04-three.md (all of it)",
+      "engine/docs/port-map.md (rows for M4)",
+      "engine/src/core/types.ts, transform.ts, paths.ts, engine/src/schema/layer3d.ts (from M1)",
+      "tmp/reacthub-pixitweenjs/src/components/AepComposition/model3d/"
+    ],
+    "requires": [
+      "prd-m1-foundation"
+    ],
+    "owns": [
+      "engine/src/three/offscreen.ts",
+      "engine/src/three/offscreen.test.ts",
+      "engine/src/three/build/*",
+      "engine/src/three/threeNode.ts",
+      "engine/src/three/threeNode.test.ts",
+      "engine/src/three/index.ts",
+      "engine/lab/three-smoke.tsx"
+    ],
+    "sharedEdits": [
+      "web/motion-three-smoke.html",
+      "web/src/dev/motion-three-smoke.tsx"
+    ],
+    "extraGuardrails": [],
+    "manualGates": []
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Port the offscreen renderer and its reference-counted pool",
+      "description": "As an engine developer, I want one shared WebGL renderer per Pixi app so that many 3D layers never hit the browser's context cap.",
+      "steps": [
+        "Read engine/docs/04-three.md section 'Offscreen renderer and pool' and tmp/reacthub-pixitweenjs/src/components/AepComposition/model3d/ThreeOffscreenRenderer.ts.",
+        "Create engine/src/three/offscreen.ts by porting ThreeOffscreenRenderer, OffscreenGlRenderer, OffscreenRenderRequest, createRendererPool, acquireOffscreenRenderer and releaseOffscreenRenderer, with the four changes in the spec (real drawing-buffer size check, no global array, debugRendererCount(), drop getOffscreenRenderer), plus setOffscreenRendererFactoryForTests(fn | null).",
+        "Create engine/src/three/offscreen.test.ts with a fake OffscreenGlRenderer (a jsdom canvas whose getContext('2d') is stubbed per test to a recording fake) and vitest fake timers for the pool."
+      ],
+      "acceptance": [
+        "Rendering twice at 512x512 calls setSize once; rendering at 256x256 after that calls it again; when the fake domElement's size was changed externally between calls, setSize is called again",
+        "render with a draw function calls draw instead of render(scene, camera) and then drawImage on the target canvas",
+        "Pool: acquire(a) twice returns the same value; release twice then advancing 1999 ms keeps it, 2000 ms disposes it once; acquire during the grace period cancels disposal",
+        "debugRendererCount() reflects live pooled renderers (1 after acquire, 0 after release plus the grace period)"
+      ],
+      "labels": [
+        "three"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Geometry, materials and disposal helpers",
+      "description": "As an engine developer, I want primitives, standard materials and clean disposal so that scenes build quickly and never leak GPU memory.",
+      "steps": [
+        "Read engine/docs/04-three.md 'Building the scene' (geometry, materials, dispose rows) and tmp/reacthub-pixitweenjs/src/components/AepComposition/model3d/geometry.ts and threeUtils.ts.",
+        "Create engine/src/three/build/geometry.ts exporting buildGeometry(spec) for box, sphere, cylinder, torus and plane (segment counts from the spec).",
+        "Create engine/src/three/build/materials.ts exporting makeMaterial(spec, textures: Map<string, THREE.Texture>) returning MeshStandardMaterial, and loadTexture(url) setting SRGBColorSpace.",
+        "Create engine/src/three/build/dispose.ts exporting disposeObject3D(root, opts) and isSharedTexture (ported).",
+        "Create engine/src/three/build/geometry.test.ts and materials.test.ts."
+      ],
+      "acceptance": [
+        "The bounding box of buildGeometry({ type: 'box', size: [1, 2, 3] }) is 1 x 2 x 3; a sphere of radius 0.5 has a bounding sphere radius 0.5 (within 1e-6)",
+        "makeMaterial with opacity 0.5 gives transparent true and opacity 0.5; with opacity 1 transparent is false; roughness, metalness, emissive and emissiveIntensity are copied",
+        "disposeObject3D on a group with two meshes calls dispose on both geometries and both materials (spied)"
+      ],
+      "labels": [
+        "three"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "Lighting presets, rig and the shadow catcher",
+      "description": "As an author, I want studio, window and golden light and a soft ground shadow so that products look lit, not pasted.",
+      "steps": [
+        "Read engine/docs/04-three.md (lighting and shadow rows, the Lights rule) and tmp/reacthub-pixitweenjs/src/components/AepComposition/model3d/lighting.ts, shadowFade.ts and framing.ts.",
+        "Create engine/src/three/build/lighting.ts porting LIGHTING_PRESETS (exact numbers), DEFAULT_LIGHTING_PRESET, resolveLightingConfig, directionFromAzimuthElevation, createLightingRig, applyLightingRig, disposeLightingRig and getRoomEnvironmentTexture (cached per renderer); add the 'none' preset (no rig lights); the rig exposes its lights as key, fill, rim, ambient.",
+        "Create engine/src/three/build/shadow.ts exporting createShadowCatcher({ opacity, y, size }) (horizontal plane, ShadowMaterial, receiveShadow, soft edge from shadowEdgeFade) and fitShadowCamera(light, box).",
+        "Create engine/src/three/build/lighting.test.ts."
+      ],
+      "acceptance": [
+        "LIGHTING_PRESETS.studio has keyAzimuth -35, keyElevation 38, keyIntensity 3.2 (same as the library)",
+        "createLightingRig for 'studio' returns lights named key, fill, rim and ambient; the key light has castShadow true",
+        "directionFromAzimuthElevation(0, 90) points straight up (y close to 1)",
+        "createShadowCatcher({ opacity: 0.35, y: 0, size: 20 }) returns a mesh lying flat (rotation.x = -Math.PI / 2) at y 0 with a ShadowMaterial of opacity 0.35"
+      ],
+      "labels": [
+        "three"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-004",
+      "title": "glTF: load, normalise and stateless clip time",
+      "description": "As an author, I want a glTF character or prop placed at a set height, standing on the floor, with its clip at an exact time for any frame so that seeking is reliable.",
+      "steps": [
+        "Read engine/docs/04-three.md rules 'glTF normalise' and 'glTF clip time' and tmp/reacthub-pixitweenjs/src/components/AepComposition/model3d/animation.ts.",
+        "Create engine/src/three/build/gltf.ts exporting loadGltf(url) (GLTFLoader from three/examples/jsm/loaders/GLTFLoader.js), normalizeGltf(root, { height? }), pickClip(clips, name) returning { clip, warning? }, HOLD_EPSILON and clipTime(localSec, clipDuration, { speed, loop, offset }).",
+        "Create engine/src/three/build/gltf.test.ts testing normalizeGltf on a hand-built Group of meshes and clipTime with a table of cases."
+      ],
+      "acceptance": [
+        "normalizeGltf on a group whose box spans y 1..5, x 2..4 with height 2 gives a box of height 2 with min.y 0 and x centred on 0 (within 1e-6)",
+        "clipTime(3.5, 2, { speed: 1, loop: true, offset: 0 }) is 1.5; with loop false it is 2 - HOLD_EPSILON; with speed 2 and loop true clipTime(0.75, 2, …) is 1.5; before the offset (localSec 0.5, offset 1) it is 0",
+        "pickClip with a missing name returns the first clip and a warning naming the missing clip"
+      ],
+      "labels": [
+        "three"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-005",
+      "title": "buildObject and buildScene",
+      "description": "As an engine developer, I want a layer spec turned into a ready Three scene with objects, lights, camera and shadow so that ThreeNode only has to draw it.",
+      "steps": [
+        "Read engine/docs/04-three.md table rows object.ts and scene.ts and the Rotations, Camera and Lights rules.",
+        "Create engine/src/three/build/object.ts exporting buildObject(spec, ctx: { textures, gltfs: Map<assetId, loaded gltf> }) returning { root (a wrapper Group carrying position, rotation in radians, scale), mixer?, clip?, warnings, dispose() }; gltf objects clone the loaded scene (SkeletonUtils.clone for skinned models), normalise, and create an AnimationMixer when animation is set.",
+        "Create engine/src/three/build/scene.ts exporting buildScene(layer, ctx) returning ThreeRig { scene, camera, lookAt, objects, lights, shadow, mixers, warnings, dispose() } and preloadThreeAssets(layer, doc) that loads the layer's textures and gltfs in parallel.",
+        "Create engine/src/three/build/scene.test.ts on a primitive-only layer (no network)."
+      ],
+      "acceptance": [
+        "buildScene for a layer with a box at rotation [0, 90, 0] gives objects.get(id).rotation.y equal to Math.PI / 2",
+        "camera.fov equals the layer's fov and camera.aspect equals width / height",
+        "lights contains key, fill, rim and ambient for preset 'studio' plus every extra light id; lighting preset 'none' gives only the extra lights",
+        "rig.dispose() disposes every geometry and material in the scene (spied)"
+      ],
+      "labels": [
+        "three"
+      ],
+      "dependsOn": [
+        "US-002",
+        "US-003",
+        "US-004"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "ThreeNode: sprite, targets, update, ready, destroy",
+      "description": "As a runtime author, I want a three layer to behave like any other MotionNode so that it can be tweened, filtered, shown and hidden like a sprite.",
+      "steps": [
+        "Read engine/docs/04-three.md sections 'How it draws' and 'ThreeNode', and the canvas -> texture -> sprite parts of tmp/reacthub-pixitweenjs/src/components/AepComposition/model3d/Pixi3DModelLayer.tsx.",
+        "Create engine/src/three/threeNode.ts exporting createThreeNode: NodeFactory implementing everything in the spec: acquire/release the shared renderer for ctx.app, a 2D canvas plus Texture.from(canvas) plus Sprite, applyBaseTransform from engine/src/core/transform.ts, resolveTarget (base, camera, object:, light:, postfx: via a nullable postFx field, else null), update(t) (mixers via clipTime, lookAt, fov, render, texture.source.update()), ready, errors and warnings arrays, destroy.",
+        "Expose 'scale' on objects as a uniform proxy and 'material.color' and 'material.emissive' as colour refs; lookAt.x/y/z write the node's lookAt Vector3.",
+        "Create engine/src/three/index.ts re-exporting createThreeNode, the offscreen API and the build helpers.",
+        "Create engine/src/three/threeNode.test.ts using setOffscreenRendererFactoryForTests with a fake renderer and a primitive-only layer."
+      ],
+      "acceptance": [
+        "resolveTarget('object:b', 'rotation.y') returns kind 'deg' on the wrapper's rotation; resolveTarget('object:b', 'rotation.w') and resolveTarget('object:zz', 'scale') return null",
+        "resolveTarget('camera', 'position.z') and resolveTarget('light:key', 'intensity') return refs; resolveTarget('postfx:glow', 'intensity') returns null while postFx is null",
+        "update(1) calls the fake renderer's render once and the node's ready resolves after the first update",
+        "destroy() releases the renderer (debugRendererCount() falls to 0 after the grace period with fake timers) and disposes the rig",
+        "With the renderer factory throwing, creating the node does not throw and ready rejects with that error"
+      ],
+      "labels": [
+        "three"
+      ],
+      "dependsOn": [
+        "US-001",
+        "US-005"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Smoke page: one ThreeNode on a bare Pixi app, tweened with GSAP",
+      "description": "As a project owner, I want to see a three layer draw and move in the browser before the runtime exists so that WebGL problems show up in phase M4, not phase M7.",
+      "steps": [
+        "Read web/three-check.html and web/src/dev/three-check.tsx (page shape, hashCanvas) and engine/fixtures/three-gltf.json and three-primitives.json.",
+        "Create engine/lab/three-smoke.tsx (all page code: a select between the two fixtures; parse the doc, take its first three layer, preloadThreeAssets, create a Pixi Application (await app.init, preserveDrawingBuffer true, ticker stopped), createThreeNode with ctx.app, add its display, and a plain gsap.timeline (paused) that tweens object rotation.y and camera position.z via the node's resolveTarget refs), plus an HTML stub web/motion-three-smoke.html (copy the shape of web/three-check.html; its script src is /src/dev/motion-three-smoke.tsx) and a one-line stub web/src/dev/motion-three-smoke.tsx that only does `import '../../../engine/lab/three-smoke';` (stubs exist because Vite serves HTML only from the web/ root; all real code lives in engine/lab).",
+        "Add a seek slider: on input, timeline.seek(t), node.update(t), app.render(); show the canvas hash after each seek and the node's errors and warnings.",
+        "Open http://localhost:5173/motion-three-smoke.html, check both fixtures, seek to the same time twice and compare hashes; save screenshots to debug/engine/."
+      ],
+      "acceptance": [
+        "On the three-gltf fixture the robot is visible, lit and standing on its shadow, and its pose changes between seek 0.5 s and 1.5 s (Wave clip)",
+        "Seeking to 2.0 s, then 0, then 2.0 s again shows the same hash both times at 2.0 s",
+        "The page shows no errors for either fixture and the browser console has no errors"
+      ],
+      "labels": [
+        "three",
+        "ui"
+      ],
+      "dependsOn": [
+        "US-006"
+      ]
+    }
+  ]
+}

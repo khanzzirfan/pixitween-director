@@ -1,0 +1,195 @@
+{
+  "name": "X2: end-to-end catalogue test with Muse (one can product, S19) on the Three.js engine",
+  "branchName": "ralph/x2-e2e-catalog",
+  "description": "Last task. Proves the merged branch end to end on ONE catalogue product (a can): runs the paid S19 catalogue live script with Muse under a hard budget on a one-product feed, converts and plays the produced film on the Three.js player in headless Chromium, opens it in the studio, and writes a report with cost, screenshots and results. The S20 cinematic run and the cartoon (toon) story are out of scope.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Budget check: estimate S19 on a one-can feed without spending",
+      "description": "As a project owner, I want the cost known before any paid call so that the test stays under budget.",
+      "steps": [
+        "Check which keys the S19 live script needs against .env.example and whether they are set (print only 'set' or 'missing', never the value).",
+        "Create fixtures/catalog/feed-1.csv with the header of fixtures/catalog/feed-6.csv and exactly one product that is a can (drinks category) taken from feed-6.csv. Run npm run live -- s19-catalog fixtures/catalog/feed-1.csv (no --yes) and record the printed estimate.",
+        "Start docs/e2e-catalog-report.md with the keys status, the estimate and the budget cap of 2 dollars."
+      ],
+      "acceptanceCriteria": [
+        "docs/e2e-catalog-report.md has the estimate and the keys status, and the estimate is under 2 dollars (or the story records why the run is skipped)",
+        "fixtures/catalog/feed-1.csv has exactly one product row and parses with parseFeed from shared/catalog",
+        "No API key value appears in docs/e2e-catalog-report.md or debug/ralph logs (grep for 'sk-' and 'Bearer' prints nothing)",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "e2e",
+        "live"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Run S19 live with Muse on the one-can feed",
+      "description": "As a project owner, I want the catalogue path to produce real films so that the demo is proven.",
+      "steps": [
+        "Run npm run live -- s19-catalog fixtures/catalog/feed-1.csv --yes once and keep its output in debug/app/e2e/s19.log.",
+        "List the films and index written under web/public/cartoon/catalog/ for the can and record the actual cost printed by the run in the report."
+      ],
+      "acceptanceCriteria": [
+        "web/public/cartoon/catalog/ has an index and at least one film per product",
+        "The report lists the produced film files and the real cost",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "e2e",
+        "live"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "The produced can film converts and plays on the Three.js engine",
+      "description": "As a project owner, I want each produced film to play on the new engine so that Three.js carries the demo.",
+      "steps": [
+        "Write e2e/catalog-motion.spec.ts (or a node script with vitest if simpler): for the film from US-002, parse with parseAepCompositionSafe, convert with aepToMotion from web/src/motion/aep (zero 'skipped' warnings for supported kinds), then open the dev page http://localhost:5173/aep-motion.html with that film in headless Chromium, take screenshots at 25 % and 75 % into debug/app/e2e/, and check the page has no console errors, the canvas is not blank and the two frames differ.",
+        "Run it and record per-film results (warnings count, screenshots) in the report."
+      ],
+      "acceptanceCriteria": [
+        "Every produced film parses, converts and renders non-blank frames that differ between 25 % and 75 %, or the report lists the exact film and reason it did not",
+        "debug/app/e2e/ holds the screenshots",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "e2e",
+        "ui"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Studio check: open the produced can film in the studio on the motion engine",
+      "description": "As a project owner, I want the studio to play a catalogue film so that the whole app path works.",
+      "steps": [
+        "Find how a produced catalogue film opens in the studio (gallery or the catalogue studio page, see web/src/ and docs of S15 if present after the merge). Use headless Chromium on http://localhost:5173 to open the S19 can film, press play, seek to the middle, and save screenshots to debug/app/e2e/.",
+        "Record console errors (none expected) and the film ids in the report."
+      ],
+      "acceptanceCriteria": [
+        "One studio screenshot show the film drawn by the motion engine, or the report names the blocker",
+        "The console has no errors during play and seek",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes",
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "e2e",
+        "ui"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Final report and full gate",
+      "description": "As a project owner, I want one report so that I can see what was proven and what remains.",
+      "steps": [
+        "Complete docs/e2e-catalog-report.md: what ran, total live spend against the 2 dollar cap, pass or fail per film, screenshots list, remaining warning kinds with counts, and open problems.",
+        "Run npm run typecheck, npm run lint and npm test and record the results."
+      ],
+      "acceptanceCriteria": [
+        "The report states the total live spend (under 2 dollars) and a pass or fail for every film",
+        "npm run typecheck and npm run lint pass and npm test is green",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ],
+      "labels": [
+        "e2e",
+        "docs"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/10-aep-adapter.md"
+    ],
+    "readFirst": [
+      "scripts/live/s19-catalog.ts (header says what it does and costs) and scripts/live/run.ts",
+      "fixtures/catalog/feed-6.csv",
+      ".env.example (which keys the live scripts need; never print .env)",
+      "web/src/dev/aep-motion.tsx (dev page that plays a stored film on the engine)"
+    ],
+    "requires": [
+      "prd-x1-merge-integration",
+      "prd-x3-known-test-failures"
+    ],
+    "owns": [
+      "docs/e2e-catalog-report.md",
+      "e2e/catalog-motion.spec.ts"
+    ],
+    "sharedEdits": [
+      "fixtures/catalog/feed-1.csv",
+      "web/public/cartoon/catalog/**",
+      "scripts/live/**"
+    ],
+    "profile": "adopt",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; use the stored films under data/films/*/versions/*.json (read with node:fs) and assets under web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/10-aep-adapter.md and engine/docs/README.md before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "The app's composition format is AepCompositionJson from `@shared/aep` (our own copy of the schema). Never import `reacthub-pixitweenjs`, `pixi.js`, `@pixi/*` or `pixi-filters` in new code.",
+      "Use the engine through `@engine/*` (engine/src). Do not edit engine/ except the files in metadata.sharedEdits; if the engine lacks something, add a row to docs/todos/ENGINE-NEEDS.md, use a workaround and say so in notes.",
+      "Edit only the files the story names, their tests, and metadata.sharedEdits. Do not change server/ behaviour, agent prompts or stored films.",
+      "No `@ts-nocheck` and no `@ts-ignore`. `@ts-expect-error` only with a reason on the same line.",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic; check drawing in the browser. Never weaken a test to make it pass.",
+      "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
+      "Record only real results. Never invent measurements or test output.",
+      "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+      "EXCEPTION to the offline rule above, for this PRD only: the live scripts may call the paid services they are written for (SAM, Muse). HARD BUDGET: total live spend for the whole PRD must stay under 2 US dollars (one product, one can). Test ONLY the S19 catalogue path on ONE can product. Do not run s20-cinematic, the cartoon or toon scripts, or any other live script. Always run a live script first WITHOUT --yes to read its printed estimate; if the estimate is above 1.5 dollars, stop and record it. Run each live script with --yes at most once; never loop or retry a paid call; if a paid run fails, record the error and stop spending. Keep a running spend tally in docs/e2e-catalog-report.md.",
+      "Never print, log or commit API keys or .env. If a key is missing, record which one in notes, skip the paid step and mark the story's acceptance as not met (do not fake a result).",
+      "Browser checks use the dev server on http://localhost:5173 (already running; never kill it) and headless Chromium through @playwright/test."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner opens the studio, picks a produced catalogue film and judges how it looks."
+    ]
+  }
+}

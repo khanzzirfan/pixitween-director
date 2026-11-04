@@ -1,0 +1,6 @@
+{"seq": 1, "event": {"filmId": "f_sample", "at": "2026-10-30T10:00:00.000Z", "type": "film.status", "status": "planning"}}
+{"seq": 2, "event": {"filmId": "f_sample", "at": "2026-10-30T10:00:01.000Z", "type": "cost", "usd": 0.01, "model": "muse-image-1.0", "units": "1 image"}}
+{"seq": 3, "event": {"filmId": "f_sample", "at": "2026-10-30T10:00:02.000Z", "type": "cost", "usd": 0.01, "model": "muse-image-1.0", "units": "1 image"}}
+{ this line is not json
+{"seq": 4, "event": {"filmId": "f_sample", "at": "2026-10-30T10:00:03.000Z", "type": "cost", "usd": 0.0025, "model": "sam-3.1", "units": "1 image"}}
+{"seq": 5, "event": {"filmId": "f_sample", "at": "2026-10-30T10:00:04.000Z", "type": "cost", "usd": 0, "model": "clippy-animate-image", "units": "1 clip", "credits": 25}}

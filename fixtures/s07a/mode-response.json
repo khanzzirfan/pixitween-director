@@ -1,0 +1,16 @@
+{
+  "_handAuthored": true,
+  "mode": "generate",
+  "proposal": {
+    "token": "0123456789abcdef0123456789abcdef",
+    "sceneId": "s2",
+    "attempt": 1,
+    "model": "fast-h3-omni",
+    "durationSec": 8,
+    "withSound": true,
+    "estCredits": 25,
+    "reason": "Needs real liquid motion",
+    "balance": 120,
+    "expiresAt": "2026-11-02T01:30:00Z"
+  }
+}

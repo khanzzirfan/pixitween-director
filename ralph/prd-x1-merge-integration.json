@@ -1,0 +1,225 @@
+{
+  "name": "X1: merge the integration branch into feat/gsap-threejs and resolve conflicts",
+  "branchName": "ralph/x1-merge-integration",
+  "description": "Checkpoints the Three.js migration, merges the integration branch (catalogue, cinematic and hero3d work, 16 commits) into this branch, resolves every conflict keeping our Three.js engine and no Pixi, ports integration code that still imports the library, and finishes with a green typecheck, lint and test run.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Checkpoint commit, then start the merge and list the conflicts",
+      "description": "As a maintainer, I want the migration saved in a commit before the merge so that the merge can be inspected and undone.",
+      "steps": [
+        "Run git status. Make sure .gitignore keeps out debug/, tmp/, node_modules/, .env and the .ralph-tui session files (add lines to .gitignore if one is missing; never stage .env).",
+        "git add -A, then git commit with the message 'chore: checkpoint Three.js engine migration before merging integration'.",
+        "Run git merge integration --no-commit --no-ff. Conflicts are expected.",
+        "Create docs/merge-integration-notes.md listing the conflicted files (git diff --name-only --diff-filter=U) grouped by area: package/config, engine+shared, web, server+scripts+data+docs."
+      ],
+      "acceptanceCriteria": [
+        "git log -1 --format=%s on HEAD (before the merge) is the checkpoint message and git status shows MERGE_HEAD present (git rev-parse -q --verify MERGE_HEAD prints a hash)",
+        "docs/merge-integration-notes.md lists every conflicted file once",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "merge"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Resolve package.json, package-lock.json and config conflicts",
+      "description": "As a maintainer, I want one dependency list so that the merged app installs and keeps Pixi out.",
+      "steps": [
+        "Read the conflicted package.json, eslint.config.js, web/vite.config.ts, tsconfig files, playwright and vitest configs.",
+        "Keep our removal of reacthub-pixitweenjs, pixi.js, @pixi/*, pixi-filters and gl-transitions, and our lint fence; add integration's other dependencies and scripts.",
+        "Delete package-lock.json's conflict, then run npm install to regenerate it from the merged package.json."
+      ],
+      "acceptanceCriteria": [
+        "package.json lists none of the banned packages and keeps integration's new scripts",
+        "package-lock.json has no conflict markers and npm ls --depth=0 exits without a missing-dependency error",
+        "git diff --name-only --diff-filter=U lists no file of this story",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "merge",
+        "config"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Resolve engine/, shared/ and web player conflicts (ours wins, keep non-Pixi additions)",
+      "description": "As a maintainer, I want our engine and player kept so that the Three.js path survives the merge.",
+      "steps": [
+        "Read the conflicted files under engine/, shared/, web/src/motion, web/src/player and web/src/selection.",
+        "Keep our side for engine/, shared/aep and the motion player and selection code. If integration added a new non-Pixi file or function in these areas (for example shared/catalog), keep it too."
+      ],
+      "acceptanceCriteria": [
+        "No conflict markers remain in engine/, shared/ and web/src/motion, web/src/player, web/src/selection (grep -rln '^<<<<<<<' prints nothing there)",
+        "npx tsc -p engine --noEmit passes",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "merge"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Resolve server/, scripts/, data/, docs/ and the other web conflicts (take both)",
+      "description": "As a maintainer, I want integration's catalogue, cinematic and hero3d work kept so that nothing is lost.",
+      "steps": [
+        "Read every remaining conflicted file. Take integration's change where we did not touch the file's purpose; combine both sides where both added code; for the library-related lines take our side.",
+        "Run git add on each resolved file."
+      ],
+      "acceptanceCriteria": [
+        "git diff --name-only --diff-filter=U prints nothing",
+        "grep -rln '^<<<<<<<\\|^>>>>>>>' --include='*.ts' --include='*.tsx' --include='*.json' --include='*.md' . (excluding node_modules, debug, tmp) prints nothing",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "merge"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Port integration code that still imports the library or Pixi",
+      "description": "As a maintainer, I want the merged code to use our engine so that the app stays Three.js only.",
+      "steps": [
+        "Run grep -rlE \"reacthub-pixitweenjs|pixi\\.js|@pixi/|pixi-filters|gl-transitions\" server web/src shared scripts e2e (quote the pattern; do not use unquoted globs).",
+        "For each hit: replace a schema import with @shared/aep; replace a player or rendering use with the motion Player or aepToMotion (see engine/docs/10-aep-adapter.md); delete a dev page or test whose only purpose was the library, and say so in docs/merge-integration-notes.md. Preserve integration's behaviour otherwise."
+      ],
+      "acceptanceCriteria": [
+        "The grep above prints nothing",
+        "npm run lint passes (the repo fence is active)",
+        "notes lists each ported or deleted file with a reason",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-004"
+      ],
+      "labels": [
+        "merge",
+        "cleanup"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Typecheck, lint, test, then finish the merge commit",
+      "description": "As a maintainer, I want a green merged branch so that the merge can be committed with confidence.",
+      "steps": [
+        "Run npm run typecheck, npm run lint, npx vitest run engine web/src/motion and npm test. Fix every new failure the merge caused (not the 11 known ones); never weaken a test.",
+        "When green, run git add -A and git commit (use the default merge message, then add nothing else).",
+        "Record the final results and any leftover issues in docs/merge-integration-notes.md."
+      ],
+      "acceptanceCriteria": [
+        "npm run typecheck and npm run lint pass",
+        "npm test fails only the 11 known tests",
+        "git rev-parse HEAD^2 prints the integration tip (the merge commit exists) and git status shows a clean tree apart from untracked debug files",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-005"
+      ],
+      "labels": [
+        "merge",
+        "tests"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "engine/docs/10-aep-adapter.md"
+    ],
+    "readFirst": [
+      "git log --oneline HEAD..integration and git diff --stat HEAD...integration (what integration adds)",
+      "engine/docs/10-aep-adapter.md and engine/docs/README.md (our engine and the converter)",
+      "package.json, eslint.config.js (the repo fence that bans pixi and the library)"
+    ],
+    "requires": [
+      "prd-a5-drop-library"
+    ],
+    "owns": [
+      "docs/merge-integration-notes.md"
+    ],
+    "sharedEdits": [
+      "package.json",
+      "package-lock.json",
+      "eslint.config.js",
+      "web/**",
+      "server/**",
+      "scripts/**",
+      "shared/**",
+      "engine/**",
+      "data/**",
+      "docs/**",
+      "fixtures/**"
+    ],
+    "profile": "adopt",
+    "standingRule": "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks on the engine lab pages. The director app is not changed.",
+    "guardrails": [
+      "Work offline. The only network use allowed is `npm install`. Tests never fetch; use the stored films under data/films/*/versions/*.json (read with node:fs) and assets under web/public.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "Read engine/docs/10-aep-adapter.md and engine/docs/README.md before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+      "The app's composition format is AepCompositionJson from `@shared/aep` (our own copy of the schema). Never import `reacthub-pixitweenjs`, `pixi.js`, `@pixi/*` or `pixi-filters` in new code.",
+      "Use the engine through `@engine/*` (engine/src). Do not edit engine/ except the files in metadata.sharedEdits; if the engine lacks something, add a row to docs/todos/ENGINE-NEEDS.md, use a workaround and say so in notes.",
+      "Edit only the files the story names, their tests, and metadata.sharedEdits. Do not change server/ behaviour, agent prompts or stored films.",
+      "No `@ts-nocheck` and no `@ts-ignore`. `@ts-expect-error` only with a reason on the same line.",
+      "jsdom has no 2D canvas context and no WebGL: unit-test pure logic; check drawing in the browser. Never weaken a test to make it pass.",
+      "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
+      "Record only real results. Never invent measurements or test output.",
+      "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
+      "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+      "EXCEPTION to the no-commit rule above, for this PRD only: you may run git add, git commit and git merge on the CURRENT branch (feat/gsap-threejs). Never push, never switch or create branches, never run git reset --hard, git clean, git checkout -- or git stash drop, and never abort the merge once conflicts are partly resolved without saying why in notes.",
+      "The integration branch still uses reacthub-pixitweenjs and pixi.js. Our branch removed them. Rule for every conflict: keep our Three.js engine, our @shared/aep schema and our removal of the packages; keep integration's other work (catalogue, cinematic, hero3d, server, scripts, data, docs) and port or delete only the code that imports the library or Pixi.",
+      "This PRD may edit any file the merge touches. Do not edit the 11 known failing tests. Write every decision that was not obvious into docs/merge-integration-notes.md.",
+      "npm install is allowed (to regenerate package-lock.json). No other network use. Never print or commit .env."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": []
+  }
+}

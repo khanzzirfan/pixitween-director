@@ -9,6 +9,7 @@
       "docs/hackathon/steps/step-08-export-and-deploy/contract-issues.md"
     ],
     "readFirst": [
+      "docs/engine/README.md (engine behaviour: composition JSON, Player slot props, layer kinds, effects, validation; read before writing code that touches the engine)",
       "docs/hackathon/06-contracts.md (shared types, file ownership, repo rules)",
       "docs/hackathon/steps/step-08-export-and-deploy/design.md (sections 3.4, 5.7, 7, 10, 11 and 12)",
       "docs/hackathon/steps/step-08-export-and-deploy/contract-issues.md (which gaps the contract update resolved; the one named shared edit)",

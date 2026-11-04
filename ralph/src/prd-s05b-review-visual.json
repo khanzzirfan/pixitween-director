@@ -9,6 +9,7 @@
       "docs/hackathon/steps/step-05-self-review-loop/contract-issues.md"
     ],
     "readFirst": [
+      "docs/engine/README.md (engine behaviour: composition JSON, Player slot props, layer kinds, effects, validation; read before writing code that touches the engine)",
       "docs/hackathon/06-contracts.md (sections 3, 3a, 4, 4a, 4b, 5 and section 6: D-1 route handlers, D-2 makeToolCtx, D-5 pickReviewer, D-7 PlayerHandle, D-10 runRules)",
       "docs/hackathon/steps/step-05-self-review-loop/design.md (sections 3-9: flow, verdict schema, loop, capture, grounding, prompt)",
       "docs/hackathon/steps/step-05-self-review-loop/contract-issues.md (Player handle, route wiring, commit source)",

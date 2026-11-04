@@ -33,6 +33,7 @@ BROWSER_GATE = (
 STANDARD_GUARDRAILS = [
     "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
     "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+    "For engine behaviour (composition JSON, Player, timeline, layer kinds) read docs/engine/README.md before writing code; never edit or copy engine source.",
     "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
     "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
     "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
@@ -47,6 +48,55 @@ STANDING_RULE = (
     "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the "
     "browser preview; nothing here spends money or needs network. Live and paid checks are listed in "
     "metadata.manualGates and run by the owner."
+)
+
+# Adopt PRDs move the director app (web/, shared/) onto our engine in engine/. They edit app files,
+# use the engine through @engine/* and never edit engine/ beyond metadata.sharedEdits.
+ADOPT_GUARDRAILS = [
+    "Work offline. The only network use allowed is `npm install`. Tests never fetch; use the stored films under data/films/*/versions/*.json (read with node:fs) and assets under web/public.",
+    "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+    "Read engine/docs/10-aep-adapter.md and engine/docs/README.md before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+    "The app's composition format is AepCompositionJson from `@shared/aep` (our own copy of the schema). Never import `reacthub-pixitweenjs`, `pixi.js`, `@pixi/*` or `pixi-filters` in new code.",
+    "Use the engine through `@engine/*` (engine/src). Do not edit engine/ except the files in metadata.sharedEdits; if the engine lacks something, add a row to docs/todos/ENGINE-NEEDS.md, use a workaround and say so in notes.",
+    "Edit only the files the story names, their tests, and metadata.sharedEdits. Do not change server/ behaviour, agent prompts or stored films.",
+    "No `@ts-nocheck` and no `@ts-ignore`. `@ts-expect-error` only with a reason on the same line.",
+    "jsdom has no 2D canvas context and no WebGL: unit-test pure logic; check drawing in the browser. Never weaken a test to make it pass.",
+    "Debug output and screenshots go to debug/app/ (gitignored). For a browser check use the dev server on http://localhost:5173 (already running; do not start another); headless Chromium through @playwright/test is fine.",
+    "Record only real results. Never invent measurements or test output.",
+    "`npm test` has 11 known failures outside your files (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). Do not edit those files. The `npm test` gate passes when no other test fails.",
+    "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+]
+
+# The engine PRD (engine/docs/README.md) builds our own engine in engine/, so it may port library
+# source and must leave the director app alone. Selected with "profile": "motion" in a PRD's metadata.
+MOTION_GUARDRAILS = [
+    "Work offline. The only network use allowed is `npm install`. Tests never fetch; browser checks load assets from web/public.",
+    "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+    "Read engine/docs/README.md and the spec doc the story names before writing code. The spec is the contract: if it is wrong or impossible, do the closest thing that works and explain the difference in notes.",
+    "Porting is allowed: read tmp/reacthub-pixitweenjs/src (a read-only copy of the library, inside this repo) and copy what engine/docs/port-map.md says. Never edit anything under tmp/. Every ported file starts with `// Ported from reacthub-pixitweenjs <path> (MIT).` and is cleaned up to strict TypeScript.",
+    "No `@ts-nocheck` and no `@ts-ignore` under engine/. `@ts-expect-error` only with a reason on the same line.",
+    "engine/ is Three.js + GSAP only: it must not import from web/, server/, shared/, `reacthub-pixitweenjs`, `pixi.js`, `pixi-filters`, `@pixi/*` or `@react-three/*`. Only the web stub files listed in metadata.sharedEdits may import engine/.",
+    "Do not touch the director app: nothing under server/, shared/, web/src/ (except the stub files under web/ listed in metadata.sharedEdits) or the existing e2e/ specs. Config files only as listed in metadata.sharedEdits.",
+    "Everything you build goes under engine/ (src/, fixtures/, lab/, e2e/, docs/). Edit only the files named in the story's steps and their tests, plus the small edits listed in metadata.sharedEdits.",
+    "Determinism: no Math.random, Date.now or performance.now in anything that affects pixels; no GSAP `overwrite`, no `immediateRender: true`, no infinite `repeat` (engine/docs/02-timeline.md, determinism rules).",
+    "jsdom has no 2D canvas context and no WebGL: unit-test pure logic and object construction; check drawing in the browser. Never weaken a test to make it pass.",
+    "Do not add a dependency the spec does not name (`postprocessing` and `@types/three` are already declared).",
+    "Debug output and screenshots go to debug/engine/ (gitignored). For a browser check use the dev server the owner runs on http://localhost:5173 (do not start another on a different port); if it is not running, run `npm run engine:e2e` instead.",
+    "Record only real results. Never invent measurements or test output.",
+    "`npm test` has 11 known failures outside engine/ (10 in scripts/preflight/docs.test.ts, 1 in web/src/authoring-agreement.test.tsx). They are not yours: do not edit those files. The `npm test` gate passes when no other test fails; also run `npx vitest run engine` and it must be fully green.",
+    "R1 is done: engine/ is Three-only. MotionNode (engine/src/core/types.ts) has `display` (layer transform) and `content` (the meshes, offset by the anchor); NodeContext has `renderer`. Effects live in engine/src/effects (EFFECTS, registerEffect, buildEffectChain, setEffectChainFactoryForTests).",
+    "The dev server on http://localhost:5173 is owner-run and shared: never kill, restart or stop it (no kill/pkill/lsof-kill on vite or port 5173). If it is down, use headless Chromium against `npx vite --config web/vite.config.ts --port 5180 --strictPort` started and stopped by you, and only that one.",
+]
+
+MOTION_STANDING_RULE = (
+    "Engine PRD. Everything is offline and free: unit tests in vitest (jsdom project) and browser checks "
+    "on the engine lab pages. The director app is not changed."
+)
+
+MOTION_BROWSER_GATE = (
+    "Verify in the browser: with the dev server on http://localhost:5173 (owner-run; else `npm run engine:e2e` "
+    "once it exists), open the page named in the story, confirm the stated behaviour, save a screenshot to debug/engine/, "
+    "and record what you saw in `notes`"
 )
 
 VAGUE = re.compile(r"(works? correctly|handles? edge cases|good ux|user[- ]friendly|as expected\b|properly\b|robust(ly)?\b)", re.I)
@@ -92,6 +142,11 @@ def build(src_path: Path) -> dict | None:
     if not md.get("owns"):
         err(f, "metadata.owns must list the paths this PRD owns")
 
+    profile = md.get("profile", "director")
+    if profile not in ("director", "motion", "adopt"):
+        err(f, f"metadata.profile must be 'director', 'motion' or 'adopt', not {profile!r}")
+    motion = profile in ("motion", "adopt")
+
     stories_out = []
     seen: dict[str, int] = {}
     for i, st in enumerate(src["stories"], start=1):
@@ -129,7 +184,7 @@ def build(src_path: Path) -> dict | None:
         elif text_len > 4500:
             warn(f, f"{where}: story text is {text_len} chars; consider splitting")
         for s in steps:
-            if LIVE_RUN.search(s) and not re.match(r"(?i)\s*(create|write|add|implement|document)", s):
+            if LIVE_RUN.search(s) and not md.get("allowLive") and not re.match(r"(?i)\s*(create|write|add|implement|document)", s):
                 err(f, f"{where}: a step appears to run a live/paid call: {s[:80]!r}")
             if CURL.search(s):
                 err(f, f"{where}: curl against a URL is a network call; not allowed in a story")
@@ -140,7 +195,7 @@ def build(src_path: Path) -> dict | None:
 
         criteria = list(acc) + UNIVERSAL_GATES
         if "ui" in labels:
-            criteria.append(BROWSER_GATE)
+            criteria.append(MOTION_BROWSER_GATE if motion else BROWSER_GATE)
         stories_out.append(
             {
                 "id": sid,
@@ -172,9 +227,10 @@ def build(src_path: Path) -> dict | None:
             "requires": md.get("requires", []),
             "owns": md.get("owns", []),
             "sharedEdits": md.get("sharedEdits", []),
-            "standingRule": STANDING_RULE,
-            "guardrails": STANDARD_GUARDRAILS + md.get("extraGuardrails", []),
-            "qualityGates": {"universal": UNIVERSAL_GATES, "ui": [BROWSER_GATE]},
+            **({"profile": profile} if motion else {}),
+            "standingRule": MOTION_STANDING_RULE if motion else STANDING_RULE,
+            "guardrails": (ADOPT_GUARDRAILS if profile == "adopt" else MOTION_GUARDRAILS if motion else STANDARD_GUARDRAILS) + md.get("extraGuardrails", []),
+            "qualityGates": {"universal": UNIVERSAL_GATES, "ui": [MOTION_BROWSER_GATE if motion else BROWSER_GATE]},
             "manualGates": md.get("manualGates", []),
         },
     }

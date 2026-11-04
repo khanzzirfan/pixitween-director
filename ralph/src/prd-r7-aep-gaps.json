@@ -1,0 +1,109 @@
+{
+  "name": "Engine R7: gaps for director films (cubic eases, pixel pivot, night and disco lighting)",
+  "branchName": "ralph/r7-aep-gaps",
+  "description": "Adds the three engine features the AEP converter needs to play director films faithfully: cubic-bezier eases written as cubic(x1,y1,x2,y2), a pixel pivot on every layer that overrides the 0..1 anchor, and the night and disco lighting presets the director uses. Nothing else.",
+  "metadata": {
+    "profile": "motion",
+    "specs": [
+      "engine/docs/10-aep-adapter.md"
+    ],
+    "readFirst": [
+      "engine/docs/10-aep-adapter.md (sections Keyframes \u2192 tweens and Base transform)",
+      "engine/docs/02-timeline.md (eases, determinism) and engine/docs/03-stage-2d.md (Base transform)",
+      "engine/src/schema/scalars.ts, engine/src/schema/layers2d.ts, engine/src/core/transform.ts, engine/src/timeline/compile.ts, engine/src/three/build/lighting.ts"
+    ],
+    "requires": [
+      "prd-r2-stage-2d"
+    ],
+    "owns": [
+      "engine/src/timeline/ease.ts",
+      "engine/src/timeline/ease.test.ts"
+    ],
+    "sharedEdits": [
+      "engine/src/schema/scalars.ts",
+      "engine/src/schema/layers2d.ts",
+      "engine/src/schema/layer3d.ts",
+      "engine/src/core/transform.ts",
+      "engine/src/core/transform.test.ts",
+      "engine/src/timeline/compile.ts",
+      "engine/src/three/build/lighting.ts",
+      "engine/src/three/build/lighting.test.ts",
+      "engine/src/stage2d/nodes/imageNode.ts",
+      "engine/src/stage2d/nodes/textNode.ts",
+      "engine/src/stage2d/nodes/shapeNode.ts",
+      "engine/src/stage2d/nodes/groupNode.ts",
+      "engine/src/three/threeNode.ts"
+    ],
+    "extraGuardrails": [
+      "Do not use GSAP CustomEase or any GSAP plugin; a cubic bezier is a small pure solver in engine/src/timeline/ease.ts."
+    ],
+    "manualGates": []
+  },
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "cubic(x1,y1,x2,y2) eases: schema, pure solver, compiler",
+      "description": "As a developer working on the AEP converter, I want to write a keyframe's bezier ease as cubic(x1,y1,x2,y2) so that director films keep their exact timing curves.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md 'Keyframes \u2192 tweens', engine/src/schema/scalars.ts (EASE_PATTERN, EaseSchema) and engine/src/timeline/compile.ts (how ease is passed to GSAP).",
+        "Create engine/src/timeline/ease.ts exporting cubicBezier(x1, y1, x2, y2): (t: number) => number (CSS cubic-bezier semantics: Newton steps with a bisection fallback, x clamped to [0, 1], endpoints exact) and resolveEase(name: string): string | ((t: number) => number) that returns a function for 'cubic(a,b,c,d)' and the name unchanged otherwise.",
+        "Extend EASE_PATTERN in scalars.ts to accept cubic(x1,y1,x2,y2) with four decimal numbers (x1 and x2 in [0, 1], y any), spaces allowed after commas.",
+        "In compile.ts pass resolveEase(tween.ease) to GSAP instead of the raw string.",
+        "Create engine/src/timeline/ease.test.ts and add one case to the compile tests."
+      ],
+      "acceptance": [
+        "cubicBezier(0, 0, 1, 1)(0.3) is within 1e-6 of 0.3; cubicBezier(0.42, 0, 0.58, 1)(0.5) is within 1e-6 of 0.5; cubicBezier(0.42, 0, 1, 1)(0.25) is below 0.25",
+        "EaseSchema accepts 'cubic(0.42,0,0.58,1)' and 'cubic(0, 0, 0.58, 1)' and rejects 'cubic(2,0,1,1)' and 'cubic(0,0,1)'",
+        "A tween x 0 -> 100 over 1 s with ease 'cubic(0.42,0,0.58,1)' compiled on a clock reads 50 (within 1e-6) at seek 0.5 and the same value after seeking 0.9, 0, 0.5",
+        "All existing timeline tests pass unchanged"
+      ],
+      "labels": [
+        "timeline",
+        "schema"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-002",
+      "title": "Pixel pivot on every layer, overriding the 0..1 anchor",
+      "description": "As a developer working on the AEP converter, I want to give a layer's anchor in pixels so that director layers rotate and scale about the same point as in After Effects without knowing the measured text size.",
+      "steps": [
+        "Read engine/docs/10-aep-adapter.md 'Base transform' and engine/docs/03-stage-2d.md 'Base transform', then engine/src/schema/layers2d.ts (LayerBaseShape) and engine/src/core/transform.ts (applyBaseTransform, setAnchor).",
+        "Add optional pivot: [number, number] (pixels in the layer's own space) to LayerBaseShape; it applies to every layer type including three.",
+        "In transform.ts make setAnchor(content, anchor, size, pivot?) put content at (-pivot[0], pivot[1], 0) when a pivot is given and keep the anchor rule otherwise; applyBaseTransform takes the layer's pivot.",
+        "Update every caller (stage2d nodes and threeNode, including the text node when it re-applies the anchor after a redraw) to pass layer.pivot.",
+        "Add tests to engine/src/core/transform.test.ts and to one node test."
+      ],
+      "acceptance": [
+        "applyBaseTransform for { x: 960, y: 540, pivot: [192, 336], anchor: [0.5, 0.5] } and size 384x672 gives content.position (-192, 336, 0) and display.position (960, -540, 0)",
+        "Without pivot the existing anchor test still gives content.position (-20, 20, 0)",
+        "A layer with pivot [0, 0] parses; pivot with three numbers fails with a path ending in .pivot",
+        "All existing engine tests pass"
+      ],
+      "labels": [
+        "core",
+        "schema"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "US-003",
+      "title": "night and disco lighting presets",
+      "description": "As a developer working on the AEP converter, I want the director's night and disco lighting presets in the three layer so that its 3D scenes keep their mood.",
+      "steps": [
+        "Read engine/src/three/build/lighting.ts (LIGHTING_PRESETS and how a preset becomes a rig) and engine/src/schema/layer3d.ts (LIGHTING_PRESETS enum), and tmp/reacthub-pixitweenjs/src/components/AepComposition/model3d/lighting.ts plus tmp/reacthub-pixitweenjs/src/components/AepComposition/stage3d/ for any night or disco values.",
+        "Add 'night' (cool blue key at low intensity, dim fill, strong cold rim, environment none) and 'disco' (magenta key, cyan fill, warm rim, environment room) to both lists, porting the library's numbers when they exist and saying in notes where the numbers came from.",
+        "Add tests to engine/src/three/build/lighting.test.ts for both presets (rig has key, fill, rim, ambient; colours as defined)."
+      ],
+      "acceptance": [
+        "resolveLightingConfig('night', {}) and resolveLightingConfig('disco', {}) return configs and createLightingRig builds four lights for each",
+        "A three layer with lighting { preset: 'night' } parses and its environment defaults to 'none'",
+        "All existing lighting and scene tests pass"
+      ],
+      "labels": [
+        "three"
+      ],
+      "dependsOn": []
+    }
+  ]
+}
