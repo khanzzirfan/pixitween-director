@@ -1,0 +1,4 @@
+id,title,price,sale_price,currency,image_link,category,link,brand
+ps-mixed-berry,Pure Spoonful Mixed Berry Yoghurt 150g,2.49,1.99,USD,fixtures/catalog/yoghurt-berry.png,dairy yoghurt breakfast,/p/ps-mixed-berry,Pure Spoonful
+ps-strawberry,Pure Spoonful Strawberry Yoghurt 150g,2.49,,USD,fixtures/catalog/yoghurt-strawberry.png,dairy yoghurt breakfast,/p/ps-strawberry,Pure Spoonful
+ps-blueberry,Pure Spoonful Blueberry Yoghurt 150g,2.49,1.79,USD,fixtures/catalog/yoghurt-blueberry.png,dairy yoghurt breakfast,/p/ps-blueberry,Pure Spoonful
