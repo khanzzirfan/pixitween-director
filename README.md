@@ -1,6 +1,6 @@
 # MuseReels
 
-> **One product photo and one sentence in. A directed 3D ad out, in about four minutes, for under seven cents.**
+> **One product photo and one sentence in. A directed 3D ad out, in about four minutes, for cents.**
 >
 > Muse plans the film like a director: the board, the camera, the light, the set. Before anything is assembled, our own engine draws every part on a **sheet** and Muse checks it against your photo, so a wrong colour or a missing label is caught on a cheap picture, not in the finished ad. Feed it a product CSV and it does the whole catalog. When you like a film, export it as an MP4, or send it to a video model for a richer final cut.
 >
@@ -12,10 +12,8 @@
 
 <p align="center"><em>Three real runs on 4 Nov 2026, one photo and one sentence each, 10 s, 9:16. Each product is a real 3D object wearing the customer's photo, with the title and price set in 3D type. Nothing is painted or edited by hand. Shot-by-shot frames are under <a href="#three-briefs-three-films">Three briefs, three films</a>.</em></p>
 
-<!-- OWNER:gif -->
-
 <p align="center">
-  <b>Live:</b> <!-- OWNER:live-url --> · <b>Demo video (3 min):</b> <!-- OWNER:video-url --> · <b>Code:</b> <!-- OWNER:repo-url --> · <b>Team:</b> <!-- OWNER:team -->
+  <a href="https://youtu.be/VFWEXzESuGU"><b>Watch the 3-minute demo</b></a> · <a href="#try-it-in-10-minutes"><b>Run it in 10 minutes</b></a> · <a href="https://github.com/khanzzirfan/pixitween-director"><b>Code (Apache 2.0)</b></a> · <b>Team:</b> Irfan
 </p>
 
 > **Judges, short on time?** Jump straight to **[Run it locally](#1-run-it-locally)**: one Muse API key, then `npm ci` and `npm run dev`, and open http://localhost:5173.
@@ -42,7 +40,7 @@
 | **What we built** | A studio that turns one photo and one sentence, or a whole product CSV, into finished 10 s vertical 3D ads, each one directed by Muse and checked before it ships. |
 | **Meta models** | **Muse Spark 1.3** directs and checks, **SAM 3.1** cuts the product out, **Muse Image** draws the elements, **Muse Voice Transcribe** takes a spoken brief. [Details](#meta-models-used). |
 | **Proof** | Three films above from three different briefs, and a film for every one of the six products in the demo catalog. Every Meta call is logged per film. |
-| **Speed and cost** | 2.5 to 5 minutes and $0.035 to $0.065 in Meta calls per film, measured on 4 Nov 2026. |
+| **Speed and cost** | 2.5 to 5 minutes and $0.035 to $0.065 in Meta calls per film, measured on 4 Nov 2026 with the cheaper `muse-spark-1.3-contributor` tier. `muse-spark-1.3` is priced higher per token; see [Cost per film](#cost-per-film). |
 | **Final cut** | Export the 3D film as an MP4 for free, or, once you like it, turn it into an AI movie: three frames of your 3D film guide Fal's MiniMax H3, about $0.50 for 10 s. [How](#5-export-an-mp4-or-a-final-ai-movie). |
 | **Try it** | One API key and three commands. [A 10-minute path](#try-it-in-10-minutes). |
 
@@ -131,7 +129,7 @@ Design documents: [sheet film](docs/architecture/sheet-film-3d.md) · [cinematic
 
 | Model | Id | What it does here | Call site |
 |-------|----|-------------------|-----------|
-| Muse Spark 1.3 | `muse-spark-1.3-contributor` | the board (strict JSON schema, lock lines), the product's form from the photo, the sheet check, the film sheet look, the board revision | [`server/meta/spark.ts`](server/meta/spark.ts) |
+| Muse Spark 1.3 | `muse-spark-1.3` | the board (strict JSON schema, lock lines), the product's form from the photo, the sheet check, the film sheet look, the board revision | [`server/meta/spark.ts`](server/meta/spark.ts) |
 | SAM 3.1 | `sam-3.1` | the product cut-out: the outline the 3D body is built from, and the pixels it wears | [`server/meta/sam.ts`](server/meta/sam.ts) |
 | Muse Image | `muse-image-1.0` | element pictures (berries, ice, steam) | [`server/meta/image.ts`](server/meta/image.ts) |
 | Muse Voice Transcribe | `muse-voice-transcribe-1.0` | the spoken brief | [`server/meta/transcribe.ts`](server/meta/transcribe.ts) |
@@ -148,7 +146,7 @@ Design documents: [sheet film](docs/architecture/sheet-film-3d.md) · [cinematic
 | 4 | [Turn a whole catalog into ads](#4-turn-a-whole-catalog-into-ads) | 1 min to start |
 | 5 | [Export an MP4, or a final AI movie](#5-export-an-mp4-or-a-final-ai-movie) | 1 min, or a few minutes for the AI movie |
 
-No time to run it? The [live app](#demo) lists finished films, with no passcode and no cost to look.
+No time to run it? [Watch the 3-minute demo](https://youtu.be/VFWEXzESuGU).
 
 ### 1. Run it locally
 
@@ -172,7 +170,7 @@ Open `.env` and set one line:
 META_API_KEY=your-muse-api-key
 ```
 
-Every other setting has a working default. Start the app:
+`.env.example` already selects `META_SPARK_MODEL=muse-spark-1.3`. Every other setting has a working default. Start the app:
 
 ```bash
 npm run dev
@@ -302,8 +300,6 @@ Optional settings in `.env`: `DIRECTOR_PASSCODE` is the code that spends the ser
 
 ## Cost per film
 
-<!-- OWNER:cost-table -->
-
 Every Meta call is recorded as a `cost` event in the film's event log. `npm run db:export-events -- <filmId>` writes a film's log out of the database, and `npx tsx scripts/cost-per-film.ts <events.jsonl>` prints its full cost record.
 
 A film's cost is its Muse Spark calls (about $0.005 each), a few Muse Image element pictures ($0.01 each) and SAM ($0.0025 per call). The sheets cost nothing: our engine renders them. Planning prices, from the vendor pages on 27 Oct 2026:
@@ -311,14 +307,15 @@ A film's cost is its Muse Spark calls (about $0.005 each), a few Muse Image elem
 | Model | Price |
 |-------|-------|
 | Muse Spark 1.3 contributor | $0.10 per 1M tokens in, $0.20 per 1M tokens out |
+| Muse Spark 1.3 | $1.25 per 1M tokens in, $4.25 per 1M tokens out |
 | Muse Image | $0.01 per image |
 | SAM 3.1 | $2.50 per 1,000 images |
 | Muse Voice Transcribe | $0.18 per hour |
 
 ## Demo
 
-- **Live app:** <!-- OWNER:live-url -->. The gallery lists the finished films; it needs no passcode and costs nothing to look.
-- **Video (3 min):** <!-- OWNER:video-url -->
+- **Video (3 min):** [https://youtu.be/VFWEXzESuGU](https://youtu.be/VFWEXzESuGU)
+- **Run it yourself:** see [Try it in 10 minutes](#try-it-in-10-minutes). You only need a Meta API key.
 
 ## Limitations
 
