@@ -9,7 +9,7 @@ import { checkSheets } from './check';
 import { lookAtFilm } from './film-sheet';
 
 vi.mock('../../authoring/beatsheet', async (orig) => ({ ...(await orig<Record<string, unknown>>()), planBoard: vi.fn() }));
-vi.mock('../cinematic-cut', () => ({ prepareCinematicParts: vi.fn(), buildCinematic: vi.fn(() => ({ durationInFrames: 240, fps: 30 })), pricesIn: vi.fn(() => undefined) }));
+vi.mock('../cinematic-cut', () => ({ prepareCinematicParts: vi.fn(), drawSet: vi.fn(async () => undefined), buildCinematic: vi.fn(() => ({ durationInFrames: 240, fps: 30 })), pricesIn: vi.fn(() => undefined) }));
 vi.mock('../form-pick', () => ({ commitCuts: vi.fn(async () => true) }));
 vi.mock('../frame-review', () => ({ renderKeyFrames: vi.fn() }));
 vi.mock('./render', () => ({ drawSheets: vi.fn(async () => ({ product: Buffer.from('p'), set: Buffer.from('s'), assetIds: [], skipped: [] })) }));
@@ -52,7 +52,7 @@ describe('makeSheetFilm', () => {
     const cuts = vi.mocked(commitCuts).mock.calls[0]![2];
     expect(cuts.flat).toBeUndefined();
     expect(cuts.keep).toBe('3d');
-    expect(prepareCinematicParts).toHaveBeenCalledWith(ctx, expect.any(Function), { seconds: 10 });
+    expect(prepareCinematicParts).toHaveBeenCalledWith(ctx, expect.any(Function), { seconds: 10, solid: true });
     expect(update).toHaveBeenCalledTimes(1);
     expect(emit).toHaveBeenCalledWith(expect.objectContaining({ type: 'director.storyboard' }));
     expect(planBoard).not.toHaveBeenCalled();

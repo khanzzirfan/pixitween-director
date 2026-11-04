@@ -78,6 +78,8 @@ function at<T extends number | V3>(v: T | Keyed<T>, f: number): T {
     const a = ks[i - 1]!;
     const b = ks[i]!;
     if (f <= b.t) {
+      // on a key the value is that key's own, even right after a hold (the first frame of the next shot)
+      if (f === b.t) return b.v;
       if (a.hold) return a.v;
       const u = (f - a.t) / Math.max(1e-6, b.t - a.t);
       return (Array.isArray(a.v) ? (a.v as V3).map((x, k) => x + ((b.v as V3)[k]! - x) * u) : (a.v as number) + ((b.v as number) - (a.v as number)) * u) as T;
@@ -125,6 +127,74 @@ function productBox(world: Obj, product: Obj, shot: { start: number; end: number
   return { left: o.W / 2 - w / 2, right: o.W / 2 + w / 2, top: o.H / 2 - h / 2, bottom: o.H / 2 + h / 2 };
 }
 
+/** How alike two framings may be and still read as two shots: the product's height on screen within this ratio, the camera's height and its side within these degrees. */
+export const SAME_FRAME = { fill: 1.3, up: 10, around: 20 };
+/** A camera that moves less than this share of its distance to the product at a shot's end carries the shot on (the end hold settles on the shot before): not a cut. */
+export const CUT_JUMP = 0.05;
+
+/** How the camera frames the product at a frame: the share of the frame's height the product fills, degrees looking down on it, degrees round it, and where the camera is. */
+export interface Framing {
+  fill: number;
+  up: number;
+  around: number;
+  pos: V3;
+  /** the camera's distance to what it looks at */
+  dist: number;
+}
+
+function framingAt(world: Obj, product: Obj, f: number): Framing {
+  const pos = at<V3>(world.camera.position, f);
+  const target = at<V3>(world.camera.target, f);
+  const fov = at<number>(world.camera.fov ?? 35, f);
+  const [dx, dy, dz] = [pos[0] - target[0], pos[1] - target[1], pos[2] - target[2]];
+  const d = Math.max(1e-6, Math.hypot(dx, dy, dz));
+  const size = typeof product.size === 'number' ? product.size : PRODUCT_H;
+  const deg = 180 / Math.PI;
+  return { fill: size / (2 * d * Math.tan((fov * Math.PI) / 360)), up: Math.atan2(dy, Math.hypot(dx, dz)) * deg, around: Math.atan2(dx, dz) * deg, pos, dist: d };
+}
+
+/** Whether two framings would read as the same shot. */
+export function sameFrame(a: Framing, b: Framing): boolean {
+  const turn = Math.abs(((a.around - b.around + 540) % 360) - 180);
+  return Math.max(a.fill, b.fill) / Math.max(1e-6, Math.min(a.fill, b.fill)) < SAME_FRAME.fill && Math.abs(a.up - b.up) < SAME_FRAME.up && turn < SAME_FRAME.around;
+}
+
+const framed = (f: Framing) => `about ${Math.round(Math.min(f.fill, 9.99) * 100)}% of the height, ${Math.abs(f.up) < 8 ? 'at eye level' : f.up > 0 ? `${Math.round(f.up)} degrees from above` : `${Math.round(-f.up)} degrees from below`}${Math.abs(f.around) < 15 ? ', straight on' : `, ${Math.round(Math.abs(f.around))} degrees round`}`;
+const listed = (ns: number[]) => (ns.length === 2 ? `${ns[0]} and ${ns[1]}` : `${ns.slice(0, -1).join(', ')} and ${ns.at(-1)}`);
+
+/**
+ * Shots that repeat a framing, measured on the camera keys (the product's spin is left out). A run of shots in a row whose middles frame the product
+ * alike reads as one shot on the film sheet (4 Nov: three straight-on medium shots of the tub in a row); a cut where the camera jumps but the framing
+ * on both sides is alike is a jump cut. A shot that carries on the camera of the one before (a jump under CUT_JUMP at the cut) is not a cut, so it is not named.
+ */
+export function framingProblems(world: Obj, product: Obj, shots: Array<{ start: number; end: number }>): string[] {
+  const problems: string[] = [];
+  // the last shot is the end hold, which keeps the framing of the shot before by design (it steps back and creeps in to it): only its cut is judged
+  const mids = shots.slice(0, -1).map((s) => framingAt(world, product, (s.start + s.end) / 2));
+  // whether the camera jumps at the cut after shot i: a shot that carries on the camera of the one before is the same take, not a cut
+  const cuts = shots.slice(0, -1).map((s, i) => {
+    const out = framingAt(world, product, s.end);
+    const into = framingAt(world, product, shots[i + 1]!.start);
+    return { into, jumps: Math.hypot(out.pos[0] - into.pos[0], out.pos[1] - into.pos[1], out.pos[2] - into.pos[2]) > CUT_JUMP * out.dist, same: sameFrame(out, into) };
+  });
+  const inRun = new Set<number>();
+  for (let i = 0; i < mids.length - 1; ) {
+    let j = i;
+    while (j + 1 < mids.length && cuts[j]!.jumps && sameFrame(mids[j]!, mids[j + 1]!)) j++;
+    if (j > i) {
+      const ns = Array.from({ length: j - i + 1 }, (_, k) => i + k + 1);
+      ns.forEach((n) => inRun.add(n - 1));
+      problems.push(`shots ${listed(ns)} frame the product the same way in their middles (${framed(mids[i]!)}), so they read as one shot: change the size, the angle or the side the camera sees in ${ns.length > 2 ? 'all but one of them' : 'one of them'}`);
+    }
+    i = j + 1;
+  }
+  for (const [i, c] of cuts.entries()) {
+    if (inRun.has(i) && inRun.has(i + 1)) continue;
+    if (c.jumps && c.same) problems.push(`the cut from shot ${i + 1} to shot ${i + 2} is a jump cut: the product is framed the same on both sides of it (${framed(c.into)}); change the size or the angle across the cut`);
+  }
+  return problems;
+}
+
 /**
  * Problems in the film's JSON, in words for Muse; empty when it passes. The length, the prop limits, every line of words inside the frame
  * and clear of the others, and no line covering the product at the middle of a shot.
@@ -149,6 +219,7 @@ export function jsonRules(film: Comp, o: { askedSeconds: number; aspect: Aspect 
   const world = layers.find((l) => l.id === 'cine:world');
   const product = layers.find((l) => l.kind === 'prop3d' && l.role === 'product');
   if (world && product) {
+    problems.push(...framingProblems(world, product, shotsOf(world, (film as Obj).durationInFrames)));
     for (const [n, shot] of shotsOf(world, (film as Obj).durationInFrames).entries()) {
       const p = productBox(world, product, shot, { W, H });
       if (!p) continue;

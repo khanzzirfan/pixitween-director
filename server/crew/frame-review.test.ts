@@ -78,6 +78,13 @@ describe('reviewFrames', () => {
     expect(ask).toContain('keep the elements and the set');
     expect(log).toHaveBeenCalledWith(expect.stringContaining('revised the board'));
   });
+  it('writes the revision from the idea Muse chose for the film', async () => {
+    const c = setup([{ fine: false, problems: ['shot 2 crops the label: pull back'] }, revisedReply()]);
+    await reviewFrames(c.ctx, { ...input(), idea: { name: 'Citrus Noon', world: 'a sunlit lido', mood: '', light: '', colour: '', camera: '', elements: '', ending: '' } });
+    const ask = (c.chat.mock.calls[0] as unknown as [{ messages: Array<{ content: string }> }])[0].messages[1]!.content;
+    expect(ask).toContain('THE IDEA you chose');
+    expect(ask).toContain('a sunlit lido');
+  });
   it('keeps the board when the frames cannot be drawn, the reply is unreadable or the revision fails', async () => {
     const down = vi.fn(async () => {
       throw new Error('no browser');
