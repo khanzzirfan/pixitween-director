@@ -158,7 +158,7 @@ No time to run it? [Watch the 3-minute demo](https://youtu.be/VFWEXzESuGU).
 - **A Muse API key** from the Meta Model API. Nothing else needs a key.
 
 ```bash
-git clone <this repository> pixitween-director
+git clone https://github.com/khanzzirfan/pixitween-director.git
 cd pixitween-director
 npm ci
 cp .env.example .env
