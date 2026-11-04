@@ -7,7 +7,7 @@ Paste-ready text for the Cerebral Valley form: https://cerebralvalley.ai/e/meta-
 - **Project name:** MuseReels
 - **Track:** Startup. Theme: Build for Your World.
 - **Team:** Irfan, solo founder (Representative).
-- **Demo video (2:56):** https://youtu.be/VFWEXzESuGU
+- **Demo video (2:37):** https://youtu.be/7vXbxRNC6xY
 - **Code (Apache-2.0):** https://github.com/khanzzirfan/pixitween-director
 
 ## Tagline
@@ -45,7 +45,7 @@ What goes beyond a basic integration: Muse Spark reviews pictures that our own e
 
 ## Demo (25%)
 
-The 2:56 video shows a film being directed from a photo and a sentence, the showrunner and critic at work, the sheets, the finished 3D film, MP4 export, the AI movie, a three-flavour yoghurt CSV run, and asking Muse to redo a wrong cut. The README has a 10-minute path to run it locally with only a Meta API key.
+The 2:37 video follows the pipeline end to end: a product photo and one sentence, Muse Spark directing every shot, the element sheets, Muse's critique of those sheets (it catches a blueberry with a missing patch), code rules checking every cut, steering in plain words, the finished 3D film, the editable shot cards, MP4 and AI movie export, and a three-flavour yoghurt CSV run with prices from the feed. The README has a 10-minute path to run it locally with only a Meta API key.
 
 ## Honest limits
 

@@ -8,7 +8,7 @@
 >
 > Built solo for the Meta hackathon.
 >
-> Demo: https://youtu.be/VFWEXzESuGU
+> Demo: https://youtu.be/7vXbxRNC6xY
 > Code: https://github.com/khanzzirfan/pixitween-director
 
 Attach the GIF from the README (`docs/images/film3d-threeup.gif`) or a 20-second clip from the demo.
@@ -17,7 +17,7 @@ Attach the GIF from the README (`docs/images/film3d-threeup.gif`) or a 20-second
 
 **MuseReels: your whole catalog, as 3D ads.** One product photo and one sentence, or a product CSV, become 10-second vertical 3D ads. Muse Spark directs, SAM 3.1 cuts the product out into a 3D body, Muse Image draws the elements, and Muse Voice Transcribe takes a spoken brief. Our own engine draws every part on a sheet that Muse checks against the photo before the film is built. Export an MP4 for free, or turn the 3D film into an AI movie.
 
-- Demo video: https://youtu.be/VFWEXzESuGU
+- Demo video: https://youtu.be/7vXbxRNC6xY
 - Code: https://github.com/khanzzirfan/pixitween-director
 
 ## Posting checklist
