@@ -8,6 +8,8 @@ primary_region = "iad"
 [env]
   PORT = "8080"
   NODE_ENV = "production"
+  # A deployed host: check DIRECTOR_PASSCODE and META_API_KEY (Fly secrets). Without those keys it runs like localhost.
+  IS_SERVER = "true"
   # The Fly volume is mounted at /data and the stores write there, so films survive a restart.
   DATA_DIR = "/data"
   # Fly sits directly in front of the server, so its client-address header can be trusted for rate limits.
