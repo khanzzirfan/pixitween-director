@@ -1,1 +1,0 @@
-~/.fly/bin/fly secrets set -a musereels META_API_KEY=LLM_1406433477616239_wUIcW3TOUdtK7Mh2SH93pdLiTuc DIRECTOR_PASSCODE=ab20aec72d0220bf430779c2c85efe62
