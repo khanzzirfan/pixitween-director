@@ -247,6 +247,17 @@ describe('convertProp', () => {
     expect(warnings).toEqual([]);
   });
 
+  it('gives a body with a section its back picture, and an extrude without a section none', () => {
+    const body = prop({ id: 'cine:product', source: { type: 'extrude', contour: [[0, 0], [10, 0], [10, 20]], depth: 6, section: 2 }, textures: { front: 'ast_front', back: 'ast_back', side: '#7f5d4e' }, size: 1 });
+    expect(convertProp(body, ctx).object!.material).toMatchObject({ map: 'ast_front', backMap: 'ast_back' });
+    const sided = prop({ id: 'cine:product', source: { type: 'extrude', contour: [[0, 0], [10, 0], [10, 20]], depth: 6, section: 2 }, textures: { front: 'ast_front', profile: 'ast_side' }, size: 1 });
+    expect(convertProp(sided, ctx).object!.material).toMatchObject({ map: 'ast_front', profileMap: 'ast_side' });
+    const flat = prop({ id: 'cine:flat', source: { type: 'extrude', contour: [[0, 0], [10, 0], [10, 20]], depth: 6 }, textures: { front: 'ast_front', back: 'ast_back' }, size: 1 });
+    expect(convertProp(flat, ctx).object!.material.backMap).toBeUndefined();
+    const none = prop({ id: 'cine:old', source: { type: 'extrude', contour: [[0, 0], [10, 0], [10, 20]], depth: 6, section: 2 }, textures: { front: 'ast_front' }, size: 1 });
+    expect(convertProp(none, ctx).object!.material.backMap).toBeUndefined();
+  });
+
   it('turns a card into an unlit, camera-facing plane with its flipbook', () => {
     const splash = prop({
       id: 'cine:ing4-brew-splash',

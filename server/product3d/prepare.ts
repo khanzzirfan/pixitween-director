@@ -1,14 +1,19 @@
 // Owned by S13a. From the film's product cut-out to the texture assets a 3D layer wears, once per film (design sections 3.1 and 5).
-import sharp from 'sharp';
 import type { AssetRef } from '@shared/composition';
 import type { AssetStore } from '@shared/ports';
+import { createHash } from 'node:crypto';
+import sharp from 'sharp';
+import type { Buffer } from 'node:buffer';
+import { backTexture, sideTexture } from './back';
 import { boxFaces } from './box';
+import { decode, encode, trim } from './codec';
 import { hexOf, sideColour } from './colour';
 import { detailFocus } from './focus';
 import { maskContour, type Point } from './contour';
 import type { Rgba } from './pixels';
 import type { PrimitiveShape } from './types';
 import { findBodyBand, unwrapCylinder, LABEL_HEIGHT, LABEL_WIDTH } from './unwrap';
+import { wrapStrip } from './wrap360';
 
 export type ProductShape = PrimitiveShape | 'other';
 
@@ -31,6 +36,10 @@ export interface Prepared3D {
   contour?: Point[];
   /** Where the label is on the front picture, [u, v] shares of its width and height (v from the top): the macro shot aims here. Flat products only. */
   focus?: [number, number];
+  /** The drawn or supplied back, fitted to the front texture's box and matched to its colour: a body's back half wears it. Only with a back in the input. */
+  back?: AssetRef;
+  /** The drawn side view, as tall as the front texture and filled edge to edge: a body's side quarters wear it. Only with a side in the input. */
+  profile?: AssetRef;
   /** Set when the requested shape could not be built and another was used. */
   fallback?: 'extrude';
 }
@@ -40,38 +49,16 @@ export interface PrepareInput {
   shape: ProductShape;
   filmId?: string;
   sceneId?: string;
+  /** The back view of the product (a transparent PNG, seen from behind): a body gets a back texture, a round shape a label that goes all the way round. */
+  back?: Buffer;
+  /** The side view of the product (a transparent PNG): a body's sides wear it instead of the stretched edge of the front and back. */
+  side?: Buffer;
 }
 
 /** Remembers what was made per cut-out and shape, so a film does the image work once. */
 export type PrepareCache = Map<string, Prepared3D>;
 export const newPrepareCache = (): PrepareCache => new Map();
 const sharedCache: PrepareCache = new Map();
-
-async function decode(png: Buffer): Promise<Rgba> {
-  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  return { width: info.width, height: info.height, data: new Uint8ClampedArray(data.buffer, data.byteOffset, data.byteLength) };
-}
-const encode = (data: Uint8ClampedArray, width: number, height: number): Promise<Buffer> =>
-  sharp(Buffer.from(data.buffer, data.byteOffset, data.byteLength), { raw: { width, height, channels: 4 } }).png().toBuffer();
-
-/** The smallest box that holds every opaque pixel, as a cropped copy. */
-function trim(img: Rgba): Rgba {
-  let [x0, y0, x1, y1] = [img.width, img.height, -1, -1];
-  for (let y = 0; y < img.height; y++)
-    for (let x = 0; x < img.width; x++)
-      if (img.data[(y * img.width + x) * 4 + 3]! > 127) {
-        x0 = Math.min(x0, x);
-        y0 = Math.min(y0, y);
-        x1 = Math.max(x1, x);
-        y1 = Math.max(y1, y);
-      }
-  if (x1 < 0) return img;
-  const width = x1 - x0 + 1;
-  const height = y1 - y0 + 1;
-  const data = new Uint8ClampedArray(width * height * 4);
-  for (let y = 0; y < height; y++) data.set(img.data.subarray(((y + y0) * img.width + x0) * 4, ((y + y0) * img.width + x0 + width) * 4), y * width * 4);
-  return { width, height, data };
-}
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
@@ -81,7 +68,8 @@ const round3 = (n: number) => Math.round(n * 1000) / 1000;
  * A second call with the same cut-out and shape returns the first result and stores nothing.
  */
 export async function prepareProduct3D(assets: AssetStore, input: PrepareInput, cache: PrepareCache = sharedCache): Promise<Prepared3D> {
-  const key = `${input.cutoutAssetId}:${input.shape}`;
+  const hashOf = (b: Buffer) => createHash('sha1').update(b).digest('hex').slice(0, 8);
+  const key = `${input.cutoutAssetId}:${input.shape}${input.back ? `:turn:${hashOf(input.back)}` : ''}${input.side ? `:side:${hashOf(input.side)}` : ''}`;
   const hit = cache.get(key);
   if (hit) return hit;
 
@@ -92,8 +80,10 @@ export async function prepareProduct3D(assets: AssetStore, input: PrepareInput, 
   const band = ROUND.includes(input.shape) ? findBodyBand(cut) : null;
   if (band) {
     const side = sideColour(cut, band);
-    const out = unwrapCylinder(cut, band, side);
-    const texture = await assets.put(await encode(out.data, LABEL_WIDTH, LABEL_HEIGHT), 'image/png', { ...meta, width: LABEL_WIDTH, height: LABEL_HEIGHT });
+    // with a back view the strip goes all the way round (its front half is the unwrap below, unchanged); without one, or when the back has no straight body, it is today's
+    const strip = input.back ? await wrapStrip({ front: await assets.read(input.cutoutAssetId), back: input.back }).catch(() => undefined) : undefined;
+    const out = strip ? undefined : unwrapCylinder(cut, band, side);
+    const texture = await assets.put(strip ?? (await encode(out!.data, LABEL_WIDTH, LABEL_HEIGHT)), 'image/png', { ...meta, width: LABEL_WIDTH, height: LABEL_HEIGHT });
     result = { shape: input.shape, texture, textureKind: 'label', side: hexOf(side), aspect: round3(cut.height / (band.r * 2)) };
   } else if (FLAT.includes(input.shape)) {
     const faces = boxFaces(cut);
@@ -113,8 +103,18 @@ export async function prepareProduct3D(assets: AssetStore, input: PrepareInput, 
     for (let y = 0; y < h; y++) front.data.set(cut.data.subarray(((y + box.y) * cut.width + box.x) * 4, ((y + box.y) * cut.width + box.x + w) * 4), y * w * 4);
     const moved = contour.map(([x, y]) => [round3(x - box.x), round3(y - box.y)] as Point);
     const side = sideColour(front, { top: 0, bottom: h - 1, cx: w / 2, r: w / 2 });
-    const texture = await assets.put(await encode(front.data, w, h), 'image/png', { ...meta, width: w, height: h });
-    result = { shape: 'other', texture, textureKind: 'front', side: hexOf(side), aspect: round3(h / w), contour: moved, focus: detailFocus(front), ...(input.shape !== 'other' ? { fallback: 'extrude' as const } : {}) };
+    const frontPng = await encode(front.data, w, h);
+    const texture = await assets.put(frontPng, 'image/png', { ...meta, width: w, height: h });
+    const backAsset = input.back ? await backTexture({ back: input.back, front: frontPng }).then((png) => assets.put(png, 'image/png', { ...meta, width: w, height: h })).catch(() => undefined) : undefined;
+    const profileAsset = input.side
+      ? await sideTexture({ side: input.side, front: frontPng })
+          .then(async (png) => {
+            const m = await sharp(png).metadata();
+            return assets.put(png, 'image/png', { ...meta, width: m.width ?? w, height: m.height ?? h });
+          })
+          .catch(() => undefined)
+      : undefined;
+    result = { shape: 'other', texture, ...(backAsset ? { back: backAsset } : {}), ...(profileAsset ? { profile: profileAsset } : {}), textureKind: 'front', side: hexOf(side), aspect: round3(h / w), contour: moved, focus: detailFocus(front), ...(input.shape !== 'other' ? { fallback: 'extrude' as const } : {}) };
   }
   cache.set(key, result);
   return result;

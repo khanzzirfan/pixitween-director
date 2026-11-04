@@ -151,6 +151,16 @@ describe('buildCinematic body', () => {
     const slab = productOf(buildCinematic(ctx, p as never, { ...p.board, body: { form: 'slab', depth: 0.25, section: 5 } }));
     expect(slab.section).toBe(2);
   });
+  it("takes the depth measured on the drawn side over the form's, and wears the drawn back", () => {
+    const p = parts('round');
+    const drawn = { ...p, depthShare: 0.5, prep: { ...p.prep, back: { id: 'ast_b', width: 800, height: 1000 } } };
+    const comp = buildCinematic(ctx, drawn as never, p.board);
+    const layer = (comp as unknown as { precomps: { cine: { layers: Array<{ id: string; source: { depth: number }; textures: { back?: string } }> } } }).precomps.cine.layers.find((l) => l.id === 'cine:product')!;
+    expect(layer.source.depth).toBe(400);
+    expect(layer.textures.back).toBe('ast_b');
+    // without a back, the measured depth is not used (it came from nothing the film wears)
+    expect(productOf(buildCinematic(ctx, { ...p, depthShare: 0.5 } as never, p.board)).depth).toBe(760);
+  });
   it("takes the board's form when no form was seen, and the old default with neither", () => {
     const boxy = productOf(buildCinematic(ctx, parts() as never, { ...parts().board, body: { form: 'boxy', depth: 0.6, section: 4.5 } }));
     expect(boxy.section).toBe(4.5);

@@ -5,6 +5,7 @@ import type { ToolCtx } from '@shared/tools';
 import { buildCinematicFilm, type CinematicInput } from '../../authoring/cinematic-film';
 import type { Beat } from '../../authoring/beatsheet';
 import type { IngredientAsset } from '../../authoring/ingredients';
+import type { TurnaroundViews } from '../../product3d/turnaround';
 import { drawSheets } from './render';
 
 const pic = (id: string, w = 128, h = 64) => ({ id, src: `/api/assets/${id}`, width: w, height: h });
@@ -81,5 +82,39 @@ describe('drawSheets', () => {
     const { ctx } = fakeCtx();
     const render = vi.fn(async () => { throw new Error('down'); });
     await expect(drawSheets(ctx, { film: buildCinematicFilm(input(true)), photo: await png('#ffffff'), render })).rejects.toThrow(/product: down/);
+  });
+});
+
+describe('drawSheets with a turnaround', () => {
+  const views = async () => ({ front: await png('#cc3355'), side: await png('#3355cc'), back: await png('#55cc33') });
+  const panelCounts = async (turnaround?: { views: TurnaroundViews; sheet?: Buffer }) => {
+    const compose = await import('./compose');
+    const spy = vi.spyOn(compose, 'composeSheet');
+    const { ctx, puts, events } = fakeCtx();
+    const r = await drawSheets(ctx, { film: buildCinematicFilm(input(false)), photo: await png('#ffffff'), render: fakeRender(), ...(turnaround ? { turnaround } : {}) });
+    const product = spy.mock.calls.find((c) => /Product sheet/.test(c[0].title))![0].panels.length;
+    spy.mockRestore();
+    return { product, r, puts, events };
+  };
+  it('saves the turnaround sheet first, and its product sheet composes 3 more panels', async () => {
+    const without = await panelCounts();
+    const withViews = await panelCounts({ views: await views(), sheet: await png('#ffffff') });
+    expect(withViews.product).toBe(without.product + 3);
+    expect(withViews.puts).toHaveLength(without.puts.length + 1);
+    expect(withViews.r.turnaround).toBeDefined();
+    expect(withViews.events.map((e) => e.asset!.role)).toEqual(['sheet', 'sheet', 'sheet']);
+    expect(withViews.events[0]!.asset!.id).toBe(withViews.r.assetIds[0]);
+  });
+  it('builds the same assets and product sheet panels as before when the film has no views', async () => {
+    const a = await panelCounts();
+    expect(a.r.turnaround).toBeUndefined();
+    expect(a.puts).toHaveLength(2);
+  });
+  it('shows a supplied back as two views and saves no turnaround sheet', async () => {
+    const { front, back } = await views();
+    const none = await panelCounts();
+    const supplied = await panelCounts({ views: { front, back } });
+    expect(supplied.product).toBe(none.product + 2);
+    expect(supplied.puts).toHaveLength(none.puts.length);
   });
 });

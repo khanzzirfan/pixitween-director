@@ -159,6 +159,7 @@ function buildBody(spec: Extract<PrimitiveGeometry, { type: 'extrude' }>): THREE
 
   const positions: number[] = [];
   const uvs: number[] = [];
+  const views: number[] = [];
   const index: number[] = [];
   const per = BODY_ARC + 1;
   for (const back of [false, true]) {
@@ -193,6 +194,9 @@ function buildBody(spec: Extract<PrimitiveGeometry, { type: 'extrude' }>): THREE
           // the back reads the picture the other way round, but both halves end on the same edge column so the side wall has no seam
           const flat = back ? 1 - aFlat : aFlat;
           uvs.push(flat + (edge - flat) * ease, 1 - along);
+          // the pictures laid along their own directions (engine/src/three/build/views.ts): the photo's u straight across the front, and the side
+          // picture's u across the depth, the front (+z) at its left; one formula all round, so the blend has no seam
+          if (spec.views) views.push(aFlat, 1 - along, 0.5 - z / Math.max(2 * half * ratio, 1e-6));
         }
       }
     }
@@ -212,6 +216,10 @@ function buildBody(spec: Extract<PrimitiveGeometry, { type: 'extrude' }>): THREE
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(index);
+  // group 0 is the front half, group 1 the back half: a body given a back picture wears two materials (one material ignores the groups)
+  const halfIndices = index.length / 2;
+  geometry.addGroup(0, halfIndices, 0);
+  geometry.addGroup(halfIndices, halfIndices, 1);
   geometry.computeVertexNormals();
   // the two halves meet along the silhouette; their normals are averaged there so the shading has no crease
   const normal = geometry.getAttribute('normal') as THREE.BufferAttribute;
@@ -226,5 +234,7 @@ function buildBody(spec: Extract<PrimitiveGeometry, { type: 'extrude' }>): THREE
       normal.setXYZ(bi, mix.x, mix.y, mix.z);
     }
   }
+  if (views.length) geometry.setAttribute('views', new THREE.Float32BufferAttribute(views, 3));
   return geometry;
 }
+

@@ -34,6 +34,13 @@ describe('sheetCheckPrompt', () => {
   });
 });
 
+describe('sheetCheckPrompt with a drawn back', () => {
+  it('mentions the turnaround only when the film has a drawn back', () => {
+    expect(sheetCheckPrompt({ board, title: 'Cold Brew', sheets: ['the product sheet'] })).not.toMatch(/turnaround|drawn back/);
+    expect(sheetCheckPrompt({ board, title: 'Cold Brew', sheets: ['the product sheet'], drawnBack: true })).toMatch(/turnaround.*drawn back/s);
+  });
+});
+
 describe('checkSheets', () => {
   it('makes one image call with the photo then the sheets present, and one ledger line', async () => {
     const reviewImages = vi.fn(async () => ({ fine: true, problems: [] }));

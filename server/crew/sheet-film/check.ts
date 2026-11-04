@@ -20,11 +20,12 @@ const SHEET_NAMES: Array<[keyof Pick<PartSheets, 'product' | 'elements' | 'set'>
 export const namesOf = (s: PartSheets): string[] => SHEET_NAMES.filter(([k]) => s[k]).map(([, n]) => n);
 
 /** What Muse is asked when it looks at the part sheets beside the photo. `sheets` names the sheets shown, in order, after the photo. */
-export function sheetCheckPrompt(o: { board: CinematicBoard; title: string; sheets: string[] }): string {
+export function sheetCheckPrompt(o: { board: CinematicBoard; title: string; sheets: string[]; drawnBack?: boolean }): string {
   const ids = o.board.elements.map((e) => `${e.id} (${e.name})`);
   return [
     `You wrote the board for a 3D product film of "${o.title}": "${o.board.concept}" (${o.board.mood}). Before the film is built, here are its parts drawn by the 3D engine.`,
     `The first picture is the real photo of the product. The next pictures are, in order: ${o.sheets.join('; ')}.`,
+    ...(o.drawnBack ? ["The product sheet's first row shows the product's drawn front, side and back from Muse's turnaround. The back of the 3D product is that drawn back, so compare the two: the 3D back should read as the drawn back."] : []),
     `The elements on your board: ${ids.length ? ids.join(', ') : 'none'}.`,
     ...(o.board.locks?.length ? [`Your lock lines, which must hold in every shot: ${o.board.locks.map((l) => `"${l}"`).join('; ')}.`] : []),
     'Check four things. Does the 3D product match the photo (its shape, its label and the colours: compare the swatches)? Is each element what the board names it? Does the set read as the look and light of the board? Do the lock lines hold?',
@@ -53,9 +54,9 @@ export function parseSheetCheck(raw: unknown, elementIds: string[]): SheetCheck 
 }
 
 /** One Muse look at the part sheets beside the photo: one image call, one ledger line of 0.005 USD. */
-export async function checkSheets(ctx: ToolCtx, o: { photo: Buffer; sheets: PartSheets; board: CinematicBoard; title: string }): Promise<SheetCheck> {
+export async function checkSheets(ctx: ToolCtx, o: { photo: Buffer; sheets: PartSheets; board: CinematicBoard; title: string; drawnBack?: boolean }): Promise<SheetCheck> {
   const shown = [o.sheets.product, o.sheets.elements, o.sheets.set].filter((b): b is Buffer => !!b);
-  const reply = await ctx.meta.spark.reviewImages([o.photo, ...shown], sheetCheckPrompt({ board: o.board, title: o.title, sheets: namesOf(o.sheets) }));
+  const reply = await ctx.meta.spark.reviewImages([o.photo, ...shown], sheetCheckPrompt({ board: o.board, title: o.title, sheets: namesOf(o.sheets), ...(o.drawnBack ? { drawnBack: true } : {}) }));
   ctx.ledger.add(ctx.filmId, 'muse-spark-1.3-contributor', 'sheet check', 0.005);
   return parseSheetCheck(reply, o.board.elements.map((e) => e.id));
 }

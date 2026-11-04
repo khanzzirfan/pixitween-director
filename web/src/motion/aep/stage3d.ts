@@ -145,6 +145,8 @@ export function convertProp(
   let geometry: Object3D['geometry'];
   let color = side;
   let map: string | undefined;
+  let backMap: string | undefined;
+  let profileMap: string | undefined;
   let unlit = false;
   let transparent = false;
   let flipbook: Object3D['flipbook'];
@@ -205,6 +207,8 @@ export function convertProp(
     const depth = sampleAt(source.depth, prop.inPoint, 100);
     geometry = { type: 'extrude', contour: source.contour, depth: Math.max(depth, 1e-6), bevel: source.bevel, sideColor: side, ...(source.section !== undefined ? { section: source.section } : {}), ...(source.axis !== undefined ? { axis: source.axis } : {}) };
     if (prop.textures?.front) map = sanitizeId(prop.textures.front);
+    if (prop.textures?.back && map && source.section !== undefined) backMap = sanitizeId(prop.textures.back);
+    if (prop.textures?.profile && map && source.section !== undefined) profileMap = sanitizeId(prop.textures.profile);
   } else if (source.shape === 'box') {
     const w = source.proportions?.width ?? 1;
     const h = source.proportions?.height ?? 1;
@@ -261,6 +265,8 @@ export function convertProp(
       emissiveIntensity: 0,
       opacity: mat?.opacity ?? 1,
       map,
+      ...(backMap ? { backMap } : {}),
+      ...(profileMap ? { profileMap } : {}),
       unlit,
       transparent,
       // The library's props are always physical (clearcoat 0 by default).

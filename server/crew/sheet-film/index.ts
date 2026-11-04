@@ -54,7 +54,7 @@ export async function makeSheetFilm(
     // the product, element and set sheets, drawn from the built film
     let sheets: PartSheets | undefined;
     try {
-      sheets = await drawSheets(ctx, { film: build(board), photo, render });
+      sheets = await drawSheets(ctx, { film: build(board), photo, render, ...(parts.turnaround ? { turnaround: parts.turnaround } : {}) });
       for (const why of sheets.skipped) log(`sheet skipped, the others kept: ${why}`);
     } catch (err) {
       log(`sheets skipped: ${err instanceof Error ? err.message : String(err)}`);
@@ -66,7 +66,7 @@ export async function makeSheetFilm(
     let problems: string[] = [];
     if (sheets) {
       try {
-        const check = await checkSheets(ctx, { photo, sheets, board, title: parts.title });
+        const check = await checkSheets(ctx, { photo, sheets, board, title: parts.title, ...(parts.turnaround ? { drawnBack: true } : {}) });
         problems = check.problems;
         if (check.dropElements.length) {
           const kept = reviewBoard({ ...board, elements: board.elements.filter((e) => !check.dropElements.includes(e.id)) }, check.dropElements);

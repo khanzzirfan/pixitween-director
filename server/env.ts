@@ -65,6 +65,8 @@ const schema = z.object({
   FILM_PATH: z.enum(['3d', 'crew']).default('3d'),
   CREW_ENABLED: boolOn,
   PRODUCT_3D: boolOff,
+  // The 3D product's back and depth: Muse draws a side and a back beside the real front (server/product3d/turnaround-flow.ts). Off until the owner has judged it.
+  TURNAROUND: boolOff,
   SHOWRUNNER_MODEL: z.string().default('muse-wonder-1.0'),
   CREW_MAX_WORKERS: int(4, 1, 8),
   CREW_FILM_BUDGET_USD: z.coerce.number().min(0.1).max(20).default(1.5),

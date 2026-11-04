@@ -210,6 +210,30 @@ describe('buildGeometry', () => {
       expect(front).toBeGreaterThan(0.5);
       expect(back).toBeLessThan(0.5);
     });
+    it('has two groups, the front half then the back half, that add up to every index', () => {
+      const g = body();
+      expect(g.groups).toHaveLength(2);
+      expect(g.groups.map((x) => x.materialIndex)).toEqual([0, 1]);
+      expect(g.groups[0]!.start).toBe(0);
+      expect(g.groups[0]!.count + g.groups[1]!.count).toBe(g.getIndex()!.count);
+    });
+    it('carries the views coordinates only when asked: the photo\'s u straight across the front and the side picture\'s u across the depth', () => {
+      expect(body().getAttribute('views')).toBeUndefined();
+      const g = buildGeometry({ type: 'extrude', contour: bottle, depth: 40, section: 2, views: true });
+      const pos = g.getAttribute('position');
+      const views = g.getAttribute('views');
+      expect(views.count).toBe(pos.count);
+      for (let i = 0; i < pos.count; i += 7) {
+        // the photo's u follows x on both halves (no ease toward the edge); the side picture's u follows z, the front (+z) at its left
+        expect(views.getX(i)).toBeCloseTo((pos.getX(i) + 20) / 40, 1);
+        // across the row's own depth: a row that is narrower is shallower too, and still spans the whole side picture
+        expect(views.getZ(i)).toBeGreaterThanOrEqual(-1e-6);
+        expect(views.getZ(i)).toBeLessThanOrEqual(1 + 1e-6);
+      }
+    });
+    it('carries no views coordinates for a body lying across', () => {
+      expect(buildGeometry({ type: 'extrude', contour: bottle, depth: 40, section: 2, axis: 'across', views: true }).getAttribute('views')).toBeUndefined();
+    });
     it('reads the photo\'s edge column on the side wall, so the side is not striped', () => {
       const g = body();
       const pos = g.getAttribute('position');

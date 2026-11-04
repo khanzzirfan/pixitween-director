@@ -222,6 +222,8 @@ export async function preloadThreeAssets(layer: ThreeLayer, doc: MotionDoc): Pro
   const fontIds = new Set<string>();
   for (const object of layer.objects) {
     if (object.material.map !== undefined) textureIds.add(object.material.map);
+    if (object.material.backMap !== undefined) textureIds.add(object.material.backMap);
+    if (object.material.profileMap !== undefined) textureIds.add(object.material.profileMap);
     for (const frame of object.flipbook?.frames ?? []) textureIds.add(frame);
     if (object.geometry.type === 'gltf') gltfIds.add(object.geometry.asset);
     if (object.geometry.type === 'text3d') fontIds.add(object.geometry.font);

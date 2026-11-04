@@ -76,6 +76,10 @@ export interface CinematicInput {
   focus?: [number, number];
   /** The outline in the front texture's own pixels; required for shape 'other'. */
   contour?: Array<[number, number]>;
+  /** A flat product's back half wears this picture (a drawn or supplied back, in the front texture's box) instead of the front read the other way. */
+  backTexture?: ClipAsset;
+  /** A flat product's sides wear this picture (the product seen from its side) across the depth. */
+  profileTexture?: ClipAsset;
   title: string;
   /** The price on the end disc; without one the end card is the name and tagline alone. */
   price?: number;
@@ -996,6 +1000,11 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   // assets: the product's textures and every picture an ingredient plays
   c = registerAsset(c, { id: i.texture.id, kind: 'image', src: i.texture.src, width: i.texture.width, height: i.texture.height });
   const used = new Set<string>([i.texture.id]);
+  for (const extra of flat ? [i.backTexture, i.profileTexture] : []) {
+    if (!extra) continue;
+    c = registerAsset(c, { id: extra.id, kind: 'image', src: extra.src, width: extra.width, height: extra.height });
+    used.add(extra.id);
+  }
   if (i.set) {
     c = registerAsset(c, { id: i.set.backdrop.id, kind: 'image', src: i.set.backdrop.src, width: i.set.backdrop.width, height: i.set.backdrop.height });
     used.add(i.set.backdrop.id);
@@ -1097,7 +1106,7 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     source: flat
       ? { type: 'extrude', contour: i.contour, depth: r2(Math.min(i.texture.width, i.texture.height) * (i.body?.depth ?? SOLID.depth)), section: i.body?.section ?? SOLID.section, ...(i.body?.axis === 'across' ? { axis: 'across' as const } : {}) }
       : { type: 'primitive', shape: i.shape, proportions: { width: 1, height: r2(aspect) } },
-    textures: flat ? { front: i.texture.id, side: i.set ? tint(i.side, LIGHT.sideLift) : i.side } : { label: i.texture.id, side: i.side },
+    textures: flat ? { front: i.texture.id, ...(i.backTexture ? { back: i.backTexture.id } : {}), ...(i.profileTexture ? { profile: i.profileTexture.id } : {}), side: i.set ? tint(i.side, LIGHT.sideLift) : i.side } : { label: i.texture.id, side: i.side },
     size: r(fitSize),
     material: { ...SURFACES[i.surface ?? 'satin'], ...wetLook(i.finish ?? defaultFinish(keyLevel)) },
     position: rise,

@@ -155,3 +155,4 @@ It prints the seconds of every step and the cost, and writes the sheets, `film.j
 - Delete the 2D crew (`server/crew/workers`, the showrunner tools that only serve 2D) once MG-1 and MG-2 pass.
 - An optional approval gate at the film sheet.
 - Chat edits of a 3D film.
+- The 3D product's drawn back and measured depth: see `docs/architecture/turnaround-3d.md` (`TURNAROUND=1`, off by default).

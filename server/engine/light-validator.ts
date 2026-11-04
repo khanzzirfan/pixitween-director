@@ -156,6 +156,10 @@ function validateComp(c: unknown, path: string, issues: CompositionIssue[]): voi
       if (!frames.length && typeof front !== 'string') issues.push({ path: `${lp}.source`, message: `card '${String(l.id)}' needs textures.front or source.frames` });
       for (const f of [...frames, ...(typeof front === 'string' ? [front] : [])]) if (typeof f !== 'string' || !(f in assets)) issues.push({ path: `${lp}.source`, message: `card '${String(l.id)}' references unknown assetId '${String(f)}' in this composition's assets` });
     }
+    for (const slot of ['back', 'profile'] as const) {
+      const id = isObj(l.textures) ? l.textures[slot] : undefined;
+      if (l.kind === 'prop3d' && id !== undefined && (typeof id !== 'string' || !(id in assets))) issues.push({ path: `${lp}.textures.${slot}`, message: `prop3d '${String(l.id)}' references unknown assetId '${String(id)}' in this composition's assets` });
+    }
     if (l.kind === 'prop3d' && isObj(l.source) && l.source.type === 'smoke') {
       if (!['steam', 'cloud', 'powder'].includes(String(l.source.form))) issues.push({ path: `${lp}.source.form`, message: `smoke '${String(l.id)}' form is steam, cloud or powder` });
       if (l.swarm !== undefined) issues.push({ path: `${lp}.swarm`, message: `smoke '${String(l.id)}' makes its own puffs, it is not a swarm` });
