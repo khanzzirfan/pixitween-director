@@ -6,7 +6,8 @@ import { isFilmId } from '@shared/composition';
 import { loadEnv } from '../../env';
 import { createFalClient, type FalClient } from '../../fal/client';
 import { FalApiError } from '../../fal/errors';
-import { aiFilmContext, chatNotes, buildH3Request, captureFrames, planAiFilm, quoteAiFilm } from '../../video/ai-film';
+import { renderKeyFrames } from '../../crew/frame-review';
+import { aiFilmContext, chatNotes, museConcept, buildH3Request, captureFrames, planAiFilm, quoteAiFilm, type Render3d } from '../../video/ai-film';
 import { createJobId, readJob, writeJob, type VideoJob } from '../../video/jobs';
 import { hashIp, ipMatches, openVideoSession } from '../../video/session';
 import { clientIp } from '../client-ip';
@@ -15,6 +16,8 @@ import type { AppDeps } from '../deps';
 export interface AiVideoOptions {
   dataDir?: () => string;
   fetchImpl?: typeof fetch;
+  /** Draws a 3D film's frames; the default is the headless stage on the app's own stage page. */
+  renderFrames?: Render3d;
 }
 
 type KeyChoice = { key: string; sessionId: string } | { error: 'ip_locked' | 'video_key_missing' };
@@ -56,8 +59,8 @@ export function registerAiVideoRoutes(app: Hono, deps: AppDeps, opts: AiVideoOpt
     }
     if (!film.composition || film.composition.durationInFrames < 1) return { response: c.json({ error: 'nothing_to_make', message: 'Nothing to make a movie from yet.' }, 409) };
     const comp = film.composition;
-    const chat = chatNotes(((await Promise.resolve(deps.bus?.replay?.(id)).catch(() => undefined)) ?? []).map((e) => e.event as never));
-    const plan = planAiFilm(comp, aiFilmContext(film, chat));
+    const events = ((await Promise.resolve(deps.bus?.replay?.(id)).catch(() => undefined)) ?? []).map((e) => e.event as never);
+    const plan = planAiFilm(comp, aiFilmContext(film, chatNotes(events), museConcept(events)));
     if (!plan.shots.length) return { response: c.json({ error: 'no_frames', message: 'This film has no pictures to make an AI movie from yet.' }, 409) };
     return { id, comp, plan };
   }
@@ -80,7 +83,7 @@ export function registerAiVideoRoutes(app: Hono, deps: AppDeps, opts: AiVideoOpt
     const read = await readFilm(c);
     if ('response' in read) return read.response;
     try {
-      const frames = await captureFrames({ assets: deps.assets }, read.comp, read.plan);
+      const frames = await captureFrames({ assets: deps.assets }, read.comp, read.plan, opts.renderFrames ?? ((comp, times) => renderKeyFrames(comp, times, undefined, 1500, 90, 2)));
       const client = fal(chosen.key);
       const urls = await Promise.all(frames.map((frame, i) => client.upload(frame, 'image/jpeg', `${read.id}-shot-${i + 1}.jpg`)));
       const request = buildH3Request(read.plan, urls, resolution);
