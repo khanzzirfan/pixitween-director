@@ -1,0 +1,455 @@
+{
+  "name": "PixiTween Director S24: turnaround (the image model draws the product from every side, three.js wears it)",
+  "branchName": "ralph/s24-turnaround-3d",
+  "description": "The 3D product stops guessing its sides. The image model draws one turnaround sheet from the photo (front, three-quarter, side, back), code cuts the views apart and checks that they agree, Muse checks them against the photo with one redraw at most, and three.js wears them: a 360 degree label strip for round products, a back texture for boxes, pouches and outlines. Any failure falls back to today's single-photo body. Leaves out: an image-to-3D mesh service, characters, an approval gate.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Turnaround prompt",
+      "description": "As a drawer of the turnaround (the Muse image model), I want a prompt that asks for one sheet with the same product seen four ways so that the views agree with each other and can be cut apart by code.",
+      "steps": [
+        "Read docs/architecture/turnaround-3d.md, server/art/invent-photo.ts (inventPhotoPrompt and its lint of brand terms) and server/art/lint.ts.",
+        "Create server/product3d/turnaround.ts exporting turnaroundPrompt(o: { name?: string; shape: string }): string.",
+        "The text asks for exactly one picture of the same product four times in one row, left to right: straight-on front, three-quarter turned 45 degrees, straight-on side turned 90 degrees, straight-on back turned 180 degrees. Same size, same height, same flat soft studio light, a plain white backdrop, clear white space between the four, no text added, no shadows on the floor, no people, no extra objects. Every colour, label and cap detail of the reference photo is kept, and the back shows what the back of such a product carries without inventing new brand names.",
+        "Brand and person terms of `name` are taken out with the same lint helpers invent-photo uses.",
+        "Create server/product3d/turnaround.test.ts."
+      ],
+      "acceptanceCriteria": [
+        "turnaroundPrompt({ shape: 'bottle' }) contains the four angles (front, three-quarter, side, back) and the words 'plain white backdrop'",
+        "turnaroundPrompt with a name that holds a brand term from extractBrandTerms does not contain that term",
+        "turnaroundPrompt is the same string for the same input",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "backend",
+        "turnaround"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Draw the turnaround sheet",
+      "description": "As a step of the product build, I want one image call that draws the turnaround from the photo so that the four views exist as one picture and the cost is on the film's ledger.",
+      "steps": [
+        "Read shared/ports.ts (MetaClients.image.edit), server/art/events.ts (charge), server/art/prices.ts and server/art/invent-photo.ts.",
+        "Add `turnaroundUsd: 0.04` to PRICE in server/art/prices.ts (additive).",
+        "In server/product3d/turnaround.ts export drawTurnaround(ctx: ToolCtx, o: { photo: Buffer; name?: string; shape: string; extra?: string }): Promise<Buffer>. It calls ctx.image.edit(prompt, [o.photo], '2048x768') where prompt is turnaroundPrompt plus o.extra on its own line when given, and charges PRICE.turnaroundUsd with charge(ctx, 'image', 'turnaround', ...).",
+        "An image error is thrown as an Error whose message starts 'turnaround: '.",
+        "Extend server/product3d/turnaround.test.ts with a fake ctx (image.edit recording its arguments, ledger recording adds)."
+      ],
+      "acceptanceCriteria": [
+        "drawTurnaround calls image.edit once with the photo as the only reference and size '2048x768'",
+        "drawTurnaround adds one ledger entry of 0.04 USD",
+        "when image.edit rejects, drawTurnaround rejects with a message that starts 'turnaround: '",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-001"
+      ],
+      "labels": [
+        "backend",
+        "turnaround"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Cut the four views apart",
+      "description": "As a step of the product build, I want the sheet cut into four transparent views lined up on one floor so that they can be compared and wrapped.",
+      "steps": [
+        "Read server/art/cutout-sheet.ts (whiteKeySheet, columnPieces, SheetPiece), server/media/image.ts (alphaCutout, imageSize) and server/product3d/pixels.ts.",
+        "In server/product3d/turnaround.ts export splitTurnaround(ctx: ToolCtx, sheet: Buffer): Promise<{ ok: true; views: TurnaroundViews } | { ok: false; reason: string }> with TurnaroundViews = { front: Buffer; quarter: Buffer; side: Buffer; back: Buffer } (transparent PNGs).",
+        "Use whiteKeySheet(ctx, { source: sheet, max: 4 }); exactly 4 pieces are required (fewer or more: ok false, reason 'found N views, need 4').",
+        "Scale every view so its height equals the tallest view's height (nearest the same floor line: all views bottom-aligned on the same canvas height), keeping its aspect.",
+        "Create server/product3d/turnaround.split.test.ts with sharp-made sheets: four coloured rectangles on white, three rectangles on white, one blank sheet."
+      ],
+      "acceptanceCriteria": [
+        "a sheet with four separated shapes returns ok true and four views of equal height",
+        "a sheet with three shapes returns ok false and a reason that contains 'found 3 views'",
+        "views come back in left-to-right order of the shapes in the sheet",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "backend",
+        "turnaround"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Code checks that the views agree",
+      "description": "As a gate before any model look, I want measured checks on the four views so that a sheet whose views are different products is redrawn or dropped without spending a vision call.",
+      "steps": [
+        "Read server/product3d/colour.ts (sideColour, rgbToLab), server/product3d/pixels.ts and the TurnaroundViews type in server/product3d/turnaround.ts.",
+        "Create server/product3d/agree.ts exporting viewsAgree(views: TurnaroundViews, photo: Buffer): Promise<{ ok: boolean; problems: string[] }>.",
+        "Rules, each a problem sentence when it fails: (1) the front view's mean colour is within Lab distance 18 of the photo's cut-out mean colour; (2) the front view's width over height is within 25 percent of the photo cut-out's; (3) the side view's width is between 0.25 and 1.6 times the front view's width; (4) the back view's mean colour is within Lab distance 28 of the front view's; (5) no view is more than 60 percent transparent pixels inside its own box.",
+        "Create server/product3d/agree.test.ts with synthetic views: same-colour views pass; a back view of another hue fails rule 4 with a sentence that names the back view; a front view of another hue than the photo fails rule 1."
+      ],
+      "acceptanceCriteria": [
+        "viewsAgree with four views of one colour and a photo of that colour returns ok true and no problems",
+        "viewsAgree with a back view of a clearly different hue returns ok false and a problem that mentions 'back'",
+        "viewsAgree with a front view of a different hue than the photo returns ok false and a problem that mentions 'front'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "backend",
+        "turnaround"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Muse checks the sheet against the photo",
+      "description": "As a reviewer (Muse, with the photo beside the sheet), I want to say whether the drawn views are the same product as the photo so that a wrong label, cap or colour is redrawn once.",
+      "steps": [
+        "Read server/crew/frame-review.ts (reviewImages use, reviewFrames) and the s23 checkSheets in server/crew/sheet-film/check.ts for the call shape, parsing and ledger use.",
+        "In server/product3d/turnaround-check.ts export turnaroundCheckPrompt(o: { name?: string; locks?: string[] }): string, parseTurnaroundCheck(text: string): { ok: boolean; problems: string[] }, and checkTurnaround(ctx, o: { photo: Buffer; sheet: Buffer; name?: string; locks?: string[] }): Promise<{ ok: boolean; problems: string[] }>.",
+        "The prompt asks one question: is the product in all four views the product in the first picture (shape, cap, label art, colours), and what is different; reply as JSON { \"ok\": boolean, \"problems\": string[] } with at most 4 problems of one sentence each.",
+        "parseTurnaroundCheck accepts the JSON inside a code fence or with text around it; anything unreadable returns ok true with no problems (the check never blocks a film).",
+        "checkTurnaround calls ctx.meta.spark reviewImages with the photo and the sheet, and adds the cost to ctx.ledger the way checkSheets does.",
+        "Create server/product3d/turnaround-check.test.ts with a faked ctx.meta.spark."
+      ],
+      "acceptanceCriteria": [
+        "parseTurnaroundCheck of '{\"ok\":false,\"problems\":[\"the back label is blank\"]}' returns ok false and that problem",
+        "parseTurnaroundCheck of text with no JSON returns ok true and an empty problems list",
+        "checkTurnaround makes exactly one reviewImages call and adds one ledger entry",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002"
+      ],
+      "labels": [
+        "backend",
+        "turnaround"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Wrap the views into a 360 degree label strip",
+      "description": "As a three.js body for round products, I want a label strip stitched from the front, three-quarter, side and back views so that the bottle shows its true back when it turns.",
+      "steps": [
+        "Read server/product3d/unwrap.ts (findBodyBand, unwrapCylinder, LABEL_WIDTH, LABEL_HEIGHT, how the strip's columns map to angle and where angle 0 sits), server/product3d/unwrap.test.ts and server/product3d/pixels.ts.",
+        "Create server/product3d/wrap360.ts exporting wrapStrip(views: TurnaroundViews, side: Rgb): Promise<{ strip: Buffer; band: BodyBand } | undefined>.",
+        "For each view find the body band (findBodyBand); undefined when the front view has none. Sample each view's band across its width into angles using x = cx + r * sin(theta), theta from -90 to +90 degrees, so a view covers 180 degrees of the cylinder.",
+        "Place the front at angle 0, the three-quarter at 45, the side at 90, the back at 180 (mirror the side view for 270). Between two placed views blend with weights that fall linearly with the angle distance (so a seam is a cross-fade over at most 45 degrees).",
+        "Output the same LABEL_WIDTH x LABEL_HEIGHT pixel size and the same angle-to-column mapping as unwrapCylinder so the renderer needs no change.",
+        "Create server/product3d/wrap360.test.ts: four flat-coloured cylinders (different colour per view) give a strip whose column at angle 0 is the front colour and at angle 180 the back colour; a front view with no straight body returns undefined."
+      ],
+      "acceptanceCriteria": [
+        "the strip column at angle 0 matches the front view's colour and the column at angle 180 matches the back view's colour",
+        "the strip has width LABEL_WIDTH and height LABEL_HEIGHT",
+        "wrapStrip returns undefined when the front view has no straight body band",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-003"
+      ],
+      "labels": [
+        "backend",
+        "turnaround",
+        "three"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "A back texture for flat products and outlines",
+      "description": "As a three.js body for boxes, pouches and flacons, I want a back texture next to the front one so that turning the product shows its drawn back and not the edge colour.",
+      "steps": [
+        "Read shared/aep/layer.ts (the model3d textures object near line 321 and the prop3d / stage3d product fields), shared/aep/stage3d.ts, web/src/motion/aep/model3d.ts and the stage3d adapter in web/src/motion/aep/stage3d.ts, and how server/authoring/cinematic-film.ts puts the product texture (label or front) on the cine:product prop.",
+        "Add an optional `back` asset id beside `front` wherever the product's textures are described (shared/aep/layer.ts for the model3d textures and the prop3d product, additive; old documents stay valid; bump nothing else).",
+        "Make the web adapter show `back` on the rear face of an extruded or box product when present; when absent the rear face looks as today. If the renderer cannot show a different rear face for the extruded product, show it for the box product only and write that limit in the story notes.",
+        "Add tests beside the existing adapter tests: a document with `back` converts; a document without it converts exactly as before.",
+        "Run npm run typecheck and the tests of the files you changed."
+      ],
+      "acceptanceCriteria": [
+        "a model3d layer with textures.front and textures.back parses and converts with the back asset on the rear face",
+        "every existing film fixture in web/src/motion/aep/films.test.ts still converts with no new warning",
+        "a document without `back` converts to the same output as before this story",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [],
+      "labels": [
+        "shared",
+        "three"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "prepareProduct3D uses the views",
+      "description": "As a product builder, I want prepareProduct3D to take the drawn views so that round products get the 360 strip and flat products get a back texture, and everything else stays as today.",
+      "steps": [
+        "Read server/product3d/prepare.ts and prepare.test.ts, server/product3d/wrap360.ts and the way server/crew/cinematic-cut.ts and server/tools/product3d.ts call prepareProduct3D.",
+        "Add `views?: TurnaroundViews` to PrepareInput and `back?: AssetRef` to Prepared3D (additive).",
+        "Round shapes with views: texture = wrapStrip(views, side) stored as the 'label' asset; when wrapStrip returns undefined keep today's unwrap.",
+        "Flat shapes (box, pouch) and outlines with views: texture stays the front; store the back view (trimmed, same size rules as the front) as a second image asset and return it as `back`.",
+        "The cache key gains `:views` when views are given, so the plain and the drawn body never share an entry.",
+        "Without `views` the output is identical to today's: existing prepare tests stay unchanged and green. Extend prepare.test.ts with the new cases."
+      ],
+      "acceptanceCriteria": [
+        "prepareProduct3D for a bottle with views stores a label strip of LABEL_WIDTH x LABEL_HEIGHT and returns no `back`",
+        "prepareProduct3D for a box with views returns a `back` asset and keeps textureKind 'front'",
+        "prepareProduct3D without views gives the same result as before and all of prepare.test.ts's existing cases pass",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-006",
+        "US-007"
+      ],
+      "labels": [
+        "backend",
+        "three"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "turnaroundFor: draw, cut, check, redraw once, or fall back",
+      "description": "As a pipeline step for the product, I want one function that turns a photo into checked views or a plain reason so that a film never fails because of the turnaround.",
+      "steps": [
+        "Read server/product3d/turnaround.ts, agree.ts, turnaround-check.ts, server/crew/cinematic-cut.ts (prepareParts, where the cut-out and the product name are known) and server/env.ts (how flags are read and tested).",
+        "Add TURNAROUND to server/env.ts: '0' turns the step off, anything else leaves it on (default on).",
+        "Create server/product3d/turnaround-flow.ts exporting turnaroundFor(ctx, o: { photo: Buffer; name?: string; shape: string; locks?: string[]; log: (line: string) => void }): Promise<{ views: TurnaroundViews; sheet: Buffer } | undefined>.",
+        "Steps: drawTurnaround; splitTurnaround; viewsAgree; checkTurnaround. If any step fails, redraw once with `extra` set to the problem sentences (one line each) and run the four steps again; a second failure returns undefined and logs 'turnaround: <reason>, using the single-photo body'.",
+        "Every thrown error is caught and becomes undefined plus the log line; nothing here ever throws.",
+        "Create server/product3d/turnaround-flow.test.ts with every step faked through vi.mock."
+      ],
+      "acceptanceCriteria": [
+        "when the first sheet passes every step turnaroundFor returns views and calls image.edit once",
+        "when the first sheet fails viewsAgree and the second passes, image.edit is called twice and the second prompt contains the first sheet's problem sentence",
+        "when both sheets fail, or image.edit rejects, turnaroundFor resolves to undefined and logs a line that contains 'single-photo body'",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-002",
+        "US-003",
+        "US-004",
+        "US-005"
+      ],
+      "labels": [
+        "backend",
+        "pipeline"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Use the turnaround in the sheet film and show it",
+      "description": "As a sheet film, I want the product built from the drawn views and the Plan panel to show the drawn sheet so that the owner sees what the 3D product was made from.",
+      "steps": [
+        "Read server/crew/cinematic-cut.ts (prepareCinematicParts from s23 and where prepareProduct3D is called), server/crew/sheet-film/render.ts and sheets.ts (the product sheet panels), server/crew/sheet-film/index.ts (makeSheetFilm) and web/src/crew/SheetStrip.tsx.",
+        "In prepareCinematicParts call turnaroundFor after the cut-out exists and pass its views to prepareProduct3D; save the drawn sheet as an asset with role 'sheet' (art.asset event) and keep its id on the parts.",
+        "The product sheet (drawSheets) gains a row: the four drawn views above the four 3D turns, so the owner compares them. Skipped when there are no drawn views.",
+        "SheetStrip shows the drawn turnaround as the first thumbnail of the strip when the film has one.",
+        "Existing s23 tests stay green; add a test for the new row (render faked) and one for SheetStrip."
+      ],
+      "acceptanceCriteria": [
+        "a film made with views has a saved 'sheet' asset for the drawn turnaround and the product sheet has the extra row",
+        "a film where turnaroundFor returns undefined builds exactly as an s23 film (same assets, same product sheet)",
+        "SheetStrip renders the drawn turnaround thumbnail first when present and nothing extra when absent",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-008",
+        "US-009"
+      ],
+      "labels": [
+        "backend",
+        "web",
+        "pipeline"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "Live script: single-photo body against the drawn body",
+      "description": "As an owner judging the result, I want a script that makes both bodies from one photo and shows them turning side by side so that I judge the turnaround on a real product before it is the default.",
+      "steps": [
+        "Read scripts/live/s23-sheet-film.ts and its test (flags, estimate-only default, the --yes switch, the output folder habit).",
+        "Create scripts/live/s24-turnaround.ts: with no --yes it prints the cost estimate (one image call about $0.04, one check about $0.005) and exits; with --yes it takes --photo (default the yoghurt photo path the s23 script uses), runs turnaroundFor, builds both bodies with prepareProduct3D (without and with views), renders each at yaw 0, 45, 90, 135, 180 and 270 and writes debug/turnaround/<stamp>/{sheet.jpg,single.jpg,drawn.jpg,compare.jpg} where compare.jpg has the two rows one above the other, labelled.",
+        "Print the time and the cost of each step and the reasons of any fallback.",
+        "Create scripts/live/s24-turnaround.test.ts for the estimate-only path and the argument parsing; nothing in the test calls a model or a browser."
+      ],
+      "acceptanceCriteria": [
+        "running the script without --yes prints an estimate that contains '$' and exits 0 without calling image.edit",
+        "the argument parser reads --photo and --yes and rejects an unknown flag with a message",
+        "compare.jpg layout code is covered by a test that builds it from two small fake rows",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-010"
+      ],
+      "labels": [
+        "scripts",
+        "tooling"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Docs: what is built and what is next",
+      "description": "As a next reader, I want the design doc to say what was built and what remains so that the following PRD starts from facts.",
+      "steps": [
+        "Read docs/architecture/turnaround-3d.md and the story notes of US-001 to US-011 in ralph/prd-s24-turnaround-3d.json.",
+        "Add a 'Built' section to docs/architecture/turnaround-3d.md listing each module (turnaround.ts, agree.ts, turnaround-check.ts, wrap360.ts, turnaround-flow.ts, the back texture, the sheet row) with one line each and the TURNAROUND flag.",
+        "Add a 'Next' section: an image-to-3D mesh option, a Character agent for people and mascots, an approval gate on the drawn sheet.",
+        "Add the measured numbers from MG-1 as a table the owner fills (time and cost per step) with the cells left as 'to fill'."
+      ],
+      "acceptanceCriteria": [
+        "docs/architecture/turnaround-3d.md contains the headings 'Built' and 'Next'",
+        "every module path named in the Built section exists in the repository",
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "",
+      "dependsOn": [
+        "US-010",
+        "US-011"
+      ],
+      "labels": [
+        "docs"
+      ]
+    }
+  ],
+  "metadata": {
+    "specs": [
+      "docs/architecture/turnaround-3d.md"
+    ],
+    "readFirst": [
+      "docs/architecture/turnaround-3d.md (why, the idea, who does what, fallback, estimates, limits)",
+      "docs/architecture/sheet-film-3d.md (the s23 sheet film this PRD feeds)",
+      "server/product3d/prepare.ts, unwrap.ts, box.ts, contour.ts (how the single-photo body is made today)",
+      "server/art/cutout-sheet.ts (whiteKeySheet: how a white-backdrop sheet is cut into pieces)",
+      "server/crew/sheet-film/ (the s23 modules: drawSheets, checkSheets, makeSheetFilm)"
+    ],
+    "requires": [
+      "prd-s23-sheet-film-3d"
+    ],
+    "owns": [
+      "server/product3d/turnaround.ts",
+      "server/product3d/turnaround.test.ts",
+      "server/product3d/turnaround.split.test.ts",
+      "server/product3d/agree.ts",
+      "server/product3d/agree.test.ts",
+      "server/product3d/turnaround-check.ts",
+      "server/product3d/turnaround-check.test.ts",
+      "server/product3d/turnaround-flow.ts",
+      "server/product3d/turnaround-flow.test.ts",
+      "server/product3d/wrap360.ts",
+      "server/product3d/wrap360.test.ts",
+      "scripts/live/s24-turnaround.ts",
+      "scripts/live/s24-turnaround.test.ts",
+      "docs/architecture/turnaround-3d.md"
+    ],
+    "sharedEdits": [
+      "server/product3d/prepare.ts",
+      "server/product3d/prepare.test.ts",
+      "server/art/prices.ts",
+      "server/env.ts",
+      "shared/aep/layer.ts",
+      "shared/aep/stage3d.ts",
+      "web/src/motion/aep/model3d.ts",
+      "web/src/motion/aep/stage3d.ts",
+      "server/crew/cinematic-cut.ts",
+      "server/crew/sheet-film/render.ts",
+      "server/crew/sheet-film/sheets.ts",
+      "server/crew/sheet-film/index.ts",
+      "web/src/crew/SheetStrip.tsx",
+      "web/src/crew/SheetStrip.test.tsx"
+    ],
+    "standingRule": "Offline-only PRD. Every story is implementable and verifiable with unit tests, recorded fixtures and the browser preview; nothing here spends money or needs network. Live and paid checks are listed in metadata.manualGates and run by the owner.",
+    "guardrails": [
+      "Work offline. Tests use recorded fixtures and DIRECTOR_REPLAY=1. Never call Meta, Clippy, Ollama or any other network service from a story, a test or a script you run during a story. The only network use allowed is `npm install`.",
+      "Never commit, push, tag, publish to npm, deploy or change repository settings. autoCommit is off and the owner commits.",
+      "For engine behaviour (composition JSON, Player, timeline, layer kinds) read docs/engine/README.md before writing code; never edit or copy engine source.",
+      "Never edit anything under node_modules/. The engine `reacthub-pixitweenjs` is a dependency: if it lacks something, add a row to ENGINE-NEEDS.md (what, where, proposed API, workaround, story) and use a workaround or set notes to 'blocked: engine'.",
+      "Edit only the files named in the story's steps, plus their tests. Files under shared/ are contracts (specs/hackathon/meta/06-contracts.md): change them only in a story that says so.",
+      "Never put keys, tokens, cookies or personal data in code, fixtures, logs or docs. Fixtures are redacted: no Authorization headers and no data: URLs longer than 200 characters.",
+      "No real brand names, logos or real people's likeness in prompts, fixtures or assets.",
+      "Record only real results. Never invent measurements, latencies, prices or test output.",
+      "Do not add a dependency that the story or 06-contracts.md does not name. If one is truly needed, say why in notes.",
+      "Debug output goes to debug/<step>/iteration-NN/ (gitignored). Only curated, redacted fixtures are committed, under fixtures/<step>/.",
+      "A step that would call a paid or live API is written as a script that prints an estimate and exits unless `--yes` is passed (`npm run live -- <step> --yes`, one file per step under scripts/live/). Create such scripts; never run them.",
+      "Start only on a branch that already holds the s23 sheet film: confirm server/crew/sheet-film/index.ts exports makeSheetFilm. If it does not, set notes to 'blocked: s23 not merged' and stop.",
+      "Run this PRD in its own git worktree (ralph/README.md section 3). Never edit files in the owner's main checkout: its dev server restarts on any server/ edit and kills a film that is building.",
+      "`npm test` has 6 known failures outside your files: server/agent/director.test.ts (1), server/http/app.test.ts (1), server/http/middleware.chain.test.ts (2), server/http/handlers/exports.test.ts (1), server/http/handlers/local.test.ts (1). Do not edit those files. The gate passes when no other test fails.",
+      "Every Muse call in code goes through ctx.meta.spark (chat or reviewImages) and is added to ctx.ledger like planBoard does. Tests fake ctx.meta.spark; nothing calls the network.",
+      "Creative choices stay with Muse (the board, the look, what to revise). Code draws the sheets, measures, checks rules and passes problems back to Muse as words; it never rewrites the board itself except to drop an element Muse named.",
+      "Renders in tests are faked: inject the render function (the shape of renderKeyFrames: (composition, times) => Promise<Buffer[]>) and return small sharp-made PNGs. Never launch Chromium in a unit test.",
+      "For a browser check never run `npm run dev` and never touch ports 8787, 8797, 5173 or 5199 (the owner's servers). Start your own pair and stop it after: `PORT=8798 DATA_DIR=data-s23 npx tsx server/main.ts` and `DIRECTOR_WEB_PORT=5180 DIRECTOR_API_URL=http://localhost:8798 npx vite --config web/vite.config.ts --port 5180 --strictPort`, then open http://localhost:5180.",
+      "debug/ is gitignored: the Clippy example sheets named in readFirst are reachable only if the owner linked debug/storyboard into this worktree. If they are missing, read the design doc's description of them instead; they are for the idea only.",
+      "Drawn views are never edited by code (no repainting, no label fixes). A failed view is redrawn by the image model once or the film uses the single-photo body.",
+      "Tests never call the image model, a vision model or Chromium: fake ctx.image.edit, ctx.meta.spark and the render function. Test images are made with sharp."
+    ],
+    "qualityGates": {
+      "universal": [
+        "`npm run typecheck` passes",
+        "`npm test` passes (offline, no network)",
+        "`npm run lint` passes"
+      ],
+      "ui": [
+        "Verify in the browser (dev-browser skill or preview): `npm run dev`, open the page named in the story, confirm the stated behaviour, and record what you saw in `notes`"
+      ]
+    },
+    "manualGates": [
+      "MG-1: owner runs `npm run live -- s24-turnaround --yes` (test server, PORT 8797) with a perfume photo and a can photo; open debug/turnaround/<stamp>/compare.jpg and judge whether the drawn body is better than the single-photo body at 90, 180 and 270 degrees. Expect +30-55 s and about $0.045 per product.",
+      "MG-2: owner makes one perfume film in the app: the Plan panel shows the drawn turnaround first in the sheet strip, and the spin shows the drawn back. Set TURNAROUND=0 to compare with the old body."
+    ]
+  }
+}
