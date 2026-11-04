@@ -360,3 +360,57 @@ describe('mergeTweens', () => {
     expect(a.to).toEqual({ x: 1 });
   });
 });
+
+describe('3D titles (a text3d prop)', () => {
+  const title = {
+    id: 'cine:title-words-1',
+    kind: 'prop3d',
+    stage: 'wake:world',
+    inPoint: 30,
+    outPoint: 120,
+    source: { type: 'text3d', text: 'Cold\nBrew', font: 'font-helvetiker_bold', size: 0.3, depth: 0.07, bevel: { thickness: 0.01, size: 0.007, segments: 3 }, enter: { style: 'rise', atFrame: 30 }, exit: { atFrame: 90 } },
+    position: [0, 1, 0],
+    material: { color: '#ffffff', roughness: 0.12, clearcoat: 1 },
+  } as unknown as Extract<AepLayer, { kind: 'prop3d' }>;
+
+  it('becomes engine 3D text, never fitted, with its letters rising in one after another and fading out from the last', () => {
+    const { object, tweens } = convertProp(title, ctx);
+    expect(object!.geometry).toMatchObject({ type: 'text3d', font: 'font-helvetiker_bold', text: 'Cold\nBrew', size: 0.3, depth: 0.07, bevel: { thickness: 0.01 } });
+    expect((object as { fit?: number }).fit).toBeUndefined();
+    const glyphs = tweens.filter((t) => (t as { target?: string }).target === 'glyphs:cine_title-words-1' || String((t as { target?: string }).target).startsWith('glyphs:'));
+    expect(glyphs.some((t) => t.at === 1 && 'offset.y' in t.to && (t as { stagger?: { each: number } }).stagger!.each > 0)).toBe(true);
+    expect(glyphs.some((t) => t.at === 3 && t.to.alpha === 0 && (t as { stagger?: { from: string } }).stagger!.from === 'end')).toBe(true);
+  });
+
+  it('loads its typeface and yields a valid doc', () => {
+    const comp = {
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      durationInFrames: 120,
+      assets: { ...assets, 'font-helvetiker_bold': { type: 'font' as const, src: '/fonts/helvetiker_bold.typeface.json' }, plain: { type: 'font' as const, src: '/fonts/Inter.woff2' } },
+      layers: [world(), title],
+    } as unknown as AepCompositionJson;
+    const { doc } = aepToMotion(comp);
+    expect(doc.assets['font-helvetiker_bold']).toEqual({ type: 'font', url: '/fonts/helvetiker_bold.typeface.json' });
+    expect(doc.assets.plain).toBeUndefined();
+    const parsed = parseMotionDoc(doc);
+    expect(parsed.ok, parsed.ok ? '' : JSON.stringify(parsed.errors)).toBe(true);
+    if (parsed.ok) expect(validateTargets(parsed.doc)).toEqual([]);
+  });
+});
+
+describe('3D titles near the end of the film', () => {
+  it('a line that arrives late brings its letters in closer together, so the last one lands before the world ends', () => {
+    const late = { id: 'cine:title-words-9', kind: 'prop3d', stage: 'wake:world', inPoint: 105, outPoint: 120, source: { type: 'text3d', text: 'Fresh Picked Morning Bliss', font: 'f', size: 0.1, enter: { style: 'rise', atFrame: 105 } } } as unknown as AepLayer;
+    const comp = {
+      fps: 30,
+      width: 1920,
+      height: 1080,
+      durationInFrames: 120,
+      assets: { ...assets, f: { type: 'font' as const, src: '/fonts/helvetiker_bold.typeface.json' } },
+      layers: [world(), late],
+    } as unknown as AepCompositionJson;
+    expect(() => aepToMotion(comp)).not.toThrow();
+  });
+});

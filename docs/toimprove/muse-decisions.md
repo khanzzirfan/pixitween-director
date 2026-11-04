@@ -118,3 +118,31 @@ The CRAFT deck's first line offered only contrasts, ending on "a calm object in 
 | Cold brew can | film_dd4c88c7eb87 | a cream can wakes in a cold night as ice bursts and brew swirls | 2D, clear | 3D: dark night, ice beads, a thin brew ring, but the spin ends with the label turned away for the whole end card. 2D: clean, label front-on. |
 
 Ideas now differ per product. What stops them showing in 3D: elements too sparse or small to carry the idea (berry rain), and spins that end on the product's back (can, yoghurt). Both are tool and safety gaps, not Muse's choices.
+
+### The product ends facing the lens (2026-11-04)
+
+Safety check, not a creative rule: the old 3D can cut (film_dd4c88c7eb87 v97) ended with the can turned 121 degrees from the lens, label hidden under the price, so it lost to 2D. Now `productMoves` measures the end angle (`faceOffset`: product yaw less camera azimuth) and, past `CAMERA.endFaceMax` (40 degrees), lengthens or shortens Muse's last turn just enough (a -180 spin carries on to about -292); with no turn after the last label macro it turns the product in the last shot. The default turn (no product motion written) gets the same check. Fresh can film film_7017c0b80acc: 3D won clearly (label readable, brew ribbon, bokeh night) but Muse wrote no spin, so the correction itself was not exercised on screen; it is covered by unit tests.
+
+## Boxes behind words in the 2D cut (2026-11-04)
+
+The 3D cut draws its plate in code, tied to its words (same fade, same span), so it can't show empty. The 2D crew drew boxes as separate `bg` shape layers with their own fade, place and colour, and nothing tied them to the words. On the towel film (`film_cb49e765cb9a`, 2D v87): a navy box showed 2.2 s before its words, then carried near-black words on it; a light-blue band hung half off the left edge with white words on it.
+
+Fixes:
+- `settleTextBoxes` (text-lane.ts) runs in the per-scene text step and over every scene when the 2D cut is finished. A box that words sit on takes their in/out and fade (scaled to its own strength), is redrawn round them where they rest if they spill out of it, and the words take the ink that reads on it. The crew still decides whether a line gets a box and its colour; a shape no words sit on is left alone.
+- Geometry measured every shape as full-frame; it now uses the shape's `path.size`.
+- The contrast check (R3) read words against the scene's first backdrop only; it now reads them against a solid box under them when there is one, so the finish no longer flips white-on-navy words back to black.
+- The text-size guess wrapped "BOLD STRIPES. SOFT TERRY." a word earlier than the renderer, so a line ~900 px wide was taken as 686 px and passed the safe-area fit while cut off at the left. A wrapped paragraph is now taken as wide as its box.
+
+Re-rendered the towel 2D cut through the new pass: both boxes appear only with their words, sit inside the frame and read. The coffee 2D cut (no boxes) only had small safe-area nudges.
+
+## A few drops, not a coat (2026-11-04)
+
+The cold brew can's end card looked patched: big round dents over the label, chalky between them. Two things made it. The bead map
+(`engine/src/three/build/condensation.ts`) had large beads, up to a tenth of the can's width, that read as dents; and about 19
+running drops with trails (`runners.ts`) covered the front. The close-up looked right only because there the beads were big enough
+to read as water.
+
+Now the bead map is 16 small drops per tile (about 1-2% of the can's width each, under 5% of the label covered), and its smaller
+copies, the ones the GPU reads when the can is small in frame, flatten the beads by half each step, so a far can turns smoothly
+glossy instead of blotching. Running drops are 2 (light wet) to 5 (heavy wet). The label between drops keeps its own finish.
+Checked on `film_7017c0b80acc`: the end card's label matches the original with a few drops and one trail.

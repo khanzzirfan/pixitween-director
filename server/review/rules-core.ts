@@ -137,8 +137,20 @@ export async function runRulesCore(
         const tb = box(text.id, f);
         if (!tb.visible || tb.opacity < 0.3) continue;
         const bb = box(bg.id, f);
+        // words on a solid box the crew drew under them read against the box, not the backdrop
+        const under = layers
+          .slice(0, layers.indexOf(text))
+          .filter((l) => l.id !== bg.id && l.kind === 'shape' && typeof l.fill === 'string' && metas[l.id] && metas[l.id].role !== 'product')
+          .map((l) => ({ l, b: box(l.id, f) }))
+          .filter(({ b }) => {
+            const over = intersect(tb.box, b.box);
+            return b.visible && b.opacity >= 0.6 && !!over && boxArea(over) >= 0.6 * boxArea(tb.box);
+          })
+          .at(-1);
         let lum: number;
-        if (bg.kind === 'shape' && typeof bg.fill === 'string') {
+        if (under) {
+          lum = relLuminance(parseColor(under.l.fill));
+        } else if (bg.kind === 'shape' && typeof bg.fill === 'string') {
           lum = relLuminance(parseColor(bg.fill));
         } else if (bg.kind === 'image' && o.deps?.plateLuminance) {
           const overlap = intersect(tb.box, bb.box);

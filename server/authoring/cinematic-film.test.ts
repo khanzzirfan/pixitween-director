@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
+import { PULSE, TITLE_PROPS_MAX, TITLE_REST_TILT, titleExit, titleLeaveAt, titleSpace, wordsBox } from './titles3d';
 import { checkBeatSheet, defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
-import { ELEVATION, rampKeysFor, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, SOLID, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, faceOffset, cutSpeeds, finishPost, shaderCuts, cutParams, spotLights, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
+import { ELEVATION, rampKeysFor, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, SOLID, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, faceOffset, cutSpeeds, finishPost, shaderCuts, cutParams, spotLights, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
 import { CAMERA, LIGHT, MATERIALS, SURFACES } from './cinematic-rules';
-import { SPACE_EM } from './text-width';
 import { FLOOR, floorElements, glassAsset, liquidAsset, vapourAsset, type IngredientAsset } from './ingredients';
 import type { Obj } from './types';
 
@@ -32,8 +32,17 @@ const input = (o: Partial<CinematicInput> = {}): CinematicInput => ({
   ...o,
 });
 const layers = (c: any): Obj[] => c.precomps.cine.layers;
-const world = (c: any): Obj => layers(c).find((l) => l.kind === 'stage3d')!;
-const props = (c: any): Obj[] => layers(c).filter((l) => l.kind === 'prop3d');
+const world = (c: any): Obj => layers(c).find((l) => l.id === 'cine:world')!;
+const props = (c: any): Obj[] => layers(c).filter((l) => l.kind === 'prop3d' && l.stage === 'cine:world');
+// the glossy 3D titles: their own world over the product's, the words as text3d props, plates and the price as extruded slabs
+const titles = (c: any): Obj[] => layers(c).filter((l) => l.kind === 'prop3d' && l.stage === 'cine:titles');
+const wordsOf = (c: any): any[] => titles(c).filter((l: any) => l.source.type === 'text3d');
+const flatText = (l: any): string => String(l.source.text).replace(/\n/g, ' ');
+const said = (c: any, text: string): any[] => wordsOf(c).filter((l) => flatText(l) === text);
+const slabs = (c: any, kind: string): any[] => titles(c).filter((l: any) => String(l.id).includes(`-${kind}-`));
+const SPACE = titleSpace(1080, 1920);
+/** a title's centre in screen pixels */
+const px = (l: any): [number, number] => [1080 / 2 + l.position[0] * SPACE.ppu, 1920 / 2 - l.position[1] * SPACE.ppu];
 const tanHalf = (fov: number) => Math.tan((fov * Math.PI) / 360);
 
 describe('a set keeps the horizon in the frame, and the ice out of the lens', () => {
@@ -150,7 +159,8 @@ describe('buildCinematicFilm', () => {
     expect(members.length).toBeGreaterThan(1);
     expect(ls.slice(w + 1, w + 1 + members.length).every((l) => l.kind === 'prop3d')).toBe(true);
     for (const m of members) expect(m.stage).toBe(world(c).id);
-    expect(ls.findIndex((l) => l.kind === 'text')).toBeGreaterThan(w + members.length);
+    expect(ls.some((l) => l.kind === 'text')).toBe(false);
+    expect(ls.findIndex((l) => l.id === 'cine:titles')).toBeGreaterThan(w + members.length);
     expect(ls.slice(0, w).every((l) => l.kind === 'shape')).toBe(true);
   });
   it('sets no ground or wall so the 2D halo shows through, and lights in PBR', () => {
@@ -226,20 +236,33 @@ describe('buildCinematicFilm', () => {
     for (const p of ps) if (p.swarm) expect(p.swarm.count).toBeLessThanOrEqual(LIMITS.swarm);
     expect(lightValidate(c).ok).toBe(true);
   });
-  it('copy: brand, the name word by word and the price, with the price landing when the end hold starts', () => {
+  it('copy: brand, the name and the price as 3D type, with the price coin landing when the end hold starts', () => {
     const c = buildCinematicFilm(input()) as any;
-    const texts = layers(c).filter((l) => l.kind === 'text').map((l) => l.source);
-    expect(texts).toEqual(expect.arrayContaining(['COFFEE CO.', 'Cold', 'Brew', '$4.50']));
+    expect(wordsOf(c).map(flatText)).toEqual(expect.arrayContaining(['COFFEE CO.', 'Cold Brew', '$4.50']));
     const hold = planCamera(sheet, c.fps).beats.at(-1)!;
-    const disc = layers(c).find((l) => l.kind === 'shape' && l.fill === '#c27a3a') as any;
-    const first = disc.transform.scale.find((k: any) => (Array.isArray(k.v) ? k.v[0] : k.v) > 0);
-    expect(first.t).toBeGreaterThanOrEqual(hold.start);
+    const [coin] = slabs(c, 'price-slab');
+    expect(coin.inPoint).toBeGreaterThanOrEqual(hold.start - 2);
+    expect(coin.rotation[0].t).toBeGreaterThanOrEqual(hold.start);
   });
-  it('a sale strikes the old price, pulsing with it', () => {
+  it('a sale strikes the old price, swinging with it', () => {
     const c = buildCinematicFilm(input({ price: 3.99, wasPrice: 4.75 }));
-    const old = layers(c).find((l) => l.kind === 'text' && l.source === '$4.75') as any;
-    const line = layers(c).find((l) => l.fill === '#ff5a6e') as any;
-    expect(line.transform.scale).toEqual(old.transform.scale);
+    const old = said(c, '$4.75')[0];
+    const [line] = slabs(c, 'strike');
+    expect(line.material.color).toBe('#ff5a6e');
+    const swings = (l: any) => l.rotation.filter((k: any) => k.v[1] === PULSE.swing).map((k: any) => k.t);
+    expect(swings(old).length).toBeGreaterThan(0);
+    expect(swings(old)).toEqual(swings(slabs(c, 'price-slab')[0]));
+  });
+  it('the price coin and its numbers swell together on each beat, the coin keeping its centre still', () => {
+    const c = buildCinematicFilm(input({ price: 3.99 }));
+    const nums = said(c, '$3.99')[0];
+    const [coin] = slabs(c, 'price-slab');
+    const peaks = (l: any) => l.scale.filter((k: any) => k.v[0] === PULSE.grow).map((k: any) => k.t);
+    expect(peaks(nums).length).toBeGreaterThan(0);
+    expect(peaks(coin)).toEqual(peaks(nums));
+    // the slab's origin is its base: it is lowered as it swells
+    const ys = coin.position.map((k: any) => k.v[1]);
+    expect(Math.min(...ys)).toBeLessThan(Math.max(...ys));
   });
   it('a vapour element plays as engine vapour behind or round the product: steam rises, a cloud wraps, powder bursts', () => {
     const cocoa = { ...FLOOR.dust!, id: 'cocoa', color: '#7a5233' };
@@ -288,11 +311,11 @@ describe('buildCinematicFilm', () => {
   it('a line of words in a short shot still fades out, so it never stays on into the end card', () => {
     const short: BeatSheet = { beats: sheet.beats.map((b, n) => (n === 3 ? { ...b, seconds: 0.5, text: 'Energy' } : b)) };
     const c = buildCinematicFilm(input({ sheet: short }));
-    const word = layers(c).find((l) => l.kind === 'text' && l.source === 'Energy') as any;
-    const last = word.transform.opacity.at(-1);
-    expect(Array.isArray(last) ? last[1] : last.v).toBe(0);
-    const plate = layers(c).filter((l) => l.kind === 'shape' && l.path?.roundness !== undefined).at(-1) as any;
-    expect(plate).toBeDefined();
+    const word = said(c, 'Energy')[0];
+    const hold = planCamera(short, 30).beats.at(-1)!;
+    expect(word.source.exit.atFrame).toBeLessThan(hold.start);
+    expect(word.outPoint).toBeLessThanOrEqual(hold.start + 1);
+    expect(slabs(c, 'plate').length).toBeGreaterThan(1);
   });
   it('the world carries the finish: glow that swells in the end hold, vignette, grain and an optional fringe', () => {
     const c = buildCinematicFilm(input({ finish: { glow: 'strong', grain: 'heavy', vignette: 'strong', fringe: true, floor: 'mirror', wet: 'heavy', caustics: 'none' } }));
@@ -355,12 +378,12 @@ describe('buildCinematicFilm', () => {
     expect(shaderCuts(sheet, planCamera(sheet, 30), 30)).toEqual([]);
     expect(world(buildCinematicFilm(input())).shotTransitions).toBeUndefined();
   });
-  it('a brief with no price ends on the name and tagline, with no price disc', () => {
+  it('a brief with no price ends on the name and tagline, with no price coin', () => {
     const c = buildCinematicFilm({ ...input({ tagline: 'Wake up cold' }), price: undefined });
-    const texts = layers(c).filter((l) => l.kind === 'text').map((l) => l.source);
-    expect(texts).toEqual(expect.arrayContaining(['Cold', 'Brew', 'Wake']));
-    expect(texts.some((t) => String(t).includes('$'))).toBe(false);
-    expect(layers(c).some((l) => l.kind === 'shape' && l.fill === '#c27a3a')).toBe(false);
+    const texts = wordsOf(c).map(flatText);
+    expect(texts).toEqual(expect.arrayContaining(['Cold Brew', 'Wake up cold']));
+    expect(texts.some((t) => t.includes('$'))).toBe(false);
+    expect(slabs(c, 'price-slab')).toHaveLength(0);
     expect(lightValidate(c).ok).toBe(true);
   });
   it('fits other aspects and throws on an empty sheet', () => {
@@ -485,7 +508,7 @@ describe('what the board says reaches the film', () => {
     expect(at('cine:product')).toBeGreaterThan(at('cine:world'));
     const flash = ids.filter((id, k) => /^cine:bg/.test(id) && k > at('cine:product'));
     expect(flash.length).toBeGreaterThanOrEqual(2);
-    for (const t of ids.filter((id) => id.startsWith('cine:caption'))) expect(at(t)).toBeGreaterThan(Math.max(...flash.map(at)));
+    expect(at('cine:titles')).toBeGreaterThan(Math.max(...flash.map(at)));
   });
 });
 
@@ -495,19 +518,14 @@ describe('the end card keeps clear of the product', () => {
   // the end hold's can: its fill, capped so the name and tagline have room above it
   const canH = H * Math.min(FILL.medium, CAMERA.maxHoldHeight / 1.16) * 1.16;
   const canW = canH / 3;
-  const at = (l: Obj) => {
-    const p = (l.transform as any).position;
-    const v = Array.isArray(p) && typeof p[0] === 'object' ? p[0].v : p;
-    return v as [number, number];
-  };
   it('puts the name above the can and the brand above the name', () => {
-    const [, nameY] = at(layers(c).find((l) => l.id === 'cine:caption-2')!);
-    const [, brandY] = at(layers(c).find((l) => l.id === 'cine:caption')!);
+    const [, nameY] = px(said(c, 'Cold Brew')[0]);
+    const [, brandY] = px(said(c, 'COFFEE CO.')[0]);
     expect(nameY + 0.045 * W).toBeLessThan(H / 2 - canH / 2);
     expect(brandY).toBeLessThan(nameY);
   });
-  it('puts the price disc beside the can, not over it', () => {
-    const [x] = at(layers(c).find((l) => l.id === 'cine:caption-4')!);
+  it('puts the price coin beside the can, not over it', () => {
+    const [x] = px(said(c, '$4.50')[0]);
     expect(x - 0.19 * W * 0.5).toBeGreaterThanOrEqual(W / 2 + canW / 2);
     expect(x + 0.19 * W * 0.5).toBeLessThanOrEqual(W);
   });
@@ -518,24 +536,79 @@ describe('the end card keeps clear of the product', () => {
 
 describe('the end card type follows the backdrop behind it', () => {
   const withSet = (skyLuma: number) => buildCinematicFilm(input({ key: 'mid', set: { look: 'studio', air: 'none', backdrop: pic('ast_sky', 2000, 1000), ground: '#d8d4ce', skyLuma } }));
-  const nameColour = (c: any) => (layers(c).find((l) => l.id === 'cine:caption-2')!.style as { fill: string }).fill;
+  const nameColour = (c: any) => said(c, 'Cold Brew')[0].material.color as string;
   it('is dark on a bright backdrop and white on a dark one, whatever the key', () => {
     expect(nameColour(withSet(0.8))).not.toBe('#ffffff');
     expect(nameColour(withSet(0.1))).toBe('#ffffff');
   });
 });
 
-describe('the words sit on a plate', () => {
-  it('puts a rounded plate, opposite in tone to the type, under the end card name and under each shot line, drawn before the words', () => {
+describe('the words sit on a glassy plate', () => {
+  it('puts a rounded plate, opposite in tone to the type, behind the end card name and behind each shot line', () => {
     // one line of words on the first shot, so the film has the end card and one shot line
     const worded = { ...sheet, beats: sheet.beats.map((b, k) => ({ ...b, text: k === 0 ? 'Pack the car' : undefined })) } as BeatSheet;
-    const c = buildCinematicFilm(input({ sheet: worded }));
-    const ls = layers(c);
-    const plates = ls.filter((l) => l.kind === 'shape' && (l.path as any)?.roundness !== undefined);
+    const c = buildCinematicFilm(input({ sheet: worded })) as any;
+    const plates = slabs(c, 'plate');
     expect(plates).toHaveLength(2);
-    for (const p of plates) expect([PLATE.dark, PLATE.light]).toContain(p.fill);
-    const first = ls.findIndex((l) => l.id === 'cine:caption-2');
-    expect(ls.indexOf(plates[0]!)).toBeLessThan(first);
+    // a dark world: white letters on dark glass
+    expect(said(c, 'Pack the car')[0].material.color).toBe('#ffffff');
+    for (const p of plates) {
+      expect(p.material.opacity).toBeLessThan(1);
+      expect(p.material.color).not.toBe('#ffffff');
+      expect(p.position[2]).toBeLessThan(0);
+      // it grows in across from its middle
+      expect(p.scale[0].v[0]).toBeLessThan(0.01);
+    }
+  });
+});
+
+describe('how long a line is whole on screen', () => {
+  it('a line on a short shot leaves fast, so it is whole for most of the shot and gone by the cut', () => {
+    const fps = 30;
+    const inAt = 2;
+    const cut = 25; // a 0.8 s shot
+    const out = titleLeaveAt('STAY COLD', inAt, cut, fps);
+    const exit = titleExit('STAY COLD', out - inAt, fps);
+    expect(out + exit.frames).toBeLessThanOrEqual(cut);
+    expect(exit.frames).toBeLessThanOrEqual(8);
+    expect(out - inAt).toBeGreaterThanOrEqual(15);
+  });
+
+  it('a line with a long rest takes its time to leave', () => {
+    expect(titleExit('Thick Creamy Bliss', 60, 30).seconds).toBe(0.22);
+    expect(titleExit('Thick Creamy Bliss', 60, 30).each).toBeGreaterThan(0.015);
+  });
+});
+
+describe('glossy 3D titles', () => {
+  it('lives in its own world over the product world, straight on, lit for gloss, with nothing to stand on', () => {
+    const c = buildCinematicFilm(input()) as any;
+    const t = layers(c).find((l) => l.id === 'cine:titles') as any;
+    expect(t.kind).toBe('stage3d');
+    expect(t.camera.position).toEqual([0, 0, 10]);
+    expect(t.set).toEqual({ ground: 'none', wall: false });
+    expect(t.style.shading).toBe('pbr');
+    expect(t.lights.environment).toBeDefined();
+    expect(titles(c).length).toBeLessThanOrEqual(TITLE_PROPS_MAX);
+  });
+  it('is real type: extruded, bevelled, lacquered, its font registered with the film and the scene', () => {
+    const c = buildCinematicFilm(input()) as any;
+    const name = said(c, 'Cold Brew')[0];
+    expect(name.source.depth).toBeGreaterThan(0);
+    expect(name.source.bevel.thickness).toBeGreaterThan(0);
+    expect(name.material).toMatchObject({ clearcoat: 1 });
+    expect(name.source.font).toBe('font-helvetiker_bold');
+    expect(c.assets['font-helvetiker_bold']).toMatchObject({ type: 'font', src: '/fonts/helvetiker_bold.typeface.json' });
+    expect(c.precomps.cine.assets['font-helvetiker_bold']).toBeDefined();
+  });
+  it('every block of words stays inside the frame', () => {
+    const c = buildCinematicFilm(input({ title: 'Wave Rider Longboard Pro Extra Long Edition', brand: undefined, tagline: 'Built for the long ride home' } as any)) as any;
+    for (const l of wordsOf(c)) {
+      const box = wordsBox(l.source.text, 'sans', l.source.font.endsWith('bold'), l.source.size * SPACE.ppu);
+      const [x] = px(l);
+      expect(x - box.w / 2).toBeGreaterThanOrEqual(0);
+      expect(x + box.w / 2).toBeLessThanOrEqual(1080);
+    }
   });
 });
 
@@ -650,24 +723,6 @@ describe('a set: backdrop on the wall, a floor and air', () => {
       expect(l.rim.intensity.at(-1).v).toBe(LIGHT[k].rimEnd);
     }
     expect(lights('low').fill.intensity).toBeLessThan(lights('high').fill.intensity);
-  });
-  it('the words of a line sit one space apart and stay inside the frame', () => {
-    const c = buildCinematicFilm(input({ title: 'Wave Rider Longboard Pro', brand: undefined } as any)) as any;
-    const texts = layers(c).filter((l: any) => l.kind === 'text' && l.transform.position?.[0]?.v);
-    const rows = new Map<number, any[]>();
-    for (const l of texts) {
-      const [x, y] = l.transform.position[0].v;
-      // a text layer's position is the centre of its box
-      rows.set(y, [...(rows.get(y) ?? []), { x: x - l.style.boxWidth / 2, w: l.style.boxWidth, size: l.style.size }]);
-    }
-    const lines = [...rows.values()].filter((r) => r.length >= 2);
-    expect(lines.length).toBeGreaterThan(0);
-    for (const line of lines) {
-      line.sort((a, b) => a.x - b.x);
-      expect(line[0].x).toBeGreaterThanOrEqual(0);
-      expect(line.at(-1).x + line.at(-1).w).toBeLessThanOrEqual(1080);
-      for (let n = 1; n < line.length; n++) expect(line[n].x - (line[n - 1].x + line[n - 1].w)).toBeCloseTo(SPACE_EM * line[n].size, 0);
-    }
   });
   it('the camera never goes below the floor, even at a low angle', () => {
     const cam = planCamera({ beats: sheet.beats.map((b) => ({ ...b, angle: 'low' })) }, 30);
@@ -946,50 +1001,43 @@ describe('the handheld tremor', () => {
 });
 
 describe('copy that moves', () => {
-  const texts = (c: any): Obj[] => layers(c).filter((l) => l.kind === 'text');
-  const said = (c: any, w: string) => texts(c).filter((l) => l.source === w);
   const withWords = (extra: Partial<CinematicInput> = {}, mark: Record<number, string> = { 0: 'Pack the car', 3: 'Feel summer' }) =>
     input({ sheet: { beats: sheet.beats.map((b, i) => (mark[i] ? { ...b, text: mark[i] } : b)) }, tagline: 'Summer, packed.', ...extra });
 
-  it('a shot\'s words are one layer each, popping in with an overshoot, with a shadow', () => {
+  it('a shot\'s words are one 3D block whose letters rise in one after another, swinging round to face the lens', () => {
     const c = buildCinematicFilm(withWords()) as any;
-    const pack = said(c, 'Pack');
+    const pack = said(c, 'Pack the car');
     expect(pack).toHaveLength(1);
-    const scale = (pack[0] as any).transform.scale as Array<{ t: number; v: number[] }>;
-    expect(Math.max(...scale.map((k) => k.v[0]!))).toBeCloseTo(1.12, 2);
-    expect(scale[0]!.v[0]).toBeCloseTo(0.6, 2);
-    expect(((pack[0] as any).effects as Obj[])[0]!.name).toBe('drop-shadow');
+    expect(pack[0].source.enter.style).toBe('rise');
+    expect(pack[0].rotation[0].v[1]).toBeLessThan(0);
+    expect(pack[0].rotation[1].v).toEqual([TITLE_REST_TILT, 0, 0]);
   });
-  it('the words come one after another and are gone before the next shot', () => {
+  it('the words are gone before the next shot', () => {
     const c = buildCinematicFilm(withWords()) as any;
-    const t = (w: string) => ((said(c, w)[0] as any).transform.opacity as Array<{ t: number; v: number }>);
-    const arrive = (w: string) => t(w).find((k) => k.v === 1)!.t;
-    expect(arrive('car')).toBeGreaterThan(arrive('Pack'));
     const plan = planCamera({ beats: sheet.beats }, 30);
-    const lastKey = t('car').at(-1)!;
-    expect(lastKey.v).toBe(0);
-    expect(lastKey.t).toBeLessThanOrEqual(plan.beats[0]!.end + 3);
+    const pack = said(c, 'Pack the car')[0];
+    expect(pack.source.enter.atFrame).toBeLessThan(pack.source.exit.atFrame);
+    expect(pack.outPoint).toBeLessThanOrEqual(plan.beats[0]!.end + 3);
   });
   it('lands the tagline under the name, after it, and clear of the product', () => {
     const c = buildCinematicFilm(withWords()) as any;
-    const name = said(c, 'Cold')[0] as any;
-    const tag = said(c, 'packed.')[0] as any;
+    const name = said(c, 'Cold Brew')[0];
+    const tag = said(c, 'Summer, packed.')[0];
     expect(tag).toBeDefined();
-    const y = (l: any) => (Array.isArray(l.transform.position) && typeof l.transform.position[0] === 'object' ? l.transform.position.at(-1).v[1] : l.transform.position[1]);
-    expect(tag.transform.opacity.find((k: any) => k.v === 1).t).toBeGreaterThan(name!.transform.opacity.find((k: any) => k.v === 1).t);
-    expect(y(tag)).toBeGreaterThan(y(name));
+    expect(tag.source.enter.atFrame).toBeGreaterThan(name.source.enter.atFrame);
+    expect(px(tag)[1]).toBeGreaterThan(px(name)[1]);
   });
   it('without a tagline or words there is nothing extra', () => {
     const plain = buildCinematicFilm(input()) as any;
     const rich = buildCinematicFilm(withWords()) as any;
-    expect(texts(rich).length).toBeGreaterThan(texts(plain).length);
-    expect(said(plain, 'packed.')).toHaveLength(0);
+    expect(wordsOf(rich).length).toBeGreaterThan(wordsOf(plain).length);
+    expect(said(plain, 'Summer, packed.')).toHaveLength(0);
   });
   it('never puts words in the macro or the last shot, even if the sheet asks', () => {
     const macro = sheet.beats.findIndex((b) => b.size === 'macro');
     const c = buildCinematicFilm(withWords({}, { [macro]: 'Look closer', [sheet.beats.length - 1]: 'Buy now' })) as any;
-    expect(said(c, 'Look')).toHaveLength(0);
-    expect(said(c, 'Buy')).toHaveLength(0);
+    expect(said(c, 'Look closer')).toHaveLength(0);
+    expect(said(c, 'Buy now')).toHaveLength(0);
   });
   it('still validates', () => {
     const v = lightValidate(buildCinematicFilm(withWords()));
@@ -1016,56 +1064,62 @@ describe('a wide product stays inside the frame', () => {
 
 describe("the end card as Muse styles it", () => {
   const W = 1080;
-  const wordsOf = (c: any) => layers(c).filter((l) => l.kind === 'text');
-  const plates = (c: any) => layers(c).filter((l) => l.kind === 'shape' && (l.path as any)?.kind === 'rect' && ['#0b0b12', '#ffffff'].includes(String(l.fill)) && (l.path as any).size[1] < 400);
   const base = () => buildCinematicFilm(input({ tagline: 'Cold goes anywhere' }));
-  const pos = (l: any) => {
-    const p = l.transform.position;
-    return (Array.isArray(p) && typeof p[0] === 'object' ? p[0].v : p) as [number, number];
-  };
-  const word = (c: any, text: string) => wordsOf(c).find((l) => String(l.source) === text) as any;
-  it('with no choices it is as before: a pill plate, a round disc, the product accent', () => {
-    const c = base();
-    expect(plates(c).length).toBeGreaterThan(0);
-    expect(plates(c).every((l) => (l.path as any).roundness > 0)).toBe(true);
-    expect(layers(c).some((l) => l.kind === 'shape' && l.fill === '#c27a3a' && (l.path as any).kind === 'ellipse')).toBe(true);
+  it('with no choices: glossy sans letters rising in, a glassy pill, a coin in the product accent', () => {
+    const c = base() as any;
+    expect(slabs(c, 'plate').length).toBeGreaterThan(0);
+    const coin = slabs(c, 'price-slab')[0];
+    expect(coin.material.color).toBe('#c27a3a');
+    expect(coin.source.contour.length).toBeGreaterThan(40);
+    const name = said(c, 'Cold Brew')[0];
+    expect(name.source.font).toBe('font-helvetiker_bold');
+    expect(name.source.enter.style).toBe('rise');
+    expect(name.material.clearcoat).toBe(1);
   });
-  it('plate none draws no plate, and bar runs the full width with square ends', () => {
-    expect(plates(buildCinematicFilm(input({ tagline: 'x y', endCard: { plate: 'none' } }))).length).toBe(0);
-    const bar = plates(buildCinematicFilm(input({ tagline: 'x y', endCard: { plate: 'bar' } })));
+  it('plate none draws no plate, and bar runs the full width', () => {
+    expect(slabs(buildCinematicFilm(input({ tagline: 'x y', endCard: { plate: 'none' } })), 'plate')).toHaveLength(0);
+    const bar = slabs(buildCinematicFilm(input({ tagline: 'x y', endCard: { plate: 'bar' } })), 'plate');
     expect(bar.length).toBeGreaterThan(0);
-    for (const b of bar) {
-      expect((b.path as any).roundness ?? 0).toBe(0);
-      expect((b.path as any).size[0]).toBeGreaterThanOrEqual(W - 2);
-    }
+    for (const b of bar) expect(b.size * SPACE.ppu).toBeGreaterThanOrEqual(W);
   });
-  it('price tag is a rounded rectangle, plain has no shape, and the accent colours it', () => {
-    const tag = buildCinematicFilm(input({ endCard: { price: 'tag', accent: '#2b9d8f' } }));
-    const t = layers(tag).find((l) => l.kind === 'shape' && l.fill === '#2b9d8f') as any;
-    expect(t.path.kind).toBe('rect');
-    expect(t.path.size[0]).toBeGreaterThan(t.path.size[1]);
+  it('price tag is a rounded slab wider than tall, plain has no slab, and the accent colours it', () => {
+    const tag = slabs(buildCinematicFilm(input({ endCard: { price: 'tag', accent: '#2b9d8f' } })), 'price-slab')[0];
+    expect(tag.material.color).toBe('#2b9d8f');
+    const xs = tag.source.contour.map((p: number[]) => p[0]);
+    const ys = tag.source.contour.map((p: number[]) => p[1]);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(Math.max(...ys) - Math.min(...ys));
     const plain = buildCinematicFilm(input({ endCard: { price: 'plain', accent: '#2b9d8f' } }));
-    expect(layers(plain).some((l) => l.kind === 'shape' && l.fill === '#2b9d8f')).toBe(false);
-    expect(wordsOf(plain).some((l) => /\$/.test(String(l.source)))).toBe(true);
+    expect(slabs(plain, 'price-slab')).toHaveLength(0);
+    expect(wordsOf(plain).some((l) => /\$/.test(flatText(l)))).toBe(true);
   });
   it('capitals, weight and alignment change the words', () => {
     const up = buildCinematicFilm(input({ tagline: 'Cold goes anywhere', endCard: { text: 'upper' } }));
-    expect(word(up, 'BREW')).toBeTruthy();
-    expect(word(up, 'ANYWHERE')).toBeTruthy();
-    expect(word(buildCinematicFilm(input({ endCard: { weight: 'light' } })), 'Cold').style.weight).toBe(300);
-    expect(word(buildCinematicFilm(input({ endCard: { weight: 'bold' } })), 'Cold').style.weight).toBe(700);
-    const centred = pos(word(base(), 'Cold'));
-    const left = pos(word(buildCinematicFilm(input({ tagline: 'Cold goes anywhere', endCard: { align: 'left' } })), 'Cold'));
+    expect(said(up, 'COLD BREW')).toHaveLength(1);
+    expect(said(up, 'COLD GOES ANYWHERE')).toHaveLength(1);
+    expect(said(buildCinematicFilm(input({ endCard: { weight: 'light' } })), 'Cold Brew')[0].source.font).toBe('font-helvetiker_regular');
+    const centred = px(said(base(), 'Cold Brew')[0]);
+    const left = px(said(buildCinematicFilm(input({ tagline: 'Cold goes anywhere', endCard: { align: 'left' } })), 'Cold Brew')[0]);
     expect(left[0]).toBeLessThan(centred[0]);
-    expect(left[0]).toBeLessThan(W * 0.3);
+    expect(said(buildCinematicFilm(input({ tagline: 'Cold goes anywhere', endCard: { align: 'left' } })), 'Cold Brew')[0].source.align).toBe('left');
   });
-  it('pulse false keeps the price from beating with the music', () => {
-    const keys = (c: any) => (layers(c).find((l) => l.kind === 'shape' && l.fill === '#c27a3a' && (l.path as any).kind === 'ellipse') as any).transform.scale.length;
+  it('face, letters and entrance are Muse\'s', () => {
+    const c = buildCinematicFilm(input({ endCard: { face: 'serif', letters: 'gold', entrance: 'pop' } })) as any;
+    const name = said(c, 'Cold Brew')[0];
+    expect(name.source.font).toBe('font-gentilis_bold');
+    expect(name.material.metalness).toBeGreaterThan(0.4);
+    expect(name.material.color).toBe('#f2c463');
+    expect(name.source.enter.style).toBe('pop');
+    expect(c.assets['font-gentilis_bold']).toBeDefined();
+    expect(said(buildCinematicFilm(input({ endCard: { letters: 'chrome' } })), 'Cold Brew')[0].material.color).toBe('#eef2f6');
+  });
+  it('pulse false keeps the price from swinging with the music', () => {
+    const keys = (c: any) => slabs(c, 'price-slab')[0].rotation.length;
     expect(keys(buildCinematicFilm(input({ endCard: { pulse: false } })))).toBeLessThan(keys(base()));
   });
   it('the film still passes the light validator with any style', () => {
-    for (const endCard of [{ plate: 'bar', price: 'tag', align: 'left', text: 'upper', weight: 'bold' }, { plate: 'none', price: 'plain', pulse: false }] as const) {
-      expect(lightValidate(buildCinematicFilm(input({ tagline: 'Cold goes anywhere', endCard }))).ok).toBe(true);
+    for (const endCard of [{ plate: 'bar', price: 'tag', align: 'left', text: 'upper', weight: 'bold', face: 'soft', letters: 'chrome', entrance: 'flip' }, { plate: 'none', price: 'plain', pulse: false }] as const) {
+      const v = lightValidate(buildCinematicFilm(input({ tagline: 'Cold goes anywhere', endCard })));
+      expect(v.ok, v.ok ? '' : JSON.stringify(v.issues)).toBe(true);
     }
   });
 });
@@ -1330,8 +1384,8 @@ describe('cutParams', () => {
 
 describe('reflection studio', () => {
   it('the world lights its reflections with the board\'s studio, and leaves the preset\'s own when none is written', () => {
-    expect(JSON.stringify(buildCinematicFilm(input({ reflect: 'ring' })))).toContain('"environment":"ring"');
-    expect(JSON.stringify(buildCinematicFilm(input()))).not.toContain('"environment"');
+    expect(JSON.stringify(world(buildCinematicFilm(input({ reflect: 'ring' }))))).toContain('"environment":"ring"');
+    expect(JSON.stringify(world(buildCinematicFilm(input())))).not.toContain('"environment"');
   });
 });
 

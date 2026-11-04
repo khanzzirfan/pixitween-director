@@ -48,7 +48,8 @@ describe('light validator, cinematic stage (schema 1.12.0)', () => {
   it('allows 12 props but not 13', () => {
     const c = base();
     const ls = layers(c);
-    const have = ls.filter((l) => l.kind === 'prop3d').length;
+    // the product world's own props (the titles live in a world of their own)
+    const have = ls.filter((l) => l.kind === 'prop3d' && l.stage === 'cine:world').length;
     for (let n = have; n < 12; n++) ls.push(prop(`p${n}`));
     expect(issues(c)).not.toMatch(/holds at most/);
     ls.push(prop('p13'));

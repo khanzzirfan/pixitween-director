@@ -5,7 +5,8 @@ import { registerAsset } from '../authoring/api';
 import { finishComposition } from '../authoring/finish';
 import type { Comp, Obj } from '../authoring/types';
 import { bestFlatTextColor } from '../review/contrast';
-import { runRules } from '../review/rules';
+import { listScenes, runRules } from '../review/rules';
+import { settleTextBoxes } from './text-lane';
 
 /**
  * Text the contrast rule still fails on the finished film, read against the real plate pixels, gets the flat colour that reads
@@ -46,6 +47,8 @@ export async function finishedComposition(films: FilmStore, filmId: string, asse
     comp = registerAsset(comp, { id: ref.id, kind: 'audio', src: ref.url, duration: comp.durationInFrames });
     musicAssetId = ref.id;
   }
+  // every box behind words is tied to them once more, after the last edit of any scene
+  for (const s of listScenes(comp)) comp = settleTextBoxes(comp, s.sceneId).comp;
   const finished = finishComposition(comp, { musicAssetId, brief: film.brief.text, ...(film.styleBible?.palette[0] ? { accent: film.styleBible.palette[0] } : {}) });
   return (await settleContrast(finished, assets).catch(() => ({ comp: finished, fixed: [] as string[] }))).comp;
 }

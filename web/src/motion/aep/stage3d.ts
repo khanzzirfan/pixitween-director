@@ -1,7 +1,7 @@
 // AEP stage3d (the cartoon world) -> MotionDoc three layer. See engine/docs/10-aep-adapter.md ("3D (A3)", stage3d).
 // Camera, lighting preset, ground plane and flat backdrop plane. Members (actor3d / prop3d) are passed in so a
 // later story can add their objects; they never become 2D layers. Actors become glTF objects here.
-import type { AepLayer } from '@shared/aep/layer';
+import type { AepLayer, AepProp3DText3DSource } from '@shared/aep/layer';
 import type { AepAssetMap } from '@shared/aep/asset';
 import type { AepAnimatable } from '@shared/aep/transform';
 import type { AepRotationUnit } from '@shared/aep/rotation';
@@ -185,6 +185,21 @@ export function convertProp(
       ...(source.seed !== undefined ? { seed: source.seed } : {}),
     };
     color = mat?.color ?? '#3b2314';
+  } else if (source.type === 'text3d') {
+    // Real 3D type, centred on the prop's position and never fitted: `size` is already in world units.
+    geometry = {
+      type: 'text3d',
+      font: sanitizeId(source.font),
+      text: source.text,
+      size: source.size,
+      depth: source.depth ?? source.size * 0.25,
+      curveSegments: 10,
+      ...(source.bevel ? { bevel: { thickness: source.bevel.thickness, size: source.bevel.size, segments: source.bevel.segments ?? 3 } } : {}),
+      align: source.align ?? 'center',
+      lineHeight: source.lineHeight ?? 1.2,
+      letterSpacing: source.letterSpacing ?? 0,
+    } as Object3D['geometry'];
+    color = mat?.color ?? '#ffffff';
   } else if (source.type === 'extrude') {
     // The depth is read once, at the prop's in-point.
     const depth = sampleAt(source.depth, prop.inPoint, 100);
@@ -225,6 +240,8 @@ export function convertProp(
     tweens.push(...objectTweens(mat?.metalness, ['material.metalness'], ctx.fps, clock, target));
   }
 
+  if (source.type === 'text3d') tweens.push(...letterTweens(id, source, clock, ctx.fps, ctx.worldOutPoint !== undefined ? (ctx.worldOutPoint - clock) / ctx.fps : Infinity));
+
   let swarm: Object3D['swarm'];
   if (prop.swarm) {
     swarm = { ...prop.swarm, fps: ctx.fps, duration: Math.max(0, (prop.outPoint - prop.inPoint) / 30) } as Object3D['swarm'];
@@ -253,14 +270,51 @@ export function convertProp(
       ior: mat?.ior,
       thickness: mat?.thickness,
     },
-    castShadow: prop.castShadow ?? (!isCard && source.type !== 'smoke'),
-    fit: source.type === 'liquid' || source.type === 'smoke' ? undefined : (prop.size ?? PROP_DEFAULT_SIZE),
+    castShadow: prop.castShadow ?? (!isCard && source.type !== 'smoke' && source.type !== 'text3d'),
+    fit: source.type === 'liquid' || source.type === 'smoke' || source.type === 'text3d' ? undefined : (prop.size ?? PROP_DEFAULT_SIZE),
     life: propLife(prop, clock, ctx),
     billboard: billboard || undefined,
     flipbook,
     swarm,
   } as unknown as Object3D;
   return { object, tweens, warnings };
+}
+
+/**
+ * The letters of a 3D title, one after another: in by rising from below, popping from nothing or flipping up, each settling with
+ * a little overshoot; out by fading from the last letter back as they lift. Times are on the world's clock.
+ */
+export function letterTweens(id: string, source: AepProp3DText3DSource, clock: number, fps: number, length = Infinity): Array<ConvertedTween & { target: string; stagger?: { each: number; from: 'start' | 'end' } }> {
+  const target = `glyphs:${id}`;
+  const out: Array<ConvertedTween & { target: string; stagger?: { each: number; from: 'start' | 'end' } }> = [];
+  const lift = source.size * 0.6;
+  // the last letter must land before the world ends (the engine refuses a stagger that runs past its layer): a late line comes in
+  // with its letters closer together, and if even that is too long, each letter moves faster
+  const letters = Math.max(1, source.text.replace(/\s/g, '').length);
+  const fit = (at: number, each: number, d: number): { each: number; d: number } => {
+    const room = Math.max(0.02, length - at - 0.01);
+    const dd = Math.min(d, room);
+    return { each: letters > 1 ? Math.max(0, Math.min(each, (room - dd) / (letters - 1))) : each, d: dd };
+  };
+  if (source.enter) {
+    const at = Math.max(0, (source.enter.atFrame - clock) / fps);
+    const f = fit(at, source.enter.each ?? 0.045, source.enter.seconds ?? (source.enter.style === 'pop' ? 0.45 : source.enter.style === 'flip' ? 0.6 : 0.55));
+    const stagger = { each: Math.round(f.each * 10000) / 10000, from: 'start' as const };
+    const d = f.d;
+    if (source.enter.style === 'rise') out.push({ target, at, duration: d, ease: 'back.out(1.6)', stagger, from: { 'offset.y': -lift }, to: { 'offset.y': 0 } });
+    else if (source.enter.style === 'pop') out.push({ target, at, duration: d, ease: 'back.out(2)', stagger, from: { scale: 0 }, to: { scale: 1 } });
+    else out.push({ target, at, duration: d, ease: 'power2.out', stagger, from: { 'rotation.x': 90 }, to: { 'rotation.x': 0 } });
+    out.push({ target, at, duration: d * 0.45, ease: 'power1.out', stagger, from: { alpha: 0 }, to: { alpha: 1 } });
+  }
+  if (source.exit) {
+    const at = Math.max(0, (source.exit.atFrame - clock) / fps);
+    const f = fit(at, source.exit.each ?? 0.02, source.exit.seconds ?? 0.22);
+    const d = f.d;
+    const stagger = { each: Math.round(f.each * 10000) / 10000, from: 'end' as const };
+    out.push({ target, at, duration: d, ease: 'power2.in', stagger, from: { alpha: 1 }, to: { alpha: 0 } });
+    out.push({ target, at, duration: d, ease: 'power2.in', stagger, from: { 'offset.y': 0 }, to: { 'offset.y': lift * 0.5 } });
+  }
+  return out;
 }
 
 /** A scalar animatable's value at composition frame `frame` (hold keys and out-handle easing as the library sampled them). */
