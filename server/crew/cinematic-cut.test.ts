@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { boardPrompt, floorBoard } from '../authoring/beatsheet';
 import sharp from 'sharp';
-import { buildCinematic, formFromPhoto, isProductTitle, isReadName, quotedName, isStraightCylinder, otherNouns, pricesIn, productNoun, topLuma } from './cinematic-cut';
+import { bodyFor, buildCinematic, formFromPhoto, isProductTitle, isReadName, quotedName, isStraightCylinder, otherNouns, pricesIn, productNoun, topLuma } from './cinematic-cut';
 import type { ToolCtx } from '@shared/tools';
 
 describe('pricesIn', () => {
@@ -117,9 +117,22 @@ describe('formFromPhoto', () => {
   });
 });
 
+describe('bodyFor', () => {
+  it('the form seen in the photo wins over the board (the tub the board called a slab, 4 Nov)', () => {
+    expect(bodyFor('round', { form: 'slab', depth: 0.25, section: 5 })).toEqual({ form: 'round', depth: 0.95, section: 2 });
+  });
+  it("keeps the board's depth when its form agrees, inside the form's range", () => {
+    expect(bodyFor('round', { form: 'round', depth: 0.8, section: 2 })!.depth).toBe(0.8);
+  });
+  it("is the board's body when no form was seen", () => {
+    expect(bodyFor(undefined, { form: 'boxy', depth: 0.6, section: 4.5 })).toEqual({ form: 'boxy', depth: 0.6, section: 4.5 });
+    expect(bodyFor(undefined, undefined)).toBeUndefined();
+  });
+});
+
 describe('buildCinematic body', () => {
   const ctx = { assets: { url: (id: string) => `/api/assets/${id}` } } as unknown as ToolCtx;
-  const parts = (body?: { form: 'round'; depth: number; section: number }) => ({
+  const parts = (form?: 'round') => ({
     title: 'Pure Spoonful',
     aspect: '9:16' as const,
     accent: '#cc6688',
@@ -127,15 +140,19 @@ describe('buildCinematic body', () => {
     board: floorBoard({ title: 'Pure Spoonful' }),
     ingredients: {},
     set: undefined,
-    ...(body ? { body } : {}),
+    ...(form ? { form } : {}),
   });
   const productOf = (comp: unknown) => ((comp as { precomps: { cine: { layers: Array<{ id: string; source: { depth: number; section?: number } }> } } }).precomps.cine.layers.find((l) => l.id === 'cine:product')!.source);
-  it("builds the product round from the form found with the photo when the board names none, and a later board's form wins", () => {
-    const p = parts({ form: 'round', depth: 0.95, section: 2 });
-    const asked = productOf(buildCinematic(ctx, p as never, p.board));
-    expect(asked.section).toBe(2);
-    expect(asked.depth).toBe(760);
-    const boxy = productOf(buildCinematic(ctx, p as never, { ...p.board, body: { form: 'boxy', depth: 0.6, section: 4.5 } }));
+  it('builds the product from the form seen in the photo, even when a revised board names another', () => {
+    const p = parts('round');
+    const seen = productOf(buildCinematic(ctx, p as never, p.board));
+    expect(seen.section).toBe(2);
+    expect(seen.depth).toBe(760);
+    const slab = productOf(buildCinematic(ctx, p as never, { ...p.board, body: { form: 'slab', depth: 0.25, section: 5 } }));
+    expect(slab.section).toBe(2);
+  });
+  it("takes the board's form when no form was seen, and the old default with neither", () => {
+    const boxy = productOf(buildCinematic(ctx, parts() as never, { ...parts().board, body: { form: 'boxy', depth: 0.6, section: 4.5 } }));
     expect(boxy.section).toBe(4.5);
     const none = productOf(buildCinematic(ctx, parts() as never, parts().board));
     expect(none.section).toBe(2.6);

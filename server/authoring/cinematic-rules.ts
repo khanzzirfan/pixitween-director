@@ -126,6 +126,9 @@ export const LIGHT = {
   shadow: 0.6,
   /** a set's exposure is scaled by this: the stronger key would otherwise burn the floor to cream */
   exposure: 0.85,
+  /** a pale product (its side colour brighter than `luma`: a white tub, a cream bottle) burns to flat white under the full rig, so its key,
+   * rim and spots are scaled by these and the glow starts no lower than `bloom` */
+  pale: { luma: 0.6, key: 0.8, rim: 0.65, spot: 0.7, bloom: 0.88 },
 } as const;
 
 /**
@@ -140,6 +143,10 @@ export const SPOT = {
   power: 5,
   cone: { min: 10, max: 60, default: 24 },
   soft: 0.6,
+  /** spots add to the key: the key and rim lose this share of themselves per unit of spot strength, so two spots light the product, not burn it */
+  share: 0.3,
+  /** the key and rim keep at least this share however many spots there are */
+  floor: 0.55,
   /** where each side puts the light, as multiples of `distance` (x right, z toward the lens) and the height above the product's middle in metres */
   sides: { left: [-0.8, 0.3, 0.35], right: [0.8, 0.3, 0.35], above: [0.05, 1.1, 0.1], behind: [0.15, 0.25, -1], front: [0, 0.2, 1] },
 } as const;

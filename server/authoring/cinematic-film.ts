@@ -13,7 +13,7 @@ import { WALL, type SetAir, type SetLook } from './set-art';
 import { setKeyframes } from './transform';
 import { rampProgress, type RatePoint } from '@engine/core/speedRamp';
 import type { Aspect, Comp, Obj } from './types';
-import { inkOn, tint } from './variant-film';
+import { inkOn, luma, tint } from './variant-film';
 import { TITLE_DEPTH, TITLE_PROPS_MAX, drawable, titleLeaveAt, lineWidth, plateMaterial, roundedRect, slabProp, titleFont, titleSpace, titlesWorld, wordsBox, wordsProp, wrapTitle } from './titles3d';
 
 import type { PrimitiveShape } from '../product3d/types';
@@ -1027,7 +1027,8 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   const land = Math.round(0.8 * fps);
   const turnEnd = Math.max(land + 6, Math.round((cam.beats.find((b) => b.move === 'dolly-zoom')?.start ?? holdBeat.start) ));
   // the light Muse directs shot by shot (the film's own sweep when it names none)
-  const lp = lightKeys(i.sheet, cam, { azimuth: -70, elevation: 55, key: i.set ? setLight.key : 3.2, rim: i.set ? setLight.rim : 0.6 });
+  const gain = lightBudget(i.spots, i.side);
+  const lp = lightKeys(i.sheet, cam, { azimuth: -70, elevation: 55, key: r2((i.set ? setLight.key : 3.2) * gain.key), rim: r2((i.set ? setLight.rim : 0.6) * gain.rim) });
   const lightTweens = lp ? Object.values(lp).reduce((sum, ks) => sum + Math.max(0, ks.length - 1), 0) : 0;
   // ramped shots are sampled along their curve, as densely as the tween budget allows
   const rampShots = i.sheet.beats.filter((b) => b.ramp).length;
@@ -1114,17 +1115,17 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
     camera: { position: cam.position, target, fov: cam.fov, focus: { distance: cam.focus, aperture: apertureKeys(cam, i.aperture ?? APERTURE), ...(i.bokeh ? { bokeh: r2(i.bokeh) } : {}) } },
     set: i.set ? { ground: i.set.ground, groundSize: [...CAMERA.groundSize], wall: { distance: WALL.distance, height: WALL.height }, backdrop: i.set.backdrop.id, ...floorShine(i.finish ?? defaultFinish(keyLevel)), ...floorLight(i.finish ?? defaultFinish(keyLevel)) } : { ground: 'none', wall: false },
     style: { shading: 'pbr', exposure },
-    post: ((post, blur) => (post || blur ? { ...post, ...(blur ? { motionBlur: blur } : {}) } : undefined))(finishPost(i.finish ?? defaultFinish(keyLevel), cam.beats.at(-1)!.start, i.grade), motionBlur(i.sheet, cam, i.blur)),
+    post: ((post, blur) => (post || blur ? { ...post, ...(blur ? { motionBlur: blur } : {}) } : undefined))(finishPost(i.finish ?? defaultFinish(keyLevel), cam.beats.at(-1)!.start, i.grade, gain.bloom), motionBlur(i.sheet, cam, i.blur)),
     ...(shaderCuts(i.sheet, cam, fps).length ? { shotTransitions: shaderCuts(i.sheet, cam, fps) } : {}),
     ...(speedRamps(cam).length ? { timeWarp: speedRamps(cam) } : {}),
     shadow: { opacity: i.set ? LIGHT.shadow : 0.45, softness: 0.7 },
     lights: {
       preset: 'studio',
       ...(i.reflect ? { environment: i.reflect } : {}),
-      ...(i.spots?.length ? { spots: spotLights(i.spots) } : {}),
-      key: { azimuth: lp?.azimuth ?? [key(0, -70, EASE_IN_OUT), key(land, -70, EASE_IN_OUT), key(Math.max(turnEnd, land + 6), 45, LINEAR), key(frames, 45)], elevation: lp?.elevation ?? 55, color: i.light?.key ?? keyColor, ...(lp?.key ? { intensity: lp.key } : i.set ? { intensity: setLight.key } : {}) },
+      ...(i.spots?.length ? { spots: spotLights(i.spots, gain.spot) } : {}),
+      key: { azimuth: lp?.azimuth ?? [key(0, -70, EASE_IN_OUT), key(land, -70, EASE_IN_OUT), key(Math.max(turnEnd, land + 6), 45, LINEAR), key(frames, 45)], elevation: lp?.elevation ?? 55, color: i.light?.key ?? keyColor, ...(lp?.key ? { intensity: lp.key } : i.set ? { intensity: r2(setLight.key * gain.key) } : {}) },
       ...(i.set ? { fill: { intensity: setLight.fill }, ambient: setLight.ambient } : {}),
-      rim: { ...(i.light?.rim ? { color: i.light.rim } : {}), intensity: lp?.rim ?? [key(0, i.set ? setLight.rim : 0.6, EASE_IN_OUT), key(Math.max(turnEnd, land + 6), i.set ? setLight.rim : 0.6, EASE_IN_OUT), key(frames, i.set ? setLight.rimEnd : 1.4)] },
+      rim: { ...(i.light?.rim ? { color: i.light.rim } : {}), intensity: lp?.rim ?? [key(0, r2((i.set ? setLight.rim : 0.6) * gain.rim), EASE_IN_OUT), key(Math.max(turnEnd, land + 6), r2((i.set ? setLight.rim : 0.6) * gain.rim), EASE_IN_OUT), key(frames, r2((i.set ? setLight.rimEnd : 1.4) * gain.rim))] },
     },
   };
   c = insertStage(c, world, [can, ...props.map((p) => p.layer), ...air.cards]);
@@ -1369,15 +1370,31 @@ export function floorLight(f: Finish): { caustics?: Obj } {
   return { caustics: { strength: FINISH.caustics[f.caustics], fade: FINISH.caustics.fade, scale: FINISH.caustics.scale } };
 }
 
-/** The world's spot lights for a board's spots: each stands on its side of the product at the book's distance, aimed at the product's middle. */
-export function spotLights(spots: NonNullable<CinematicInput['spots']>): Obj[] {
+/**
+ * How much of the rig the product can take. Spots add to the key, so the key and rim give up a share for each unit of spot strength; a pale
+ * product (a white tub) also takes less key, rim and spot, and its glow starts higher, or its lid and rim burn to flat white.
+ */
+export function lightBudget(spots: CinematicInput['spots'], side: string | undefined): { key: number; rim: number; spot: number; bloom?: number } {
+  const strength = (spots ?? []).slice(0, SPOT.max).reduce((sum, s) => sum + (s.strength ?? 1), 0);
+  const share = Math.max(SPOT.floor, 1 - SPOT.share * strength);
+  const pale = side !== undefined && /^#[0-9a-f]{3,6}$/i.test(side) && luma(side) > LIGHT.pale.luma;
+  return {
+    key: r2(share * (pale ? LIGHT.pale.key : 1)),
+    rim: r2(share * (pale ? LIGHT.pale.rim : 1)),
+    spot: pale ? LIGHT.pale.spot : 1,
+    ...(pale ? { bloom: LIGHT.pale.bloom } : {}),
+  };
+}
+
+/** The world's spot lights for a board's spots: each stands on its side of the product at the book's distance, aimed at the product's middle; `gain` scales their power. */
+export function spotLights(spots: NonNullable<CinematicInput['spots']>, gain = 1): Obj[] {
   return spots.slice(0, SPOT.max).map((s, n) => {
     const [x, y, z] = SPOT.sides[s.side];
     return {
       id: `spot${n + 1}`,
       position: [r2(x * SPOT.distance), r2(PRODUCT_Y + y), r2(z * SPOT.distance)],
       target: [0, r2(PRODUCT_Y), 0],
-      intensity: r2((s.strength ?? 1) * SPOT.power),
+      intensity: r2((s.strength ?? 1) * SPOT.power * gain),
       angle: Math.round(s.cone ?? SPOT.cone.default),
       penumbra: r2(s.soft ?? SPOT.soft),
       ...(s.color ? { color: s.color } : {}),
@@ -1415,12 +1432,12 @@ export function speedRamps(cam: CameraPlan): Obj[] {
   return cam.beats.flatMap((f) => (f.ramp ? [{ startFrame: f.start, durationFrames: Math.max(1, f.end - f.start + 1), rates: f.ramp.map((p) => ({ at: r2(p.at), rate: r2(p.rate) })) }] : [])).slice(0, 8);
 }
 
-/** The world's `post` for a finish: levels to numbers, and the glow swelling when the end hold starts (at `holdFrame`). Undefined when nothing is on. */
-export function finishPost(f: Finish, holdFrame: number, grade?: Grade): Obj | undefined {
+/** The world's `post` for a finish: levels to numbers, and the glow swelling when the end hold starts (at `holdFrame`); the glow starts no lower than `minThreshold`. Undefined when nothing is on. */
+export function finishPost(f: Finish, holdFrame: number, grade?: Grade, minThreshold = 0): Obj | undefined {
   const post: Obj = {};
   if (f.glow !== 'none') {
     const g = FINISH.glow[f.glow];
-    post.bloom = { intensity: [key(0, g.intensity), key(Math.max(1, holdFrame), g.intensity), key(holdFrame + 14, r2(g.intensity * FINISH.holdSwell), EASE_OUT)], threshold: g.threshold, radius: 0.7 };
+    post.bloom = { intensity: [key(0, g.intensity), key(Math.max(1, holdFrame), g.intensity), key(holdFrame + 14, r2(g.intensity * FINISH.holdSwell), EASE_OUT)], threshold: Math.max(g.threshold, minThreshold), radius: 0.7 };
   }
   if (f.vignette !== 'none') post.vignette = { darkness: FINISH.vignette[f.vignette] };
   if (f.grain !== 'none') post.grain = { opacity: FINISH.grain[f.grain] };
