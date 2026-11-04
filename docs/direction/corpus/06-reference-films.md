@@ -1,6 +1,6 @@
 # Reference films
 
-These are lessons from eight 9:16 product ads the user collected. The films live in `debug/movies/`, which holds per-film `direction.md`, `shots.json`, a contact sheet and frames, plus a cross-film `LEARNINGS.md`. The measurements come from `debug/movies/_tools/analyze.py`. I checked the readings against the contact sheets by eye.
+These are lessons from thirteen product ads the user collected (eight first, five dairy and frozen ads added 4 Nov 2026). The films live in `debug/movies/`, which holds per-film `direction.md`, `shots.json`, a contact sheet and frames, plus a cross-film `LEARNINGS.md`. The measurements come from `debug/movies/_tools/analyze.py`. I checked the readings against the contact sheets by eye.
 
 Seven of the films are AI or CG 3D renders: lemon soda, a chocolate tube, a snack pouch, a seasoning shaker, an iced-coffee sachet, a latte can and yogurt. One is a flat 2D motion graphic (a sports drink, "Tevia"). **Tevia is the closest match to our engine**, which works with layers, keyframes and cut-outs. The others show what to fake with layers.
 
@@ -30,6 +30,30 @@ Seven of the films are AI or CG 3D renders: lemon soda, a chocolate tube, a snac
 | Iced coffee | **One warm accent in a cold world.** A droplet match cut: a small object travels down the pack into the next scene. Immersion macro (inside the liquid) as the sensory peak at 55–65 % of runtime. | 0.8 s average; 3.2 s end pull-out | Cold plate + warm grade only on the product (a tint on the pack layer). The droplet and immersion need generated clips. |
 | Chocolate tube | Fastest cuts (0.67 s average). **Label macro, then pull to the tube.** Ends on the slowest, steadiest shot. Low-key warm palette, backlit gold particles, floor reflection. | 15 shots; 1.2 s hold | Label macro: yes. Gold dust = warm bokeh air. |
 | Lemon soda | Establishes the world with a long forward move through foreground objects (lemons wipe the lens), reveals the product *small* on the horizon, then brings it close. The end mirrors the opening so it loops. | 22 s; +90 % dolly over 2.2 s | Foreground wipes = large blurred cut-outs crossing fast in front (z < product). |
+
+## Batch 2 (4 Nov 2026): yoghurt and ice cream
+
+Five more ads, all dairy or frozen: Frambini (raspberry cup, AI, 20 s), Tude (2D, 15 s), milma (2D, five flavours, 18 s), noosa (6 s, 4:5) and Cream Stone Tubz (mango, 25 s). Per-film notes are in `debug/movies/<slug>/direction.md`; compact data is in `films/`.
+
+| Film | What it does | Timing | In our engine |
+|---|---|---|---|
+| **milma ice cream** | **Ring-tunnel variant film.** Two-tone concentric rings in the flavour colour. The white cup tumbles in, ingredient cut-outs sit in two opposite corners, the flavour name pops above, then the cup shrinks to the ring centre and the next colour's rings take over. After five flavours: lineup with a headline, then a logo on white. | Each act 3.0 s (0.64 s in, 2.36 s hold); lineup 1.8 s; logo 1.2 s | **Yes.** This is R4 with a ring background and a shrink transition. The best match to `variant-film.ts`. |
+| **Tude** | One pink blob behind the tub, fruit orbiting it, a tagline typed word by word, then a liquid splash wipes to a crimson end card with logo and tagline. A 16:9 ad inside a 9:16 frame, with blurred copies above and below. | 8.3 s drift, 3 s wipe, **3.7 s hold (25 %)** | **Yes.** Blob = a blurred ellipse in the field; the wipe = a 4-frame slide in the brand colour. |
+| **noosa** | A 6 s film as three 2 s beats: fruit rain on a teal plate, the yoghurt surface with fruit landing in it, then a lineup with a large logo. A small logo bug sits in every shot. | 1.9 s, 2.1 s, 2.0 s | **Yes** as a 6 s pre-roll. Falling fruit = air layer cut-outs. The surface macro needs one plate. |
+| **Cream Stone Tubz** | Hero, label macro with condensation, lid macro, ingredient macros, pulp filling the frame, round seal macro, lid peel, texture macros, whole fruit, hero pull-out, logo. Mostly static or pan. | 16 shots; 2.7 s logo hold | **Partly.** Label and seal macros yes (cut-out at 3×). Condensation and pulp need plates or clips. |
+| **Frambini** | Four 5 s AI clips on one pink palette: flat-lay hero, ingredient dipped in chocolate, a person biting it, a cut-open bite with cream and chocolate ribbons spiralling round it. | 5 s per clip, all push-in | **No** for the person; the others are plates plus a push. The ribbons need a generated clip. |
+
+### What batch 2 adds to our rules
+
+1. **Dairy and frozen palette.** One hue family per film (pink, raspberry, cream), or one hue per flavour. The pack stays white or neutral and the backdrop carries the colour.
+2. **Texture is the plate.** A yoghurt surface or an ice-cream swirl macro is the background fruit lands in. A pour or pulp filling the frame is a transition.
+3. **Fruit moves, the product does not.** Falling, orbiting or corner cut-outs. Cheap with the air layer.
+4. **Logo end card, brand-colour field.** Tude 3.7 s, Cream Stone 2.7 s, noosa 2.0 s, milma 1.2 s. One tagline line under the logo. For a 10 s film hold 2–2.5 s.
+5. **Wet label macro.** Condensation droplets on the label or lid say cold and fresh.
+6. **Interior reveal.** A cut-open product with ribbons of cream or chocolate round it is the payoff shot for sweet and dairy.
+7. **Keep the real label.** AI clips redraw the pack and change the name (Frambini became Frami). Every shot that shows the label should come from the cut-out, not the generator.
+8. **One palette keeps chained AI clips together.** Use the same colour words in every plate prompt.
+9. **Short films are three beats.** 6 s: hook, surface macro, lineup. 10 s: hook, label macro, texture, fruit rhythm, hold.
 
 ## Fake dolly zoom (no real one appears in the set)
 
@@ -61,3 +85,8 @@ R8 and a real 3D R1 are built in `server/authoring/hero3d-clip.ts` (the `hero-3d
 | R6 | Word-by-word text, key word bold or in the accent colour | Tevia |
 | R7 | Air-cloud transition: the air layer scales to fill the frame, then cut | seasoning shaker |
 | R8 | Fake dolly zoom on the reveal: plate +25 % about the product over 0.6 s, product held | chocolate tube, pouch |
+| R9 | Ring-tunnel background: two-tone concentric rings centred on the product, scaled and rotated slowly; the shrink-to-centre transition between acts | milma |
+| R10 | Blob wipe: a flat splash shape in the next field colour covers the frame for 4 frames, then the end card | Tude |
+| R11 | Fruit rain / orbit: cut-out fruit falling or circling a fixed product (air layer) | noosa, Tude |
+| R12 | Logo end card on a brand-colour field with a one-line tagline, held 2–3.7 s | Tude, Cream Stone, noosa |
+| R13 | Landscape-in-portrait: blurred enlarged copy fills the top and bottom bands | Tude |
