@@ -44,6 +44,14 @@ export function pickPrompt(o: { title: string; brief?: string; withPhoto: boolea
   ].join('\n');
 }
 
+/** Two looks in one verdict: 2D wins only when both say so clearly; any other mix is a tie, so the 3D film stays. Both agreeing on 3D is a 3D win. */
+export function combinePicks(a: FormPick, b: FormPick): FormPick {
+  const flat = (p: FormPick) => p.better === '2d' && p.clear;
+  if (flat(a) && flat(b)) return { better: '2d', clear: true, why: a.why || b.why };
+  if (a.better === '3d' && b.better === '3d') return { better: '3d', clear: a.clear && b.clear, why: a.why || b.why };
+  return { better: 'tie', clear: false, why: `the two looks disagreed (${a.better}${a.clear ? ' clearly' : ''}: ${a.why || 'no reason'}; ${b.better}${b.clear ? ' clearly' : ''}: ${b.why || 'no reason'})`.slice(0, 300) };
+}
+
 /** Muse's answer, mapped from A/B to the forms. Anything unreadable is a tie (so the 3D film stays). */
 export function parsePick(raw: unknown, aIs3d: boolean): FormPick {
   let v: unknown = raw;
@@ -84,11 +92,16 @@ export async function pickForm(ctx: ToolCtx, o: PickInput): Promise<FormPick> {
     // a floor under Muse's look: 3D frames that measure as burnt out never replace the 2D film, whatever Muse would say
     const exposure = await measureExposure(solid);
     if (isBurnt(exposure)) return { better: '2d', clear: true, why: `the 3D frames are burnt out (average brightness ${exposure.mean}, ${Math.round(exposure.hot * 100)}% near white)` };
-    const aIs3d = threeDFirst(o.filmId);
-    const images = [...(o.photo ? [o.photo] : []), ...(aIs3d ? solid : flat), ...(aIs3d ? flat : solid)];
-    const raw = await ctx.meta.spark.reviewImages(images, pickPrompt({ title: o.title, ...(o.brief ? { brief: o.brief } : {}), withPhoto: Boolean(o.photo) }));
-    ctx.ledger.add(ctx.filmId, 'muse-spark-1.3-contributor', '2D or 3D pick', 0.006);
-    return parsePick(raw, aIs3d);
+    // Muse looks twice, once with each cut shown first: a small vision model is noisy and leans on position, so the film goes back to 2D only when both looks say the 2D cut clearly wins
+    const ask = async (aIs3d: boolean): Promise<FormPick> => {
+      const images = [...(o.photo ? [o.photo] : []), ...(aIs3d ? solid : flat), ...(aIs3d ? flat : solid)];
+      const raw = await ctx.meta.spark.reviewImages(images, pickPrompt({ title: o.title, ...(o.brief ? { brief: o.brief } : {}), withPhoto: Boolean(o.photo) }));
+      ctx.ledger.add(ctx.filmId, 'muse-spark-1.3-contributor', '2D or 3D pick', 0.006);
+      return parsePick(raw, aIs3d);
+    };
+    const first = threeDFirst(o.filmId);
+    const [a, b] = await Promise.all([ask(first), ask(!first)]);
+    return combinePicks(a, b);
   } catch (err) {
     log(`2D or 3D pick skipped: ${err instanceof Error ? err.message : String(err)}`);
     return { better: '3d', clear: true, why: 'pick skipped' };

@@ -13,6 +13,9 @@ import { floorElements, sanitizeElements, MAX_ELEMENTS, type ElementSpec, type I
 // them. A checker holds the shots to what the reference films do and every element to being used; the builder (cinematic-film.ts) plays the board
 // as camera moves and element motions in one stage3d world. Pure except planBoard, which makes one Spark call (about $0.005).
 
+/** How freely Muse samples its board (0 repeats itself, 1 is loose). */
+export const BOARD_TEMPERATURE = 0.9;
+
 export const SHOT_SIZES = ['wide', 'medium', 'close', 'macro'] as const;
 /**
  * The camera's moves. push: in on the product. pull: out, the payoff. hold: stays (and drifts). orbit: swings round the product on an arc.
@@ -512,7 +515,7 @@ export function boardPrompt(o: { title: string; brief?: string; brand?: string; 
     system: [
       'You are the creative director of a short photoreal 3D product ad: the real product in a dark, moody world with real things around it, shot like the best commercials for its kind of product (food, sport, tech, home, fashion, outdoor).',
       referenceDeck(`${o.category ?? ''} ${o.title} ${o.brief ?? ''}`),
-      'YOUR TASK. You are shown the product photo. First find its ONE idea (a contrast or a device, as above) and write it as the concept. Then decide what belongs in the film, and write a shot list in which every shot has a reason (the note) that serves the idea. Vary the actions and the lengths of your shots; do not copy the worked boards. Reply with JSON only, in this shape:',
+      'YOUR TASK. You are shown the product photo. First find its ONE idea (any of the kinds above, or one of your own, chosen for this product) and write it as the concept. Then decide what belongs in the film, and write a shot list in which every shot has a reason (the note) that serves the idea. Vary the actions and the lengths of your shots; do not copy the worked boards. Reply with JSON only, in this shape:',
       `{"traits":{"rigid":true,"sits":"upright|lying|flat","edge":"crisp|fuzzy","sells":"what it sells on"},"form":"3d|2d","surface":"matte|satin|gloss|metal","concept":"one sentence","mood":"a few words","tone":"warm|cool|neutral","key":"low|mid|high","set":{"look":"beach|pool|sunset|sky|studio|night|garden","air":"none|dust|bokeh|spray|smoke","palette?":{"top":"#rrggbb","horizon":"#rrggbb","ground":"#rrggbb","glow?":{"x":0.7,"y":0.7,"color":"#rrggbb","size":0.3},"band?":{"color":"#rrggbb","height":0.09,"foam":false},"stars?":false,"texture?":"none|clouds|spots|rays|bands|grid","accent?":"#rrggbb"}},"endCard?":{"plate":"pill|bar|none","price":"disc|tag|plain","align":"center|left","text":"normal|upper","weight":"light|regular|bold","accent":"#rrggbb","pulse":true},"light?":{"key":"#rrggbb","rim":"#rrggbb"},"body?":{"depth":0.55,"section":2.6,"axis":"up|across"},"blur?":0.5,"bokeh?":0.4,"aperture?":0.3,"reflect?":"room|softbox|ring|sunset|none","spots?":[{"side":"left|right|above|behind|front","color?":"#rrggbb","strength?":1,"cone?":24,"soft?":0.6}],"grade?":{"exposure?","contrast?","saturation?","hue?","shadows?":"#rrggbb","highlights?":"#rrggbb","split?","balance?","streak?":{"color?","strength","reach?"},"halation?","letterbox?":2.39},"handheld":true,"finish":{"glow":"none|soft|strong","grain":"none|fine|heavy","vignette":"none|soft|strong","fringe":false,"floor":"none|matte|glossy|mirror","wet":"none|light|heavy","caustics":"none|soft|bright"},"tagline":"at most ${TEXT_RULES.taglineWords} words","elements":[{"id":"slug","name":"what SAM should find","use":"solid|card|liquid|vapour","glass":false,"color":"#rrggbb (liquid or vapour)","clear":false,"look":"one piece, concrete colours and materials","pieces":1,"sizeM":0.02}],"beats":[{"size","move","seconds","angle?","product?","cut?","camera?":{"from?":{"fill","height","around","lens","side"},"via?":[{...}],"to?":{...},"ease?","focus?":"product|rack|{from?,to?,aperture?}","shake?":1},"ingredient?":{"kind":"element id","action","place?","scale?"},"spin?":{"degrees","ease?","tilt?","roll?","lift?"},"light?":{"from","to","elevation","key","rim"},"ramp?":[{"at":0,"rate":1},{"at":0.35,"rate":0.2}],"dir?":"left|right|up|down","blur?":0.5,"text?":"words on screen","note"}]}`,
       `THE SET. The product does not float in nothing: it stands in a place, with depth behind it, so the camera's moves slide the near and far apart (parallax). Pick the look that suits the idea and the campaign: ${SET_LOOKS.map((l) => `${l} (${SET_HELP[l]})`).join('; ')}. Pick the air: ${SET_AIR.join(', ')}; dust is fine specks drifting round the product, bokeh is big soft lights drifting near the lens (use it for warm, festive, night or dreamy films), spray is a burst of droplets in the peak shot (water, fizz, sea), smoke is slow smoke drifting up behind the product the whole film (oud, incense, whisky, night, mystery). Match the set to the light: a low key suits night or sunset, a high key suits beach, pool, sky or garden.`,
       `THE WORLD'S COLOURS are yours. "look" is only a starting recipe; write "set.palette" to paint the world this film needs and every colour you write replaces the look's own: top (the sky overhead), horizon (the sky where it meets the floor; the camera sees mostly this low part), ground (the floor), glow (a light in the sky: x across 0-1, y down 0.3-1 where 0.7 is low and seen, size 0.1 small to 0.6 huge, its colour: a sun, a lamp, a moon, a neon sign), band (a strip along the horizon: a sea, a skyline, hills; height 0.02-0.3), stars, texture (${SET_TEXTURES.join(', ')}: clouds soft blobs, spots warm out-of-focus lights, rays light fanning from the glow, bands soft horizontal haze, grid a faint perspective grid) and accent (the colour of the texture's shapes). Pick colours from the idea and the product (a deep wine red room for a red lipstick, a pale dawn for a calm morning, hot pink and violet for a night out) and do not default to blue; a dark world suits a low key and a pale one a high key, and the ground should be a colour that sits well under the product.`,
@@ -573,8 +576,11 @@ export function isFailureText(text: string): boolean {
   return /\b(not|no|isn'?t|is not)\s+(\w+\s+){0,2}(visible|readable|legible|shown|found|detected|available|identifiable)\b|\b(unknown|unreadable|illegible|unidentified|n\/a|(cannot|can'?t|unable to) (see|read|identify|find))\b/i.test(text);
 }
 
-/** The board in a Spark reply (an object or JSON text), or why it could not be read. Elements that fail the safety pass are listed in `dropped`. */
-export function parseBoard(raw: unknown, o: { stored?: boolean } = {}): { ok: true; board: CinematicBoard; dropped: string[]; notes: string[] } | { ok: false; reason: string } {
+/**
+ * The board in a Spark reply (an object or JSON text), or why it could not be read. Elements that fail the safety pass are listed in `dropped`,
+ * and the ids Muse gave them in `gone`, so shots that used them can play without them.
+ */
+export function parseBoard(raw: unknown, o: { stored?: boolean } = {}): { ok: true; board: CinematicBoard; dropped: string[]; gone: string[]; notes: string[] } | { ok: false; reason: string } {
   let data: unknown = raw;
   if (typeof raw === 'string') {
     try {
@@ -587,6 +593,8 @@ export function parseBoard(raw: unknown, o: { stored?: boolean } = {}): { ok: tr
   const r = boardSchema.safeParse(stripNulls(data));
   if (!r.success) return { ok: false, reason: r.error.issues[0]?.message ?? 'wrong shape' };
   const { elements, dropped } = sanitizeElements(r.data.elements);
+  const kept = new Set(elements.map((e) => e.id));
+  const gone = (Array.isArray(r.data.elements) ? r.data.elements : []).map((e) => (e && typeof e === 'object' ? (e as { id?: unknown }).id : undefined)).filter((id): id is string => typeof id === 'string' && !kept.has(id));
   // a tagline over the word limit is dropped, not cut: a cut line ends mid-phrase ("Pack the cold, chase"); without one the end card shows the brand
   const notes: string[] = [];
   let tagline = r.data.tagline?.trim().replace(/\s+/g, ' ') || undefined;
@@ -607,7 +615,7 @@ export function parseBoard(raw: unknown, o: { stored?: boolean } = {}): { ok: tr
     const { text: _text, ...rest } = b;
     return rest;
   });
-  return { ok: true, board: { concept: r.data.concept, mood: r.data.mood, ...(r.data.traits && Object.values(r.data.traits).some((v) => v !== undefined) ? { traits: r.data.traits } : {}), ...(r.data.form ? { form: r.data.form } : {}), ...(r.data.surface ? { surface: r.data.surface } : {}), ...(r.data.tone ? { tone: r.data.tone } : {}), ...(r.data.key ? { key: r.data.key } : {}), ...(r.data.set ? { set: r.data.set } : {}), ...(r.data.handheld !== undefined ? { handheld: r.data.handheld } : {}), ...(r.data.finish ? { finish: r.data.finish } : {}), ...(r.data.endCard && Object.values(r.data.endCard).some((v) => v !== undefined) ? { endCard: r.data.endCard } : {}), ...(r.data.light && Object.values(r.data.light).some((v) => v !== undefined) ? { light: r.data.light } : {}), ...(r.data.body && Object.values(r.data.body).some((v) => v !== undefined) ? { body: r.data.body } : {}), ...(r.data.blur !== undefined ? { blur: r.data.blur } : {}), ...(r.data.grade && Object.values(r.data.grade).some((v) => v !== undefined) ? { grade: r.data.grade } : {}), ...(r.data.bokeh !== undefined ? { bokeh: r.data.bokeh } : {}), ...(r.data.reflect ? { reflect: r.data.reflect } : {}), ...(r.data.spots?.length ? { spots: r.data.spots } : {}), ...(r.data.aperture !== undefined ? { aperture: r.data.aperture } : {}), ...(tagline ? { tagline } : {}), elements, sheet: { beats: beats.map((b) => ({ ...b, seconds: Math.round(b.seconds * 100) / 100 })) } }, dropped, notes };
+  return { ok: true, board: { concept: r.data.concept, mood: r.data.mood, ...(r.data.traits && Object.values(r.data.traits).some((v) => v !== undefined) ? { traits: r.data.traits } : {}), ...(r.data.form ? { form: r.data.form } : {}), ...(r.data.surface ? { surface: r.data.surface } : {}), ...(r.data.tone ? { tone: r.data.tone } : {}), ...(r.data.key ? { key: r.data.key } : {}), ...(r.data.set ? { set: r.data.set } : {}), ...(r.data.handheld !== undefined ? { handheld: r.data.handheld } : {}), ...(r.data.finish ? { finish: r.data.finish } : {}), ...(r.data.endCard && Object.values(r.data.endCard).some((v) => v !== undefined) ? { endCard: r.data.endCard } : {}), ...(r.data.light && Object.values(r.data.light).some((v) => v !== undefined) ? { light: r.data.light } : {}), ...(r.data.body && Object.values(r.data.body).some((v) => v !== undefined) ? { body: r.data.body } : {}), ...(r.data.blur !== undefined ? { blur: r.data.blur } : {}), ...(r.data.grade && Object.values(r.data.grade).some((v) => v !== undefined) ? { grade: r.data.grade } : {}), ...(r.data.bokeh !== undefined ? { bokeh: r.data.bokeh } : {}), ...(r.data.reflect ? { reflect: r.data.reflect } : {}), ...(r.data.spots?.length ? { spots: r.data.spots } : {}), ...(r.data.aperture !== undefined ? { aperture: r.data.aperture } : {}), ...(tagline ? { tagline } : {}), elements, sheet: { beats: beats.map((b) => ({ ...b, seconds: Math.round(b.seconds * 100) / 100 })) } }, dropped, gone, notes };
 }
 
 /** A board as it is kept (shots under `sheet`), read back from disk: undefined when it is not a board any more. Elements go through the safety pass again. */
@@ -634,11 +642,14 @@ export function floorBoard(o: { title: string; category?: string }): CinematicBo
   return { concept: `${o.title}, the hero product with the things it is made of`, mood: 'dark, warm, glossy', set: floorSet(`${o.category ?? ''} ${o.title}`), elements, sheet: defaultBeatSheet(elements) };
 }
 
-/** Rule breaks in a board as it is: its elements through the safety pass and its shots through the checker. Used on boards read back from disk, which a person may have edited. */
-export function reviewBoard(board: CinematicBoard): { board: CinematicBoard; violations: string[]; hard: string[]; dropped: string[] } {
+/**
+ * Rule breaks in a board as it is: its elements through the safety pass and its shots through the checker. Used on boards read back from disk,
+ * which a person may have edited, and on fresh replies. `gone` names elements already dropped before (by `parseBoard`), whose shots also play without them.
+ */
+export function reviewBoard(board: CinematicBoard, gone: readonly string[] = []): { board: CinematicBoard; violations: string[]; hard: string[]; dropped: string[] } {
   const { elements, dropped } = sanitizeElements(board.elements);
   // a shot that used an element the safety pass dropped plays without it: the rest of Muse's board stands
-  const goneIds = new Set(dropped.map((d) => d.split(':')[0]!.trim()));
+  const goneIds = new Set([...gone, ...dropped.map((d) => d.split(':')[0]!.trim())]);
   const sheet: BeatSheet = { beats: board.sheet.beats.map((b) => (b.ingredient && goneIds.has(b.ingredient.kind) && !elements.some((e) => e.id === b.ingredient!.kind) ? (({ ingredient: _gone, ...rest }) => rest)(b) : b)) };
   const next = { ...board, elements, sheet };
   const hard = [...(elements.length ? [] : ['list 2 to 4 elements']), ...sheetBreaks(next.sheet, elements)];
@@ -660,9 +671,10 @@ export async function planBoard(ctx: ToolCtx, o: { title: string; brief?: string
     try {
       let reply: unknown;
       if (o.photo) {
-        reply = await ctx.meta.spark.reviewImages([o.photo], `${p.system}\n\n${p.user}`);
+        // the board is a creative draft: sampled freely, as on the text path, so two films for different products do not come out as one pattern
+        reply = await ctx.meta.spark.reviewImages([o.photo], `${p.system}\n\n${p.user}`, undefined, { temperature: BOARD_TEMPERATURE });
       } else {
-        reply = (await ctx.meta.spark.chat({ response_format: { type: 'json_object' }, temperature: 0.9, messages: [{ role: 'system', content: p.system }, { role: 'user', content: p.user }] })).content;
+        reply = (await ctx.meta.spark.chat({ response_format: { type: 'json_object' }, temperature: BOARD_TEMPERATURE, messages: [{ role: 'system', content: p.system }, { role: 'user', content: p.user }] })).content;
       }
       ctx.ledger.add(ctx.filmId, 'muse-spark-1.3-contributor', '1 call', o.photo ? 0.005 : 0.002);
       const parsed = parseBoard(reply);
@@ -671,7 +683,7 @@ export async function planBoard(ctx: ToolCtx, o: { title: string; brief?: string
         continue;
       }
       // only a board that would break the film goes back to Muse once; an element dropped for safety is reported, not a reason to refuse the board
-      const review = reviewBoard(parsed.board);
+      const review = reviewBoard(parsed.board, parsed.gone);
       violations = review.hard;
       previous = parsed.board;
       if (!violations.length) return { board: review.board, source: 'muse', violations: [], dropped: parsed.dropped };

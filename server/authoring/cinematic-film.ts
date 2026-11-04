@@ -753,27 +753,66 @@ export function lightKeys(sheet: BeatSheet, cam: CameraPlan, base: { azimuth: nu
   return Object.keys(plan).length ? plan : undefined;
 }
 
-/**
- * The product's turn and rise, from the shots' product field: a drop-in rises from above spinning (once the lens has settled), a turn swings
- * it 45 degrees through the shot, still holds the yaw it has, and the label macro faces the lens (yaw 0) at its middle.
- */
 /** How far a flat cut-out swings to either side on a turn: it shows only its front, so it rocks from one side to the other inside 30 degrees. */
 const FLAT_SWING = 25;
 
+/** Degrees between the product's front and the lens, from -180 to 180: its yaw less the camera's azimuth (the lens sits at x = sin az, z = cos az). */
+export function faceOffset(yawDeg: number, cameraPos: V3): number {
+  const az = (Math.atan2(cameraPos[0], cameraPos[2]) * 180) / Math.PI;
+  return ((((yawDeg - az + 180) % 360) + 360) % 360) - 180;
+}
+
+/**
+ * The product's turn and rise, from the shots' product field. Safety only: the film ends on the price, so the product must end with its front
+ * to the lens. When Muse's turns would leave its back or side showing (more than CAMERA.endFaceMax degrees off), its last turn is lengthened or
+ * shortened just enough; with no turn after the last label macro to adjust, the last shot turns it round. Muse's spins otherwise play as written.
+ */
 function productMoves(sheet: BeatSheet, cam: CameraPlan, land: number, frames: number, flat = false, rampKeys: number = CAMERA.rampKeys): { yaw: Array<Key<V3>>; rise: Array<Key<V3>> } {
+  const first = layProductMoves(sheet, cam, land, frames, flat, rampKeys);
+  const end = cam.position.at(-1)?.v;
+  if (!end) return first;
+  const off = faceOffset(first.at, end);
+  const max = CAMERA.endFaceMax;
+  if (Math.abs(off) <= max) return first;
+  const delta = r(Math.sign(off) * max - off);
+  return layProductMoves(sheet, cam, land, frames, flat, rampKeys, first.lastTurn !== undefined ? { beat: first.lastTurn, delta } : { beat: cam.beats.length - 1, delta, add: true });
+}
+
+/** Lays out the turn and rise: a drop-in rises from above spinning, a turn swings it 45 degrees through the shot, still holds the yaw it has, a spin turns it as Muse wrote, and the label macro faces the lens (yaw 0) at its middle. */
+function layProductMoves(
+  sheet: BeatSheet,
+  cam: CameraPlan,
+  land: number,
+  frames: number,
+  flat: boolean,
+  rampKeys: number,
+  /** an extra turn on one shot, so the product ends facing the lens: `add` turns it in a shot that had no turn of its own */
+  fix?: { beat: number; delta: number; add?: boolean },
+): { yaw: Array<Key<V3>>; rise: Array<Key<V3>>; at: number; lastTurn?: number } {
   let at = -28;
+  /** the last shot that turns the product, unless a label macro (which faces it front) comes after */
+  let lastTurn: number | undefined;
   const yaw: Array<Key<V3>> = [key(0, [4, at, 0])];
   const rise: Array<Key<V3>> = [key(0, [0, 0, 0])];
   cam.beats.forEach((f, n) => {
     const beat = sheet.beats[n]!;
     const pm = beat.product ?? 'still';
     const sp = beat.spin;
+    const extra = fix && fix.beat === n ? fix.delta : 0;
+    if (fix?.add && fix.beat === n) {
+      // a shot with no turn of its own turns the product round to face the lens, smoothly over the shot
+      yaw.push(key(f.start, [4, at, 0], EASE_OF.smooth));
+      at += extra;
+      yaw.push(key(f.end, [4, at, 0], EASE_OF.smooth));
+      return;
+    }
     const spun = !!sp && pm !== 'drop' && [sp.degrees, sp.tilt, sp.roll, sp.lift].some((v) => v !== undefined && v !== 0);
     if (spun && sp) {
       // Muse wrote the product's motion out: a turn of `degrees` over the shot, and a lean, a roll and a toss that peak at its middle
       const e = EASE_OF[sp.ease ?? 'smooth'];
       const from = at;
-      const turn = sp.degrees ?? 0;
+      const turn = (sp.degrees ?? 0) + extra;
+      if (turn !== 0) lastTurn = n;
       at = from + turn;
       const mid = Math.round((f.start + f.end) / 2);
       const hasMid = (sp.tilt || sp.roll || sp.lift) && mid > f.start + 1 && mid < f.end - 1;
@@ -808,18 +847,20 @@ function productMoves(sheet: BeatSheet, cam: CameraPlan, land: number, frames: n
       // the turn runs on through the cut into the next shot, like the camera
       yaw.push(key(f.start, [4, at, 0], EASE_THROUGH));
       // a round pack turns on; a flat one swings across to the other side, so every turn moves it
-      at = flat ? (at > 0 ? -FLAT_SWING : FLAT_SWING) : at + 45;
+      at = (flat ? (at > 0 ? -FLAT_SWING : FLAT_SWING) : at + 45) + extra;
+      lastTurn = n;
       yaw.push(key(f.end, [4, at, 0], EASE_THROUGH));
     } else {
       yaw.push(key(f.start, [4, at, 0]));
     }
     if (f.size === 'macro') {
       at = 0;
+      lastTurn = undefined;
       yaw.push(key(Math.round((f.start + f.end) / 2), [4, 0, 0], EASE_IN_OUT));
     }
   });
   yaw.push(key(frames, [4, at, 0]));
-  return { yaw: uniq(yaw), rise: uniq(rise) };
+  return { yaw: uniq(yaw), rise: uniq(rise), at, ...(lastTurn !== undefined ? { lastTurn } : {}) };
 }
 
 /**
@@ -981,7 +1022,11 @@ export function buildCinematicFilm(i: CinematicInput): Comp {
   const rampKeys = rampKeysFor(rampShots, spinRamps, cam.beats.length * 4 + lightTweens + 8 + 5);
   let yaw: Array<Key<V3>> = [key(0, [4, -250, -24], EASE_OUT), key(land, [4, -28, 0], EASE_IN_OUT)];
   if (macro && macro.start > land + 3) yaw.push(key(Math.round((macro.start + macro.end) / 2), [4, 0, 0], EASE_IN_OUT));
-  yaw.push(key(Math.max(turnEnd, (yaw.at(-1)?.t ?? 0) + 3), [4, 22, 0], EASE_IN_OUT), key(frames, [4, 16, 0]));
+  // the default turn ends at 16 degrees; when the lens has orbited away it turns on until the front meets the lens (safety, as in productMoves)
+  const camEnd = cam.position.at(-1)?.v;
+  const endOff = camEnd ? faceOffset(16, camEnd) : 0;
+  const settle = Math.abs(endOff) > CAMERA.endFaceMax ? r(Math.sign(endOff) * CAMERA.endFaceMax - endOff) : 0;
+  yaw.push(key(Math.max(turnEnd, (yaw.at(-1)?.t ?? 0) + 3), [4, 22 + settle, 0], EASE_IN_OUT), key(frames, [4, 16 + settle, 0]));
   let rise: Array<Key<V3>> = [key(0, [0, CAMERA.dropFrom, 0], EASE_OUT), key(land, [0, 0, 0])];
   if (i.sheet.beats.some((b) => b.product)) ({ yaw, rise } = productMoves(i.sheet, cam, land, frames, flat, rampKeys));
   // the label macro looks at the label: the camera and its target both move over the label's spot for that shot, and go back for the next

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { lightValidate } from '../engine/light-validator';
 import { checkBeatSheet, defaultBeatSheet, totalSeconds, type BeatSheet } from './beatsheet';
-import { ELEVATION, rampKeysFor, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, SOLID, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, cutSpeeds, finishPost, shaderCuts, cutParams, spotLights, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
+import { ELEVATION, rampKeysFor, PLATE, FILL, lightKeys, motionBlur, FOV_BASE, FOV_WIDE, LIMITS, SOLID, PRODUCT_H, PRODUCT_Y, macroOffset, PUSH_FROM, buildCinematicFilm, faceOffset, cutSpeeds, finishPost, shaderCuts, cutParams, spotLights, framingDistance, planCamera, shakeCamera, shakeKeysPerShot, type CinematicInput } from './cinematic-film';
 import { CAMERA, LIGHT, MATERIALS, SURFACES } from './cinematic-rules';
 import { SPACE_EM } from './text-width';
 import { FLOOR, floorElements, glassAsset, liquidAsset, vapourAsset, type IngredientAsset } from './ingredients';
@@ -1079,7 +1079,40 @@ describe('Muse directs the product, the light and the shutter', () => {
     const k = rot(mk(beat({ spin: { degrees: 360 } })));
     expect(k.at(-2)!.v[1]! - k[0]!.v[1]!).toBeCloseTo(360, 0);
     const back = rot(mk(beat({ spin: { degrees: -180 } })));
-    expect(back.at(-2)!.v[1]! - back[0]!.v[1]!).toBeCloseTo(-180, 0);
+    // half a turn would end on the product's back under the price, so the turn carries on round until its front meets the lens
+    expect(back.at(-2)!.v[1]! - back[0]!.v[1]!).toBeLessThan(-180);
+  });
+  it('the product ends the film facing the lens: a turn that would leave its back or side showing is carried on or cut short just enough', () => {
+    const endsFacing = (sh: BeatSheet) => {
+      const k = rot(sh);
+      const camEnd = (planCamera(sh, 30).position.at(-1)!.v as unknown) as [number, number, number];
+      return Math.abs(faceOffset(k.at(-1)!.v[1]!, camEnd));
+    };
+    for (const degrees of [-180, 90, 135, 200, 450, -90]) expect(endsFacing(mk(beat({ spin: { degrees } })))).toBeLessThanOrEqual(CAMERA.endFaceMax + 0.5);
+    // a turn that already ends facing the lens plays exactly as written
+    const full = rot(mk(beat({ spin: { degrees: 360 } })));
+    expect(full.at(-2)!.v[1]! - full[0]!.v[1]!).toBeCloseTo(360, 0);
+    // a label macro after the turn faces the product front, so nothing is added
+    const macro = rot(mk(beat({ spin: { degrees: 180 } }), beat({ size: 'macro' })));
+    expect(macro.at(-1)!.v[1]).toBe(0);
+    // a still product and a lens that orbits round behind it: there is no turn to adjust, so the last shot turns the product to the lens
+    const behind: BeatSheet = { beats: [beat(), beat({ move: 'hold', seconds: 2, camera: { to: { around: 150 } } })] };
+    expect(Math.abs(faceOffset(-28, (planCamera(behind, 30).position.at(-1)!.v as unknown) as [number, number, number]))).toBeGreaterThan(CAMERA.endFaceMax);
+    expect(endsFacing(behind)).toBeLessThanOrEqual(CAMERA.endFaceMax + 0.5);
+  });
+  it('with no product motion written, the default turn also ends facing a lens that orbited away', () => {
+    const plain = (b: object = {}): any => ({ size: 'medium', move: 'push', seconds: 2, ...b });
+    const behind: BeatSheet = { beats: [plain(), plain({ move: 'hold', seconds: 2, camera: { to: { around: 150 } } })] };
+    const k = props(buildCinematicFilm(input({ sheet: behind })))[0]!.rotation as Array<{ t: number; v: number[] }>;
+    expect(Math.abs(faceOffset(k.at(-1)!.v[1]!, (planCamera(behind, 30).position.at(-1)!.v as unknown) as [number, number, number]))).toBeLessThanOrEqual(CAMERA.endFaceMax + 0.5);
+  });
+  it('measures how far the product is turned from the lens', () => {
+    expect(faceOffset(0, [0, 0.2, 1])).toBeCloseTo(0, 5);
+    expect(faceOffset(360, [0, 0.2, 1])).toBeCloseTo(0, 5);
+    expect(faceOffset(180, [0, 0.2, 1])).toBeCloseTo(-180, 5);
+    // the lens moved round to 90 degrees: a product turned 90 faces it
+    expect(faceOffset(90, [1, 0.2, 0])).toBeCloseTo(0, 5);
+    expect(faceOffset(-30, [0, 0.2, 1])).toBeCloseTo(-30, 5);
   });
   it('tilt and roll peak at the middle of the shot, and a lift raises the product there and brings it back', () => {
     const sh = mk(beat({ spin: { degrees: 90, tilt: 20, roll: 12, lift: 1.5 } }));

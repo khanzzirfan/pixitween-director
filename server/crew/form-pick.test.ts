@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import { describe, expect, it } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
 import type { FilmStore } from '@shared/ports';
-import { commitCuts, keeps3d, parsePick, pickForm, pickPrompt, PICK_FRAMES, PICK_SHARES, threeDFirst } from './form-pick';
+import { combinePicks, commitCuts, keeps3d, parsePick, pickForm, pickPrompt, PICK_FRAMES, PICK_SHARES, threeDFirst } from './form-pick';
 
 const frames = (tag: string) => Array.from({ length: PICK_FRAMES }, (_, i) => Buffer.from(`${tag}${i}`));
 const ctxWith = (answer: unknown, seen: Buffer[][] = []) =>
@@ -42,24 +42,40 @@ describe('the 2D or 3D pick', () => {
     expect(firsts).toBeGreaterThan(70);
     expect(firsts).toBeLessThan(130);
   });
-  it('shows the photo, then film A, then film B, and names them in the prompt', async () => {
+  it('looks twice, once with each cut first, and shows the photo first both times', async () => {
     const seen: Buffer[][] = [];
     const photo = Buffer.from('photo');
     const shares: Array<readonly number[]> = [];
-    const pick = await pickForm(ctxWith({ better: 'A', clear: true }, seen), {
+    await pickForm(ctxWith({ better: 'A', clear: true }, seen), {
       filmId: 'film_x',
       title: 'Cold Brew',
       photo,
       render2d: async (s) => (shares.push(s), frames('flat')),
       render3d: async () => frames('solid'),
     });
-    const aIs3d = threeDFirst('film_x');
-    expect(seen[0]![0]).toBe(photo);
-    expect(seen[0]![1]!.toString()).toBe(aIs3d ? 'solid0' : 'flat0');
-    expect(seen[0]![1 + PICK_FRAMES]!.toString()).toBe(aIs3d ? 'flat0' : 'solid0');
-    expect(pick.better).toBe(aIs3d ? '3d' : '2d');
+    expect(seen).toHaveLength(2);
+    const firsts = seen.map((images) => images[1]!.toString());
+    expect(firsts.sort()).toEqual(['flat0', 'solid0']);
+    for (const images of seen) {
+      expect(images[0]).toBe(photo);
+      expect(images).toHaveLength(1 + 2 * PICK_FRAMES);
+    }
     expect(shares[0]).toEqual(PICK_SHARES);
     expect(pickPrompt({ title: 'Cold Brew', withPhoto: true })).toContain(`pictures 2 to ${PICK_FRAMES + 1}`);
+  });
+  it('takes the film back to 2D only when both looks say 2D clearly', () => {
+    const flat = { better: '2d', clear: true, why: 'x' } as const;
+    const solid = { better: '3d', clear: true, why: 'y' } as const;
+    expect(combinePicks(flat, flat)).toMatchObject({ better: '2d', clear: true });
+    expect(keeps3d(combinePicks(flat, solid))).toBe(true);
+    expect(combinePicks(flat, solid).better).toBe('tie');
+    expect(keeps3d(combinePicks(flat, { better: '2d', clear: false, why: '' }))).toBe(true);
+    expect(combinePicks(solid, solid).better).toBe('3d');
+  });
+  it('keeps 3D when Muse says A both times (so the two looks disagree about the forms)', async () => {
+    const pick = await pickForm(ctxWith({ better: 'A', clear: true }), { filmId: 'film_x', title: 't', render2d: async () => frames('flat'), render3d: async () => frames('solid') });
+    expect(pick.better).toBe('tie');
+    expect(keeps3d(pick)).toBe(true);
   });
   it('keeps the 3D film when the frames cannot be drawn, as before the check', async () => {
     const fail = await pickForm(ctxWith({ better: 'A' }), { filmId: 'f', title: 't', render2d: async () => { throw new Error('no server'); }, render3d: async () => frames('s') });
