@@ -12,10 +12,8 @@
 
 <p align="center"><em>Three real runs on 4 Nov 2026, one photo and one sentence each, 10 s, 9:16. Each product is a real 3D object wearing the customer's photo, with the title and price set in 3D type. Nothing is painted or edited by hand. Shot-by-shot frames are under <a href="#three-briefs-three-films">Three briefs, three films</a>.</em></p>
 
-<!-- OWNER:gif -->
-
 <p align="center">
-  <b>Live:</b> <!-- OWNER:live-url --> · <b>Demo video (3 min):</b> <!-- OWNER:video-url --> · <b>Code:</b> <!-- OWNER:repo-url --> · <b>Team:</b> <!-- OWNER:team -->
+  <b>Demo video (3 min):</b> <a href="https://youtu.be/VFWEXzESuGU">https://youtu.be/VFWEXzESuGU</a> · <b>Code:</b> <a href="https://github.com/khanzzirfan/pixitween-director">https://github.com/khanzzirfan/pixitween-director</a> · <b>Team:</b> Irfan
 </p>
 
 > **Judges, short on time?** Jump straight to **[Run it locally](#1-run-it-locally)**: one Muse API key, then `npm ci` and `npm run dev`, and open http://localhost:5173.
@@ -302,8 +300,6 @@ Optional settings in `.env`: `DIRECTOR_PASSCODE` is the code that spends the ser
 
 ## Cost per film
 
-<!-- OWNER:cost-table -->
-
 Every Meta call is recorded as a `cost` event in the film's event log. `npm run db:export-events -- <filmId>` writes a film's log out of the database, and `npx tsx scripts/cost-per-film.ts <events.jsonl>` prints its full cost record.
 
 A film's cost is its Muse Spark calls (about $0.005 each), a few Muse Image element pictures ($0.01 each) and SAM ($0.0025 per call). The sheets cost nothing: our engine renders them. Planning prices, from the vendor pages on 27 Oct 2026:
@@ -311,14 +307,15 @@ A film's cost is its Muse Spark calls (about $0.005 each), a few Muse Image elem
 | Model | Price |
 |-------|-------|
 | Muse Spark 1.3 contributor | $0.10 per 1M tokens in, $0.20 per 1M tokens out |
+| Muse Spark 1.3 | $1.25 per 1M tokens in, $4.25 per 1M tokens out |
 | Muse Image | $0.01 per image |
 | SAM 3.1 | $2.50 per 1,000 images |
 | Muse Voice Transcribe | $0.18 per hour |
 
 ## Demo
 
-- **Live app:** <!-- OWNER:live-url -->. The gallery lists the finished films; it needs no passcode and costs nothing to look.
-- **Video (3 min):** <!-- OWNER:video-url -->
+- **Video (3 min):** [https://youtu.be/VFWEXzESuGU](https://youtu.be/VFWEXzESuGU)
+- **Run it yourself:** see [Try it in 10 minutes](#try-it-in-10-minutes). You only need a Meta API key.
 
 ## Limitations
 
