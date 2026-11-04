@@ -35,7 +35,10 @@ export function estimateTextSize(layer: Obj): { w: number; h: number } {
     text = String(typeof layer.source === 'string' ? layer.source : (layer.source?.[0]?.v ?? ''));
   if (style.boxWidth) {
     const boxes = text.split('\n').map((line) => wrapWords(line, style.boxWidth, size, k));
-    return { w: Math.max(...boxes.map((b) => b.w)), h: boxes.reduce((n, b) => n + b.h, 0) };
+    // a line that wraps filled its box: the renderer's real glyphs may fit one more word on it than this guess does, so a wrapped
+    // paragraph is taken as wide as the box (the widest it can be) and never fits in the frame on paper only
+    const wrapped = boxes.some((b) => b.h > size * 1.2 * 1.01);
+    return { w: wrapped ? Math.max(style.boxWidth, ...boxes.map((b) => b.w)) : Math.max(...boxes.map((b) => b.w)), h: boxes.reduce((n, b) => n + b.h, 0) };
   }
   const lines = text.split('\n');
   return { w: Math.max(0, ...lines.map((line) => line.length * size * k)), h: lines.length * size * 1.2 };

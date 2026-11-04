@@ -1,6 +1,6 @@
 // AEP asset table -> MotionDoc asset table. See engine/docs/10-aep-adapter.md ("Layers", `image`
 // and `model3d` rows) — `image` assets become MotionDoc `image` assets, `model` assets become
-// `gltf` assets, everything else (audio, video, lottie, gif, svg, font, composition) has no place
+// `gltf` assets, a `*.typeface.json` font becomes a `font` asset (3D titles), everything else (audio, video, lottie, gif, svg, font, composition) has no place
 // in a MotionDoc asset table and is dropped.
 import type { AepAssetMap } from '@shared/aep/asset';
 import type { Asset } from '@engine/schema';
@@ -21,7 +21,8 @@ export function convertAssets(assetMap: AepAssetMap | undefined, resolveUrl: (sr
   if (!assetMap) return { assets };
 
   for (const [originalId, asset] of Object.entries(assetMap)) {
-    const type = ASSET_TYPE_MAP[asset.type];
+    // a font reaches the engine only as a Three typeface (the 3D titles' letters); other fonts are for flat text and stay behind
+    const type = asset.type === 'font' && /\.typeface\.json(\?|$)/.test(asset.src) ? 'font' : ASSET_TYPE_MAP[asset.type];
     if (!type) continue;
     assets[sanitizeId(originalId)] = { type, url: resolveUrl(asset.src) };
   }

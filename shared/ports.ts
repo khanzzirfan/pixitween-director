@@ -92,7 +92,8 @@ export interface AssetStore {
 export interface MetaClients {
   spark: {
     chat(req: ChatRequest, opts?: { signal?: AbortSignal }): Promise<ChatResponse>;
-    reviewImages(images: Buffer[], prompt: string, schema?: object): Promise<unknown>;
+    /** `temperature` sets how freely the model samples; omitted, the provider's default applies. */
+    reviewImages(images: Buffer[], prompt: string, schema?: object, opts?: { temperature?: number }): Promise<unknown>;
     video(mp4: Buffer, prompt: string): Promise<string>;
   };
   image: {

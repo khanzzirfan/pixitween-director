@@ -11,7 +11,7 @@ Rules the agentic director follows to make product clips and films look like rea
 | [03-plate-prompts.md](03-plate-prompts.md) | Plate prompt slot order, worked prompts, banned words, light sources, negatives, composition contract | Plate writer (Muse image) |
 | [04-motion-and-edit.md](04-motion-and-edit.md) | Anti-slideshow rules, three motion layers, timing table, beat sync, pacing, sound | Builder, `retail-clip.ts`, `finish.ts` |
 | [05-critic-rubric.md](05-critic-rubric.md) | Ten pass/fail checks with fixes, plus AI tells | Blind critic |
-| [06-reference-films.md](06-reference-films.md) | Measured lessons from 8 reference product ads in `debug/movies/`: push sizes, cut rhythm, end-hold ratio, the variant grammar, tilt entries, halo, label macro; build list R1–R8 | Showrunner, `retail-clip.ts`, the variant-film builder |
+| [06-reference-films.md](06-reference-films.md) | Measured lessons from 13 reference product ads in `debug/movies/` (batch 2: yoghurt and ice cream, ring-tunnel variant film, logo end cards): push sizes, cut rhythm, end-hold ratio, the variant grammar, tilt entries, halo, label macro; build list R1–R13 | Showrunner, `retail-clip.ts`, the variant-film builder |
 
 Wired in code: looks, `pickLook`, `lookPlatePrompt` / `generateLookPlate`, and `buildRetailClip({ look })` with the light sweep, shadow side, world motion, air, grade, price shape and beat-timed pop. Not yet: the ingredient orbit's cut-outs (it uses bokeh for now), sound hits, and the critic rubric in the review prompt.
 

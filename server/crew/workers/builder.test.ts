@@ -109,6 +109,21 @@ describe('runBuilderJob: build', () => {
   });
 });
 
+describe('runBuilderJob: a shot waiting for a video clip', () => {
+  it('gets its poster and "clip pending" caption with no model call, and the job is done, not failed', async () => {
+    const t = await setup();
+    // the showrunner switched s1 to video while its build was queued
+    await t.film.films.update(t.film.filmId, { storyboard: { ...storyboard, scenes: [{ ...scene, mode: 'generate' }, { ...scene, id: 's2' }] } });
+    const b = scripted([[caption(1)]]);
+    const r = await runBuilderJob(t.job('build-scene'), ac(), t.crew, { backendFor: () => b });
+    expect(b.calls()).toBe(0);
+    expect(r.summary).toMatch(/waiting for the video clip/);
+    const ids = layerIds(await t.comp());
+    expect(ids).toContain('s1:bg');
+    expect(ids).toContain('s1:caption');
+  });
+});
+
 describe('runBuilderJob: rebuild, restyle, edit, fix', () => {
   it('a rebuild on a scene with 4 layers leaves only what the model adds', async () => {
     const t = await setup({ layers: 4 });

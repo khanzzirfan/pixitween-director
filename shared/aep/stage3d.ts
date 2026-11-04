@@ -88,6 +88,10 @@ export function refineProp3DLayer(
     }
   }
 
+  if (prop.source.type === "text3d") {
+    if (prop.role === "product") issue(`prop3d '${prop.id}' the product cannot be text`, ["source"]);
+    if (swarm) issue(`prop3d '${prop.id}' text is not a swarm`, ["swarm"]);
+  }
   if (prop.source.type === "smoke" && prop.role === "product") issue(`prop3d '${prop.id}' the product cannot be smoke`, ["source"]);
   if (prop.source.type === "liquid" && prop.role === "product") issue(`prop3d '${prop.id}' the product cannot be a liquid`, ["source"]);
   if (prop.source.type === "primitive" && prop.source.round !== undefined && prop.source.shape !== "box") {
@@ -126,6 +130,7 @@ export function usesCinematicFields(
     if (layer.source.type === "card") return "prop3d card source";
     if (layer.source.type === "liquid") return "prop3d liquid source";
     if (layer.source.type === "smoke") return "prop3d smoke source";
+    if (layer.source.type === "text3d") return "prop3d text3d source";
     if (layer.source.type === "primitive" && layer.source.round !== undefined) return "prop3d source.round";
     if (layer.material) return "prop3d material";
     if (layer.swarm) return "prop3d swarm";

@@ -47,12 +47,11 @@ const schema = z.object({
   META_SPARK_MODEL: z.string().default('muse-spark-1.3-contributor'),
   CLIPPY_MCP_URL: optStr,
   CLIPPY_TOKEN: optStr,
-  /** Optional. One Revana key pays for Seedance 2.5 video and MiniMax M3 chat. Unset means that path is off. */
-  REVANA_API_KEY: optStr,
-  REVANA_BASE_URL: z.string().default('https://api.revana.si/v1'),
   GLIMMER_BASE_URL: z.string().default('http://localhost:11434'),
   GLIMMER_MODEL: z.string().default('muse-glimmer:30b-mlx'),
   DIRECTOR_PASSCODE: optStr,
+  /** A deployed host: check the studio code and keys. If those keys are not set, or this is unset, run like localhost. */
+  IS_SERVER: bool,
   DIRECTOR_REPLAY: bool,
   DIRECTOR_RECORD: bool,
   DIRECTOR_FIXTURES_DIR: z.string().default('fixtures/replay'),
@@ -62,6 +61,8 @@ const schema = z.object({
   FILMS_QUEUE_MAX: int(4, 0, 20),
   FILMS_STARTS_PER_WINDOW: int(3, 1, 50),
   FILMS_WINDOW_SEC: int(300, 30, 3600),
+  // How a new product film is made: '3d' is the sheet film (one 3D film checked on sheets, no 2D crew); 'crew' keeps the 2D crew and its 3D cut.
+  FILM_PATH: z.enum(['3d', 'crew']).default('3d'),
   CREW_ENABLED: boolOn,
   PRODUCT_3D: boolOff,
   SHOWRUNNER_MODEL: z.string().default('muse-wonder-1.0'),

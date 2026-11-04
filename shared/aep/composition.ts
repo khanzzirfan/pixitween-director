@@ -424,6 +424,8 @@ export const aepCompositionSchema: z.ZodType<AepCompositionJson> =
       } else {
         if (layer.source.type === "gltf") {
           needAsset(layer.id, "prop3d", layer.source.assetId, ["layers", i, "source", "assetId"]);
+        } else if (layer.source.type === "text3d") {
+          needAsset(layer.id, "prop3d", layer.source.font, ["layers", i, "source", "font"]);
         } else if (layer.source.type === "card") {
           needAsset(layer.id, "prop3d", layer.textures?.front, ["layers", i, "textures", "front"]);
           layer.source.frames?.forEach((assetId, fi) =>

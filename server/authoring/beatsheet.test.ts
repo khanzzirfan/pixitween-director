@@ -1,10 +1,11 @@
 import { Buffer } from 'node:buffer';
 import { describe, expect, it, vi } from 'vitest';
 import type { ToolCtx } from '@shared/tools';
-import { defaultFinish, boardPrompt, checkBeatSheet, CUTS, IN_SCENE_CUTS, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
+import { BOARD_TEMPERATURE, choosesFlat, defaultFinish, boardPrompt, checkBeatSheet, CUTS, IN_SCENE_CUTS, defaultBeatSheet, effectiveAngles, effectiveSizes, floorBoard, floorSet, isFailureText, parseBoard, planBoard, reviewBoard, totalSeconds, type BeatSheet } from './beatsheet';
 import { TEXT_RULES } from './cinematic-rules';
+import { FORM_VERDICTS, verdictLines } from './form-verdicts';
 import { floorElements } from './ingredients';
-import { EXAMPLES, filmLines, nearestFilms, pickExamples, referenceDeck } from './reference-deck';
+import { EXAMPLES, corpusPace, filmLines, filmMatch, kindsOf, nearestFilms, pickExamples, referenceDeck } from './reference-deck';
 import type { FilmSnapshot } from '../corpus/films';
 
 const els = floorElements('Coffee Co. Cold Brew', 'drinks');
@@ -116,6 +117,76 @@ describe('parseBoard', () => {
     expect(r.ok && r.dropped.join('|')).toMatch(/cola: brand-name "coke"/);
     expect(r.ok && r.dropped.join('|')).toMatch(/element 5/);
   });
+  it('keeps the form and traits Muse wrote, and drops a bad value', () => {
+    const r = parseBoard({ ...lemonBoard(), form: '2d', traits: { rigid: false, sits: 'lying', edge: 'fuzzy', sells: 'softness' } });
+    expect(r.ok && r.board.form).toBe('2d');
+    expect(r.ok && r.board.traits).toEqual({ rigid: false, sits: 'lying', edge: 'fuzzy', sells: 'softness' });
+    const bad = parseBoard({ ...lemonBoard(), form: 'hologram', traits: { sits: 'floating' } });
+    expect(bad.ok && bad.board.form).toBeUndefined();
+    expect(bad.ok && bad.board.traits).toBeUndefined();
+    const none = parseBoard(lemonBoard());
+    expect(none.ok && none.board.form).toBeUndefined();
+  });
+
+  it("keeps the body's axis Muse wrote, and drops a bad one", () => {
+    const r = parseBoard({ ...lemonBoard(), body: { depth: 0.8, section: 2, axis: 'across' } });
+    expect(r.ok && r.board.body).toEqual({ depth: 0.8, section: 2, axis: 'across' });
+    const bad = parseBoard({ ...lemonBoard(), body: { depth: 0.8, axis: 'sideways' } });
+    expect(bad.ok && bad.board.body?.axis).toBeUndefined();
+  });
+  it('builds the body from the form Muse names, and asks for it every time', () => {
+    const round = parseBoard({ ...lemonBoard(), body: { form: 'round' } });
+    expect(round.ok && round.board.body).toEqual({ form: 'round', depth: 0.95, section: 2 });
+    // a form decides the section; a depth outside the form is pulled back into it
+    const thin = parseBoard({ ...lemonBoard(), body: { form: 'round', depth: 0.3, section: 5 } });
+    expect(thin.ok && thin.board.body).toEqual({ form: 'round', depth: 0.75, section: 2 });
+    const lying = parseBoard({ ...lemonBoard(), body: { form: 'lying' } });
+    expect(lying.ok && lying.board.body?.axis).toBe('across');
+    const unknown = parseBoard({ ...lemonBoard(), body: { form: 'blob', depth: 0.4 } });
+    expect(unknown.ok && unknown.board.body).toEqual({ depth: 0.4 });
+    const p = boardPrompt({ title: 'Tub', seconds: 8 }).system;
+    expect(p).toMatch(/always write "body"/);
+    expect(p).toMatch(/"form":"round\|boxy\|slab\|lying"/);
+    expect(p).toMatch(/"form":"round\|thin\|chunk \(solid\)"/);
+  });
+  it("keeps the surface Muse wrote and drops one it does not know", () => {
+    expect((parseBoard({ ...lemonBoard(), surface: 'matte' }) as { board: { surface?: string } }).board.surface).toBe('matte');
+    const bad = parseBoard({ ...lemonBoard(), surface: 'velvet' });
+    expect(bad.ok && bad.board.surface).toBeUndefined();
+    expect(boardPrompt({ title: 'Cold brew', seconds: 8 }).system).toMatch(/THE PRODUCT'S SURFACE/);
+  });
+  it('trusts a 2d choice only when its own traits give the reason', () => {
+    expect(choosesFlat({ form: '2d', traits: { rigid: false, sits: 'lying', edge: 'fuzzy' } })).toBe(true);
+    expect(choosesFlat({ form: '2d', traits: { rigid: true, sits: 'upright', edge: 'fuzzy' } })).toBe(true);
+    expect(choosesFlat({ form: '2d', traits: { rigid: true, sits: 'upright', edge: 'crisp' } })).toBe(false);
+    expect(choosesFlat({ form: '2d' })).toBe(false);
+    expect(choosesFlat({ form: '3d', traits: { rigid: false } })).toBe(false);
+    expect(choosesFlat({})).toBe(false);
+  });
+
+  it('teaches the choice of form in the prompt, with the owner\'s verdicts as examples', () => {
+    const p = boardPrompt({ title: 'Cold brew', seconds: 10 }).system;
+    expect(p).toMatch(/3D OR 2D/);
+    for (const line of verdictLines()) expect(p).toContain(line);
+    expect(FORM_VERDICTS.some((v) => v.form === '2d')).toBe(true);
+    expect(FORM_VERDICTS.some((v) => v.form === '3d')).toBe(true);
+  });
+
+  it('drops words that say the model could not see the product, from a shot and from the tagline', () => {
+    const b = lemonBoard() as { beats: Array<Record<string, unknown>>; tagline?: string };
+    b.beats[1]!.text = 'No pack visible';
+    b.beats[0]!.text = 'Sun pool repeat';
+    b.tagline = 'Label not readable';
+    const r = parseBoard(b);
+    expect(r.ok && r.board.sheet.beats[1]!.text).toBeUndefined();
+    expect(r.ok && r.board.sheet.beats[0]!.text).toBe('Sun pool repeat');
+    expect(r.ok && r.board.tagline).toBeUndefined();
+    expect(r.ok && r.notes.join('|')).toMatch(/No pack visible/);
+  });
+  it('tells a failure to see from copy', () => {
+    for (const bad of ['NO PACK VISIBLE', 'not visible', 'Product not found', 'Unknown', 'N/A', 'label is not readable', 'Unable to read', "can't see the can"]) expect(isFailureText(bad), bad).toBe(true);
+    for (const good of ['Carry the sunshine', 'No ice, no compromise', 'Nothing beats cold', 'Not just coffee', 'Seen on every beach', 'Find your shade']) expect(isFailureText(good), good).toBe(false);
+  });
   it('makes a solid one piece, clamps sizes and gives glass no picture', () => {
     const b = lemonBoard();
     b.elements[0]!.pieces = 4;
@@ -168,6 +239,23 @@ describe('parseBoard tagline', () => {
   });
 });
 
+describe('parseBoard locks', () => {
+  it('reads lock lines, keeps the first 4 and drops a line of 300 characters', () => {
+    const one = parseBoard({ ...lemonBoard(), locks: ['the tub is white with a pink label'] });
+    expect(one.ok && one.board.locks).toEqual(['the tub is white with a pink label']);
+    const six = parseBoard({ ...lemonBoard(), locks: Array.from({ length: 6 }, (_, i) => `lock line number ${i}`) });
+    expect(six.ok && six.board.locks).toHaveLength(4);
+    const long = parseBoard({ ...lemonBoard(), locks: ['x'.repeat(300), 'the label faces the lens'] });
+    expect(long.ok).toBe(true);
+    expect(long.ok && long.board.locks).toEqual(['the label faces the lens']);
+  });
+  it('keeps locks through reviewBoard and tells Muse about them in the prompt', () => {
+    const r = parseBoard({ ...lemonBoard(), locks: ['the tub is white with a pink label'] });
+    expect(r.ok && reviewBoard(r.board).board.locks).toEqual(['the tub is white with a pink label']);
+    expect(boardPrompt({ title: 'X', seconds: 8 }).system).toContain('LOCKS');
+  });
+});
+
 describe('reference deck', () => {
   it.each(EXAMPLES.map((e) => [e.product.slice(0, 24), e] as const))('the worked board for %s parses and passes the checker', (_n, e) => {
     const r = parseBoard(e.board);
@@ -217,9 +305,14 @@ describe('nearestFilms', () => {
     expect(nearestFilms('running sneakers', 1, films)[0]!.slug).toBe('b');
     expect(nearestFilms('cold brew coffee', 1, films)[0]!.slug).toBe('c');
   });
-  it('shows the most varied films when nothing matches, and is stable', () => {
-    expect(nearestFilms('camping stove', 1, films)[0]!.slug).toBe('b');
-    expect(nearestFilms('camping stove', 3, films)).toEqual(nearestFilms('camping stove', 3, films));
+  it('shows films of about our length when nothing matches, differently for different products, and is stable', () => {
+    const long = { ...film('long', 'Bluetooth speaker walkthrough', ['push-in', 'pan left', 'pull-out', 'tilt up']), duration_s: 57 };
+    const more = ['d', 'e', 'f', 'g', 'h', 'i'].map((x) => film(x, `Unrelated ${x} gadget`, ['push-in', 'pull-out', 'static']));
+    const set = [...[...films, ...more].map((f) => ({ ...f, duration_s: 10 })), long];
+    expect(nearestFilms('camping stove', 3, set).map((f) => f.slug)).not.toContain('long');
+    expect(nearestFilms('camping stove', 3, set)).toEqual(nearestFilms('camping stove', 3, set));
+    const firsts = new Set(['camping stove', 'garden hose', 'yoga mat', 'desk lamp', 'tennis racket', 'wool socks', 'baby monitor', 'ink pen'].map((t) => nearestFilms(t, 1, set)[0]!.slug));
+    expect(firsts.size).toBeGreaterThan(1);
   });
   it('writes each film as its measured shots and lessons, and says when none match', () => {
     const lines = filmLines(films[1]!);
@@ -228,6 +321,32 @@ describe('nearestFilms', () => {
     expect(lines).toContain('Lesson: one idea per film');
     expect(referenceDeck('perfume bottle', films)).toContain('REAL FILMS NEAREST THIS PRODUCT');
     expect(referenceDeck('camping stove', films)).toContain('the corpus has none of this kind of product');
+  });
+  it('matches a kind of product when no word is shared, and spellings of one word', () => {
+    const set = [...films, film('y', "AI product ad, 'Veloura Yogurt' three flavours", ['push-in', 'push-in', 'static']), film('s', 'Sunscreen spray bottle on beach sand', ['push-in', 'static', 'pull-out'])];
+    expect(kindsOf('Clear Water Swim Goggles')).toEqual(new Set(['outdoor']));
+    expect(nearestFilms('dairy Wild Berry Greek Yoghurt', 1, set)[0]!.slug).toBe('y');
+    expect(nearestFilms('swim summer Swim Goggles', 1, set)[0]!.slug).toBe('s');
+    expect(filmMatch('latte', set[2]!)).toBeGreaterThan(0); // both are drinks
+  });
+  it('writes a film reviewed by beats beat by beat, with the shots under each beat', () => {
+    const f = film('n', "AI/CG product ad, 'Nescafe Ice Roast' sachet. 10.03s, 24fps source, 9:16 (468x832).", ['push-in', 'pull-out', 'push-in']);
+    const byBeats = { ...f, review: { ...f.review!, shot_labels: [], beats: [{ t: '0.0-1.5', beat: 'hook', note: 'sachet on ice, push into the logo' }, { t: '1.5-3.0', beat: 'immersion', note: 'lens inside the coffee' }] } };
+    const lines = filmLines(byBeats);
+    expect(lines).toContain("Real film: AI/CG product ad, 'Nescafe Ice Roast' sachet (3.0 s, 3 shots).");
+    expect(lines).toContain('0.0-1.5 s hook (2 shots: 1.0s push-in, 1.0s pull-out): sachet on ice, push into the logo');
+    expect(lines).toContain('1.5-3.0 s immersion (1 shot: 1.0s push-in): lens inside the coffee');
+  });
+  it('measures the pace of ads of about our length, and says nothing with too few', () => {
+    const quick = ['a', 'b', 'c', 'd', 'e'].map((x) => ({ ...film(x, 'ad', ['push-in', 'static', 'pull-out', 'push-in']), duration_s: 8 }));
+    const fast = quick.map((f) => ({ ...f, shots: f.shots.map((s, i) => ({ ...s, dur_s: 0.5, enters_via: i === 1 ? 'soft' : 'hard' })) }));
+    const pace = corpusPace(fast);
+    expect(pace).toContain('5 films of 6-16 s');
+    expect(pace).toContain('the middle half have 4-4 shots');
+    expect(pace).toContain('the median shot lasts 0.5 s and 100% of shots are under a second');
+    expect(pace).toContain('67% of cuts are hard');
+    expect(corpusPace(fast.slice(0, 4))).toBe('');
+    expect(referenceDeck('perfume', fast)).toContain('PACE OF REAL ADS');
   });
 });
 
@@ -287,11 +406,27 @@ describe('planBoard', () => {
     expect(c.chat).not.toHaveBeenCalled();
     expect(c.add).toHaveBeenCalledWith('f', 'muse-spark-1.3-contributor', '1 call', 0.005);
   });
+  it('samples the board freely on the photo path too, not at the provider default', async () => {
+    const c = ctx([lemonBoard()]);
+    await planBoard(c.ctx, { title: 'Citrus Soda', category: 'soda', photo });
+    const call = c.reviewImages.mock.calls[0] as unknown as [Buffer[], string, undefined, { temperature: number }];
+    expect(call[3]).toEqual({ temperature: BOARD_TEMPERATURE });
+  });
   it('asks with words alone when there is no photo', async () => {
     const c = ctx([JSON.stringify(lemonBoard())]);
     const r = await planBoard(c.ctx, { title: 'Citrus Soda' });
     expect(r.source).toBe('muse');
     expect(c.chat).toHaveBeenCalledTimes(1);
+  });
+  it('sends a board that misses the asked length back once, then keeps Muse\'s board either way', async () => {
+    const parsed = parseBoard(lemonBoard());
+    if (!parsed.ok) throw new Error(parsed.reason);
+    const asked = totalSeconds(reviewBoard(parsed.board).board.sheet) + 2;
+    const c = ctx([lemonBoard(), lemonBoard()]);
+    const r = await planBoard(c.ctx, { title: 'Citrus Soda', photo, seconds: asked });
+    expect(r.source).toBe('muse');
+    expect(c.reviewImages).toHaveBeenCalledTimes(2);
+    expect((c.reviewImages.mock.calls[1] as unknown as [unknown, string])[1]).toContain(`the film must run ${asked} s`);
   });
   it('asks once more with the broken rules, then takes the second board', async () => {
     const bad = { ...lemonBoard(), beats: [{ size: 'wide', move: 'push', seconds: 1 }] };
@@ -375,6 +510,19 @@ describe('reviewBoard and the mending retry', () => {
     expect(r.hard).toEqual([]);
     expect(r.board.sheet.beats.some((x) => x.ingredient?.kind === 'ice')).toBe(false);
     expect(r.board.sheet.beats.some((x) => x.ingredient?.kind === 'lemon-slice')).toBe(true);
+  });
+
+  it('a fresh reply whose element the safety pass drops is kept on the first ask, its shots playing without it', async () => {
+    const reply = lemonBoard();
+    reply.elements[1] = { ...reply.elements[1]!, name: 'Nike ice', look: 'a Nike logo ice cube, clear' };
+    const reviewImages = vi.fn(async () => JSON.stringify(reply));
+    const ctx = { filmId: 'f', meta: { spark: { reviewImages } }, ledger: { add: vi.fn() } } as unknown as ToolCtx;
+    const r = await planBoard(ctx, { title: 'Citrus Soda', photo: Buffer.from('x') });
+    expect(r.source).toBe('muse');
+    expect(reviewImages).toHaveBeenCalledTimes(1);
+    expect(r.dropped.join(' ')).toContain('ice');
+    expect(r.board.sheet.beats.some((x) => x.ingredient?.kind === 'ice')).toBe(false);
+    expect(r.board.sheet.beats.some((x) => x.ingredient?.kind === 'fizz')).toBe(true);
   });
 
   it('passes a good board and names what a hand edit broke', () => {

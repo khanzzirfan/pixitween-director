@@ -25,6 +25,42 @@ const STAGE_WAIT_MS = 30_000;
 
 type Stage = { seek(s: number): Promise<void>; whenReady(s: number): Promise<boolean> };
 
+/**
+ * Motion blur, in the page: a frame inside a blurred shot is drawn `samples` times across the shutter's open time and the pictures are averaged into an
+ * overlay canvas (which the page's canvas rule pins over the stage), so the screenshot that follows is the blurred frame; any other frame hides the overlay.
+ * The same averaging as the browser export (`captureFrames`). Written as a string because the page cannot see the helpers tsx adds to a function.
+ */
+const BLUR_FRAME = `async ([t, fps, duration]) => {
+  const stage = window.__stage;
+  let out = document.getElementById('__blur');
+  const blur = stage.blurAt ? stage.blurAt(t) : null;
+  if (!blur) {
+    if (out) out.style.display = 'none';
+    return false;
+  }
+  const src = stage.canvas();
+  if (!src) return false;
+  if (!out) {
+    out = document.createElement('canvas');
+    out.id = '__blur';
+    document.body.appendChild(out);
+  }
+  out.style.display = 'none';
+  out.width = src.width;
+  out.height = src.height;
+  const ctx = out.getContext('2d');
+  const settle = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  for (let k = 0; k < blur.samples; k++) {
+    await stage.seek(Math.min(Math.max(0, t + ((k + 0.5) / blur.samples - 0.5) * (blur.shutter / fps)), Math.max(0, duration - 1e-4)));
+    await settle();
+    ctx.globalAlpha = 1 / (k + 1);
+    ctx.drawImage(src, 0, 0, out.width, out.height);
+  }
+  ctx.globalAlpha = 1;
+  out.style.display = 'block';
+  return true;
+}`;
+
 export class RenderError extends Error {
   constructor(
     readonly code: 'not-ready' | 'aborted' | 'page-error' | 'unavailable',
@@ -84,8 +120,12 @@ export async function renderFrames(o: RenderOptions): Promise<{ width: number; h
     for (let i = 0; i < o.frames; i++) {
       if (o.signal?.aborted) throw aborted();
       if (pageError) throw new RenderError('page-error', `The film failed to draw: ${pageError}`);
-      await page.evaluate((s) => (window as unknown as { __stage: Stage }).__stage.seek(s), i / o.fps);
-      await page.waitForTimeout(SETTLE_MS);
+      const t = i / o.fps;
+      const blurred = (await page.evaluate(`(${BLUR_FRAME})(${JSON.stringify([t, o.fps, o.frames / o.fps])})`)) as boolean;
+      if (!blurred) {
+        await page.evaluate((s) => (window as unknown as { __stage: Stage }).__stage.seek(s), t);
+        await page.waitForTimeout(SETTLE_MS);
+      } else await page.waitForTimeout(SETTLE_MS);
       const jpg = await page.screenshot({ type: 'jpeg', quality: 90, clip });
       if (i === 0) {
         size = { width: clip.width * o.scale, height: clip.height * o.scale };

@@ -21,6 +21,7 @@ import { createId } from './ids';
 import { createInbox, type Inbox } from './inbox';
 import { corpusFor, lessonsBlock, recordOutcome } from '../corpus/store';
 import { startCinematic } from './cinematic-cut';
+import { makeSheetFilm } from './sheet-film';
 import { getDb } from '../db/open';
 import { createCrewPersist } from './persist';
 import { createScheduler, type Scheduler } from './scheduler';
@@ -163,7 +164,9 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
     // the hard clock: at the deadline, stop what is open (writers roll back), finish with what exists and end the session
     // the wrap's finish, so a session that ends while it runs (the cinematic cut takes a minute) waits for it before calling the film ready
     let wrapping: Promise<void> | undefined;
-    const wrapTimer = setTimeout(() => {
+    // the sheet film runs no crew, so it has no wrap: an 'Out of time' finish would put a 2D film over it
+    const sheetFilm = !opts.resume && !fake && env.FILM_PATH === '3d' && process.env.CINEMATIC_CUT !== '0';
+    const wrapTimer = sheetFilm ? undefined : setTimeout(() => {
       wrapping = (async () => {
         if (ac.signal.aborted) return;
         crew.emit({ type: 'showrunner.say', kind: 'note', text: 'Out of time: wrapping up with what is built.' });
@@ -172,10 +175,25 @@ export function createCrew(deps: AppDeps, o: CrewOptions = {}) {
         ac.abort();
       })();
     }, deadline.totalMs);
-    wrapTimer.unref?.();
+    wrapTimer?.unref?.();
 
     const done = (async () => {
       try {
+        if (sheetFilm) {
+          // the sheet film: one 3D film made from its parts, checked on sheets; no showrunner, no 2D crew
+          await status('planning');
+          crew.emit({ type: 'showrunner.say', kind: 'note', text: 'Making the 3D film: plan, sheets, film sheet' });
+          await status('building');
+          const made = await makeSheetFilm(toolCtx, { log: (line) => crew.emit({ type: 'showrunner.say', kind: 'note', text: line }) });
+          if (made.ok) {
+            crew.emit({ type: 'showrunner.say', kind: 'note', text: Object.entries(made.seconds).map(([step, s]) => `${step} ${s} s`).join(', ') });
+            await status('ready');
+          } else {
+            toolCtx.emit({ type: 'error', where: 'sheet-film', message: made.reason });
+            await status('failed');
+          }
+          return;
+        }
         if (!opts.resume) {
           // the 3D cut's slow part (cut-out, board, element pictures) runs while the crew builds, so the finish only assembles
           startCinematic(toolCtx, film.brief.text, (line) => crew.emit({ type: 'showrunner.say', kind: 'note', text: line }));

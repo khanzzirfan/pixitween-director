@@ -1,22 +1,23 @@
-// A reel job remembers which session started it, not the API key. Polling loads the key again from that session.
+// An AI movie job remembers which session and network started it, not the API key. Polling loads the key again the same way the start did.
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { VideoProvider } from '@shared/api';
+import type { AiVideoResolution } from '@shared/api';
 import type { FalHandle } from '../fal/client';
-import type { HiggsfieldHandle } from '../higgsfield/client';
 
 const ID = /^vid_[a-f0-9]{24}$/;
 
 export interface VideoJob {
   id: string;
-  provider: VideoProvider;
+  filmId: string;
+  resolution: AiVideoResolution;
+  durationSec: number;
+  costUsd: number;
+  /** The session whose saved Fal key paid. The server has no Fal key of its own. */
   sessionId: string;
   ipHash: string;
   createdAt: string;
-  fal?: FalHandle;
-  higgsfield?: HiggsfieldHandle;
-  revana?: { generationId: string };
+  fal: FalHandle;
 }
 
 function pathFor(dataDir: string, id: string): string | undefined {
@@ -40,7 +41,7 @@ export function readJob(dataDir: string, id: string): VideoJob | undefined {
   if (!path) return undefined;
   try {
     const job = JSON.parse(readFileSync(path, 'utf8')) as VideoJob;
-    if (!job || job.id !== id || !job.sessionId || !job.ipHash) return undefined;
+    if (!job || job.id !== id || !job.ipHash || !job.fal) return undefined;
     return job;
   } catch {
     return undefined;

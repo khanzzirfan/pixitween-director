@@ -148,6 +148,25 @@ describe('POST /jobs/:jobId/cancel', () => {
   });
 });
 
+describe('POST /scenes/:sceneId/rebuild', () => {
+  it('queues a rebuild of the shot for the user, and refuses while the shot is being built', async () => {
+    const s = await setup();
+    await reviseStoryboard(s.session.crew, adds(2));
+    let release: () => void = () => undefined;
+    registerWorker('rebuild-scene', () => new Promise<{ summary: string }>((res) => (release = () => res({ summary: 'again' }))));
+    const res = await s.app.request(`/api/films/${s.filmId}/scenes/s1/rebuild`, post());
+    expect(res.status).toBe(200);
+    const { jobId } = (await res.json()) as { jobId: string };
+    expect(s.session.crew.board.get(jobId)).toMatchObject({ kind: 'rebuild-scene', sceneId: 's1', origin: 'user' });
+    await settle();
+    expect((await s.app.request(`/api/films/${s.filmId}/scenes/s1/rebuild`, post())).status).toBe(409);
+    expect((await s.app.request(`/api/films/${s.filmId}/scenes/nope/rebuild`, post())).status).toBe(404);
+    release();
+    await s.session.scheduler.idle();
+    s.session.stop();
+  });
+});
+
 describe('POST /scenes/:sceneId/revert', () => {
   it('is 409 nothing_to_revert when the scene has no earlier finished job', async () => {
     const s = await setup();

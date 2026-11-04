@@ -254,7 +254,7 @@ npx tsx scripts/demo-film.ts load data-fake
 | `npm run r8:fixtures` | regenerate the engine's R8 test fixtures (`fixtures/r8`) |
 | `npm run live -- <name> [--yes]` | live checks that spend money; a dry run unless `--yes` is passed |
 
-Optional settings in `.env`: `PRODUCT_3D=true` turns on 3D product shots, `CREW_FILM_BUDGET_USD` sets the budget per film, and `DIRECTOR_PASSCODE` is the code that spends the server Muse key. Visitors without that code use their own key from Settings. A Fal, Higgsfield, or Revana key saved in Settings is spent only for that browser session and only from the IP that saved it. `REVANA_API_KEY` is for local scripts; it is not handed to other visitors.
+Optional settings in `.env`: `PRODUCT_3D=true` turns on 3D product shots, `CREW_FILM_BUDGET_USD` sets the budget per film, and `DIRECTOR_PASSCODE` is the code that spends the server Muse key. Visitors without that code use their own key from Settings. The Export panel's "Make AI movie" button sends a finished film's scenes to Fal's MiniMax H3 as reference frames and gets one clip back; its price is on the button, and `FAL_API_KEY=<your key> npm run live -- s22-ai-video --film=<id>` runs the same path from the terminal. A Fal key saved in Settings is spent only for that browser session and only from the IP that saved it. The Fal key is optional and always the visitor's own: the server has none to spend.
 
 ---
 

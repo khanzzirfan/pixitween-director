@@ -138,7 +138,7 @@ export function StudioShell(p: StudioShellProps) {
   const dark = theme === 'dark';
   const keyMode = useAccessMode();
   const videoKeys = useVideoKeyStatus();
-  const hasVideo = Boolean(videoKeys && (videoKeys.fal || videoKeys.higgsfield || videoKeys.revana));
+  const hasVideo = Boolean(videoKeys?.fal);
   const keyShown = keyMode === 'none' && hasVideo ? 'key' : keyMode;
 
   const rail = (

@@ -49,7 +49,7 @@ export function createSparkClient(http: MetaHttp, opts: { model: string }): Meta
       };
     },
 
-    async reviewImages(images: Buffer[], prompt: string, schema?: object): Promise<unknown> {
+    async reviewImages(images: Buffer[], prompt: string, schema?: object, callOpts?: { temperature?: number }): Promise<unknown> {
       const content = [
         { type: 'text', text: prompt },
         ...images.map((img) => ({ type: 'image_url', image_url: { url: dataUrl(img, sniffImageMime(img)) } })),
@@ -58,6 +58,7 @@ export function createSparkClient(http: MetaHttp, opts: { model: string }): Meta
         model: opts.model,
         messages: [{ role: 'user', content }],
         response_format: schema ? { type: 'json_schema', json_schema: { name: 'review', strict: true, schema } } : { type: 'json_object' },
+        ...(callOpts?.temperature !== undefined ? { temperature: callOpts.temperature } : {}),
       });
       const text = r.body.choices[0]?.message.content ?? '';
       try {

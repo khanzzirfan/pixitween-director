@@ -92,10 +92,20 @@ export function ChatThread({ crew, now, filmStatus, aspect, productUrl, getPoste
   const [text, setText] = useState('');
   const [error, setError] = useState('');
   const [poster, setPoster] = useState<string | undefined>();
-  const ready = filmStatus === 'ready';
+  // A correction after the film is ready starts new jobs: say so until they settle, then show the film again with a fresh first frame.
+  // Only once the film has settled as ready at least once, so jobs still finishing at the first ready do not hide it.
+  const active = Object.values(crew.jobs).some((j) => j.status === 'running' || j.status === 'queued' || j.status === 'awaiting-frames');
+  const settled = useRef(false);
+  if (filmStatus === 'ready' && !active) settled.current = true;
+  const updating = settled.current && active;
+  const ready = filmStatus === 'ready' && !updating;
   const asked = useRef(false);
   useEffect(() => {
-    if (!ready || asked.current) return;
+    if (!ready) {
+      asked.current = false;
+      return;
+    }
+    if (asked.current) return;
     asked.current = true;
     (async () => {
       try {
@@ -119,6 +129,7 @@ export function ChatThread({ crew, now, filmStatus, aspect, productUrl, getPoste
   return (
     <div className="thread">
       <DirectorNotes crew={crew} now={now} onAsk={(o) => void send(o)} readOnly={readOnly} lead={brief && (brief.photoUrl || brief.text || brief.voice) ? <BriefBubbles {...brief} /> : undefined} waiting={waiting}>
+        {filmStatus === 'ready' && updating && <div className="bubble crew k-updating" role="status"><p>Updating your film…</p></div>}
         {ready && <ReadyBubble posterUrl={poster ?? productUrl} aspect={aspect} onPlay={onPlay} />}
       </DirectorNotes>
       {error && <p role="alert" className="crew-error">{error}</p>}

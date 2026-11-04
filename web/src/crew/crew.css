@@ -125,11 +125,15 @@
 .card-meta select { border: 1px solid var(--border); border-radius: 9px; padding: 3px 6px; background: var(--surface); color: var(--text); font-size: 12px; }
 .tag { padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 650; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .tag.mode-generate { background: color-mix(in srgb, #ec4899 16%, transparent); color: #db2777; }
-.card-actions { display: flex; gap: 6px; opacity: 0; transition: opacity .15s; }
+/* the card's actions sit in the tags' row as small icons, at its right edge; the row wraps when it is full. They show on hover, and a retry stays in view. */
+.card-actions { display: inline-flex; gap: 4px; margin-left: auto; opacity: 0; transition: opacity .15s; }
 .scene-card:hover .card-actions, .scene-card:focus-within .card-actions { opacity: 1; }
 @media (hover: none) { .card-actions { opacity: 1; } }
-.card-actions button { padding: 3px 9px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 12px; }
-.card-actions .danger { margin-left: auto; color: var(--c-bad); }
+.card-actions .icon { width: 24px; height: 24px; padding: 0; display: grid; place-items: center; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; line-height: 1; }
+.card-actions .icon:disabled { opacity: .35; cursor: default; }
+.card-actions .danger { color: var(--c-bad); }
+.scene-card.ring-failed .card-actions { opacity: 1; }
+.card-actions .retry { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
 .add-slot { height: 22px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; position: relative; opacity: .35; transition: opacity .15s; padding: 0; }
 .add-slot::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--border); }
 .add-slot span { position: relative; width: 20px; height: 20px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center; font-size: 14px; line-height: 1; }
@@ -237,3 +241,10 @@
 .replay-speeds button { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 8px; padding: 3px 7px; font-size: 12px; font-weight: 700; }
 .replay-speeds button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .replay-missing { padding: 40px 20px; text-align: center; }
+
+/* S23: the sheets a 3D film was checked on, above the plan */
+.sheet-strip { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 8px; }
+.sheet-thumb { padding: 0; border: 0; background: none; cursor: zoom-in; flex: 0 0 auto; }
+.sheet-thumb img { height: 72px; border-radius: 6px; display: block; }
+.sheet-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); display: grid; place-items: center; z-index: 50; }
+.sheet-overlay img { max-width: 94vw; max-height: 94vh; border-radius: 8px; }

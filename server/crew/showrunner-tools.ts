@@ -203,14 +203,39 @@ export async function finishGate(crew: CrewCtx, ctx: ToolCtx): Promise<FinishGat
   return { pass: block.length === 0, block, accepted };
 }
 
-/** Makes the film ready when the gate passes; the accepted findings are listed in the note. */
-export async function finishFilm(crew: CrewCtx, ctx: ToolCtx, summary: string, o: { force?: boolean } = {}): Promise<ToolResult> {
+const finishing = new Map<string, Promise<ToolResult>>();
+const finished = new Map<string, { version: number; result: ToolResult }>();
+
+/**
+ * Makes the film ready when the gate passes; the accepted findings are listed in the note. Runs once per film: the director's own `finish` call and the
+ * crew's auto-finish (out of time, or idle) can both ask while the cinematic cut, which takes minutes, is still being made, and a second run would draw
+ * and commit the whole film again. A call made while one runs joins it; a call made after one finished, with the film unchanged since, gets its result.
+ */
+export function finishFilm(crew: CrewCtx, ctx: ToolCtx, summary: string, o: { force?: boolean } = {}): Promise<ToolResult> {
+  const id = crew.filmId;
+  const running = finishing.get(id);
+  if (running) return running;
+  const run = (async () => {
+    const last = finished.get(id);
+    if (last && last.version === (await crew.films.get(id)).version) return last.result;
+    const result = await runFinish(crew, ctx, summary, o);
+    if (result.ok) finished.set(id, { version: (await crew.films.get(id)).version, result });
+    return result;
+  })().finally(() => finishing.delete(id));
+  finishing.set(id, run);
+  return run;
+}
+
+async function runFinish(crew: CrewCtx, ctx: ToolCtx, summary: string, o: { force?: boolean } = {}): Promise<ToolResult> {
   let gate = await finishGate(crew, ctx);
   // out of time: what is built ships, and what the gate would still block is listed as accepted (a film with nothing built still fails)
   if (!gate.pass && o.force && !gate.block.some((b) => b.startsWith('nothing is built'))) gate = { pass: true, block: [], accepted: [...gate.accepted, ...gate.block.map((b) => `${b} (out of time)`)] };
   if (!gate.pass) return fail(gate.block.join(', '));
   // a round product gets the cinematic cut (real camera, ingredient splashes, animated price card); anything else keeps the 2D finish
-  const cinematic = process.env.CINEMATIC_CUT === '0' ? false : await cinematicCut(ctx, (line) => crew.emit({ type: 'showrunner.say', kind: 'note', text: line })).catch(() => false);
+  const cinematic = process.env.CINEMATIC_CUT === '0' ? false : await cinematicCut(ctx, (line) => crew.emit({ type: 'showrunner.say', kind: 'note', text: line })).catch((err: unknown) => {
+        crew.emit({ type: 'showrunner.say', kind: 'note', text: `cinematic cut failed: ${err instanceof Error ? err.message : String(err)}` });
+        return false;
+      });
   if (!cinematic) await applyFinish(crew.films, crew.filmId, ctx.assets);
   await crew.films.update(crew.filmId, { status: 'ready' });
   crew.emit({ type: 'film.status', status: 'ready' });
